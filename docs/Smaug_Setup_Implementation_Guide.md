@@ -153,11 +153,11 @@ luajit -v
 ### ✔️ Checklist de Pré-requisitos
 
 ```markdown
-- [ ] gcc/clang --version (mostra versão sem erro)
-- [ ] cmake --version (>= 3.10)
-- [ ] luajit -v (>= 2.0.5)
-- [ ] git --version (opcional, mas prático)
-- [ ] valgrind --version (Linux/macOS, opcional)
+- [x] gcc/clang --version (mostra versão sem erro)
+- [x] cmake --version (>= 3.10)
+- [x] luajit -v (>= 2.0.5)
+- [x] git --version (opcional, mas prático)
+- [x] valgrind --version (Linux/macOS, opcional)
 ```
 
 ---
