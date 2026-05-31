@@ -5,7 +5,8 @@ funções existem em duas variantes, `f64` (`double`) e `i64` (`int64_t`), com
 estruturas e semântica análogas. As diferenças de int64 estão na seção final.
 
 **Status:** todas as funções abaixo estão **implementadas** para f64 e i64
-(`smaug_core.c` + `smaug_ops_f64.c` + `smaug_ops_i64.c`).
+(`smaug_core.c` + `smaug_ops_f64.c` + `smaug_ops_i64.c`), mais as operações
+booleanas (`smaug_ops_bool.c`).
 
 ---
 
@@ -114,9 +115,10 @@ Grow strategy: quando `size >= capacity`, a capacidade cresce **1.5×**
 Progressão típica: 4 → 6 → 9 → 13 → 19 → 28 → 42 → ...
 ```
 
-> ⚠️ Se o `realloc` do `null_mask` falhar logo após o `realloc` do `data` ter
-> sucesso, a série fica num estado inconsistente (`data` realocado mas
-> `capacity` não atualizado). Ver "Problemas conhecidos".
+> Nota: o `append` cresce `data` e `null_mask` juntos. Se o segundo `realloc`
+> falha, o primeiro é revertido para manter o invariante `size <= capacity` e os
+> dois buffers sempre com `capacity` elementos (ver "Problemas conhecidos" #1,
+> resolvido).
 
 ---
 
@@ -127,7 +129,12 @@ Progressão típica: 4 → 6 → 9 → 13 → 19 → 28 → 42 → ...
 - Retornam série nova; **NULL se** `a->size != b->size` ou ponteiro NULL.
 - Propagação de NA: se qualquer operando na posição `i` é nulo, o resultado em
   `i` é nulo.
-- `div`: divisão por zero segue IEEE 754 (`±Inf` / `NaN`), sem checagem própria.
+- `div` (f64): divisão por zero segue IEEE 754 (`±Inf` / `NaN`), resultado fica
+  **válido**, sem checagem própria.
+- `div` (i64): divisão por zero produz **NULL** naquela posição (não há `Inf`
+  inteiro, e a divisão inteira por zero é comportamento indefinido em C). Ou
+  seja, o i64 difere do f64 aqui: onde o f64 deixa `Inf`/`NaN` válido, o i64
+  marca NA.
 
 ```
 a   = [1.0, 2.0, NA ]
@@ -139,6 +146,9 @@ a+b = [11.0, NA, NA ]
 
 - Retornam série nova; o escalar nunca propaga NA. Posições nulas permanecem
   nulas; válidas recebem `op(data[i], scalar)`.
+- `div_scalar` (i64) com `scalar == 0` retorna uma série **toda NULL** (mesmo
+  motivo do `div` série×série: evita o UB da divisão inteira por zero).
+  No f64, `div_scalar` por `0.0` segue IEEE 754 (`±Inf`/`NaN` válido).
 
 ---
 
@@ -156,11 +166,19 @@ a+b = [11.0, NA, NA ]
 Regra do `ignore_na`:
 
 - `ignore_na = true` → pula nulos.
-- `ignore_na = false` → encontrar um nulo aborta e retorna NAN (f64).
+- `ignore_na = false` → encontrar um nulo aborta e retorna um sentinela:
+  **NAN** nas funções que retornam `double` (todas as f64, e `mean`/`var`/`std`
+  do i64); **`INT64_MIN`** nas funções i64 que retornam `int64_t` (`sum`, `min`,
+  `max`), já que `int64_t` não tem como representar NAN.
 
 `var`/`std` são **populacionais** (dividem por N, não N-1). Para amostral,
 multiplique a variância por `N/(N-1)`. `mean` de série vazia ou só-nulos → NAN.
-`min`/`max` retornam NAN (f64) se nenhum elemento válido.
+`min`/`max` retornam NAN (f64) ou `INT64_MIN` (i64) se nenhum elemento válido.
+
+> ⚠️ **Sentinela ambíguo no i64.** Como `INT64_MIN` é um inteiro válido, uma
+> série cujo `sum`/`min`/`max` legitimamente dê `INT64_MIN` é indistinguível do
+> caso de erro. O frontend Lua deve chamar `count_nonnull()` antes (ou usar
+> `ignore_na = true`) quando essa ambiguidade importar.
 
 ---
 
@@ -211,16 +229,57 @@ Não sabem posicionar NA, então falham se houver nulos. Filtre antes (futuro
 
 ---
 
+## Operações Boolean (BoolSeries)
+
+As comparações (`gt`/`lt`/`eq`) devolvem um par **(valores `uint8_t*`, máscara
+`smaug_mask_t*`)** de mesmo comprimento — não um `smaug_series_*_t`. Valores:
+`1` = true, `0` = false. As funções em `smaug_ops_bool.c` operam sobre esse par.
+
+```c
+uint8_t* smaug_bool_and(const uint8_t *a, const smaug_mask_t *am,
+                        const uint8_t *b, const smaug_mask_t *bm,
+                        size_t n, smaug_mask_t **out_mask);
+/* ... or, xor (mesma assinatura); not tem só um operando ... */
+size_t smaug_bool_count_true(const uint8_t *a, const smaug_mask_t *am, size_t n);
+bool   smaug_bool_any(const uint8_t *a, const smaug_mask_t *am, size_t n);
+bool   smaug_bool_all(const uint8_t *a, const smaug_mask_t *am, size_t n);
+```
+
+- Cada op lógica aloca um novo array de valores (e, via `out_mask` não-NULL, a
+  máscara do resultado). **O caller libera ambos** com `free()`.
+- Máscara `NULL` na entrada = todos os elementos válidos.
+- **Lógica de três valores (Kleene)**, igual a SQL/pandas:
+
+  | op | regra com NA |
+  |----|--------------|
+  | AND | `NA and false = false`; `NA and true = NA`; `NA and NA = NA` |
+  | OR  | `NA or true = true`; `NA or false = NA`; `NA or NA = NA` |
+  | XOR | qualquer operando NA → `NA` |
+  | NOT | `not NA = NA` |
+
+- Agregações **ignoram NA**: `count_true` conta só os válidos verdadeiros;
+  `any` = existe algum válido true; `all` = todos os válidos são true (NA
+  pulado); `all` de vazio = `true` (vacuamente verdadeiro).
+
+No frontend, a classe `BoolSeries` (`lua/smaug/core/boolseries.lua`) possui
+esses arrays via `ffi.gc(ptr, free)` e expõe `:land/:lor/:lxor/:lnot`,
+`:count_true/:any/:all`, e os operadores `*` (and), `+` (or), `-` (xor).
+`Series:filter(bool_series)` usa os valores como máscara de `smaug_*_filter`.
+
+---
+
 ## Diferenças do int64 (`i64`)
 
 A API i64 é idêntica em forma à f64, trocando `double` por `int64_t`. Diferenças
 semânticas:
 
-- `sum`, `min`, `max` retornam `int64_t` (não `double`).
+- `sum`, `min`, `max` retornam `int64_t` (não `double`). Com `ignore_na=false`
+  e algum nulo — ou série vazia/só-nulos — retornam **`INT64_MIN`** como
+  sentinela (ver aviso de ambiguidade na seção Reduções).
 - `mean`, `var`, `std` retornam `double` — a média de inteiros pode ser
-  fracionária; nunca truncar implicitamente.
-- `div` (série e escalar) é **divisão inteira** (trunca), diferente do IEEE 754
-  do f64.
+  fracionária; nunca truncar implicitamente. Usam NAN como sentinela.
+- `div` (série e escalar) é **divisão inteira** (trunca). Divisão por zero vira
+  **NULL** (não `Inf`/`NaN` como no f64), evitando o UB da divisão inteira.
 - `get` retorna `int64_t` e **não tem NAN** para sinalizar nulo. O caller **deve
   checar `is_null` antes** de confiar no valor (um nulo devolve `0`, que é
   ambíguo).
@@ -239,6 +298,7 @@ proporções ou medições que exijam precisão fracionária.
 | `view` | Smaug | **não** liberar enquanto a série-pai existir |
 | `gt`/`lt`/`eq` | Smaug | `free` no array `uint8_t*` (e no `out_mask`) |
 | `argsort` | Smaug | `free` no `size_t*` |
+| `smaug_bool_*` (and/or/xor/not) | Smaug | `free` no array `uint8_t*` (e no `out_mask`) |
 
 No frontend Lua, use `ffi.gc(ptr, C.smaug_f64_free)` para automatizar a limpeza
 dos structs de série.
@@ -247,10 +307,12 @@ dos structs de série.
 
 ## Problemas conhecidos
 
-1. **`f64_grow` / `i64_grow` em falha parcial de realloc.** Se o `realloc` do
-   `data` tem sucesso mas o do `null_mask` falha, `s->data` já foi atualizado mas
-   `s->capacity` não — série inconsistente. Idealmente realocar o mask primeiro,
-   ou usar buffers temporários e só comitar ambos no sucesso.
+1. ~~**`f64_grow` / `i64_grow` em falha parcial de realloc.**~~ **RESOLVIDO.**
+   Antes, se o `realloc` do `data` tinha sucesso mas o do `null_mask` falhava,
+   `s->data` era atualizado mas `s->capacity` não — série inconsistente. Agora,
+   em falha do `null_mask`, o `data` é encolhido de volta para o `capacity`
+   antigo, preservando o invariante (ambos os buffers sempre com `capacity`
+   elementos). Coberto por `tests/test_alloc.c`.
 
 2. **Convenção de `0xFF`/`0x00` vs `1`/`0`.** As máscaras de null usam
    `0xFF`/`0x00`, mas `gt`/`lt`/`eq` devolvem `1`/`0` no array booleano.

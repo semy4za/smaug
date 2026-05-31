@@ -60,6 +60,34 @@ Fluxo de uma chamada como `df["idade"]:sum()`: o `__index` do DataSet devolve a
 `Series` da coluna, o método `:sum()` em Lua chama `C.smaug_f64_sum(ptr, ...)`
 via FFI, o C executa o loop acumulador e devolve um `double` direto ao Lua.
 
+## Formatos de dados suportados
+
+O Smaug lê e escreve **quatro** formatos — e apenas estes:
+
+| Formato | Fonte | Tipos |
+|---------|-------|-------|
+| **CSV** | `.csv` / `.tsv` | inferência heurística |
+| **JSON** | `.json` (records ou columnar) | nativos do JSON |
+| **XML** | `.xml` (convenção `row_tag`) | inferência heurística |
+| **SQL** | SQLite (dependência opcional) | do schema |
+
+Design completo em `Roadmap.md` (Fase 5). Ainda não implementados.
+
+## Tipos de dados (dtypes)
+
+O Smaug adota um conjunto curado de tipos, em camadas (detalhe em
+`Roadmap.md` → "Sistema de tipos"):
+
+| Camada | Tipos | Status |
+|--------|-------|--------|
+| Núcleo | `float64`, `int64`, `bool`, `string` | f64/i64/bool ✅; string (Fase 6) |
+| Alto valor | `datetime`, `categorical` | pós-MVP |
+| Otimização | `float32`, `int32`, `int8/16`, `uint*` | mesma API, storage estreito; só se necessário |
+
+A classe `Series` abstrai o dtype: adicionar um tipo novo é registrar um
+descritor + o backend C, sem mudar o código do usuário. Sem coerção implícita
+entre tipos.
+
 ---
 
 ## Decisões de design
@@ -102,16 +130,21 @@ smaug/
 ├── src/
 │   ├── smaug_core.c        # Lifecycle: create/free/clone/view, get/set, append
 │   ├── smaug_ops_f64.c     # Operações float64
-│   └── smaug_ops_i64.c     # Operações int64
+│   ├── smaug_ops_i64.c     # Operações int64
+│   └── smaug_ops_bool.c    # Lógica booleana (Kleene)
 ├── docs/
 │   ├── README.md           # Este arquivo
 │   ├── API_Reference.md    # Referência da API C
 │   ├── Build_and_Testing.md# Compilação e testes
 │   └── Roadmap.md          # Fases futuras + design do frontend Lua
+├── lua/
+│   └── smaug/
+│       └── ffi_loader.lua  # ✅ Ponte FFI: cdef completo + ffi.load
 └── build/                  # Output da compilação (libsmaug_math.so)
 ```
 
-A criar (ver `Roadmap.md`): sistema de build, `lua/smaug/` (frontend), `tests/`.
+A criar (ver `Roadmap.md`): resto do frontend (`core/series.lua`, `init.lua`),
+`DataSet`, CSV I/O.
 
 ---
 
@@ -122,9 +155,14 @@ A criar (ver `Roadmap.md`): sistema de build, `lua/smaug/` (frontend), `tests/`.
 | Header `smaug_math.h` | ✅ Completo e estável |
 | Backend C — f64 (lifecycle + ops) | ✅ Completo |
 | Backend C — i64 (lifecycle + ops) | ✅ Completo |
-| Sistema de build | ❌ A criar |
-| Frontend Lua | ❌ A criar |
-| Testes | ❌ A criar |
+| Backend C — bool (lógica Kleene) | ✅ `smaug_ops_bool.c` |
+| Sistema de build (`Makefile`) | ✅ Completo |
+| Testes C (`test_ops` + `test_alloc` + `test_bool`) | ✅ Passam (Valgrind-clean) |
+| Frontend Lua — `ffi_loader.lua` | ✅ Completo e validado |
+| Frontend Lua — `Series` (f64 + i64) | ✅ Implementada (despacho por dtype) |
+| Frontend Lua — `BoolSeries` + comparações + `filter` | ✅ Implementada |
+| Frontend Lua — `init.lua` | ✅ Entry point |
+| Frontend Lua — `DataSet` | ❌ Fase 3 |
 | CSV I/O | ❌ Fase 5 |
 
 Detalhes em `API_Reference.md` (o que cada função faz) e `Roadmap.md` (o que vem

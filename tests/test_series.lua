@@ -1,0 +1,190 @@
+-- tests/test_series.lua
+-- Smoke test do frontend Lua (classe Series, ambos os dtypes).
+-- Rode da raiz do projeto:  luajit tests/test_series.lua
+
+package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
+
+local smaug  = require("smaug")
+local Series = smaug.Series
+
+local function approx(a, b) return math.abs(a - b) < 1e-9 end
+local n_ok = 0
+local function check(cond, msg)
+    if not cond then error("FALHOU: " .. msg, 2) end
+    n_ok = n_ok + 1
+end
+
+-- ---- factories + acesso 1-based ----
+local s = Series.float64(3, "x")
+s:set(1, 1.0); s:set(2, 2.0); s:set(3, 3.0)
+check(s:len() == 3, "len")
+check(s:get(2) == 2.0, "get 1-based")
+check(s[3] == 3.0, "__index numérico")
+s[1] = 10.0
+check(s[1] == 10.0, "__newindex numérico")
+
+-- ---- nil <-> null ----
+s:set(2, nil)
+check(s:is_null(2), "set nil -> null")
+check(s:get(2) == nil, "get null -> nil")
+check(s:count_nonnull() == 2, "count_nonnull")
+
+-- ---- reduções (ignore_na default = true) ----
+check(approx(s:sum(), 13.0), "sum ignora NA")           -- 10 + 3
+check(approx(s:mean(), 6.5), "mean ignora NA")
+check(s:sum(false) == nil, "sum(false) com NA -> nil")  -- propaga NA
+
+-- ---- from_table com nulos ----
+local t = Series.from_table({5, Series.NA, 15, 20}, "float64", "t")
+check(t:len() == 4, "from_table len")
+check(t:is_null(2), "from_table nil -> null")
+check(approx(t:sum(), 40.0), "from_table sum")
+
+-- ---- aritmética: série × escalar ----
+local a = Series.from_table({1, 2, 3}, "float64")
+local b = a + 10
+check(b:get(1) == 11.0 and b:get(3) == 13.0, "Series + escalar")
+local c = 2 * a                       -- escalar à esquerda (comutativo)
+check(c:get(2) == 4.0, "escalar * Series (comuta)")
+check(a:get(1) == 1.0, "imutabilidade: original intacto")
+
+-- ---- aritmética: série × série ----
+local d = Series.from_table({1, 2, 3}, "float64")
+local e = Series.from_table({10, 20, 30}, "float64")
+local f = d + e
+check(f:get(1) == 11.0 and f:get(3) == 33.0, "Series + Series")
+
+-- ---- propagação de NA em série × série ----
+local g = Series.from_table({1, Series.NA, 3}, "float64")
+local h = g + e
+check(h:is_null(2), "NA propaga em Series+Series")
+
+-- ---- erros de tipo/tamanho ----
+local i64s = Series.int64(3)
+local ok = pcall(function() return i64s + d end)   -- dtypes diferentes
+check(not ok, "erro: + entre dtypes diferentes")
+
+-- ---- int64: sentinela INT64_MIN vira nil ----
+local k = Series.from_table({10, Series.NA, 30}, "int64")
+check(k:sum() == 40, "i64 sum ignora NA")
+check(k:sum(false) == nil, "i64 sum(false) com NA -> nil (INT64_MIN)")
+check(k:max() == 30, "i64 max")
+
+-- ---- int64: divisão por zero vira null ----
+local num = Series.from_table({10, 20}, "int64")
+local den = Series.from_table({2, 0}, "int64")
+local q = num / den
+check(q:get(1) == 5, "i64 div ok")
+check(q:is_null(2), "i64 div por zero -> null")
+
+-- ---- clone independente ----
+local orig = Series.from_table({1, 2, 3}, "float64")
+local cl = orig:clone()
+cl[1] = 99
+check(orig[1] == 1.0, "clone independente")
+
+-- ---- sort ----
+local uns = Series.from_table({3, 1, 2}, "float64")
+local sorted = uns:sort(true)
+check(sorted:get(1) == 1.0 and sorted:get(3) == 3.0, "sort asc")
+local sort_fail = pcall(function() return g:sort() end)  -- g tem NA
+check(not sort_fail, "sort com NA dá erro")
+
+-- ---- tostring não crasha ----
+check(type(tostring(s)) == "string", "__tostring")
+
+-- ---- view: zero-copy, read-only, reflete a pai, _parent segura a pai ----
+local base = Series.from_table({10, 20, 30, 40, 50}, "float64", "base")
+local vw = base:view(2, 3)                       -- [20, 30, 40]
+check(vw:len() == 3, "view len")
+check(vw:get(1) == 20.0 and vw:get(3) == 40.0, "view valores")
+check(vw._is_view == true, "view marcada como view")
+base:set(2, 99.0)                                -- muta a pai
+check(vw:get(1) == 99.0, "view reflete mutação da pai (zero-copy)")
+local vw_ro = pcall(function() vw:set(1, 0.0) end)
+check(not vw_ro, "view é read-only (set falha)")
+local vw_ap = pcall(function() vw:append(1.0) end)
+check(not vw_ap, "view é read-only (append falha)")
+local vw_oob = pcall(function() return base:view(4, 5) end)
+check(not vw_oob, "view fora dos limites dá erro")
+-- clone de view -> série independente e mutável
+local vw_clone = vw:clone()
+vw_clone:set(1, -1.0)
+check(vw_clone:get(1) == -1.0 and vw:get(1) == 99.0, "clone de view é independente/mutável")
+
+-- ---- take: seleção por índices (cópia independente) ----
+local src = Series.from_table({100, 200, 300, 400}, "float64")
+local tk = src:take({4, 1, 3})
+check(tk:len() == 3, "take len")
+check(tk:get(1) == 400.0 and tk:get(2) == 100.0 and tk:get(3) == 300.0, "take ordem")
+local tk_oob = pcall(function() return src:take({1, 99}) end)
+check(not tk_oob, "take índice fora dos limites dá erro")
+
+-- ---- head / tail (retornam Series) ----
+local long = Series.from_table({1, 2, 3, 4, 5, 6}, "float64")
+local hd = long:head(2)
+check(hd:len() == 2 and hd:get(1) == 1.0 and hd:get(2) == 2.0, "head")
+local tl = long:tail(2)
+check(tl:len() == 2 and tl:get(1) == 5.0 and tl:get(2) == 6.0, "tail")
+
+-- ---- astype: conversão entre dtypes ----
+local floats = Series.from_table({1.9, 2.1, Series.NA, 4.7}, "float64")
+local ints = floats:astype("int64")
+check(ints._dtype == "int64", "astype muda dtype")
+check(ints:get(1) == 1 and ints:get(2) == 2, "astype f64->i64 trunca")
+check(ints:is_null(3), "astype preserva null")
+local back = Series.from_table({5, 6}, "int64"):astype("float64")
+check(back._dtype == "float64" and back:get(1) == 5.0, "astype i64->f64")
+
+-- ---- describe ----
+local dd = Series.from_table({1, 2, 3, 4, Series.NA}, "float64"):describe()
+check(dd.count == 4 and dd.nulls == 1, "describe count/nulls")
+check(approx(dd.mean, 2.5), "describe mean")
+check(dd.min == 1 and dd.max == 4, "describe min/max")
+check(approx(dd["50%"], 2.5), "describe mediana")
+
+-- ===== Camada bool: comparações, filter, lógica Kleene =====
+
+-- ---- comparações -> BoolSeries ----
+local cmp = Series.from_table({10, 20, 30, 40}, "float64")
+local gt = cmp:gt(25)                       -- [F, F, T, T]
+check(gt:len() == 4, "gt len")
+check(gt:get(1) == false and gt:get(3) == true, "gt valores")
+check(gt:count_true() == 2, "count_true")
+check(gt:any() == true and gt:all() == false, "any/all")
+local lt = cmp:lt(25)
+check(lt:get(1) == true and lt:get(4) == false, "lt")
+local eq = cmp:eq(30)
+check(eq:get(3) == true and eq:count_true() == 1, "eq")
+
+-- ---- filter ----
+local kept = cmp:filter(gt)
+check(kept:len() == 2 and kept:get(1) == 30.0 and kept:get(2) == 40.0, "filter")
+local filt_dtype = pcall(function() return cmp:filter({}) end)
+check(not filt_dtype, "filter exige BoolSeries")
+
+-- ---- lógica AND/OR/XOR/NOT (métodos e operadores * + -) ----
+local a = Series.from_table({1, 1, 0, 0}, "int64"):gt(0)   -- [T,T,F,F]
+local b = Series.from_table({1, 0, 1, 0}, "int64"):gt(0)   -- [T,F,T,F]
+check(a:land(b):to_table()[1] == true and a:land(b):get(2) == false, "and")
+check((a + b):get(2) == true, "or via operador +")          -- T or F
+check((a - b):get(1) == false and (a - b):get(2) == true, "xor via operador -")
+check((a * b):get(1) == true and (a * b):get(2) == false, "and via operador *")
+check(a:lnot():get(1) == false and a:lnot():get(3) == true, "not")
+
+-- ---- Kleene (três valores) ----
+local x = Series.from_table({1, Series.NA, Series.NA}, "int64"):gt(0)  -- [T, NA, NA]
+local y = Series.from_table({0, 0, 1}, "int64"):gt(0)                  -- [F, F, T]
+local kand = x:land(y)
+check(kand:get(1) == false, "T and F = F")
+check(kand:get(2) == false, "NA and F = F (Kleene)")
+check(kand:get(3) == nil,   "NA and T = NA (Kleene)")
+local kor = x:lor(y)
+check(kor:get(2) == nil,  "NA or F = NA (Kleene)")
+check(kor:get(3) == true, "NA or T = T (Kleene)")
+check(x:lnot():get(2) == nil, "NOT NA = NA")
+
+-- ---- tostring da BoolSeries ----
+check(type(tostring(gt)) == "string", "BoolSeries __tostring")
+
+print(string.format("OK — %d checks passaram (Series f64 + i64 + bool)", n_ok))

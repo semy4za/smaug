@@ -1,0 +1,472 @@
+-- lua/smaug/core/series.lua
+--
+-- Classe Series: uma coluna tipada, 1-dimensional, com null handling.
+--
+-- ARQUITETURA: a Series NÃO conhece os detalhes de cada tipo. Ela despacha
+-- para uma família de funções C (`smaug_<dtype>_*`) através de um DESCRITOR de
+-- dtype (tabela DTYPES abaixo). Adicionar um novo tipo (bool, string, datetime,
+-- float32, ...) = registrar um descritor novo + o backend C, sem tocar na
+-- lógica da Series. É o ponto de extensão central do frontend.
+--
+-- Convenções traduzidas aqui (a fronteira Lua↔C):
+--   * Índices 1-based (Lua) -> 0-based (C).
+--   * `nil` (Lua) <-> NA/null (C). get() de posição nula devolve nil.
+--   * Sentinelas do C (NAN no f64; INT64_MIN nas reduções i64) viram nil.
+
+local ffi = require("ffi")
+local C   = require("smaug.ffi_loader")
+local BoolSeries = require("smaug.core.boolseries")
+
+local NAN     = 0 / 0
+local I64_MIN = -9223372036854775807LL - 1LL   -- INT64_MIN sem overflow de literal
+
+local function is_nan(v) return v ~= v end
+
+-- Sentinela de valor ausente. Use em tabelas passadas a from_table, já que um
+-- `nil` no meio de uma tabela Lua torna o comprimento (#) indefinido.
+--   Series.from_table({1, Series.NA, 3}, "float64")   -- 3 elementos, [2] nulo
+local NA = setmetatable({}, { __tostring = function() return "NA" end })
+
+local function is_na(v) return v == nil or v == NA or (type(v) == "number" and is_nan(v)) end
+
+-- =====================================================================
+-- Descritores de dtype: o coração da abstração.
+-- Cada descritor mapeia o nome do dtype para o conjunto de funções C e
+-- as particularidades semânticas daquele tipo.
+-- =====================================================================
+local DTYPES = {
+    float64 = {
+        name        = "float64",
+        free        = C.smaug_f64_free,
+        create      = C.smaug_f64_create,
+        clone       = C.smaug_f64_clone,
+        get         = C.smaug_f64_get,
+        set         = C.smaug_f64_set,
+        set_null    = C.smaug_f64_set_null,
+        is_null     = C.smaug_f64_is_null,
+        append      = C.smaug_f64_append,
+        append_null = C.smaug_f64_append_null,
+        add = C.smaug_f64_add, sub = C.smaug_f64_sub,
+        mul = C.smaug_f64_mul, div = C.smaug_f64_div,
+        add_scalar = C.smaug_f64_add_scalar, sub_scalar = C.smaug_f64_sub_scalar,
+        mul_scalar = C.smaug_f64_mul_scalar, div_scalar = C.smaug_f64_div_scalar,
+        sum = C.smaug_f64_sum, mean = C.smaug_f64_mean,
+        min = C.smaug_f64_min, max = C.smaug_f64_max,
+        var = C.smaug_f64_var, std = C.smaug_f64_std,
+        count_nonnull = C.smaug_f64_count_nonnull,
+        sort = C.smaug_f64_sort,
+        view = C.smaug_f64_view, take = C.smaug_f64_take,
+        filter = C.smaug_f64_filter,
+        gt = C.smaug_f64_gt, lt = C.smaug_f64_lt, eq = C.smaug_f64_eq,
+        -- Uma redução int (sum/min/max) devolveu o sentinela de erro?
+        -- No f64 isso é detectado por NaN no próprio valor.
+        is_int_sentinel = function(_) return false end,
+    },
+    int64 = {
+        name        = "int64",
+        free        = C.smaug_i64_free,
+        create      = C.smaug_i64_create,
+        clone       = C.smaug_i64_clone,
+        get         = C.smaug_i64_get,
+        set         = C.smaug_i64_set,
+        set_null    = C.smaug_i64_set_null,
+        is_null     = C.smaug_i64_is_null,
+        append      = C.smaug_i64_append,
+        append_null = C.smaug_i64_append_null,
+        add = C.smaug_i64_add, sub = C.smaug_i64_sub,
+        mul = C.smaug_i64_mul, div = C.smaug_i64_div,
+        add_scalar = C.smaug_i64_add_scalar, sub_scalar = C.smaug_i64_sub_scalar,
+        mul_scalar = C.smaug_i64_mul_scalar, div_scalar = C.smaug_i64_div_scalar,
+        sum = C.smaug_i64_sum, mean = C.smaug_i64_mean,
+        min = C.smaug_i64_min, max = C.smaug_i64_max,
+        var = C.smaug_i64_var, std = C.smaug_i64_std,
+        count_nonnull = C.smaug_i64_count_nonnull,
+        sort = C.smaug_i64_sort,
+        view = C.smaug_i64_view, take = C.smaug_i64_take,
+        filter = C.smaug_i64_filter,
+        gt = C.smaug_i64_gt, lt = C.smaug_i64_lt, eq = C.smaug_i64_eq,
+        -- sum/min/max do i64 retornam INT64_MIN quando há nulo + !ignore_na.
+        is_int_sentinel = function(v) return v == I64_MIN end,
+    },
+}
+
+local Series = {}
+Series.__index = Series   -- placeholder; sobrescrito no fim com dispatcher
+
+-- métodos ficam aqui; o __index real decide entre índice numérico e método
+local methods = {}
+
+-- =====================================================================
+-- Construção interna
+-- =====================================================================
+local function wrap(c_ptr, dtype, name, parent)
+    if c_ptr == nil then error("smaug: falha ao alocar Series ("..dtype..")", 2) end
+    local d = DTYPES[dtype]
+    ffi.gc(c_ptr, d.free)   -- limpeza automática quando o objeto Lua morrer
+    -- Para views, c_ptr tem external_alloc=true: o free só libera o struct da
+    -- view, nunca os dados da pai. E guardamos `_parent` para impedir que o GC
+    -- do Lua colete a pai enquanto a view viver (evita use-after-free).
+    return setmetatable({
+        _c      = c_ptr,
+        _d      = d,
+        _dtype  = dtype,
+        _name   = name or "unnamed",
+        _parent = parent,                     -- nil exceto em views
+        _is_view = c_ptr.meta.is_view,        -- fonte da verdade: o struct C
+    }, Series)
+end
+
+-- Bloqueia mutação em views (read-only por contrato). O C só impede `append`;
+-- set/set_null escreveriam na memória da pai, então a guarda fica aqui.
+local function assert_mutable(self)
+    if self._is_view then
+        error("smaug: view é read-only; use :clone() para uma cópia mutável", 3)
+    end
+end
+
+local function check_index(self, i)
+    if type(i) ~= "number" or i < 1 or i > self._c.size or i % 1 ~= 0 then
+        error("smaug: índice "..tostring(i).." fora dos limites [1, "..
+              tonumber(self._c.size).."]", 3)
+    end
+end
+
+-- =====================================================================
+-- Factories
+-- =====================================================================
+function Series.new(dtype, size, name)
+    if not DTYPES[dtype] then
+        error("smaug: dtype desconhecido '"..tostring(dtype)..
+              "'. Suportados: float64, int64.", 2)
+    end
+    return wrap(DTYPES[dtype].create(size or 0), dtype, name)
+end
+
+function Series.float64(size, name) return Series.new("float64", size, name) end
+function Series.int64(size, name)   return Series.new("int64",   size, name) end
+
+-- Cria a partir de uma tabela Lua. `nil` na tabela vira null.
+function Series.from_table(arr, dtype, name)
+    dtype = dtype or "float64"
+    if not DTYPES[dtype] then
+        error("smaug: dtype desconhecido '"..tostring(dtype).."'", 2)
+    end
+    local n = #arr
+    local s = Series.new(dtype, n, name)
+    for i = 1, n do
+        if is_na(arr[i]) then s:set_null(i) else s:set(i, arr[i]) end
+    end
+    return s
+end
+
+-- =====================================================================
+-- Acesso (1-based; nil <-> null)
+-- =====================================================================
+function methods.get(self, i)
+    check_index(self, i)
+    if self._d.is_null(self._c, i - 1) then return nil end
+    return tonumber(self._d.get(self._c, i - 1))
+end
+
+function methods.set(self, i, v)
+    assert_mutable(self)
+    check_index(self, i)
+    if is_na(v) then
+        self._d.set_null(self._c, i - 1)
+    else
+        self._d.set(self._c, i - 1, v)
+    end
+end
+
+function methods.is_null(self, i)
+    check_index(self, i)
+    return self._d.is_null(self._c, i - 1)
+end
+
+function methods.set_null(self, i)
+    assert_mutable(self)
+    check_index(self, i)
+    self._d.set_null(self._c, i - 1)
+end
+
+function methods.append(self, v)
+    assert_mutable(self)
+    local rc
+    if is_na(v) then
+        rc = self._d.append_null(self._c)
+    else
+        rc = self._d.append(self._c, v)
+    end
+    if rc ~= 0 then error("smaug: append falhou (OOM)", 2) end
+    return self   -- chainable
+end
+
+-- =====================================================================
+-- Reduções. ignore_na default = true (comportamento pandas-like).
+-- =====================================================================
+local function reduce_num(self, fn_name, ignore_na)
+    if ignore_na == nil then ignore_na = true end
+    local v = self._d[fn_name](self._c, ignore_na)
+    -- min/max/sum do i64: INT64_MIN é sentinela de "nulo encontrado"
+    if (fn_name == "sum" or fn_name == "min" or fn_name == "max")
+       and self._d.is_int_sentinel(v) then
+        return nil
+    end
+    v = tonumber(v)
+    if is_nan(v) then return nil end
+    return v
+end
+
+function methods.sum(self, ignore_na)  return reduce_num(self, "sum",  ignore_na) end
+function methods.mean(self, ignore_na) return reduce_num(self, "mean", ignore_na) end
+function methods.min(self, ignore_na)  return reduce_num(self, "min",  ignore_na) end
+function methods.max(self, ignore_na)  return reduce_num(self, "max",  ignore_na) end
+function methods.var(self, ignore_na)  return reduce_num(self, "var",  ignore_na) end
+function methods.std(self, ignore_na)  return reduce_num(self, "std",  ignore_na) end
+
+function methods.count_nonnull(self)
+    return tonumber(self._d.count_nonnull(self._c))
+end
+
+-- Tamanho da série. NOTA: o operador `#` só chama __len em builds do LuaJIT
+-- com compat 5.2; por padrão (5.1) `#serie` não funciona. Use :len().
+function methods.len(self)  return tonumber(self._c.size) end
+methods.size = methods.len
+
+-- =====================================================================
+-- Transformações (retornam nova Series; imutabilidade por padrão)
+-- =====================================================================
+function methods.clone(self)
+    return wrap(self._d.clone(self._c), self._dtype, self._name)
+end
+
+function methods.sort(self, ascending)
+    if ascending == nil then ascending = true end
+    local r = self._d.sort(self._c, ascending)
+    if r == nil then
+        error("smaug: sort não suporta séries com nulos (use dropna primeiro)", 2)
+    end
+    return wrap(r, self._dtype, self._name)
+end
+
+-- View: fatia zero-copy [start, start+len-1] (1-based). A view aponta para a
+-- memória da pai (read-only) e segura uma referência a ela (_parent) para o GC
+-- do Lua não coletar a pai enquanto a view existir.
+function methods.view(self, start, len)
+    start = start or 1
+    len   = len or (self:len() - start + 1)
+    local n = self:len()
+    if type(start) ~= "number" or type(len) ~= "number"
+       or start < 1 or len < 0 or start + len - 1 > n then
+        error("smaug: view("..tostring(start)..", "..tostring(len)..
+              ") fora dos limites [1, "..n.."]", 2)
+    end
+    local r = self._d.view(self._c, start - 1, len)
+    -- a pai real é a raiz (se self já é view, encadeia para a pai original)
+    return wrap(r, self._dtype, self._name, self._parent or self)
+end
+
+-- Take: nova série (cópia independente) com os elementos nas posições `idx`
+-- (tabela Lua 1-based). Erro se algum índice estiver fora dos limites.
+function methods.take(self, idx)
+    if type(idx) ~= "table" then error("smaug: take espera uma tabela de índices", 2) end
+    local n = self:len()
+    local len = #idx
+    local cidx = ffi.new("size_t[?]", len)
+    for i = 1, len do
+        local k = idx[i]
+        if type(k) ~= "number" or k < 1 or k > n or k % 1 ~= 0 then
+            error("smaug: take índice "..tostring(k).." fora dos limites [1, "..n.."]", 2)
+        end
+        cidx[i - 1] = k - 1
+    end
+    local r = self._d.take(self._c, cidx, len)
+    if r == nil then error("smaug: take falhou", 2) end
+    return wrap(r, self._dtype, self._name)
+end
+
+-- head/tail: nova série (cópia) com as primeiras / últimas n linhas.
+function methods.head(self, n)
+    n = math.min(n or 5, self:len())
+    local idx = {}
+    for i = 1, n do idx[i] = i end
+    return self:take(idx)
+end
+
+function methods.tail(self, n)
+    local total = self:len()
+    n = math.min(n or 5, total)
+    local idx = {}
+    for i = 1, n do idx[i] = total - n + i end
+    return self:take(idx)
+end
+
+-- Converte para tabela Lua. Nulos viram `na_value` (default nil).
+function methods.to_table(self, na_value)
+    local t = {}
+    for i = 1, self:len() do
+        local v = self:get(i)
+        if v == nil then v = na_value end
+        t[i] = v
+    end
+    return t
+end
+
+-- astype: nova série de outro dtype, convertendo valor a valor. Nulos
+-- permanecem nulos. f64->i64 trunca em direção a zero (semântica C).
+function methods.astype(self, dtype, name)
+    if not DTYPES[dtype] then
+        error("smaug: dtype desconhecido '"..tostring(dtype).."'", 2)
+    end
+    local n = self:len()
+    local out = Series.new(dtype, n, name or self._name)
+    for i = 1, n do
+        local v = self:get(i)
+        if v == nil then out:set_null(i) else out:set(i, v) end
+    end
+    return out
+end
+
+-- describe: resumo estatístico (tabela Lua). Percentis calculados a partir dos
+-- valores não-nulos ordenados em Lua (não exige dropna no C).
+function methods.describe(self)
+    local vals = {}
+    for i = 1, self:len() do
+        local v = self:get(i)
+        if v ~= nil then vals[#vals + 1] = v end
+    end
+    table.sort(vals)
+    local m = #vals
+    local function pct(p)
+        if m == 0 then return nil end
+        if m == 1 then return vals[1] end
+        local rank = p * (m - 1) + 1           -- interpolação linear (tipo numpy)
+        local lo = math.floor(rank)
+        local frac = rank - lo
+        if lo >= m then return vals[m] end
+        return vals[lo] + frac * (vals[lo + 1] - vals[lo])
+    end
+    return {
+        count   = m,                            -- não-nulos
+        nulls   = self:len() - m,
+        mean    = self:mean(),
+        std     = self:std(),
+        min     = self:min(),
+        ["25%"] = pct(0.25),
+        ["50%"] = pct(0.50),                    -- mediana
+        ["75%"] = pct(0.75),
+        max     = self:max(),
+    }
+end
+
+-- =====================================================================
+-- Comparações -> BoolSeries, e filtragem
+-- =====================================================================
+local function compare(self, cfn, threshold)
+    if type(threshold) ~= "number" then
+        error("smaug: comparação espera um escalar numérico", 3)
+    end
+    local om = ffi.new("smaug_mask_t*[1]")
+    local vals = cfn(self._c, threshold, om)
+    if vals == nil then error("smaug: comparação falhou", 3) end
+    return BoolSeries._own(vals, om[0], self:len(), self._name)
+end
+
+function methods.gt(self, threshold) return compare(self, self._d.gt, threshold) end
+function methods.lt(self, threshold) return compare(self, self._d.lt, threshold) end
+function methods.eq(self, threshold) return compare(self, self._d.eq, threshold) end
+
+-- filter(bool_series): nova Series só com as linhas onde a máscara é true.
+-- NA na máscara conta como false (linha descartada).
+function methods.filter(self, mask)
+    if getmetatable(mask) ~= BoolSeries then
+        error("smaug: filter espera uma BoolSeries (use :gt/:lt/:eq)", 2)
+    end
+    if mask:len() ~= self:len() then
+        error("smaug: filter com máscara de tamanho diferente ("..
+              mask:len().." vs "..self:len()..")", 2)
+    end
+    local r = self._d.filter(self._c, mask._vals)
+    if r == nil then error("smaug: filter falhou", 2) end
+    return wrap(r, self._dtype, self._name)
+end
+
+-- =====================================================================
+-- Aritmética (metamétodos). Series±Series exige mesmo dtype e tamanho.
+-- =====================================================================
+local function both_series(a, b)
+    return getmetatable(a) == Series and getmetatable(b) == Series
+end
+
+local function binop(a, b, series_fn, scalar_fn, scalar_left_ok, opname)
+    -- Series op Series
+    if both_series(a, b) then
+        if a._dtype ~= b._dtype then
+            error("smaug: '"..opname.."' entre dtypes diferentes ("..
+                  a._dtype.." e "..b._dtype..") não é permitido", 2)
+        end
+        if a._c.size ~= b._c.size then
+            error("smaug: '"..opname.."' entre séries de tamanhos diferentes", 2)
+        end
+        local r = a._d[series_fn](a._c, b._c)
+        if r == nil then error("smaug: '"..opname.."' falhou", 2) end
+        return wrap(r, a._dtype, a._name)
+    end
+    -- Series op scalar  (a é Series, b é número)
+    if getmetatable(a) == Series and type(b) == "number" then
+        local r = a._d[scalar_fn](a._c, b)
+        return wrap(r, a._dtype, a._name)
+    end
+    -- scalar op Series  (a é número, b é Series)
+    if type(a) == "number" and getmetatable(b) == Series then
+        if scalar_left_ok == "commute" then
+            local r = b._d[scalar_fn](b._c, a)
+            return wrap(r, b._dtype, b._name)
+        end
+        error("smaug: 'escalar "..opname.." Series' não é suportado; "..
+              "inverta a ordem ou use métodos explícitos", 2)
+    end
+    error("smaug: operandos inválidos para '"..opname.."'", 2)
+end
+
+Series.__add = function(a, b) return binop(a, b, "add", "add_scalar", "commute", "+") end
+Series.__mul = function(a, b) return binop(a, b, "mul", "mul_scalar", "commute", "*") end
+Series.__sub = function(a, b) return binop(a, b, "sub", "sub_scalar", false,      "-") end
+Series.__div = function(a, b) return binop(a, b, "div", "div_scalar", false,      "/") end
+
+-- =====================================================================
+-- Metamétodos de inspeção/acesso
+-- =====================================================================
+Series.__len = function(self) return tonumber(self._c.size) end
+
+Series.__tostring = function(self)
+    local n = tonumber(self._c.size)
+    local parts = {}
+    local limit = math.min(n, 10)
+    for i = 1, limit do
+        local v = self:get(i)
+        parts[#parts + 1] = string.format("  [%d] %s", i,
+            v == nil and "NA" or tostring(v))
+    end
+    if n > limit then parts[#parts + 1] = "  ... ("..(n - limit).." mais)" end
+    return string.format("Series '%s' (%s, len=%d)\n%s",
+        self._name, self._dtype, n, table.concat(parts, "\n"))
+end
+
+-- __index: índice numérico -> get(); senão, método.
+Series.__index = function(self, k)
+    if type(k) == "number" then return methods.get(self, k) end
+    return methods[k]
+end
+
+-- __newindex: série[i] = v -> set(); outras chaves gravam no objeto.
+Series.__newindex = function(self, k, v)
+    if type(k) == "number" then methods.set(self, k, v)
+    else rawset(self, k, v) end
+end
+
+-- expõe o registro de dtypes para extensão futura (bool, string, ...)
+Series._DTYPES = DTYPES
+Series.NA = NA
+
+return Series

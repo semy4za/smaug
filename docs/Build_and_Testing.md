@@ -52,14 +52,17 @@ clean:
 ```bash
 cd smaug && make
 # → build/libsmaug_math.so
+
+make test       # compila e roda tests/test_alloc.c e test_ops.c
+make valgrind   # roda os testes sob Valgrind (--leak-check=full)
 ```
 
 ## Opção 2 — Comando direto
 
 ```bash
 mkdir -p build
-gcc -std=c11 -fPIC -Wall -O2 -I./include -shared \
-    src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c \
+gcc -std=c11 -fPIC -Wall -Wextra -O2 -I./include -shared \
+    src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c src/smaug_ops_bool.c \
     -o build/libsmaug_math.so
 ```
 
@@ -87,7 +90,8 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 add_library(smaug_math SHARED
     src/smaug_core.c
     src/smaug_ops_f64.c
-    src/smaug_ops_i64.c)
+    src/smaug_ops_i64.c
+    src/smaug_ops_bool.c)
 
 set_target_properties(smaug_math PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/build"
@@ -124,33 +128,27 @@ nm -D build/libsmaug_math.so | grep smaug | head
 
 ## Testar o carregamento via LuaJIT
 
-`test_load.lua` na raiz:
+A ponte FFI oficial é `lua/smaug/ffi_loader.lua` — ela declara o `ffi.cdef`
+completo (f64 + i64 + `free`) e faz o `ffi.load` com fallback de paths e
+detecção de SO, devolvendo o namespace `C`.
 
 ```lua
-local ffi = require("ffi")
-ffi.cdef([[
-    typedef uint8_t smaug_mask_t;
-    typedef struct { const char *name, *dtype; bool is_view, external_alloc; } smaug_metadata_t;
-    typedef struct {
-        double *data; smaug_mask_t *null_mask;
-        size_t size, capacity; smaug_metadata_t meta;
-    } smaug_series_f64_t;
-    smaug_series_f64_t* smaug_f64_create(size_t size);
-    void   smaug_f64_set(smaug_series_f64_t *s, size_t idx, double val);
-    double smaug_f64_sum(const smaug_series_f64_t *s, bool ignore_na);
-    void   smaug_f64_free(smaug_series_f64_t *s);
-]])
+-- smoke test usando o loader oficial
+package.path = "./lua/?.lua;" .. package.path
+local C = require("smaug.ffi_loader")
 
-local C = ffi.load("./build/libsmaug_math.so")
 local s = C.smaug_f64_create(3)
-assert(s ~= nil)
 C.smaug_f64_set(s, 0, 1.0)
 C.smaug_f64_set(s, 1, 2.0)
 C.smaug_f64_set(s, 2, 3.0)
 assert(math.abs(C.smaug_f64_sum(s, true) - 6.0) < 1e-9)
 C.smaug_f64_free(s)
-print("OK — soma = 6, série liberada")
+print("OK — soma = 6")
 ```
+
+O `test_load.lua` na raiz é um smoke test histórico com `cdef` mínimo inline
+(carrega só 4 funções). Ele continua válido, mas para código novo use o
+`ffi_loader.lua`.
 
 ```bash
 luajit test_load.lua   # → OK — soma = 6, série liberada
@@ -158,15 +156,21 @@ luajit test_load.lua   # → OK — soma = 6, série liberada
 
 ---
 
-## Testes em C (a criar)
+## Testes em C
 
-Estrutura mínima sugerida para a Fase 1:
+Estrutura atual (**implementada**):
 
 ```
 tests/
-├── test_alloc.c   # create/free/clone/append, invariantes, leaks
-└── test_ops.c     # resultados numéricos contra valores conhecidos
+├── test_alloc.c   # create/free/clone/view/append, invariantes, grow — Valgrind-clean
+├── test_ops.c     # resultados numéricos contra valores conhecidos
+├── test_bool.c    # lógica booleana de três valores (Kleene) + agregações
+└── test_series.lua # frontend: Series (f64/i64), BoolSeries, comparações, filter
 ```
+
+Rode os C com `make test` (ou `make valgrind` para checar leaks) e o frontend
+Lua com `make test-lua`. Todos passam e os testes C são validados sob Valgrind
+sem vazamentos.
 
 Exemplo de teste de operações (`tests/test_ops.c`):
 
@@ -209,12 +213,15 @@ gcc -std=c11 -g -O0 -I./include \
 
 ## Verificação de memória com Valgrind
 
+O alvo `make valgrind` já roda os dois testes sob Valgrind. Manualmente:
+
 ```bash
 gcc -std=c11 -g -O0 -I./include \
-    tests/test_alloc.c src/smaug_core.c src/smaug_ops_f64.c \
+    tests/test_alloc.c src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c \
     -lm -o build/test_alloc
 
 valgrind --leak-check=full --error-exitcode=1 ./build/test_alloc
+# → HEAP SUMMARY: all heap blocks were freed -- no leaks are possible
 ```
 
 Para FFI + LuaJIT, o Valgrind precisa de supressões do próprio LuaJIT:

@@ -16,13 +16,17 @@ static int f64_grow(smaug_series_f64_t *s) {
     if (new_cap <= s->capacity) new_cap = s->capacity + 1; /* overflow guard */
 
     double *nd = realloc(s->data, new_cap * sizeof(double));
-    if (!nd) return -1;
-    s->data = nd;
+    if (!nd) return -1;            /* data intacto; nada mudou, série consistente */
+    s->data = nd;                  /* commit: data agora tem new_cap elementos */
 
     smaug_mask_t *nm = realloc(s->null_mask, new_cap * sizeof(smaug_mask_t));
     if (!nm) {
-        /* data já foi realocado; não dá undo. Mantém série consistente
-           com o capacity antigo — só o ponteiro data mudou. */
+        /* null_mask falhou. data já cresceu — encolhe de volta para preservar
+           o invariante (data e null_mask sempre com 'capacity' elementos).
+           realloc para menor não invalida os dados; se ela falhar, o buffer
+           maior permanece, o que ainda é seguro. capacity fica inalterado. */
+        double *back = realloc(s->data, s->capacity * sizeof(double));
+        if (back) s->data = back;
         return -1;
     }
     s->null_mask = nm;
@@ -35,11 +39,16 @@ static int i64_grow(smaug_series_i64_t *s) {
     if (new_cap <= s->capacity) new_cap = s->capacity + 1;
 
     int64_t *nd = realloc(s->data, new_cap * sizeof(int64_t));
-    if (!nd) return -1;
+    if (!nd) return -1;            /* data intacto; série consistente */
     s->data = nd;
 
     smaug_mask_t *nm = realloc(s->null_mask, new_cap * sizeof(smaug_mask_t));
-    if (!nm) return -1;
+    if (!nm) {
+        /* Ver f64_grow: encolhe data de volta para preservar o invariante. */
+        int64_t *back = realloc(s->data, s->capacity * sizeof(int64_t));
+        if (back) s->data = back;
+        return -1;
+    }
     s->null_mask = nm;
     s->capacity  = new_cap;
     return 0;
