@@ -1,4 +1,4 @@
-#include "../include/smaug_math.h"
+#include "../include/smaug_numeric.h"
 #include <math.h>      /* NAN, isnan(), sqrt() — para mean/var/std */
 #include <stdint.h>    /* INT64_MIN, INT64_MAX */
 #include <stdlib.h>    /* malloc, free, qsort */
@@ -7,8 +7,8 @@
 #define VALID(s, i)  ((s)->null_mask[(i)] == 0xFF)
 #define INVALID(s,i) ((s)->null_mask[(i)] != 0xFF)
 
+/* smaug_i64_create vem de smaug_core.h (incluído via smaug_numeric.h). */
 static smaug_series_i64_t *alloc_result(size_t size) {
-    extern smaug_series_i64_t *smaug_i64_create(size_t);
     return smaug_i64_create(size);
 }
 

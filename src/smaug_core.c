@@ -1,9 +1,15 @@
-#include "../include/smaug_math.h"
+#include "../include/smaug_core.h"
 #include <math.h>      /* NAN */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* Libera buffers crus devolvidos pelo backend, usando o mesmo heap/runtime que
+   os alocou. Ver smaug_core.h. */
+void smaug_free(void *ptr) {
+    free(ptr);
+}
 
 /* ===================================================================
    Helpers internos (não expostos pelo header)

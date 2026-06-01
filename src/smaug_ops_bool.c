@@ -1,4 +1,4 @@
-#include "../include/smaug_math.h"
+#include "../include/smaug_bool.h"
 #include <stdlib.h>
 #include <stddef.h>
 

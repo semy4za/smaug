@@ -35,8 +35,19 @@ valgrind: test
 # Smoke test do frontend Lua (requer luajit e a .so compilada)
 test-lua: $(TARGET)
 	luajit tests/test_series.lua
+	luajit tests/test_dataset.lua
+
+# Gera docs/MANIFEST.txt (sha256 + linhas de cada arquivo versionável)
+manifest:
+	bash scripts/make_manifest.sh
+
+# Verifica a árvore atual contra o MANIFEST.txt (detecta perda/divergência)
+verify:
+	@bash scripts/make_manifest.sh >/dev/null
+	@git diff --stat docs/MANIFEST.txt 2>/dev/null || true
+	@echo "MANIFEST regenerado; compare com a versão anterior (git diff) para detectar mudanças."
 
 clean:
 	rm -rf build
 
-.PHONY : clean test valgrind test-lua
+.PHONY : clean test valgrind test-lua manifest verify

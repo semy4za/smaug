@@ -1,12 +1,30 @@
 # Smaug — Referência da API C
 
-Referência do contrato público definido em `include/smaug_math.h`. Todas as
-funções existem em duas variantes, `f64` (`double`) e `i64` (`int64_t`), com
-estruturas e semântica análogas. As diferenças de int64 estão na seção final.
+Referência do contrato público do backend C. Todas as funções numéricas existem
+em duas variantes, `f64` (`double`) e `i64` (`int64_t`), com estruturas e
+semântica análogas. As diferenças de int64 estão na seção final.
 
 **Status:** todas as funções abaixo estão **implementadas** para f64 e i64
 (`smaug_core.c` + `smaug_ops_f64.c` + `smaug_ops_i64.c`), mais as operações
 booleanas (`smaug_ops_bool.c`).
+
+## Mapa de headers (qual `#include` usar)
+
+Os headers são separados por responsabilidade (inspirado no NumPy, onde os tipos
+ficam em `ndarraytypes.h` separados das funções). Inclua o mais específico que
+cobre o que você usa, ou o umbrella `smaug.h` para tudo:
+
+| Header | Conteúdo | Inclui |
+|--------|----------|--------|
+| `smaug_types.h` | Tipos base: `smaug_mask_t`, `smaug_metadata_t`, structs `series_f64`/`series_i64`. **Zero funções.** | — |
+| `smaug_core.h` | Lifecycle (create/free/clone/view), get/set, append, `smaug_free`. | `smaug_types.h` |
+| `smaug_numeric.h` | Aritmética, reduções, comparações, ordenação, take/filter/count (f64+i64). | `smaug_core.h` |
+| `smaug_bool.h` | Operações booleanas Kleene. | `smaug_types.h` |
+| `smaug.h` | **Umbrella** — inclui os de operação. | todos acima |
+
+> O antigo `smaug_math.h` foi **removido** (o nome "math" não refletia o
+> conteúdo). Use `smaug.h` ou o header específico. A biblioteca compilada
+> permanece `libsmaug_math.so`/`smaug_math.dll` (nome do binário).
 
 ---
 

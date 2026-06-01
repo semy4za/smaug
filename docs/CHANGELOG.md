@@ -4,6 +4,78 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Adicionado (qualidade / processo)
+- `docs/CODE_REVIEW.md`: review completo do código (baseline pré-Fase 1.6).
+  Veredito: correto e consistente; achados A1–A6 de robustez para tratar no
+  endurecimento (assimetria de empty-reduction, overflow em `view`, valores
+  especiais f64, overflow i64, caminho de falha de `realloc`, validação de
+  `take`).
+- `docs/MANIFEST.txt` + `scripts/make_manifest.sh` + alvos `make manifest` /
+  `make verify`: método de integridade (sha256 + linhas por arquivo) para
+  transferir o projeto sem perdas/divergência. Seção "Integridade do projeto" no
+  `Build_and_Testing.md`.
+
+### Alterado (arquitetura de headers — refactor)
+- `smaug_math.h` **removido** e separado por responsabilidade (inspirado no
+  NumPy): `smaug_types.h` (tipos base, zero funções), `smaug_core.h` (lifecycle
+  + `smaug_free`), `smaug_numeric.h` (aritmética/reduções/comparações/sort/utils
+  f64+i64), `smaug_bool.h` (Kleene) e `smaug.h` (umbrella). Cada `.c` passou a
+  incluir o header específico; testes incluem o umbrella. Removida a gambiarra
+  `extern smaug_*_create` nos ops (agora declarado via header). A lib compilada
+  permanece `libsmaug_math.so`/`smaug_math.dll`. Prepara o terreno para
+  `smaug_string.h` (6º header) entrar sem tocar nos demais. Refactor validado:
+  build limpo, 3 testes C + 99 checks Lua, Valgrind-clean. Mapa de headers
+  documentado na `API_Reference.md`.
+
+### Planejado (Fase 1.6 — Endurecimento, gate atual)
+- Definida a Fase 1.6 como **gate obrigatório** antes de `string` e I/O:
+  endurecer Fases 1–4 ao nível "aviação". Critério de fechamento documentado no
+  `Roadmap.md` (cobertura ≥90% medida por gcov, testes sistemáticos +
+  property-based, `fillna`).
+- Estratégia de testes documentada no `Build_and_Testing.md`: casos
+  degenerados, valores especiais do f64, overflow do i64, **property-based em
+  Lua** (decisão registrada), e **falha de alocação em C**. Alvo `make coverage`.
+- Registrada a **dívida técnica** explícita (`Roadmap.md`): `median`/`quantile`
+  nativo, `abs`/`round`/`clip`, `cumsum`/`cumprod`, `diff`/`shift`, `unique`/
+  `value_counts`, `dropna`, broadcasting, `apply`/`map`, tipos Tier 2/3, e
+  benchmarks/estresse.
+- **Reordenação registrada:** `string` (Tier 1) promovido para **antes** do I/O
+  (um CSV/JSON real tem colunas de texto). Sequência do MVP: 1.6 → `string` →
+  CSV/JSON → XML/SQL. `fillna` é a única funcionalidade nova da 1.6.
+
+### Corrigido (portabilidade Windows)
+- `smaug_free()`: nova função exportada pela lib para liberar os buffers crus
+  (arrays de comparações/bool ops, `size_t*` do argsort). Substitui o uso da
+  `free()` da libc via FFI, que falhava no Windows (`cannot resolve symbol
+  'free'` — a DLL não exporta a `free` do runtime). O frontend (`series.lua`,
+  `boolseries.lua`, `ffi_loader.lua`) passa a usar `C.smaug_free`. Validado
+  Valgrind-clean no Linux e funcionando no Windows.
+
+### Adicionado (ferramentas)
+- `scripts\windows-build.ps1`: setup + build + testes no Windows via PowerShell.
+  Compila `build\smaug_math.dll` com gcc (sem make), roda os testes C e Lua.
+  Flag `-Setup` instala MSYS2 + gcc + luajit. Seção "Windows (PowerShell)" no
+  `Build_and_Testing.md`. (Valgrind permanece exclusivo do Linux.) Script em
+  ASCII puro para evitar problemas de codificação no Windows PowerShell 5.1.
+
+### Adicionado (Fase 3 — DataSet)
+- `lua/smaug/core/dataset.lua`: classe `DataSet` (tabela 2D = coleção de Series
+  alinhadas). Construção (`new`, `from_columns`, açúcar `smaug.dataset{...}`);
+  CRUD de colunas (`add_column`/`drop_column`/`rename_column`, com validação de
+  comprimento e nome único); acesso `df["col"]` via `__index` e `:column`;
+  metadados (`columns`/`ncols`/`nrows`/`dtypes`/`row`); operações de linha que
+  retornam novo DataSet (`filter`/`sort_by`/`head`/`tail`/`iloc`/`take`/
+  `sample`); `select` de colunas; `describe`, `to_table` e `__tostring`
+  tabular.
+- `Series:argsort(asc)`: tabela 1-based de índices que ordenam (nil se há
+  nulos). Base do `DataSet:sort_by`, que reordena todas as colunas pela mesma
+  permutação mantendo o alinhamento.
+- `tests/test_dataset.lua`: 30 checks (dims, acesso, CRUD, filter/sort_by/
+  head/tail/iloc/take/sample/select, describe, imutabilidade de derivados,
+  tostring). Valgrind-clean. `Makefile`: `test_dataset.lua` em `make test-lua`.
+- `init.lua`: expõe `DataSet` e `smaug.dataset`. Versão → 0.3.0-dev.
+
+
 ### Adicionado (Fase 4 — bool, comparações e filtro)
 - `src/smaug_ops_bool.c`: backend booleano com **lógica de três valores
   (Kleene)** — `and`/`or`/`xor`/`not` e agregações `count_true`/`any`/`all`

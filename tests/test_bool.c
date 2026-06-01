@@ -4,11 +4,11 @@
  * em and/or/xor/not e as agregações count_true/any/all.
  *
  *   make test   (compila junto)   ou:
- *   gcc -std=c11 -g -O0 -I./include tests/test_bool.c src/*.c -lm -o build/test_bool
+ *   gcc -std=c11 -g -O0 -I./include tests/test_bool.c src(...).c -lm -o build/test_bool
  *   valgrind --leak-check=full ./build/test_bool
  */
 
-#include "../include/smaug_math.h"
+#include "../include/smaug.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>

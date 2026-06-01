@@ -1,8 +1,10 @@
 # Smaug — Roadmap e Design do Frontend
 
-Este documento descreve o que **ainda não existe**: o roadmap faseado e o design
-planejado do frontend Lua e dos módulos de I/O. O backend C (Fase 1) já está
-pronto — ver `API_Reference.md`.
+Este documento descreve o roadmap faseado e o design do frontend Lua e dos
+módulos de I/O. O backend C (f64/i64/bool) e o frontend (`Series`, `BoolSeries`,
+`DataSet`) já estão implementados — ver `API_Reference.md` para o contrato C e
+"Classe Series/DataSet" abaixo. O foco **atual** é a Fase 1.6 (endurecimento):
+levar o que existe ao nível "aviação" antes de avançar para `string` e I/O.
 
 ---
 
@@ -10,33 +12,153 @@ pronto — ver `API_Reference.md`.
 
 | Fase | O que | Status |
 |------|-------|--------|
-| **1** | Backend C: structs, lifecycle, ops f64/i64, null handling | ✅ Completo (build + testes + smoke FFI) |
-| **2** | Classe `Series` em Lua, metamétodos, `ffi.gc` | ⏳ Em andamento — `ffi_loader.lua` + `Series` (f64/i64) ✅ |
-| **3** | Classe `DataSet`, slicing (`iloc`/`head`/`tail`) | — |
-| **4** | Boolean indexing, `BoolSeries`, filtros | ⏳ comparações + `BoolSeries` + `Series:filter` ✅; falta `dropna` e `DataSet:filter` |
-| **5** | I/O: 4 formatos padrão (CSV, JSON, XML, SQL) | — (design documentado) |
-| **6+** | GroupBy, joins, strings/categorical/datetime | Futuro |
-| **7** | Resample, window ops, pivot, lazy evaluation | Futuro |
+| **1** | Backend C: structs, lifecycle, ops f64/i64, null handling | ✅ Completo |
+| **2** | Classe `Series` (despacho por dtype, `ffi.gc`, metamétodos) | ✅ Completo (f64 + i64) |
+| **3** | Classe `DataSet`: slicing, filter, sort_by, select, CRUD | ✅ Completo |
+| **4** | `BoolSeries`, comparações, `filter` | ⏳ Quase — comparações + `BoolSeries` + `Series:filter` + `DataSet:filter` ✅; falta `dropna` |
+| **1.6** | **Endurecimento (testes nível aviação + cobertura + `fillna`)** | ⏳ **ATUAL — gate antes de avançar** |
+| **5** | Tipo `string` (Tier 1) | — (promovido para antes do I/O) |
+| **6** | I/O: **CSV + JSON** (alvo de deploy), depois XML + SQL | — (design documentado) |
+| **7+** | GroupBy, joins, categorical, datetime | Futuro |
+| **8** | Resample, window ops, pivot, lazy evaluation | Futuro |
 
-**MVP = Fases 1–5.** As fases 6–7 são extensões pós-launch.
+**MVP = backend endurecido + `string` + I/O (CSV/JSON).** Os demais formatos
+(XML/SQL) e as fases 7–8 são extensões pós-launch.
 
-A Fase 1 está **fechada**: o `Makefile` compila `build/libsmaug_math.so` sem
-warnings (`-Wall -Wextra`), `tests/test_ops.c` passa, e o smoke test FFI
-(`test_load.lua`) carrega a lib e soma uma série.
+### Ordem de execução revisada (decisão registrada)
 
-Próximos passos imediatos para a Fase 2:
+Duas decisões tomadas em conjunto e que reordenam o plano original:
 
-1. ✅ `lua/smaug/ffi_loader.lua` — `ffi.cdef` completo (f64 + i64 + `free`) e
-   `ffi.load` com fallback de paths. **Feito e validado.**
-2. ⏳ `lua/smaug/core/series.lua` — classe `Series` com `ffi.gc`, metamétodos e
-   conversões (1-based↔0-based, `nil`↔`NAN`).
-3. ⏳ `lua/smaug/init.lua` — entry point que expõe `Series` (e futuramente
-   `DataSet`, `read_csv`).
-4. ⏳ Smoke test do frontend Lua exercitando a classe `Series`.
+1. **Endurecimento antes de tudo (Fase 1.6).** Nenhuma fase nova começa antes de
+   o que já existe (Fases 1–4) estar validado em nível aviação — testes
+   sistemáticos, cobertura **medida** (não estimada), e o gate de ~90% atingido.
+   Ver "Fase 1.6 — Endurecimento".
+2. **`string` antes de I/O.** Um CSV/JSON real tem colunas de texto; sem o tipo
+   `string`, o I/O nasceria capenga (teria que descartar ou recusar colunas de
+   texto). Por isso `string` (antes listado como Fase 6) foi **promovido** para
+   antes do I/O.
+
+Sequência daqui pra frente: **Fase 1.6 → `string` → CSV/JSON → (XML/SQL) →
+`dropna` e demais funções da dívida técnica**.
+
+A Fase 1 está **fechada**: o `Makefile` compila a lib sem warnings
+(`-Wall -Wextra`), e os testes C (`test_alloc`, `test_ops`, `test_bool`) passam,
+Valgrind-clean.
 
 ---
 
-## Frontend Lua — estrutura planejada
+## Fase 1.6 — Endurecimento (gate atual)
+
+Objetivo: levar o que já existe (Fases 1–4) ao nível de robustez "rotina de
+aviação" **antes** de construir `string` e I/O em cima. Não se adiciona
+funcionalidade nova aqui (exceto `fillna`, justificado abaixo); o foco é provar
+que o existente está correto sob estresse e medir essa garantia.
+
+### Critério de "fase validada" (o gate)
+
+A Fase 1.6 só fecha quando **todos** os itens abaixo forem verdadeiros:
+
+1. **Cobertura medida ≥ 90%** de linhas no backend C (`gcov`/`lcov`), com cada
+   ramo não-coberto identificado e justificado por escrito. O número é
+   **medido**, nunca estimado.
+2. Bateria de testes sistemáticos (Frente 1) passando, Valgrind-clean.
+3. Property-based tests (Frente 1) passando em N≥1000 casos aleatórios por
+   invariante, com seed fixa para reprodutibilidade.
+4. `fillna` implementado, testado e documentado (Series + DataSet).
+5. Dívida técnica registrada (seção "Dívida técnica") — o que ficou de fora é
+   decisão explícita, não esquecimento.
+
+### Frente 1 — Testes sistemáticos (nível aviação)
+
+Property-based testing em **Lua** (decisão registrada): a stack do Smaug é fina
+e determinística (Lua → FFI → C, sem camadas que escondam comportamento), então
+testar em Lua exercita o mesmo código C e ainda valida a fronteira FFI
+(1-based↔0-based, `nil`↔NA, sentinelas). A única exceção é o teste de **falha de
+alocação**, que precisa ser em C (não há como forçar `realloc` a falhar pelo
+Lua).
+
+Cobertura exigida:
+
+- **Casos degenerados**, em toda operação: série vazia, de 1 elemento,
+  toda-nula, toda-igual. Cada uma pode quebrar reduções, `sort`, `view`, `take`,
+  `filter`, `argsort` de formas diferentes.
+- **Valores especiais do f64**: `+Inf`, `-Inf`, `NaN` fornecido pelo usuário
+  (distinto de nulo), `-0.0`. Definir e testar o comportamento de
+  `sum`/`min`/`max`/`sort`/comparações na presença deles.
+- **Overflow do i64**: operações perto de `INT64_MAX`/`INT64_MIN`, e a colisão
+  com o sentinela `INT64_MIN` das reduções.
+- **Property-based (invariantes que valem sempre)**, p. ex.:
+  - `len(filter(s, mask)) == count_true(mask)`
+  - `sort` é permutação: mesmos elementos, mesma contagem de nulos, monotônico
+  - `clone(s)` é igual a `s` em todos os índices, e independente (mutar um não
+    afeta o outro)
+  - `take(s, perm)` seguido de `take` pela permutação inversa devolve `s`
+  - `astype` ida-e-volta preserva valores representáveis e nulos
+  - `not(not b) == b` (Kleene), De Morgan entre `and`/`or`/`not`
+- **Falha de alocação (em C)**: interceptar `malloc`/`realloc` para falhar sob
+  demanda e exercitar de verdade o caminho de erro do `grow` (o fix do realloc
+  parcial), confirmando que a série permanece consistente.
+
+### Frente 2 — Cobertura medida
+
+`make coverage` compila com `--coverage` (gcov), roda toda a suíte, e gera um
+relatório (texto via `gcov`, opcional HTML via `lcov`/`genhtml`). O relatório
+fica versionado/documentado a cada fechamento de fase. Ramos não-cobertos viram
+itens: ou ganham teste, ou ganham justificativa.
+
+### Frente 3 — `fillna` (única funcionalidade nova)
+
+`fillna` entra agora por ser o par natural do null handling — nosso diferencial.
+Todo o resto das funções estatísticas/utilitárias fica na dívida técnica.
+
+Contrato (a implementar):
+
+- **`Series:fillna(value)`** → nova Series (imutável por padrão) com cada nulo
+  substituído por `value`. `value` deve ser compatível com o dtype (número para
+  f64/i64). Posições não-nulas inalteradas.
+- **`Series:fillna()` sem argumento** → erro (não há "valor padrão" seguro;
+  forward/backward-fill é dívida técnica).
+- **`DataSet:fillna(value)`** → aplica a todas as colunas; ou
+  **`DataSet:fillna({col = value, ...})`** → por coluna. Colunas omitidas no
+  mapa permanecem com seus nulos.
+- Não altera o dtype. Não há coerção implícita (preencher i64 com `1.5` é erro).
+
+---
+
+## Dívida técnica (registrada explicitamente)
+
+Itens conscientemente adiados para manter o endurecimento sem escopo-creep. Cada
+um é decisão registrada, não esquecimento. Serão reagendados em fase dedicada
+após o MVP de I/O.
+
+**Funções estatísticas/utilitárias (nível Series/DataSet):**
+
+- `median` / `quantile` nativos (hoje `describe` calcula quantis em Lua; falta
+  uma redução de primeira classe)
+- `abs`, `round`, `clip`
+- `cumsum` / `cumprod` (acumuladores)
+- `diff`, `shift` (deslocamento de janela)
+- `unique`, `value_counts`, `mode`
+- `dropna` (Fase 4; destrava `sort`/`sort_by` em dados com nulos) — adiado mas
+  prioritário logo após o MVP de I/O
+- `fillna` por método (forward/backward-fill); só o preenchimento por valor
+  entra na Fase 1.6
+
+**Semântica numérica:**
+
+- **Broadcasting** (operar Series de tamanhos diferentes / Series × array) — o
+  coração do NumPy; hoje só há tamanhos iguais
+- `apply` / `map` (aplicar função Lua arbitrária elemento a elemento)
+- Reconciliar a assimetria documentada de divisão por zero entre f64 (IEEE 754:
+  `±Inf`/`NaN`) e i64 (vira NULL)
+
+**Tipos (Tier 2/3):** `datetime`, `categorical` (Tier 2); larguras estreitas
+`float32`/`int32`/`int16`/`int8`/`uint*` (Tier 3). Ver "Sistema de tipos".
+
+**Performance/robustez:** benchmarks e teste de estresse (séries de 10⁷+
+elementos); avaliação de SIMD; o `ffi.gc` em hot paths (construção em massa).
+
+---
 
 ```
 lua/smaug/
@@ -44,7 +166,7 @@ lua/smaug/
 ├── ffi_loader.lua      # ffi.cdef + ffi.load (tradução pura, sem lógica) ✅
 ├── core/
 │   ├── series.lua      # classe Series (despacho por dtype) ✅
-│   ├── dataset.lua     # classe DataSet
+│   ├── dataset.lua     # classe DataSet ✅
 │   ├── indexer.lua     # loc/iloc (futuro)
 │   └── groupby.lua     # GroupBy (futuro)
 ├── io/
@@ -65,7 +187,7 @@ Detecta o SO para escolher `libsmaug_math.so` / `.dylib` / `smaug_math.dll` e
 tenta `./build/`, `../build/`, `../../build/`, `/usr/local/lib/`, depois o nome
 puro (deixa o loader do SO resolver via `LD_LIBRARY_PATH`).
 
-O cdef cobre **todas** as assinaturas de `smaug_math.h` (f64 + i64) mais
+O cdef cobre **todas** as assinaturas dos headers (f64 + i64 + bool) mais
 `void free(void*)` da libc — necessário para liberar os arrays brutos
 (`uint8_t*` de `gt`/`lt`/`eq`, `size_t*` de `argsort`) que o backend devolve com
 contrato "caller libera".
@@ -118,8 +240,9 @@ Implementado e testado (`tests/test_series.lua`, 69 checks, Valgrind-clean):
   `:append(v)` (chainable), `:len()`/`:size()`
 - **Reduções:** `:sum(ignore_na)`, `:mean()`, `:min()`, `:max()`, `:std()`,
   `:var()`, `:count_nonnull()` — `ignore_na` default `true`
-- **Transformações:** `:clone()`, `:sort(asc)`, `:view(start, len)`,
-  `:take(idx)`, `:head(n)`, `:tail(n)`, `:astype(dtype)`, `:to_table(na_value)`
+- **Transformações:** `:clone()`, `:sort(asc)`, `:argsort(asc)`,
+  `:view(start, len)`, `:take(idx)`, `:head(n)`, `:tail(n)`, `:astype(dtype)`,
+  `:to_table(na_value)`
 - **Inspeção:** `:describe()` (count, nulls, mean, std, min, 25/50/75%, max)
 - **Comparações/filtro:** `:gt(t)`/`:lt(t)`/`:eq(t)` → `BoolSeries`,
   `:filter(bool_series)` → nova Series
@@ -153,26 +276,51 @@ Semântica da fronteira Lua↔C tratada pela classe:
 > Lua). `:clone()` de uma view devolve uma cópia independente e mutável. Views
 > encadeadas apontam para a pai-raiz. Validado sob Valgrind com GC forçado.
 
-Comparações (`:gt`/`:lt`/`:eq` → `BoolSeries`) e `:filter` já estão
-implementadas (ver "BoolSeries e filtros"). Ainda **não** implementado:
-`dropna` (Fase 4, destrava `sort` em séries com nulos); `DataSet:filter`
-(depende do DataSet, Fase 3).
+Comparações (`:gt`/`:lt`/`:eq` → `BoolSeries`), `Series:filter` e
+`DataSet:filter` já estão implementados (ver "BoolSeries e filtros" e "Classe
+DataSet"). Ainda **não** implementado da Fase 4: `dropna` (destrava
+`sort`/`sort_by` em dados com nulos) — adiado para depois do MVP de I/O (ver
+"Dívida técnica").
 
-### Classe `DataSet` (Fase 3)
+### Classe `DataSet` (Fase 3) ✅ implementada
 
 Tabela 2D = coleção de `Series` alinhadas (mesmo número de linhas). Cada coluna é
-uma Series independente — não compartilham dados, só o comprimento.
+uma Series independente — não compartilham dados, só o comprimento. Arquivo:
+`lua/smaug/core/dataset.lua`.
 
-Atributos: `_columns` (dict nome→Series), `_col_names` (ordem), `_dtypes`,
-`_length`.
+Atributos: `_columns` (dict nome→Series), `_col_names` (ordem), `_length`,
+`_name`.
 
-Funcionalidades previstas: acesso por coluna (`df["nome"]` via `__index`), CRUD
-de colunas (`add_column`/`drop_column`), slicing (`iloc`/`head`/`tail`/`sample`),
-filtragem (`filter(bool_series)`), seleção/reordenação de colunas, ordenação
-(`sort_by`), `describe`, e pretty-print tabular via `__tostring`.
+Implementado e testado (`tests/test_dataset.lua`, 30 checks, Valgrind-clean):
+
+- **Construção:** `DataSet.new(name)`, `DataSet.from_columns({{nome, dados,
+  dtype?}, ...})` (açúcar `smaug.dataset{...}`).
+- **CRUD de colunas (mutam, chainable):** `:add_column(name, series)` (valida
+  comprimento e nome único), `:drop_column(name)`, `:rename_column(old, new)`.
+- **Acesso/metadados:** `df["col"]` (via `__index`), `:column(name)`/`:col`,
+  `:has_column`, `:columns()`, `:ncols()`, `:nrows()`/`:len()`, `:dtypes()`,
+  `:row(i, na)`.
+- **Linhas → novo DataSet:** `:filter(bool_series)`, `:sort_by(col, asc)`,
+  `:head(n)`, `:tail(n)`, `:iloc(start, stop)`, `:take(idx)`, `:sample(n, seed)`.
+- **Colunas → novo DataSet:** `:select(names)` (subconjunto + reordenação).
+- **Inspeção:** `:describe()` (por coluna), `:to_table(na)`, `__tostring`
+  (tabular).
 
 Invariantes: todas as colunas têm o mesmo `_length` (validado em `add_column`);
 `_col_names` e `_columns` sempre sincronizados.
+
+> **Posse e imutabilidade.** `add_column` assume posse da Series passada (não
+> clona). Operações que derivam linhas (`filter`/`head`/`tail`/`take`/`iloc`/
+> `sample`/`sort_by`) produzem colunas novas via `Series:take`/`:filter`, então
+> o DataSet derivado é independente do original — confirmado em teste.
+
+> **`sort_by` reordena todas as colunas** pela permutação (`Series:argsort`) da
+> coluna-chave, mantendo o alinhamento entre colunas. Falha se a chave tem
+> nulos (o backend não posiciona NA — use `dropna`, Fase 4).
+
+> **Acesso vs métodos no `__index`.** Métodos têm precedência sobre nomes de
+> coluna. Para uma coluna cujo nome colida com um método (ex. uma coluna
+> "head"), use `df:column("head")`.
 
 ### `BoolSeries` e filtros (Fase 4) — comparações + lógica ✅
 
@@ -193,13 +341,14 @@ Encapsula o par (`uint8_t*` valores, `smaug_mask_t*` máscara) devolvido por
 
 `Series:filter(bool_series)` ✅ devolve uma nova Series só com as linhas onde a
 máscara é true (NA na máscara conta como false → linha descartada).
+`DataSet:filter` ✅ também implementado (ver "Classe DataSet").
 
-Ainda da Fase 4: `dropna` (destrava `sort` em séries com nulos) e `DataSet:filter`
-(depende de DataSet, Fase 3).
+Ainda da Fase 4: `dropna` — adiado para depois do MVP de I/O (ver "Dívida
+técnica").
 
 ---
 
-## I/O — formatos de dados padrão (Fase 5)
+## I/O — formatos de dados padrão (Fase 6)
 
 O Smaug suporta **quatro** formatos de entrada/saída, e **apenas** estes quatro.
 Eles são o contrato oficial de I/O do projeto; outros formatos estão fora de
@@ -207,14 +356,15 @@ escopo.
 
 | Formato | Extensão | Leitura | Escrita | Notas |
 |---------|----------|---------|---------|-------|
-| **CSV** | `.csv` / `.tsv` | ✅ planejado | ✅ planejado | Sem type hints → inferência heurística |
-| **JSON** | `.json` | ✅ planejado | ✅ planejado | Tipos nativos → menos inferência |
-| **XML** | `.xml` | ✅ planejado | ✅ planejado | Precisa de convenção tabular explícita |
-| **SQL** | SQLite + `.sql` | ✅ planejado | ✅ planejado | Via SQLite; tipos vêm do schema |
+| **CSV** | `.csv` / `.tsv` | ✅ planejado | ✅ planejado | **Alvo de deploy.** Sem type hints → inferência heurística |
+| **JSON** | `.json` | ✅ planejado | ✅ planejado | **Alvo de deploy.** Tipos nativos → menos inferência |
+| **XML** | `.xml` | ✅ planejado | ✅ planejado | Pós-deploy. Precisa de convenção tabular explícita |
+| **SQL** | SQLite + `.sql` | ✅ planejado | ✅ planejado | Pós-deploy. Via SQLite; tipos vêm do schema |
 
-> **Status:** design apenas. Nenhum dos quatro está implementado. A ordem de
-> implementação sugerida é CSV → JSON → SQL → XML (do mais simples/comum ao mais
-> complexo).
+> **Status:** design apenas; nada implementado. **Pré-requisito:** o tipo
+> `string` (Tier 1) precisa existir antes — um CSV/JSON real tem colunas de
+> texto. Ordem de implementação: **CSV → JSON** (alvo de deploy) e depois
+> **SQL → XML**.
 
 ### Struct intermediária comum
 
@@ -347,7 +497,7 @@ quebrar a API.
 | `float64` | `double` | NaN + bitmask | ✅ pronto |
 | `int64` | `int64_t` | bitmask (sem NaN) | ✅ pronto |
 | `bool` | `uint8_t` | bitmask | ✅ comparações + `BoolSeries` (Fase 4) |
-| `string` | dictionary encoding | bitmask | ⏳ Fase 6 |
+| `string` | dictionary encoding | bitmask | ⏳ **Fase 5** (próxima, pré-requisito do I/O) |
 
 O `bool` já existe de forma embrionária — é o `uint8_t*` que `gt`/`lt`/`eq`
 devolvem. A Fase 4 o promove a tipo de primeira classe (`BoolSeries`) com
@@ -357,6 +507,14 @@ O `string` é o maior buraco para trabalho estilo pandas. Plano: começa como
 array de ponteiros (`char**` + comprimentos) e evolui para **dictionary
 encoding** (IDs inteiros + dicionário de valores únicos), que acelera muito
 groupby, comparação e sorting quando há repetição.
+
+> **Encaixe na arquitetura de headers.** O `string` entra como o 6º header
+> (`smaug_string.h`, ao lado de `smaug_numeric.h` e `smaug_bool.h`), incluindo
+> apenas `smaug_types.h` (a fundação que isola os tipos) e um lifecycle próprio
+> (tamanho variável exige alocação do texto, diferente dos numéricos de tamanho
+> fixo). O umbrella `smaug.h` passará a incluí-lo. Nenhum `.c` existente é
+> tocado — é adição, não modificação. Foi para viabilizar isso que os tipos
+> foram isolados em `smaug_types.h`.
 
 ### Tier 2 — alto valor (pós-MVP)
 
@@ -385,7 +543,7 @@ código do usuário.
   `category`→`categorical`. Larguras menores do NumPy (`int32`, `float32`, …)
   promovem para o tipo de 64 bits correspondente até o Tier 3 existir.
 
-## GroupBy e Joins (Fase 6+)
+## GroupBy e Joins (Fase 7+)
 
 GroupBy: `df:groupby(col)` → objeto que mapeia chave → índices de linha, com
 agregações por grupo (`:sum()`, `:mean()`, `:count()`, `:agg{...}`). Backend

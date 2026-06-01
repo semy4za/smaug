@@ -71,7 +71,7 @@ O Smaug lê e escreve **quatro** formatos — e apenas estes:
 | **XML** | `.xml` (convenção `row_tag`) | inferência heurística |
 | **SQL** | SQLite (dependência opcional) | do schema |
 
-Design completo em `Roadmap.md` (Fase 5). Ainda não implementados.
+Design completo em `Roadmap.md` (Fase 6). Ainda não implementados.
 
 ## Tipos de dados (dtypes)
 
@@ -80,7 +80,7 @@ O Smaug adota um conjunto curado de tipos, em camadas (detalhe em
 
 | Camada | Tipos | Status |
 |--------|-------|--------|
-| Núcleo | `float64`, `int64`, `bool`, `string` | f64/i64/bool ✅; string (Fase 6) |
+| Núcleo | `float64`, `int64`, `bool`, `string` | f64/i64/bool ✅; string (Fase 5, próxima) |
 | Alto valor | `datetime`, `categorical` | pós-MVP |
 | Otimização | `float32`, `int32`, `int8/16`, `uint*` | mesma API, storage estreito; só se necessário |
 
@@ -126,7 +126,11 @@ malloc/free (sem overhead de GC). No Lua, cada struct retornado é registrado co
 ```
 smaug/
 ├── include/
-│   └── smaug_math.h        # Contrato público (tipos + assinaturas f64/i64)
+│   ├── smaug_types.h      # Tipos base (mask, metadata, structs) — zero funções
+│   ├── smaug_core.h       # Lifecycle, get/set, append, smaug_free
+│   ├── smaug_numeric.h    # Aritmética/reduções/comparações/sort/utils (f64+i64)
+│   ├── smaug_bool.h       # Lógica booleana (Kleene)
+│   └── smaug.h            # Umbrella (inclui os de operação)
 ├── src/
 │   ├── smaug_core.c        # Lifecycle: create/free/clone/view, get/set, append
 │   ├── smaug_ops_f64.c     # Operações float64
@@ -152,7 +156,7 @@ A criar (ver `Roadmap.md`): resto do frontend (`core/series.lua`, `init.lua`),
 
 | Camada | Status |
 |--------|--------|
-| Header `smaug_math.h` | ✅ Completo e estável |
+| Headers (5, separados por responsabilidade) | ✅ Completo e estável |
 | Backend C — f64 (lifecycle + ops) | ✅ Completo |
 | Backend C — i64 (lifecycle + ops) | ✅ Completo |
 | Backend C — bool (lógica Kleene) | ✅ `smaug_ops_bool.c` |
@@ -161,9 +165,14 @@ A criar (ver `Roadmap.md`): resto do frontend (`core/series.lua`, `init.lua`),
 | Frontend Lua — `ffi_loader.lua` | ✅ Completo e validado |
 | Frontend Lua — `Series` (f64 + i64) | ✅ Implementada (despacho por dtype) |
 | Frontend Lua — `BoolSeries` + comparações + `filter` | ✅ Implementada |
+| Frontend Lua — `DataSet` | ✅ Implementada (Fase 3) |
 | Frontend Lua — `init.lua` | ✅ Entry point |
-| Frontend Lua — `DataSet` | ❌ Fase 3 |
-| CSV I/O | ❌ Fase 5 |
+| Portabilidade Windows (`smaug_free` + PowerShell) | ✅ Build + testes no Windows |
+| **Endurecimento (Fase 1.6)** | ⏳ **Em andamento — gate atual** |
+| Tipo `string` (Tier 1) | ❌ Fase 5 (próxima, pré-requisito do I/O) |
+| I/O — CSV + JSON (deploy) | ❌ Fase 6 |
 
-Detalhes em `API_Reference.md` (o que cada função faz) e `Roadmap.md` (o que vem
-a seguir).
+> **Gate de qualidade.** Nenhuma fase nova começa antes de a anterior estar
+> validada em nível "aviação": testes sistemáticos, property-based, e cobertura
+> **medida** (gcov) ≥ 90%. A Fase 1.6 (endurecimento) é o gate atual; ver
+> `Roadmap.md`.

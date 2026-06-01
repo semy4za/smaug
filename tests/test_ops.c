@@ -1,4 +1,4 @@
-#include "../include/smaug_math.h"
+#include "../include/smaug.h"
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>

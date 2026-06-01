@@ -1,4 +1,4 @@
-#include "../include/smaug_math.h"
+#include "../include/smaug_numeric.h"
 #include <math.h>      /* NAN, isnan(), sqrt() */
 #include <stdlib.h>    /* malloc, free, qsort */
 #include <stddef.h>
@@ -14,10 +14,9 @@
    =================================================================== */
 
 /* Aloca uma nova série f64 com todos os elementos marcados como NULL.
-   Operações preenchem apenas as posições válidas. */
+   Operações preenchem apenas as posições válidas.
+   smaug_f64_create vem de smaug_core.h (incluído via smaug_numeric.h). */
 static smaug_series_f64_t *alloc_result(size_t size) {
-    /* reutiliza smaug_f64_create que já inicia null_mask como 0x00 */
-    extern smaug_series_f64_t *smaug_f64_create(size_t);
     return smaug_f64_create(size);
 }
 

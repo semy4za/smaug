@@ -1,0 +1,311 @@
+-- lua/smaug/core/dataset.lua
+--
+-- DataSet: tabela 2D = coleção de Series alinhadas (mesmo número de linhas).
+-- Cada coluna é uma Series independente; as colunas só compartilham o
+-- comprimento, nunca os dados.
+--
+-- Atributos de instância:
+--   _columns   : dict  nome -> Series
+--   _col_names : array com a ordem das colunas
+--   _length    : número de linhas (nil enquanto não há colunas)
+--   _name      : rótulo opcional
+--
+-- Invariantes (garantidos por add_column):
+--   * todas as colunas têm o mesmo _length;
+--   * _col_names e _columns sempre sincronizados (mesma cardinalidade/chaves).
+--
+-- Posse: add_column assume a posse da Series passada (não clona). Operações que
+-- derivam linhas (filter/head/tail/take/iloc/sample/sort_by) produzem colunas
+-- novas via Series:take/:filter, então o DataSet derivado é independente.
+
+local Series     = require("smaug.core.series")
+local BoolSeries = require("smaug.core.boolseries")
+
+local DataSet = {}
+local methods = {}
+
+local function is_series(x)     return getmetatable(x) == Series end
+local function is_boolseries(x) return getmetatable(x) == BoolSeries end
+
+-- =====================================================================
+-- Construção
+-- =====================================================================
+function DataSet.new(name)
+    return setmetatable({
+        _columns   = {},
+        _col_names = {},
+        _length    = nil,
+        _name      = name or "DataSet",
+    }, DataSet)
+end
+
+-- Constrói de uma lista ORDENADA de pares { {nome, series_ou_tabela}, ... }.
+-- Se o 2º elemento for uma tabela Lua, vira Series via from_table (dtype opcional
+-- no 3º elemento do par, default float64).
+function DataSet.from_columns(pairs_list, name)
+    local df = DataSet.new(name)
+    for _, pair in ipairs(pairs_list) do
+        local cname, data, dtype = pair[1], pair[2], pair[3]
+        local col = is_series(data) and data
+                    or Series.from_table(data, dtype or "float64", cname)
+        df:add_column(cname, col)
+    end
+    return df
+end
+
+-- =====================================================================
+-- CRUD de colunas (mutam o DataSet; chainable)
+-- =====================================================================
+function methods.add_column(self, name, series)
+    if type(name) ~= "string" then error("smaug: nome de coluna deve ser string", 2) end
+    if not is_series(series) then error("smaug: add_column espera uma Series", 2) end
+    if self._columns[name] ~= nil then
+        error("smaug: coluna '"..name.."' já existe", 2)
+    end
+    local n = series:len()
+    if self._length == nil then
+        self._length = n
+    elseif n ~= self._length then
+        error("smaug: coluna '"..name.."' tem "..n.." linhas; esperado "..
+              self._length, 2)
+    end
+    self._columns[name] = series
+    self._col_names[#self._col_names + 1] = name
+    return self
+end
+
+function methods.drop_column(self, name)
+    if self._columns[name] == nil then
+        error("smaug: coluna '"..name.."' não existe", 2)
+    end
+    self._columns[name] = nil
+    for i, n in ipairs(self._col_names) do
+        if n == name then table.remove(self._col_names, i); break end
+    end
+    if #self._col_names == 0 then self._length = nil end
+    return self
+end
+
+function methods.rename_column(self, old, new)
+    if self._columns[old] == nil then error("smaug: coluna '"..old.."' não existe", 2) end
+    if self._columns[new] ~= nil then error("smaug: coluna '"..new.."' já existe", 2) end
+    self._columns[new] = self._columns[old]
+    self._columns[old] = nil
+    for i, n in ipairs(self._col_names) do
+        if n == old then self._col_names[i] = new; break end
+    end
+    return self
+end
+
+-- =====================================================================
+-- Acesso / metadados
+-- =====================================================================
+function methods.column(self, name)
+    local c = self._columns[name]
+    if c == nil then error("smaug: coluna '"..name.."' não existe", 2) end
+    return c
+end
+methods.col = methods.column
+
+function methods.has_column(self, name) return self._columns[name] ~= nil end
+function methods.columns(self)
+    local t = {}
+    for i, n in ipairs(self._col_names) do t[i] = n end   -- cópia defensiva
+    return t
+end
+function methods.ncols(self) return #self._col_names end
+function methods.nrows(self) return self._length or 0 end
+methods.len = methods.nrows
+
+function methods.dtypes(self)
+    local t = {}
+    for _, n in ipairs(self._col_names) do t[n] = self._columns[n]._dtype end
+    return t
+end
+
+-- Linha i (1-based) como tabela Lua { coluna = valor }. Nulos viram na_value.
+function methods.row(self, i, na_value)
+    if type(i) ~= "number" or i < 1 or i > self:nrows() then
+        error("smaug: linha "..tostring(i).." fora dos limites [1, "..self:nrows().."]", 2)
+    end
+    local r = {}
+    for _, n in ipairs(self._col_names) do
+        local v = self._columns[n]:get(i)
+        if v == nil then v = na_value end
+        r[n] = v
+    end
+    return r
+end
+
+-- =====================================================================
+-- Seleção de colunas / linhas -> novo DataSet
+-- =====================================================================
+-- Constrói um novo DataSet aplicando uma transformação a cada coluna.
+local function map_columns(self, fn, new_name)
+    local df = DataSet.new(new_name or self._name)
+    for _, n in ipairs(self._col_names) do
+        df:add_column(n, fn(self._columns[n]))
+    end
+    return df
+end
+
+-- select: novo DataSet só com as colunas nomeadas, na ordem dada.
+function methods.select(self, names)
+    if type(names) ~= "table" then error("smaug: select espera uma tabela de nomes", 2) end
+    local df = DataSet.new(self._name)
+    for _, n in ipairs(names) do
+        df:add_column(n, self:column(n))   -- compartilha a Series (imutável por padrão)
+    end
+    return df
+end
+
+-- take: novo DataSet com as linhas nos índices idx (tabela 1-based).
+function methods.take(self, idx)
+    return map_columns(self, function(c) return c:take(idx) end)
+end
+
+function methods.head(self, n)
+    return map_columns(self, function(c) return c:head(n) end)
+end
+
+function methods.tail(self, n)
+    return map_columns(self, function(c) return c:tail(n) end)
+end
+
+-- iloc(start, stop): faixa de linhas 1-based inclusiva -> novo DataSet.
+function methods.iloc(self, start, stop)
+    local total = self:nrows()
+    start = start or 1
+    stop  = stop or total
+    if start < 1 or stop > total or start > stop + 1 then
+        error("smaug: iloc("..start..", "..stop..") fora dos limites [1, "..total.."]", 2)
+    end
+    local idx = {}
+    for i = start, stop do idx[#idx + 1] = i end
+    return self:take(idx)
+end
+
+-- sample(n): n linhas aleatórias (sem reposição) -> novo DataSet.
+function methods.sample(self, n, seed)
+    local total = self:nrows()
+    n = math.min(n or 1, total)
+    if seed ~= nil then math.randomseed(seed) end
+    -- Fisher-Yates parcial sobre uma permutação de 1..total
+    local perm = {}
+    for i = 1, total do perm[i] = i end
+    for i = 1, n do
+        local j = math.random(i, total)
+        perm[i], perm[j] = perm[j], perm[i]
+    end
+    local idx = {}
+    for i = 1, n do idx[i] = perm[i] end
+    return self:take(idx)
+end
+
+-- filter(bool_series): novo DataSet só com as linhas onde a máscara é true.
+function methods.filter(self, mask)
+    if not is_boolseries(mask) then
+        error("smaug: filter espera uma BoolSeries (use coluna:gt/:lt/:eq)", 2)
+    end
+    if mask:len() ~= self:nrows() then
+        error("smaug: filter com máscara de tamanho diferente ("..
+              mask:len().." vs "..self:nrows()..")", 2)
+    end
+    return map_columns(self, function(c) return c:filter(mask) end)
+end
+
+-- sort_by(col, ascending): novo DataSet ordenado pela permutação da coluna-chave.
+function methods.sort_by(self, col, ascending)
+    local key = self:column(col)
+    local idx = key:argsort(ascending)
+    if idx == nil then
+        error("smaug: sort_by não suporta nulos na coluna '"..col..
+              "' (use dropna primeiro)", 2)
+    end
+    return self:take(idx)
+end
+
+-- =====================================================================
+-- Inspeção
+-- =====================================================================
+-- describe: tabela { coluna = (describe da Series) } para colunas numéricas.
+function methods.describe(self)
+    local t = {}
+    for _, n in ipairs(self._col_names) do
+        t[n] = self._columns[n]:describe()
+    end
+    return t
+end
+
+-- to_table: dict { coluna = {valores} } (nulos viram na_value).
+function methods.to_table(self, na_value)
+    local t = {}
+    for _, n in ipairs(self._col_names) do
+        t[n] = self._columns[n]:to_table(na_value)
+    end
+    return t
+end
+
+-- =====================================================================
+-- Pretty-print tabular
+-- =====================================================================
+local function cell_str(v)
+    if v == nil then return "NA" end
+    if type(v) == "number" then
+        if v % 1 == 0 then return string.format("%d", v) end
+        return string.format("%.4g", v)
+    end
+    return tostring(v)
+end
+
+DataSet.__tostring = function(self)
+    local names = self._col_names
+    local nrows = self:nrows()
+    if #names == 0 then return "DataSet '"..self._name.."' (vazio)" end
+
+    local limit = math.min(nrows, 10)
+    -- larguras: max entre nome e células exibidas (+ a coluna de índice)
+    local widths = {}
+    for _, n in ipairs(names) do widths[n] = #n end
+    local idxw = #tostring(nrows)
+    local rows = {}
+    for i = 1, limit do
+        local row = {}
+        for _, n in ipairs(names) do
+            local s = cell_str(self._columns[n]:get(i))
+            row[n] = s
+            if #s > widths[n] then widths[n] = #s end
+        end
+        rows[i] = row
+    end
+
+    local function pad(s, w) return s .. string.rep(" ", w - #s) end
+    local out = {}
+    -- cabeçalho
+    local header = { string.rep(" ", idxw) }
+    for _, n in ipairs(names) do header[#header + 1] = pad(n, widths[n]) end
+    out[#out + 1] = table.concat(header, "  ")
+    -- linhas
+    for i = 1, limit do
+        local line = { pad(tostring(i), idxw) }
+        for _, n in ipairs(names) do line[#line + 1] = pad(rows[i][n], widths[n]) end
+        out[#out + 1] = table.concat(line, "  ")
+    end
+    if nrows > limit then out[#out + 1] = "... ("..(nrows - limit).." linhas a mais)" end
+
+    return string.format("DataSet '%s' [%d linhas x %d colunas]\n%s",
+        self._name, nrows, #names, table.concat(out, "\n"))
+end
+
+-- __index: df["coluna"] OU df:metodo(). Métodos têm precedência; para uma
+-- coluna cujo nome colide com um método, use df:column(nome).
+DataSet.__index = function(self, k)
+    local m = methods[k]
+    if m ~= nil then return m end
+    if type(k) == "string" then return rawget(self, "_columns")[k] end
+    return nil
+end
+
+DataSet.__len = function(self) return self:nrows() end
+
+return DataSet

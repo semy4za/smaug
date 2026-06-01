@@ -7,7 +7,7 @@
 --   * _vals  : uint8_t*       (1 = true, 0 = false)
 --   * _nulls : smaug_mask_t*  (0xFF = válido, 0x00 = NA)  -- pode ser nil
 --   * _n     : comprimento
--- Ambos os arrays são malloc()ados em C; registramos ffi.gc(ptr, C.free) para
+-- Ambos os arrays são malloc()ados em C; registramos ffi.gc(ptr, C.smaug_free) para
 -- liberá-los automaticamente.
 --
 -- Null handling: lógica de três valores (Kleene), feita em C — ver
@@ -24,8 +24,8 @@ local methods = {}
 -- `vals` e `nulls` são cdata uint8_t*/smaug_mask_t* (nulls pode ser nil).
 local function own(vals, nulls, n, name)
     if vals == nil then error("smaug: BoolSeries recebeu ponteiro nulo", 2) end
-    ffi.gc(vals, C.free)
-    if nulls ~= nil then ffi.gc(nulls, C.free) end
+    ffi.gc(vals, C.smaug_free)
+    if nulls ~= nil then ffi.gc(nulls, C.smaug_free) end
     return setmetatable({
         _vals  = vals,
         _nulls = nulls,         -- pode ser nil (sem nulos)

@@ -1,14 +1,14 @@
 -- lua/smaug/ffi_loader.lua
 --
 -- Ponte FFI do Smaug. Responsabilidade ÚNICA: tradução.
---   1. Declara os tipos e assinaturas de include/smaug_math.h via ffi.cdef.
+--   1. Declara os tipos e assinaturas de include/smaug.h (umbrella) via ffi.cdef.
 --   2. Carrega a biblioteca compilada (libsmaug_math.so / .dylib / .dll).
 --   3. Devolve o namespace C.
 --
 -- Sem lógica de negócio aqui. Conversão 1-based/0-based, nil<->NAN, ffi.gc,
 -- validação etc. ficam nas camadas de cima (series.lua, dataset.lua).
 --
--- Mantenha este cdef em sincronia com include/smaug_math.h.
+-- Mantenha este cdef em sincronia com include/smaug.h.
 
 local ffi = require("ffi")
 
@@ -154,8 +154,10 @@ ffi.cdef([[
     smaug_series_i64_t* smaug_i64_take  (const smaug_series_i64_t *s, const size_t *idx, size_t len);
     smaug_series_i64_t* smaug_i64_filter(const smaug_series_i64_t *s, const uint8_t *mask);
 
-    /* --- libc free: para liberar os arrays brutos devolvidos por compare e argsort --- */
-    void free(void *ptr);
+    /* --- liberação dos arrays brutos devolvidos por compare/argsort/bool ops.
+       Exportada pela própria lib Smaug (não a free() da libc), para liberar no
+       mesmo runtime/heap que alocou — essencial no Windows. --- */
+    void smaug_free(void *ptr);
 
     /* ===================================================================
        Operações Boolean (BoolSeries) — lógica de três valores (Kleene)

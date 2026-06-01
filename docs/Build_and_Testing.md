@@ -126,7 +126,33 @@ nm -D build/libsmaug_math.so | grep smaug | head
 
 ---
 
-## Testar o carregamento via LuaJIT
+## Windows (PowerShell)
+
+No Windows não há `make` nem Valgrind por padrão. Use o script
+`scripts\windows-build.ps1`, que compila o backend em `build\smaug_math.dll`
+(nome que o `ffi_loader.lua` procura no Windows) chamando o `gcc` diretamente, e
+roda os testes C e Lua.
+
+Toolchain recomendada: **MSYS2** (entrega `gcc` e `luajit` juntos). O script
+instala tudo com a flag `-Setup`:
+
+```powershell
+# da raiz do projeto:
+powershell -ExecutionPolicy Bypass -File .\scripts\windows-build.ps1 -Setup   # 1ª vez
+powershell -ExecutionPolicy Bypass -File .\scripts\windows-build.ps1          # depois
+```
+
+O `-Setup` instala o MSYS2 (via `winget`, se ausente) e os pacotes
+`mingw-w64-ucrt-x86_64-gcc` e `mingw-w64-ucrt-x86_64-luajit`. Se o `pacman`
+reclamar de runtime desatualizado, abra o app "MSYS2 UCRT64" e rode
+`pacman -Syu` uma vez (pode pedir reinício), depois repita o script.
+
+Saída esperada: os três testes C imprimem `PASS` e os dois testes Lua imprimem
+`OK — N checks passaram`, terminando em `TUDO PASSOU.`
+
+Diferenças vs. Linux: a checagem de vazamentos (Valgrind) **não** roda no
+Windows — ela continua sendo feita no Linux com `make valgrind`. Os testes de
+correção são os mesmos nos dois sistemas.
 
 A ponte FFI oficial é `lua/smaug/ffi_loader.lua` — ela declara o `ffi.cdef`
 completo (f64 + i64 + `free`) e faz o `ffi.load` com fallback de paths e
@@ -156,26 +182,108 @@ luajit test_load.lua   # → OK — soma = 6, série liberada
 
 ---
 
+## Integridade do projeto (transferência sem perdas)
+
+Para garantir que o projeto seja transferido entre máquinas (e entre sessões de
+trabalho) sem perder ou divergir arquivos, o repositório mantém um
+`docs/MANIFEST.txt` com o **sha256 e a contagem de linhas** de cada arquivo
+versionável (fontes, headers, Lua, docs, scripts — exceto `build/`).
+
+```bash
+make manifest    # regenera docs/MANIFEST.txt
+make verify      # regenera e mostra o diff contra a versão anterior (via git)
+```
+
+Fluxo recomendado:
+
+1. **Antes de empacotar/enviar:** rode `make manifest` e inclua o
+   `MANIFEST.txt` no pacote. Ele é o inventário canônico do que deve existir.
+2. **Ao receber o projeto:** rode `make manifest` de novo e compare com o
+   `MANIFEST.txt` recebido (ou `git diff`). Hashes diferentes denunciam arquivos
+   alterados; arquivos ausentes denunciam perda na transferência.
+3. **A fonte da verdade é o projeto completo** (o `.zip`/repo), não cópias
+   parciais. Nunca se presume que uma cópia anterior está atual.
+
+O `MANIFEST.txt` é gerado por `scripts/make_manifest.sh` (portável: roda em
+bash, inclusive no MSYS2/Git Bash no Windows).
+
+---
+
+## Estratégia de testes (nível aviação)
+
+O padrão de teste do projeto é "rotina de aviação": não basta cobrir casos
+felizes; cobre-se o espaço de entradas sistematicamente, mede-se a cobertura, e
+afirma-se invariantes que devem valer **sempre**. Isto é o gate da Fase 1.6
+(ver `Roadmap.md`) e o padrão para todas as fases seguintes.
+
+Camadas de teste:
+
+1. **Testes C** (`test_*.c`) — exercitam o backend diretamente; rodam sob
+   Valgrind para garantir ausência de vazamentos e erros de memória. É a única
+   camada que pode testar **falha de alocação** (interceptando `malloc`/`realloc`
+   para falhar sob demanda e exercitar os caminhos de erro do `grow`).
+2. **Testes Lua** (`test_*.lua`) — exercitam o sistema como o usuário o usa
+   (Lua → FFI → C), validando de quebra a fronteira FFI: índices 1-based↔0-based,
+   `nil`↔NA, e os sentinelas (`NAN`, `INT64_MIN`) virando `nil`.
+3. **Property-based em Lua** (`test_props.lua`) — gera N≥1000 entradas
+   aleatórias por invariante (com seed fixa para reprodutibilidade) e verifica
+   propriedades que devem valer para qualquer entrada.
+
+Decisão registrada: o **property-based testing é feito em Lua**, porque a stack
+do Smaug é fina e determinística — testar em Lua exercita o mesmo código C e
+ainda cobre a fronteira FFI. A única exceção é a falha de alocação, que fica em C.
+
+O que a bateria sistemática cobre, por categoria:
+
+- **Casos degenerados**, em toda operação: série vazia, de 1 elemento,
+  toda-nula, toda-igual.
+- **Valores especiais do f64**: `+Inf`, `-Inf`, `NaN` do usuário (≠ nulo),
+  `-0.0`.
+- **Overflow do i64**: perto de `INT64_MAX`/`INT64_MIN`; colisão com o sentinela.
+- **Invariantes (property-based)**: `len(filter)==count_true(mask)`; `sort` é
+  permutação; `clone` igual e independente; `take`+inversa = identidade;
+  `astype` ida-e-volta; leis de Kleene (`not not b == b`, De Morgan).
+- **Falha de alocação (C)**: série permanece consistente após erro de `realloc`.
+
+### Cobertura medida (gcov)
+
+A cobertura é **medida, não estimada**. O alvo `make coverage` compila com
+`--coverage`, roda toda a suíte e gera relatório via `gcov` (HTML opcional via
+`lcov`/`genhtml`). Gate da Fase 1.6: **≥ 90% de linhas no backend C**, com cada
+ramo não-coberto identificado e justificado. O relatório é registrado a cada
+fechamento de fase.
+
+```bash
+make coverage    # compila com --coverage, roda a suíte, imprime o resumo gcov
+```
+
+---
+
 ## Testes em C
 
 Estrutura atual (**implementada**):
 
 ```
 tests/
-├── test_alloc.c   # create/free/clone/view/append, invariantes, grow — Valgrind-clean
-├── test_ops.c     # resultados numéricos contra valores conhecidos
-├── test_bool.c    # lógica booleana de três valores (Kleene) + agregações
-└── test_series.lua # frontend: Series (f64/i64), BoolSeries, comparações, filter
+├── test_alloc.c    # create/free/clone/view/append, invariantes, grow — Valgrind-clean
+├── test_ops.c      # resultados numéricos contra valores conhecidos
+├── test_bool.c     # lógica booleana de três valores (Kleene) + agregações
+├── test_series.lua # frontend: Series (f64/i64), BoolSeries, comparações, filter
+├── test_dataset.lua# frontend: DataSet (CRUD, filter, sort_by, slicing, etc.)
+└── (Fase 1.6, planejados)
+    ├── test_edge.lua    # casos degenerados + valores especiais f64 + overflow i64
+    ├── test_props.lua   # property-based (invariantes, N≥1000 casos, seed fixa)
+    └── test_allocfail.c # falha de alocação injetada (caminho de erro do grow)
 ```
 
 Rode os C com `make test` (ou `make valgrind` para checar leaks) e o frontend
-Lua com `make test-lua`. Todos passam e os testes C são validados sob Valgrind
-sem vazamentos.
+Lua com `make test-lua` (roda `test_series.lua` e `test_dataset.lua`). Todos
+passam e os testes C são validados sob Valgrind sem vazamentos.
 
 Exemplo de teste de operações (`tests/test_ops.c`):
 
 ```c
-#include "../include/smaug_math.h"
+#include "../include/smaug.h"   /* umbrella; ou smaug_numeric.h p/ só numérico */
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>

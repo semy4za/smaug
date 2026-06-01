@@ -58,6 +58,7 @@ local DTYPES = {
         view = C.smaug_f64_view, take = C.smaug_f64_take,
         filter = C.smaug_f64_filter,
         gt = C.smaug_f64_gt, lt = C.smaug_f64_lt, eq = C.smaug_f64_eq,
+        argsort = C.smaug_f64_argsort,
         -- Uma redução int (sum/min/max) devolveu o sentinela de erro?
         -- No f64 isso é detectado por NaN no próprio valor.
         is_int_sentinel = function(_) return false end,
@@ -85,6 +86,7 @@ local DTYPES = {
         view = C.smaug_i64_view, take = C.smaug_i64_take,
         filter = C.smaug_i64_filter,
         gt = C.smaug_i64_gt, lt = C.smaug_i64_lt, eq = C.smaug_i64_eq,
+        argsort = C.smaug_i64_argsort,
         -- sum/min/max do i64 retornam INT64_MIN quando há nulo + !ignore_na.
         is_int_sentinel = function(v) return v == I64_MIN end,
     },
@@ -247,6 +249,20 @@ function methods.sort(self, ascending)
         error("smaug: sort não suporta séries com nulos (use dropna primeiro)", 2)
     end
     return wrap(r, self._dtype, self._name)
+end
+
+-- argsort: tabela Lua 1-based de índices que ordenam a série. Devolve `nil` se
+-- a série contém nulos (o backend não sabe posicionar NA). Usado por
+-- DataSet:sort_by para reordenar todas as colunas pela mesma permutação.
+function methods.argsort(self, ascending)
+    if ascending == nil then ascending = true end
+    local p = self._d.argsort(self._c, ascending)
+    if p == nil then return nil end          -- série com nulos
+    local n = self:len()
+    local idx = {}
+    for i = 1, n do idx[i] = tonumber(p[i - 1]) + 1 end   -- 0-based -> 1-based
+    C.smaug_free(p)
+    return idx
 end
 
 -- View: fatia zero-copy [start, start+len-1] (1-based). A view aponta para a

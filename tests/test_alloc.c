@@ -13,7 +13,7 @@
  *   valgrind --leak-check=full --error-exitcode=1 ./build/test_alloc
  */
 
-#include "../include/smaug_math.h"
+#include "../include/smaug.h"
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
