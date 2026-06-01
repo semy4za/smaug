@@ -83,8 +83,8 @@ Cobertura exigida:
   toda-nula, toda-igual. Cada uma pode quebrar reduções, `sort`, `view`, `take`,
   `filter`, `argsort` de formas diferentes.
 - **Valores especiais do f64**: `+Inf`, `-Inf`, `NaN` fornecido pelo usuário
-  (distinto de nulo), `-0.0`. Definir e testar o comportamento de
-  `sum`/`min`/`max`/`sort`/comparações na presença deles.
+  (distinto de nulo), `-0.0`. Comportamento **decidido** abaixo ("Contrato de
+  valores especiais"); a Frente 1 testa cada caso.
 - **Overflow do i64**: operações perto de `INT64_MAX`/`INT64_MIN`, e a colisão
   com o sentinela `INT64_MIN` das reduções.
 - **Property-based (invariantes que valem sempre)**, p. ex.:
@@ -98,6 +98,42 @@ Cobertura exigida:
 - **Falha de alocação (em C)**: interceptar `malloc`/`realloc` para falhar sob
   demanda e exercitar de verdade o caminho de erro do `grow` (o fix do realloc
   parcial), confirmando que a série permanece consistente.
+
+### Contrato de valores especiais (decidido)
+
+Decisões tomadas para o comportamento de `NaN`/`Inf` e reduções de coleções
+vazias. Estas são o contrato a implementar na Fase 1.6.
+
+1. **`NaN` é distinto de `null`.** No Smaug, `null` (bitmask) = "valor ausente";
+   `NaN` (IEEE 754) = "valor presente, mas matematicamente indefinido". São
+   conceitos separados — ao contrário de pandas/numpy, que usam `NaN` como
+   `null`. Esta separação é uma vantagem do Smaug e deve ser preservada: uma
+   operação **nunca** converte `NaN` em `null` nem vice-versa.
+
+2. **`NaN` é "forte" e contagioso na aritmética** (já garantido pelo IEEE 754,
+   sem código extra): `NaN + x = NaN`, `NaN * 0 = NaN`, etc. Comparações com
+   `NaN` são sempre `false` (`NaN > 5`, `NaN == NaN` → `false`), então
+   `:gt`/`:lt`/`:eq` com `NaN` dão `false` (não `null`).
+
+3. **`sort`/`argsort` recusam séries com `NaN`** — exatamente como já recusam
+   séries com `null`. Regra uniforme: **valor sem ordem bem-definida → recusa**
+   (retorna erro/NULL), em vez de produzir ordenação silenciosamente errada.
+   O usuário limpa antes (`dropna` / futuro tratamento de `NaN`) e então ordena.
+   Implementação: o sort, além do check de bitmask, passa a checar `isnan()` nos
+   valores f64 (i64 não tem `NaN`, não muda). `+Inf`/`-Inf` **são** ordenáveis
+   (maior/menor valor) e **não** são recusados.
+
+4. **Redução de coleção vazia/toda-nula — `sum` com `min_count`** (segue o
+   pandas): `sum()` retorna `0` por padrão (`min_count=0`), prático e compatível.
+   `sum(min_count=1)` retorna `null` se não houver ao menos 1 valor válido —
+   para quem precisa distinguir "soma zero" de "não havia dado" (evita erro
+   silencioso). `mean`/`min`/`max` de vazio continuam `null`/`NAN` (não há valor
+   neutro). Aplicável a `sum` (e `prod`, se vier).
+
+> **Warnings adiados.** A ideia de emitir aviso quando uma operação encontra
+> `NaN` (ex.: na camada Lua, opt-in) foi **adiada para uma fase futura de
+> observabilidade**, que tratará warnings de forma sistemática em todo o projeto
+> em vez de ad-hoc. Ver "Dívida técnica".
 
 ### Frente 2 — Cobertura medida
 
@@ -157,6 +193,13 @@ após o MVP de I/O.
 
 **Performance/robustez:** benchmarks e teste de estresse (séries de 10⁷+
 elementos); avaliação de SIMD; o `ffi.gc` em hot paths (construção em massa).
+
+**Observabilidade (fase dedicada futura):** sistema de **warnings** unificado —
+ex.: avisar (opt-in, na camada Lua) quando uma operação encontra `NaN`, quando
+há overflow de i64, ou outras condições silenciosas. Adiado de propósito para
+ser tratado de forma sistemática em todo o projeto, em vez de avisos ad-hoc
+espalhados. Inclui decidir o mecanismo (retorno de status, callback, log
+opt-in) sem penalizar os loops quentes do backend C.
 
 ---
 

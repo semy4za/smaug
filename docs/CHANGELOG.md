@@ -4,6 +4,20 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Decidido (contrato de valores especiais — Fase 1.6)
+- **`NaN` ≠ `null`** no Smaug: `null` é ausência (bitmask), `NaN` é valor IEEE
+  indefinido. Nunca se converte um no outro (vantagem sobre pandas/numpy).
+- `NaN` contagioso na aritmética (IEEE, de graça); comparações com `NaN` dão
+  `false` (`:gt`/`:lt`/`:eq`), não `null`.
+- **`sort`/`argsort` recusam `NaN`** (além de `null`) — regra uniforme "sem
+  ordem definida → recusa". `±Inf` são ordenáveis (não recusados).
+- **`sum(min_count=...)`**: `sum()` retorna 0 por padrão; `sum(min_count=1)`
+  retorna `null` se não houver valor válido (evita erro silencioso). Segue o
+  pandas. `mean`/`min`/`max` de vazio seguem `null`/`NAN`.
+- **Warnings adiados** para uma fase de observabilidade dedicada (tratados de
+  forma sistemática, não ad-hoc). Registrado na dívida técnica.
+- Documentado em `Roadmap.md` ("Contrato de valores especiais" + dívida).
+
 ### Adicionado (qualidade / processo)
 - `docs/CODE_REVIEW.md`: review completo do código (baseline pré-Fase 1.6).
   Veredito: correto e consistente; achados A1–A6 de robustez para tratar no

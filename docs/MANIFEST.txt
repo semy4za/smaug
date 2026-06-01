@@ -1,0 +1,35 @@
+# Smaug — MANIFEST de integridade
+# Gerado por scripts/make_manifest.sh
+# Formato: <sha256>  <linhas>  <caminho>
+#
+02440bd9a4b2c5c42c545c1756ecc01dd04520f3609afa4373f0a156fc0dbb9e      53  ./Makefile
+df2ebcd10997f04394c22f58801247ac5c672ef8e1f34e2bf6fc75c598e123ff     346  ./docs/API_Reference.md
+6303e28ed737c030d915f6d71e61c9f737a22eee4ccbd0979089377806e47645     377  ./docs/Build_and_Testing.md
+fff3dacd4fb04b3cb5a750571595a2f4718ac116839cafce27314be98367c57e     204  ./docs/CHANGELOG.md
+1c03fc955d42b8f551a96fdcb45a2e6d468c44cb238e3f983fe1adfadb158168      76  ./docs/CODE_REVIEW.md
+e98aa6441465eded70a989e40018567e5d6bbba5bc5e829275619819d49d3752     178  ./docs/README.md
+ac5e20248df3f5bfee0943788a102bb36cc05b6d8fb762cba6512800fb4d877e     613  ./docs/Roadmap.md
+1a962624dbef1cab3ee1238a1d2f13e7b64fbb1bcad4fe06a2b0328d4dde4742      27  ./include/smaug.h
+963e21a0d5b9b1857da7bbe7310a4a9340057fcf7560272f062e4e83727c5da3      40  ./include/smaug_bool.h
+b10e6e4b8703cf71abad70679b000d650ed37c891f644e53e80902f4cc805b2d      58  ./include/smaug_core.h
+3299b0ce0035dda28a919d504830019a29bca7aa1ef77f63259d8cd70a34da43      86  ./include/smaug_numeric.h
+686b957dac70dc6d906a3ca723cbabb9a626349588bc1f5872d44051e6f4661a      51  ./include/smaug_types.h
+bb305e8d5b91ac7ab9a2634cb1d5ee50b7db7fa740ccfd867fc815e803c47f25     141  ./lua/smaug/core/boolseries.lua
+cbe504c2e814d70174c6f2158ccac5eaf04c619eba143deff545c3ca320d1ae2     311  ./lua/smaug/core/dataset.lua
+a259f2f5421a25732af462723fe015b2dc5724519b40b29b4029779e31f97a31     488  ./lua/smaug/core/series.lua
+274e342fcdfbe554566f328fac7b34854e7c40d7db4f0b2fd1fd883014ba4f98     213  ./lua/smaug/ffi_loader.lua
+09044a60cd7891600013e3bb7f15ddc7b9e741db8f4499ed93499e355aadea17      28  ./lua/smaug/init.lua
+b66ef9c2b20f6cc829414653c16e208f3d9c9daf5765ccd4c11053b821621def      25  ./scripts/make_manifest.sh
+f301331a2d5f805665d3a4377482866fc528b1a8df5a64fd1677d97c76483811     150  ./scripts/windows-build.ps1
+d97f781b9cf6fc4a5de826ca16c74439f4aeaabe1704421baf8a651c5e5d67c6     354  ./src/smaug_core.c
+267958936286e557235eb7d884c5032e4cd72d6c544d7e24d639c6d1f7f669a8     134  ./src/smaug_ops_bool.c
+ded1b0097cd9e70f9852dbf6255dc10c9ca87228da4c9d2f7ae645fd56ba4392     454  ./src/smaug_ops_f64.c
+c2654288985151bb30a29195e3cfdded0daf657bf372ceac4738040b2911c44d     445  ./src/smaug_ops_i64.c
+eb8534eb8a2404a6cc143f4d4f27a34209c791301539de5f54be9822d1005aa6      22  ./test_load.lua
+427253b1234873224e0053bec67a3d894c74278bd8b5579b6440ec6234de3678     209  ./tests/test_alloc.c
+c3a4e968b31bf94327b9b87be8e912861bbc0cb54563bf02a5aeb6583eff2c93      80  ./tests/test_bool.c
+0e6f8b602e9dd802dd0cec139a37220e570bb0bb444b47cc9c27f8c37df1d7b3     105  ./tests/test_dataset.lua
+c1f1a08db58d897a367d83b92ff1f22e932d86b53c62d88a4d4567fc9c0f882a      22  ./tests/test_ops.c
+c61324b82dfb664a245874174c5c3fac80715d11f230b7cc190ddb13aa91995a     190  ./tests/test_series.lua
+#
+# total de arquivos: 29
