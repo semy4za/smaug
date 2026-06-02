@@ -270,14 +270,16 @@ tests/
 ├── test_bool.c     # lógica booleana de três valores (Kleene) + agregações
 ├── test_series.lua # frontend: Series (f64/i64), BoolSeries, comparações, filter
 ├── test_dataset.lua# frontend: DataSet (CRUD, filter, sort_by, slicing, etc.)
-└── (Fase 1.6, planejados)
-    ├── test_edge.lua    # casos degenerados + valores especiais f64 + overflow i64
+├── test_edge.lua   # ✅ casos degenerados (vazia/1-elem/toda-nula/toda-igual) + propagação NA
+└── (Fase 1.6, ainda planejados)
+    ├── test_special.lua # valores especiais f64 (Inf, NaN do usuário, -0.0) + overflow i64
     ├── test_props.lua   # property-based (invariantes, N≥1000 casos, seed fixa)
     └── test_allocfail.c # falha de alocação injetada (caminho de erro do grow)
 ```
 
 Rode os C com `make test` (ou `make valgrind` para checar leaks) e o frontend
-Lua com `make test-lua` (roda `test_series.lua` e `test_dataset.lua`). Todos
+Lua com `make test-lua` (roda `test_series.lua`, `test_dataset.lua` e
+`test_edge.lua`). Todos
 passam e os testes C são validados sob Valgrind sem vazamentos.
 
 Exemplo de teste de operações (`tests/test_ops.c`):

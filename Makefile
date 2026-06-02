@@ -36,6 +36,7 @@ valgrind: test
 test-lua: $(TARGET)
 	luajit tests/test_series.lua
 	luajit tests/test_dataset.lua
+	luajit tests/test_edge.lua
 
 # Gera docs/MANIFEST.txt (sha256 + linhas de cada arquivo versionável)
 manifest:

@@ -4,8 +4,8 @@
 #
 2d82d7ce17426b86ad962da4698e1fc88820b41351860a74a950f126f4503c2b     141  ./docs/API_INDEX.md
 0f36df40dd144fdc6ea735fc3febe5522af9798dc71e4aa58b96d0e981833b8d     346  ./docs/API_Reference.md
-04917943f5daa294fce3b5a7bd0e379468eaad240cbd231eef92628ed2896b7c     377  ./docs/Build_and_Testing.md
-8e4f6f3b0f8dca3a5cb5142abf39ec813901e47c6b55a47472c44519da042af8     215  ./docs/CHANGELOG.md
+80d2a4eecb5b30480d7069a15125242b3b6d7e05aae50afce9f44bd4fc29b84e     379  ./docs/Build_and_Testing.md
+03e61c8db854ced61b91a3ff69d16af5c9991d9af4248bdbf975982f99076e06     224  ./docs/CHANGELOG.md
 1c03fc955d42b8f551a96fdcb45a2e6d468c44cb238e3f983fe1adfadb158168      76  ./docs/CODE_REVIEW.md
 d329cd82aee8b550128afc60405c28342cc52712602172ebfbf604119f24a792     178  ./docs/README.md
 6144c0ef948296e3c8db9d7acdffd4be38cb07dffcc51a78989df8bb02fdcc35     613  ./docs/Roadmap.md
@@ -22,7 +22,7 @@ cbe504c2e814d70174c6f2158ccac5eaf04c619eba143deff545c3ca320d1ae2     311  ./lua/
 a259f2f5421a25732af462723fe015b2dc5724519b40b29b4029779e31f97a31     488  ./lua/smaug/core/series.lua
 a3dd7d425b6e154cf3782a00f245e100ac45f9e7e7254779d73b9e8c3435add8     213  ./lua/smaug/ffi_loader.lua
 09044a60cd7891600013e3bb7f15ddc7b9e741db8f4499ed93499e355aadea17      28  ./lua/smaug/init.lua
-10b2e88318443e6d9c7eaff1ca26c9d56bb45f86b064ede450bb48fd55dc1330      53  ./Makefile
+73520b85491d43b9e3b56583e3e4a9810cd80339c26b86a528c495403685357c      54  ./Makefile
 cb828add8f90f2e44bd826cc4053f524b73fe65d62f3fa90bebbb936f19ac04e      34  ./scripts/make_manifest.sh
 fb4bd0d81c1aafbcfcd927314da5f1c9d2fa1dce0a07c5bab85d01ad1ce42405     150  ./scripts/windows-build.ps1
 d97f781b9cf6fc4a5de826ca16c74439f4aeaabe1704421baf8a651c5e5d67c6     354  ./src/smaug_core.c
@@ -33,7 +33,8 @@ c2654288985151bb30a29195e3cfdded0daf657bf372ceac4738040b2911c44d     445  ./src/
 427253b1234873224e0053bec67a3d894c74278bd8b5579b6440ec6234de3678     209  ./tests/test_alloc.c
 c3a4e968b31bf94327b9b87be8e912861bbc0cb54563bf02a5aeb6583eff2c93      80  ./tests/test_bool.c
 0e6f8b602e9dd802dd0cec139a37220e570bb0bb444b47cc9c27f8c37df1d7b3     105  ./tests/test_dataset.lua
+ad131f2ede73174853f770f75d1a81a584655e6e2a06fb3f03f575436983b8c7     162  ./tests/test_edge.lua
 c1f1a08db58d897a367d83b92ff1f22e932d86b53c62d88a4d4567fc9c0f882a      22  ./tests/test_ops.c
 c61324b82dfb664a245874174c5c3fac80715d11f230b7cc190ddb13aa91995a     190  ./tests/test_series.lua
 #
-# total de arquivos: 33
+# total de arquivos: 34

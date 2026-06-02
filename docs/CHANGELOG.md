@@ -4,6 +4,15 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Adicionado (Fase 1.6 — endurecimento, em andamento)
+- `tests/test_edge.lua`: bateria de casos degenerados (59 checks) — série
+  vazia, 1 elemento, toda-nula, toda-igual — cobrindo reduções, sort, view,
+  take, filter, comparações, em f64 e i64. Inclui verificação explícita de
+  **propagação de NA em comparação** (comparar nulo → NA na máscara, nunca
+  false). Integrado ao `make test-lua`. Valgrind-clean. Confirma que o
+  comportamento atual nos limites é são; marca com "PENDENTE (1.6)" os pontos
+  que dependem de `min_count`/`fillna`/recusa-de-NaN ainda a implementar.
+
 ### Alterado (infra)
 - **Biblioteca renomeada** `libsmaug_math` → `libsmaug` (`.so`/`.dll`/`.dylib`),
   coordenado em 3 lugares: `Makefile` (TARGET), `ffi_loader.lua` (nomes do
