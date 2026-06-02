@@ -346,6 +346,35 @@ function methods.astype(self, dtype, name)
     return out
 end
 
+-- fillna: devolve NOVA Series com cada NULL substituído por `value`.
+-- Contrato: sem argumento = erro; sem coerção de tipo (i64 só aceita inteiro);
+-- preenche NULL (ausência), NÃO NaN (NaN é valor presente — fica intacto).
+-- Posições não-nulas inalteradas. Não altera o dtype.
+function methods.fillna(self, value)
+    -- sem valor seguro de preenchimento (fwd/bwd-fill é dívida técnica)
+    if value == nil or value == NA then
+        error("smaug: fillna requer um valor de preenchimento", 2)
+    end
+    if type(value) ~= "number" then
+        error("smaug: fillna requer um número compatível com o dtype", 2)
+    end
+    -- sem coerção: i64 só aceita inteiro (1.5 em i64 é erro, não trunca)
+    if self._dtype == "int64" and value % 1 ~= 0 then
+        error("smaug: fillna em int64 requer valor inteiro (sem coerção); "
+              .. "recebido " .. tostring(value), 2)
+    end
+    local n = self:len()
+    local out = Series.new(self._dtype, n, self._name)
+    for i = 1, n do
+        if self:is_null(i) then
+            out:set(i, value)                 -- preenche o null
+        else
+            out:set(i, self:get(i))           -- copia o valor (NaN incluso)
+        end
+    end
+    return out
+end
+
 -- describe: resumo estatístico (tabela Lua). Percentis calculados a partir dos
 -- valores não-nulos ordenados em Lua (não exige dropna no C).
 function methods.describe(self)

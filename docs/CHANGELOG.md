@@ -4,6 +4,19 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Adicionado (Fase 1.6 — `fillna`)
+- **`Series:fillna(value)`** e **`DataSet:fillna(value | {col=value})`**: nova
+  Series/DataSet com NULLs substituídos. Cumpre o contrato: sem argumento =
+  erro; **sem coerção** (`fillna(1.5)` em int64 = erro, não trunca); preenche
+  **null** e **preserva NaN** (NaN é valor, não ausência — distinção null≠NaN em
+  ação). Original imutável. Implementado em Lua (não toca no backend C).
+- `tests/test_fillna.lua`: 25 checks (Series + DataSet, casos degenerados,
+  preservação de NaN, recusa de coerção). Integrado ao `make test-lua`.
+  Valgrind-clean.
+- Achado **A7** registrado no `CODE_REVIEW.md`: `set` em int64 trunca não-inteiro
+  silenciosamente (e NaN vira lixo) — a corrigir em peça dedicada; o `fillna`
+  já valida por conta própria, então cumpre o contrato mesmo antes dessa correção.
+
 ### Corrigido (Fase 1.6 — contrato de NaN agora implementado)
 - **`NaN` deixa de virar `null`.** O `is_na` do `series.lua` tratava `NaN`
   como ausente; agora só `nil`/`Series.NA` são null. `set(i, NaN)`,

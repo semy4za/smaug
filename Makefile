@@ -38,6 +38,7 @@ test-lua: $(TARGET)
 	luajit tests/test_dataset.lua
 	luajit tests/test_edge.lua
 	luajit tests/test_special.lua
+	luajit tests/test_fillna.lua
 
 # Gera docs/MANIFEST.txt (sha256 + linhas de cada arquivo versionável)
 manifest:

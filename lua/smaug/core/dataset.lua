@@ -159,6 +159,31 @@ function methods.select(self, names)
     return df
 end
 
+-- fillna: novo DataSet com NULLs preenchidos.
+--   fillna(valor)          -> aplica `valor` a TODAS as colunas
+--   fillna({col = valor})  -> por coluna; colunas omitidas mantêm seus nulos
+-- Cada coluna usa Series:fillna (mesmo contrato: sem coerção de tipo).
+function methods.fillna(self, value)
+    if value == nil then
+        error("smaug: fillna requer um valor ou tabela {coluna=valor}", 2)
+    end
+    -- caso 1: valor escalar → todas as colunas
+    if type(value) ~= "table" then
+        return map_columns(self, function(c) return c:fillna(value) end)
+    end
+    -- caso 2: mapa {col = valor} → só as colunas citadas; resto inalterado
+    local df = DataSet.new(self._name)
+    for _, n in ipairs(self._col_names) do
+        local col = self._columns[n]
+        if value[n] ~= nil then
+            df:add_column(n, col:fillna(value[n]))
+        else
+            df:add_column(n, col)   -- mantém a coluna como está (com nulos)
+        end
+    end
+    return df
+end
+
 -- take: novo DataSet com as linhas nos índices idx (tabela 1-based).
 function methods.take(self, idx)
     return map_columns(self, function(c) return c:take(idx) end)

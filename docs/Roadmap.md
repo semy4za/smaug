@@ -47,6 +47,48 @@ Valgrind-clean.
 
 ---
 
+## Visão de longo prazo — o ecossistema
+
+> **Norte do projeto, não tarefa imediata.** Esta seção registra a intenção de
+> longo prazo para que as decisões de arquitetura de hoje sejam tomadas com o
+> destino em mente. Nada aqui é curto ou médio prazo; tudo depende do Smaug
+> estar maduro e endurecido primeiro.
+
+O Smaug é a **fundação de um ecossistema de dados em Lua**, não um fim em si.
+Inspirado no ecossistema Python (numpy/pandas → matplotlib → scikit-learn →
+SQLAlchemy), o plano de longo prazo tem três bibliotecas que consomem o Smaug:
+
+1. **Visualização (matplotlib-like, HTML/SVG)** — renderização de gráficos a
+   partir de dados do Smaug. *Implicação para hoje:* a interface de **exportação
+   de dados** (`to_table`, e futuros acessos a colunas/ranges/bins) será API
+   pública consumida por terceiros — deve permanecer limpa e estável. Sem
+   trabalho extra agora, mas mudanças nessa superfície passam a ter peso de "API
+   pública".
+
+2. **Machine learning (scikit-learn-like; eventualmente TensorFlow-like)** — a
+   peça mais pesada, e de outra ordem de grandeza. *Implicações para hoje:*
+   - ML exige **matriz numérica densa 2-D homogênea** (tudo float64, contígua),
+     diferente do `DataSet` (2-D heterogêneo) e da `Series` (1-D). Essa
+     representação ainda **não existe** e será necessária — registrar como
+     pré-requisito futuro, não construir agora.
+   - **Broadcasting** (hoje na dívida técnica) é pré-requisito de ML — sobe de
+     "talvez" para "vai precisar" quando o ML entrar.
+   - Distinguir as duas ambições: "scikit-learn-like" (algoritmos clássicos —
+     regressão, k-means, árvores) é factível; "TensorFlow-like" (autodiff, redes
+     neurais, aceleração) é drasticamente mais difícil em Lua/FFI e deve ser
+     avaliado com cautela de escopo quando chegar a hora.
+
+3. **ORM (v2.0)** — mapeamento objeto↔banco. O mais desacoplado: aproveita o
+   **I/O de SQL** já planejado (Fase 6). *Implicação para hoje:* praticamente
+   nenhuma; encaixa naturalmente depois do I/O.
+
+Consequência transversal: por ser fundação de três bibliotecas, **cada fraqueza
+no Smaug se multiplica**. Isso reforça a decisão de endurecer agora (Fase 1.6)
+antes de avançar — o rigor "nível aviação" não é exagero, é o que sustenta o
+ecossistema.
+
+---
+
 ## Fase 1.6 — Endurecimento (gate atual)
 
 Objetivo: levar o que já existe (Fases 1–4) ao nível de robustez "rotina de
@@ -64,7 +106,7 @@ A Fase 1.6 só fecha quando **todos** os itens abaixo forem verdadeiros:
 2. Bateria de testes sistemáticos (Frente 1) passando, Valgrind-clean.
 3. Property-based tests (Frente 1) passando em N≥1000 casos aleatórios por
    invariante, com seed fixa para reprodutibilidade.
-4. `fillna` implementado, testado e documentado (Series + DataSet).
+4. `fillna` implementado, testado e documentado (Series + DataSet). ✅ **FEITO**
 5. Dívida técnica registrada (seção "Dívida técnica") — o que ficou de fora é
    decisão explícita, não esquecimento.
 
@@ -142,7 +184,7 @@ relatório (texto via `gcov`, opcional HTML via `lcov`/`genhtml`). O relatório
 fica versionado/documentado a cada fechamento de fase. Ramos não-cobertos viram
 itens: ou ganham teste, ou ganham justificativa.
 
-### Frente 3 — `fillna` (única funcionalidade nova)
+### Frente 3 — `fillna` (única funcionalidade nova) ✅ FEITO
 
 `fillna` entra agora por ser o par natural do null handling — nosso diferencial.
 Todo o resto das funções estatísticas/utilitárias fica na dívida técnica.

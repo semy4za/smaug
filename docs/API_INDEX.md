@@ -98,6 +98,7 @@ Notas: f64 `div`/0 segue IEEE (±Inf/NaN); i64 `div`/0 → NULL.
 | `:view(start, len)` | view zero-copy segura (read-only, segura `_parent`) |
 | `:take(idx)` / `:head(n)` / `:tail(n)` | seleção de linhas → nova Series |
 | `:astype(dtype)` | conversão de tipo |
+| `:fillna(value)` | nova Series com NULLs→value; sem coerção; NaN intacto; sem arg=erro |
 | `:to_table([na])` | → tabela Lua |
 | `:describe()` | resumo estatístico (count, nulls, mean, std, min, quartis, max) |
 | `:gt(k)` / `:lt(k)` / `:eq(k)` | comparação → BoolSeries |
@@ -125,6 +126,7 @@ Notas: f64 `div`/0 segue IEEE (±Inf/NaN); i64 `div`/0 → NULL.
 | `:ncols()` / `:nrows()` / `:len()` | dimensões |
 | `:dtypes()` / `:row(i, [na])` | tipos por coluna / linha como tabela |
 | `:filter(boolseries)` | linhas onde mask é true → novo DataSet |
+| `:fillna(value)` / `:fillna({col=value})` | preenche NULLs (todas as colunas, ou por coluna) → novo DataSet |
 | `:sort_by(col, asc)` | ordena todas as colunas pela chave → novo DataSet |
 | `:head(n)` / `:tail(n)` / `:iloc(start, stop)` / `:take(idx)` | fatias → novo DataSet |
 | `:sample(n, [seed])` | amostra aleatória → novo DataSet |
@@ -140,7 +142,7 @@ Notas: f64 `div`/0 segue IEEE (±Inf/NaN); i64 `div`/0 → NULL.
 
 ## NÃO existe ainda (não procure — consulte o Roadmap para a fase)
 
-`fillna`, `dropna`, `median`/`quantile` nativos, `abs`/`round`/`clip`,
+`dropna`, `median`/`quantile` nativos, `abs`/`round`/`clip`,
 `cumsum`/`cumprod`, `diff`/`shift`, `unique`/`value_counts`, broadcasting,
 `apply`/`map`, tipo `string`, `datetime`, `categorical`, I/O (CSV/JSON/XML/SQL),
 GroupBy/joins. Ver `Roadmap.md` para quando cada um entra.

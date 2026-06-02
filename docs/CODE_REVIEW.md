@@ -49,6 +49,16 @@ teste em C com `malloc`/`realloc` interceptados (Fase 1.6, Frente 1).
 `smaug_*_take` checa `!idx` (o array) e cada `idx[i] >= size`, o que está
 correto. Sem ação — registrado só para confirmar que foi revisado.
 
+### A7 — `set` em i64 trunca não-inteiro silenciosamente (a corrigir)
+`Series:set(i, 1.5)` numa série i64 grava `1` silenciosamente (truncagem),
+violando o princípio "sem coerção implícita". Pior: `set(i, NaN)` em i64 grava
+lixo (`INT64_MIN` reinterpretado), pois i64 não tem NaN. **Decisão:** o `set`
+deve **rejeitar** valor não-inteiro em i64 com erro claro. Mudança de base
+(afeta `from_table`/`append`/`astype`), portanto será feita em peça dedicada,
+sondando dependências e com teste próprio — não junto do `fillna`. O `fillna`
+faz sua própria validação antes do `set`, então cumpre o contrato mesmo antes
+desta correção.
+
 ## Pontos confirmados como corretos (revisados, sem ação)
 
 - Lifecycle: create/free/clone/view com `external_alloc` impedindo double-free
