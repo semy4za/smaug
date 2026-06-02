@@ -12,7 +12,7 @@ ffi.cdef([[
     void   smaug_f64_free(smaug_series_f64_t *s);
 ]])
 
-local C = ffi.load("./build/libsmaug_math.so")
+local C = ffi.load("./build/libsmaug.so")
 local s = C.smaug_f64_create(3)
 assert(s ~= nil)
 C.smaug_f64_set(s, 0, 1.0)

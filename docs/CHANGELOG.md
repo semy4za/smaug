@@ -4,6 +4,17 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Alterado (infra)
+- **Biblioteca renomeada** `libsmaug_math` → `libsmaug` (`.so`/`.dll`/`.dylib`),
+  coordenado em 3 lugares: `Makefile` (TARGET), `ffi_loader.lua` (nomes do
+  `ffi.load`) e `windows-build.ps1`. O nome "math" não refletia mais o conteúdo
+  (a lib é o Smaug inteiro). Validado: Lua carrega e passa os 99 checks nas duas
+  plataformas. Docs de comandos/exemplos atualizadas.
+- `.gitattributes`: força `eol=lf` em todo arquivo de texto. Resolve a conversão
+  CRLF↔LF do Git no Windows, que mudava os bytes e quebrava a verificação por
+  hash do `MANIFEST.txt` (e gerava diffs-fantasma). Agora Windows e Linux
+  produzem bytes idênticos.
+
 ### Decidido (contrato de valores especiais — Fase 1.6)
 - **`NaN` ≠ `null`** no Smaug: `null` é ausência (bitmask), `NaN` é valor IEEE
   indefinido. Nunca se converte um no outro (vantagem sobre pandas/numpy).

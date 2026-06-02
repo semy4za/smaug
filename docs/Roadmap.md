@@ -226,7 +226,7 @@ lua/smaug/
 
 Responsabilidade única: **tradução**, sem lógica de negócio. Declara os tipos
 (`ffi.cdef`) e carrega a `.so` com fallback de paths, retornando o namespace `C`.
-Detecta o SO para escolher `libsmaug_math.so` / `.dylib` / `smaug_math.dll` e
+Detecta o SO para escolher `libsmaug.so` / `.dylib` / `smaug.dll` e
 tenta `./build/`, `../build/`, `../../build/`, `/usr/local/lib/`, depois o nome
 puro (deixa o loader do SO resolver via `LD_LIBRARY_PATH`).
 
@@ -245,8 +245,8 @@ local ffi = require("ffi")
 ffi.cdef([[ /* tipos e assinaturas de smaug_math.h + void free(void*) */ ]])
 
 local function load_library()
-    local name = ({ Windows="smaug_math.dll", OSX="libsmaug_math.dylib" })[ffi.os]
-                 or "libsmaug_math.so"
+    local name = ({ Windows="smaug.dll", OSX="libsmaug.dylib" })[ffi.os]
+                 or "libsmaug.so"
     for _, p in ipairs({ "./build/"..name, "../build/"..name,
                          "../../build/"..name, "/usr/local/lib/"..name, name }) do
         local ok, lib = pcall(ffi.load, p)

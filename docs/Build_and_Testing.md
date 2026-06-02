@@ -34,7 +34,7 @@ LDFLAGS = -shared
 # Backend C completo (f64 + i64)
 SRCS = src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c
 
-TARGET = build/libsmaug_math.so
+TARGET = build/libsmaug.so
 
 $(TARGET): $(SRCS) | build
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
@@ -51,7 +51,7 @@ clean:
 
 ```bash
 cd smaug && make
-# → build/libsmaug_math.so
+# → build/libsmaug.so
 
 make test       # compila e roda tests/test_alloc.c e test_ops.c
 make valgrind   # roda os testes sob Valgrind (--leak-check=full)
@@ -63,7 +63,7 @@ make valgrind   # roda os testes sob Valgrind (--leak-check=full)
 mkdir -p build
 gcc -std=c11 -fPIC -Wall -Wextra -O2 -I./include -shared \
     src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c src/smaug_ops_bool.c \
-    -o build/libsmaug_math.so
+    -o build/libsmaug.so
 ```
 
 ## Opção 3 — CMake (cross-platform)
@@ -120,7 +120,7 @@ mkdir build && cd build && cmake .. && make -j$(nproc)
 
 ```bash
 # símbolos exportados
-nm -D build/libsmaug_math.so | grep smaug | head
+nm -D build/libsmaug.so | grep smaug | head
 # esperado: T smaug_f64_create, T smaug_f64_sum, T smaug_i64_create, ...
 ```
 
@@ -129,7 +129,7 @@ nm -D build/libsmaug_math.so | grep smaug | head
 ## Windows (PowerShell)
 
 No Windows não há `make` nem Valgrind por padrão. Use o script
-`scripts\windows-build.ps1`, que compila o backend em `build\smaug_math.dll`
+`scripts\windows-build.ps1`, que compila o backend em `build\smaug.dll`
 (nome que o `ffi_loader.lua` procura no Windows) chamando o `gcc` diretamente, e
 roda os testes C e Lua.
 
@@ -344,7 +344,7 @@ valgrind --suppressions=/path/to/luajit.supp luajit tests/test_ffi.lua
 
 **A) Caminho relativo (mais simples no dev):**
 ```lua
-local C = ffi.load("./build/libsmaug_math.so")
+local C = ffi.load("./build/libsmaug.so")
 ```
 
 **B) `LD_LIBRARY_PATH`:**
@@ -355,16 +355,16 @@ luajit meu_script.lua
 
 **C) Instalar no sistema (produção):**
 ```bash
-sudo cp build/libsmaug_math.so /usr/local/lib/ && sudo ldconfig
+sudo cp build/libsmaug.so /usr/local/lib/ && sudo ldconfig
 ```
 
 ---
 
 ## Outras plataformas
 
-- **macOS:** `brew install gcc cmake luajit`. A lib vira `libsmaug_math.dylib`.
+- **macOS:** `brew install gcc cmake luajit`. A lib vira `libsmaug.dylib`.
 - **Windows:** MSVC Build Tools + CMake + binários do LuaJIT. A lib vira
-  `smaug_math.dll`. Adicione o diretório dela ao PATH.
+  `smaug.dll`. Adicione o diretório dela ao PATH.
 
 ---
 
@@ -372,6 +372,6 @@ sudo cp build/libsmaug_math.so /usr/local/lib/ && sudo ldconfig
 
 | Sintoma | Causa provável | Ação |
 |---------|---------------|------|
-| `libsmaug_math.so not found` | build não feito ou path errado | recompilar; conferir `ls build/` |
+| `libsmaug.so not found` | build não feito ou path errado | recompilar; conferir `ls build/` |
 | `Segmentation fault` | ponteiro NULL ou OOB via FFI | rodar sob Valgrind / ASan |
 | build sem otimização | modo Debug | usar `-O2`/`-O3` ou `-DCMAKE_BUILD_TYPE=Release` |

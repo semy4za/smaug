@@ -5,7 +5,7 @@ LDFLAGS = -shared
 # Backend C completo (f64 + i64 + bool)
 SRCS = src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c src/smaug_ops_bool.c
 
-TARGET = build/libsmaug_math.so
+TARGET = build/libsmaug.so
 
 # Flags para os binários de teste (debug, sem -fPIC/-shared)
 TEST_CFLAGS = -std=c11 -g -O0 -Wall -Wextra -I./include

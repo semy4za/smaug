@@ -24,7 +24,7 @@ cobre o que você usa, ou o umbrella `smaug.h` para tudo:
 
 > O antigo `smaug_math.h` foi **removido** (o nome "math" não refletia o
 > conteúdo). Use `smaug.h` ou o header específico. A biblioteca compilada
-> permanece `libsmaug_math.so`/`smaug_math.dll` (nome do binário).
+> permanece `libsmaug.so`/`smaug.dll` (nome do binário).
 
 ---
 

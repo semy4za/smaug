@@ -1,0 +1,31 @@
+# Normalização de fim de linha — força LF em todos os arquivos de texto.
+#
+# Motivo: o projeto é desenvolvido em Windows e Linux. Sem isto, o Git do
+# Windows converte LF↔CRLF ao gravar/commitar, o que muda os bytes dos arquivos
+# e quebra a verificação por hash do docs/MANIFEST.txt (e gera diffs-fantasma).
+# Com LF forçado, as duas plataformas produzem bytes idênticos.
+
+# Padrão: trate tudo como texto e normalize para LF no repositório.
+* text=auto eol=lf
+
+# Arquivos de texto do projeto (explícito, por clareza).
+*.c        text eol=lf
+*.h        text eol=lf
+*.lua      text eol=lf
+*.md       text eol=lf
+*.sh       text eol=lf
+*.txt      text eol=lf
+Makefile   text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Scripts PowerShell: LF funciona no PowerShell moderno e mantém o hash
+# consistente entre máquinas.
+*.ps1      text eol=lf
+
+# Binários (se algum dia forem versionados) — nunca normalizar.
+*.so       binary
+*.dll      binary
+*.dylib    binary
+*.o        binary
+*.exe      binary

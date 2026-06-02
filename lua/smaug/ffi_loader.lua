@@ -2,7 +2,7 @@
 --
 -- Ponte FFI do Smaug. Responsabilidade ÚNICA: tradução.
 --   1. Declara os tipos e assinaturas de include/smaug.h (umbrella) via ffi.cdef.
---   2. Carrega a biblioteca compilada (libsmaug_math.so / .dylib / .dll).
+--   2. Carrega a biblioteca compilada (libsmaug.so / .dylib / .dll).
 --   3. Devolve o namespace C.
 --
 -- Sem lógica de negócio aqui. Conversão 1-based/0-based, nil<->NAN, ffi.gc,
@@ -180,9 +180,9 @@ ffi.cdef([[
 
 -- Nome do arquivo da lib conforme o SO.
 local function lib_filename()
-    if ffi.os == "Windows" then return "smaug_math.dll" end
-    if ffi.os == "OSX"     then return "libsmaug_math.dylib" end
-    return "libsmaug_math.so"
+    if ffi.os == "Windows" then return "smaug.dll" end
+    if ffi.os == "OSX"     then return "libsmaug.dylib" end
+    return "libsmaug.so"
 end
 
 -- Tenta carregar a lib a partir de uma lista de paths candidatos.

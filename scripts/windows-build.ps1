@@ -4,7 +4,7 @@
 #
 # O que faz:
 #   1. (opcional, com -Setup) instala MSYS2 + gcc + luajit.
-#   2. Compila o backend C em build\smaug_math.dll (nome que o ffi_loader
+#   2. Compila o backend C em build\smaug.dll (nome que o ffi_loader
 #      procura no Windows).
 #   3. Compila e roda os testes em C (test_alloc, test_ops, test_bool).
 #   4. Roda os testes Lua (test_series.lua, test_dataset.lua) com luajit.
@@ -105,10 +105,10 @@ $sources = @(
 )
 
 Write-Host ""
-Write-Host "== Compilando build\smaug_math.dll ==" -ForegroundColor Cyan
-& $gcc -std=c11 -Wall -Wextra -O2 -I".\include" -shared -static-libgcc -o "build\smaug_math.dll" @sources
+Write-Host "== Compilando build\smaug.dll ==" -ForegroundColor Cyan
+& $gcc -std=c11 -Wall -Wextra -O2 -I".\include" -shared -static-libgcc -o "build\smaug.dll" @sources
 if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar a DLL." }
-Write-Host "OK -> build\smaug_math.dll" -ForegroundColor Green
+Write-Host "OK -> build\smaug.dll" -ForegroundColor Green
 
 $cTests = @("test_alloc", "test_ops", "test_bool")
 $allPass = $true

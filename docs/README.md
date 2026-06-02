@@ -51,7 +51,7 @@ expressivo, backend C rápido**.
 │  Bridge FFI (ffi.cdef + ffi.load + ffi.gc)   │
 │  Assinaturas C, hooks de GC, sem lógica       │
 ├─────────────────────────────────────────────┤
-│  Backend C (libsmaug_math.so)                │
+│  Backend C (libsmaug.so)                │
 │  Structs tipadas, arrays contíguos, bitmasks  │
 └─────────────────────────────────────────────┘
 ```
@@ -144,7 +144,7 @@ smaug/
 ├── lua/
 │   └── smaug/
 │       └── ffi_loader.lua  # ✅ Ponte FFI: cdef completo + ffi.load
-└── build/                  # Output da compilação (libsmaug_math.so)
+└── build/                  # Output da compilação (libsmaug.so)
 ```
 
 A criar (ver `Roadmap.md`): resto do frontend (`core/series.lua`, `init.lua`),
