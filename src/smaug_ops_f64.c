@@ -358,9 +358,12 @@ static int cmp_f64_desc(const void *a, const void *b) {
 size_t *smaug_f64_argsort(const smaug_series_f64_t *s, bool ascending) {
     if (!s) return NULL;
 
-    /* Falha se houver qualquer NULL */
+    /* Falha se houver qualquer NULL ou NaN. NaN é um valor presente, mas sem
+       ordem bem-definida (toda comparação com NaN é false), então ordenar uma
+       série com NaN produziria resultado indefinido. Contrato: sort/argsort
+       recusam NaN além de null (ver Roadmap, "Contrato de valores especiais"). */
     for (size_t i = 0; i < s->size; i++) {
-        if (INVALID(s, i)) return NULL;
+        if (INVALID(s, i) || isnan(s->data[i])) return NULL;
     }
 
     f64_entry_t *entries = malloc(s->size * sizeof(f64_entry_t));
@@ -387,7 +390,7 @@ smaug_series_f64_t *smaug_f64_sort(const smaug_series_f64_t *s, bool ascending) 
     if (!s) return NULL;
 
     size_t *indices = smaug_f64_argsort(s, ascending);
-    if (!indices) return NULL;  /* série com NULLs ou alloc failure */
+    if (!indices) return NULL;  /* série com NULL/NaN, ou falha de alocação */
 
     smaug_series_f64_t *result = smaug_f64_take(s, indices, s->size);
     free(indices);

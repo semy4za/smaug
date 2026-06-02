@@ -27,7 +27,10 @@ local function is_nan(v) return v ~= v end
 --   Series.from_table({1, Series.NA, 3}, "float64")   -- 3 elementos, [2] nulo
 local NA = setmetatable({}, { __tostring = function() return "NA" end })
 
-local function is_na(v) return v == nil or v == NA or (type(v) == "number" and is_nan(v)) end
+-- Ausência (null) é APENAS nil ou o sentinela NA. NaN NÃO é ausência —
+-- é um valor de ponto flutuante presente, porém indefinido (contrato:
+-- "NaN é distinto de null"). Ver Roadmap, "Contrato de valores especiais".
+local function is_na(v) return v == nil or v == NA end
 
 -- =====================================================================
 -- Descritores de dtype: o coração da abstração.

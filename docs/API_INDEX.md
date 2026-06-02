@@ -80,11 +80,16 @@ Notas: f64 `div`/0 segue IEEE (±Inf/NaN); i64 `div`/0 → NULL.
 `Series.int64(size, name)`, `Series.from_table(arr, dtype, name)`.
 `Series.NA` (sentinela de nulo em tabelas).
 
+> **NaN ≠ null (implementado).** `nil` e `Series.NA` → null (ausente, bitmask).
+> `NaN` (ex.: `0/0` ou `0/0` de operação) → valor **presente** porém indefinido,
+> NÃO null: `is_null`→false, `count_nonnull` conta. `ignore_na` pula null, não
+> NaN (NaN contamina reduções → resultado nil). `sort`/`argsort` **recusam** NaN
+> (além de null). Comparação com NaN → false (máscara válida, não NA).
+
 | Método | O que faz |
 |--------|-----------|
 | `:get(i)` / `:set(i, v)` | acesso 1-based; nil↔NA |
-| `:is_null(i)` / `:set_null(i)` | nulos |
-| `:append(v)` | adiciona ao fim (chainable) |
+| `:is_null(i)` / `:set_null(i)` | nulos || `:append(v)` | adiciona ao fim (chainable) |
 | `:len()` / `:size()` | tamanho (use isto, não `#`) |
 | `:sum/mean/min/max/var/std([ignore_na])` | reduções (default ignore_na=true) |
 | `:count_nonnull()` | nº de não-nulos |

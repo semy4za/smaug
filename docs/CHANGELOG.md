@@ -4,6 +4,23 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Corrigido (Fase 1.6 — contrato de NaN agora implementado)
+- **`NaN` deixa de virar `null`.** O `is_na` do `series.lua` tratava `NaN`
+  como ausente; agora só `nil`/`Series.NA` são null. `set(i, NaN)`,
+  `from_table` e `append` gravam `NaN` como valor presente (`is_null`→false,
+  `count_nonnull` conta). Cumpre a decisão "NaN ≠ null". Permite null e NaN
+  **distintos** na mesma série (vantagem sobre pandas/numpy).
+- **`sort`/`argsort` (f64) passam a recusar `NaN`** além de null (checagem
+  `isnan` no `smaug_ops_f64.c`). NaN não tem ordem definida → recusa, como já
+  acontecia com null. `±Inf` continuam ordenáveis.
+
+### Adicionado (Fase 1.6 — endurecimento)
+- `tests/test_special.lua`: 35 checks dos valores especiais do f64 — `±Inf`
+  (ordenáveis, reduções), `NaN` distinto de null (set/from_table/op, contágio,
+  recusa no sort, comparação→false), `-0.0`. Integrado ao `make test-lua`.
+  Valgrind-clean. As asserções falharam antes das correções (prova de que as
+  violações existiam) e passam depois.
+
 ### Adicionado (Fase 1.6 — endurecimento, em andamento)
 - `tests/test_edge.lua`: bateria de casos degenerados (59 checks) — série
   vazia, 1 elemento, toda-nula, toda-igual — cobrindo reduções, sort, view,
