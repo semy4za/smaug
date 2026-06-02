@@ -214,7 +214,7 @@ bash, inclusive no MSYS2/Git Bash no Windows).
 O padrão de teste do projeto é "rotina de aviação": não basta cobrir casos
 felizes; cobre-se o espaço de entradas sistematicamente, mede-se a cobertura, e
 afirma-se invariantes que devem valer **sempre**. Isto é o gate da Fase 1.6
-(ver `Roadmap.md`) e o padrão para todas as fases seguintes.
+(ver `Roadmap.md`) e o padrão para todo o projeto.
 
 Camadas de teste:
 
@@ -225,13 +225,30 @@ Camadas de teste:
 2. **Testes Lua** (`test_*.lua`) — exercitam o sistema como o usuário o usa
    (Lua → FFI → C), validando de quebra a fronteira FFI: índices 1-based↔0-based,
    `nil`↔NA, e os sentinelas (`NAN`, `INT64_MIN`) virando `nil`.
-3. **Property-based em Lua** (`test_props.lua`) — gera N≥1000 entradas
-   aleatórias por invariante (com seed fixa para reprodutibilidade) e verifica
-   propriedades que devem valer para qualquer entrada.
+3. **Property-based em Lua** (`test_props.lua`) — gera milhares de entradas
+   aleatórias por invariante e verifica propriedades que devem valer para
+   qualquer entrada. Usa um conjunto de **seeds fixas** (múltiplas, para ampliar
+   o espaço sem perder determinismo); cada invariante roda N casos por seed
+   (≥1000 casos no total). Em caso de falha, imprime a seed e o nº do caso para
+   reprodução exata. Cada propriedade tem seu **gerador apropriado**, que respeita
+   o contrato: o gerador do `sort` produz séries sem null/NaN (pois o sort
+   recusa), o do `filter` injeta nulls, e há um gerador com NaN para testar a
+   distinção null≠NaN. Invariantes cobertos: clone independente (anti-aliasing),
+   view compartilha memória, sort é permutação (multiconjunto + monotonia),
+   sort recusa null/NaN, filter↔count_true, take+inversa=identidade, astype
+   ida-volta, fillna remove null e preserva NaN, e leis de Kleene (dupla negação,
+   De Morgan).
 
 Decisão registrada: o **property-based testing é feito em Lua**, porque a stack
 do Smaug é fina e determinística — testar em Lua exercita o mesmo código C e
 ainda cobre a fronteira FFI. A única exceção é a falha de alocação, que fica em C.
+
+**Validação do próprio teste (mutation testing).** Para garantir que os
+invariantes realmente detectam bugs (e não passam por serem fracos), o teste foi
+validado injetando bugs propositais no código (ex.: fazer `clone` retornar
+`self`, criando aliasing) e confirmando que o property-based **falha** — e aponta
+seed+caso. Um property-based que passa sob bug injetado é falsa confiança; este
+foi verificado contra isso.
 
 O que a bateria sistemática cobre, por categoria:
 
@@ -272,8 +289,9 @@ tests/
 ├── test_dataset.lua# frontend: DataSet (CRUD, filter, sort_by, slicing, etc.)
 ├── test_edge.lua   # ✅ casos degenerados (vazia/1-elem/toda-nula/toda-igual) + propagação NA
 ├── test_special.lua# ✅ valores especiais f64 (Inf, NaN distinto de null, -0.0)
-└── (Fase 1.6, ainda planejados)
-    ├── test_props.lua   # property-based (invariantes, N≥1000 casos, seed fixa)
+├── test_fillna.lua # ✅ fillna (Series + DataSet), preservação de NaN, sem coerção
+├── test_props.lua  # ✅ property-based: 10 invariantes × 3 seeds × 400 casos (~222k checks)
+└── (Fase 1.6, ainda planejado)
     └── test_allocfail.c # falha de alocação injetada (caminho de erro do grow)
 ```
 

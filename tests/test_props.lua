@@ -1,0 +1,249 @@
+-- tests/test_props.lua
+-- Property-based testing (Fase 1.6 — endurecimento).
+--
+-- Filosofia: em vez de exemplos fixos, gera milhares de entradas aleatórias e
+-- verifica INVARIANTES que devem valer sempre. Cada propriedade tem seu gerador
+-- apropriado, que RESPEITA O CONTRATO (ex.: o gerador do sort produz séries sem
+-- null/NaN, porque o sort recusa esses; o do filter inclui nulls de propósito).
+--
+-- Reprodutibilidade: roda N casos para cada uma de SEEDS (seeds fixas e
+-- documentadas). Tudo determinístico — rodou hoje, roda igual amanhã. Em caso
+-- de falha, imprime a seed e o nº do caso para reprodução exata.
+--
+-- Rode da raiz:  luajit tests/test_props.lua
+
+package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
+
+local smaug = require("smaug")
+local S     = smaug.Series
+
+-- Seeds fixas (reprodutível) — múltiplas para ampliar o espaço sem perder
+-- determinismo. Trocar/adicionar seeds é uma decisão consciente.
+local SEEDS = { 20260602, 1337, 987654321 }
+local N_PER_SEED = 400          -- 3 seeds × 400 = 1200 casos por invariante (≥1000)
+
+local nan = 0/0
+local function is_nan(x) return x ~= x end
+
+-- estado de teste; registra a seed e o caso atuais para mensagens de falha
+local cur_seed, cur_case = nil, nil
+local n_checks = 0
+local function check(cond, msg)
+    if not cond then
+        error(string.format("FALHOU [seed=%s caso=%d]: %s",
+              tostring(cur_seed), cur_case or -1, msg), 2)
+    end
+    n_checks = n_checks + 1
+end
+
+-- ---------- geradores (cada um respeita o contrato da propriedade) ----------
+
+-- série LIMPA: sem null, sem NaN. Para sort/argsort (que recusam ambos).
+local function gen_clean(dtype, n)
+    local s = S.new(dtype, n)
+    for i = 1, n do
+        if dtype == "int64" then s:set(i, math.random(-100000, 100000))
+        else s:set(i, (math.random() - 0.5) * 2e6) end
+    end
+    return s
+end
+
+-- série com NULLS (~25%): para filter, clone, Kleene.
+local function gen_nullable(dtype, n)
+    local s = S.new(dtype, n)
+    for i = 1, n do
+        if math.random() < 0.25 then s:set_null(i)
+        elseif dtype == "int64" then s:set(i, math.random(-100000, 100000))
+        else s:set(i, (math.random() - 0.5) * 2e6) end
+    end
+    return s
+end
+
+-- série f64 com NULLS e NaN (~15% null, ~15% NaN): testa null≠NaN.
+local function gen_with_nan(n)
+    local s = S.float64(n)
+    for i = 1, n do
+        local r = math.random()
+        if r < 0.15 then s:set_null(i)
+        elseif r < 0.30 then s:set(i, nan)
+        else s:set(i, (math.random() - 0.5) * 2e6) end
+    end
+    return s
+end
+
+-- permutação aleatória 1..n (Fisher-Yates)
+local function random_perm(n)
+    local p = {}; for i = 1, n do p[i] = i end
+    for i = n, 2, -1 do local j = math.random(i); p[i], p[j] = p[j], p[i] end
+    return p
+end
+
+-- ---------- a bateria de invariantes ----------
+-- Cada função roda 1 caso aleatório e faz suas asserções.
+
+local PROPERTIES = {}
+
+-- INV1: clone é independente — mutar o clone não afeta o original (anti-aliasing)
+PROPERTIES["clone_independente"] = function()
+    local n = math.random(1, 40)
+    local s = gen_nullable("float64", n)
+    local snap = {}; for i = 1, n do snap[i] = s:get(i) end
+    local c = s:clone()
+    -- muta o clone em posições aleatórias
+    for _ = 1, math.random(1, 5) do c:set(math.random(n), 123456.0) end
+    for i = 1, n do
+        check(s:get(i) == snap[i], "clone mutou o original no idx " .. i)
+    end
+end
+
+-- INV2: view COMPARTILHA memória — mutar a base reflete na view (oposto do clone)
+PROPERTIES["view_compartilha"] = function()
+    local n = math.random(2, 40)
+    local s = gen_clean("float64", n)
+    local start = math.random(1, n)
+    local len = math.random(1, n - start + 1)
+    local v = s:view(start, len)
+    check(v:len() == len, "view comprimento errado")
+    for i = 1, len do
+        check(v:get(i) == s:get(start + i - 1), "view não reflete a base no idx " .. i)
+    end
+end
+
+-- INV3: sort preserva o MULTICONJUNTO e é monotônico (série limpa)
+PROPERTIES["sort_permutacao"] = function()
+    local n = math.random(1, 40)
+    local s = gen_clean("int64", n)
+    local before = {}; for i = 1, n do before[i] = s:get(i) end
+    table.sort(before)
+    local sorted = s:sort()
+    check(sorted:len() == n, "sort mudou o tamanho")
+    for i = 1, n do
+        check(sorted:get(i) == before[i],
+              "multiconjunto difere no idx " .. i)
+        if i > 1 then
+            check(sorted:get(i) >= sorted:get(i - 1), "sort não-monotônico no idx " .. i)
+        end
+    end
+end
+
+-- INV4: sort/argsort RECUSAM séries com null ou NaN (contrato)
+PROPERTIES["sort_recusa_null_nan"] = function()
+    local n = math.random(1, 30)
+    local s = gen_with_nan(n)
+    -- só vale o invariante se a série DE FATO tem null ou NaN
+    local tem_buraco = false
+    for i = 1, n do
+        if s:is_null(i) or is_nan(s:get(i)) then tem_buraco = true; break end
+    end
+    if tem_buraco then
+        local ok = pcall(function() return s:sort() end)
+        check(not ok, "sort deveria recusar série com null/NaN")
+        check(s:argsort() == nil, "argsort deveria retornar nil com null/NaN")
+    end
+end
+
+-- INV5: len(filter(s, mask)) == count_true(mask), com nulls
+PROPERTIES["filter_count_true"] = function()
+    local n = math.random(1, 40)
+    local s = gen_nullable("float64", n)
+    local k = (math.random() - 0.5) * 2e6
+    local mask = s:gt(k)
+    local filtered = s:filter(mask)
+    check(filtered:len() == mask:count_true(),
+          "len(filter)=" .. filtered:len() .. " != count_true=" .. mask:count_true())
+end
+
+-- INV6: take + permutação inversa = identidade
+PROPERTIES["take_inversa"] = function()
+    local n = math.random(1, 30)
+    local s = gen_clean("float64", n)
+    local perm = random_perm(n)
+    local inv = {}; for i = 1, n do inv[perm[i]] = i end
+    local back = s:take(perm):take(inv)
+    for i = 1, n do
+        check(math.abs(back:get(i) - s:get(i)) < 1e-9, "take+inversa != id no idx " .. i)
+    end
+end
+
+-- INV7: astype ida-e-volta f64->i64->f64 preserva valores inteiros
+PROPERTIES["astype_ida_volta"] = function()
+    local n = math.random(1, 30)
+    local s = S.float64(n)
+    for i = 1, n do
+        if math.random() < 0.2 then s:set_null(i)
+        else s:set(i, math.random(-100000, 100000)) end  -- inteiros como float
+    end
+    local round = s:astype("int64"):astype("float64")
+    for i = 1, n do
+        if s:is_null(i) then
+            check(round:is_null(i), "astype perdeu null no idx " .. i)
+        else
+            check(round:get(i) == s:get(i), "astype ida-volta difere no idx " .. i)
+        end
+    end
+end
+
+-- INV8: fillna remove todos os nulls e preserva não-nulos e NaN
+PROPERTIES["fillna_remove_null"] = function()
+    local n = math.random(1, 40)
+    local s = gen_with_nan(n)
+    local snap = {}; for i = 1, n do snap[i] = s:get(i) end  -- nil p/ null, NaN p/ nan
+    local f = s:fillna(0)
+    for i = 1, n do
+        if s:is_null(i) then
+            check(f:get(i) == 0, "fillna não preencheu null no idx " .. i)
+        elseif is_nan(snap[i]) then
+            check(is_nan(f:get(i)), "fillna não preservou NaN no idx " .. i)
+        else
+            check(f:get(i) == snap[i], "fillna alterou valor no idx " .. i)
+        end
+    end
+end
+
+-- INV9: Kleene — not(not b) == b
+PROPERTIES["kleene_dupla_negacao"] = function()
+    local n = math.random(1, 30)
+    local s = gen_nullable("float64", n)
+    local b = s:gt(0)
+    local bb = b:lnot():lnot()
+    for i = 1, n do
+        check(b:get(i) == bb:get(i), "not(not b) != b no idx " .. i)
+        check(b:is_null(i) == bb:is_null(i), "not(not b) perdeu NA no idx " .. i)
+    end
+end
+
+-- INV10: Kleene — De Morgan: not(a and b) == (not a) or (not b)
+PROPERTIES["kleene_de_morgan"] = function()
+    local n = math.random(1, 30)
+    local a = gen_nullable("float64", n):gt(0)
+    local b = gen_nullable("float64", n):gt(0)
+    local left  = a:land(b):lnot()
+    local right = a:lnot():lor(b:lnot())
+    for i = 1, n do
+        check(left:get(i) == right:get(i), "De Morgan (valor) falha no idx " .. i)
+        check(left:is_null(i) == right:is_null(i), "De Morgan (NA) falha no idx " .. i)
+    end
+end
+
+-- ---------- runner ----------
+local order = {
+    "clone_independente", "view_compartilha", "sort_permutacao",
+    "sort_recusa_null_nan", "filter_count_true", "take_inversa",
+    "astype_ida_volta", "fillna_remove_null",
+    "kleene_dupla_negacao", "kleene_de_morgan",
+}
+
+for _, name in ipairs(order) do
+    local prop = PROPERTIES[name]
+    for _, seed in ipairs(SEEDS) do
+        cur_seed = seed
+        math.randomseed(seed)
+        for caso = 1, N_PER_SEED do
+            cur_case = caso
+            prop()
+        end
+    end
+end
+
+print(string.format("OK — %d invariantes × %d seeds × %d casos = %d checks (property-based)",
+      #order, #SEEDS, N_PER_SEED, n_checks))

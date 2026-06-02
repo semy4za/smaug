@@ -105,7 +105,8 @@ A Fase 1.6 só fecha quando **todos** os itens abaixo forem verdadeiros:
    **medido**, nunca estimado.
 2. Bateria de testes sistemáticos (Frente 1) passando, Valgrind-clean.
 3. Property-based tests (Frente 1) passando em N≥1000 casos aleatórios por
-   invariante, com seed fixa para reprodutibilidade.
+   invariante, com seed fixa para reprodutibilidade. ✅ **FEITO** (~222k checks,
+   validado por mutation testing)
 4. `fillna` implementado, testado e documentado (Series + DataSet). ✅ **FEITO**
 5. Dívida técnica registrada (seção "Dívida técnica") — o que ficou de fora é
    decisão explícita, não esquecimento.

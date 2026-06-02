@@ -4,6 +4,18 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Adicionado (Fase 1.6 — property-based)
+- `tests/test_props.lua`: testes baseados em propriedades — 10 invariantes ×
+  3 seeds fixas × 400 casos (~222 mil checks). Invariantes: clone independente
+  (anti-aliasing), view compartilha memória, sort é permutação (multiconjunto +
+  monotonia), sort recusa null/NaN, filter↔count_true, take+inversa=identidade,
+  astype ida-volta, fillna remove null/preserva NaN, Kleene (dupla negação, De
+  Morgan). Cada invariante com gerador próprio que respeita o contrato. Seeds
+  fixas (reprodutível); falha imprime seed+caso. **Validado por mutation
+  testing** (bug de aliasing injetado no clone → property-based detectou).
+  Valgrind-clean mesmo com 222k checks (prova o `ffi.gc` sob carga). Integrado
+  ao `make test-lua`.
+
 ### Adicionado (Fase 1.6 — `fillna`)
 - **`Series:fillna(value)`** e **`DataSet:fillna(value | {col=value})`**: nova
   Series/DataSet com NULLs substituídos. Cumpre o contrato: sem argumento =
