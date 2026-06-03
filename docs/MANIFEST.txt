@@ -4,16 +4,16 @@
 #
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
 ed7d63f5177cc7d7fbfee9c7c18ebeb4d6fd7da02680ec7778cfe23be1d15b03      31  ./.gitattributes
-07b8128ad4eceaed20dbc38e7821aaf5956c5c039be61b71602ca577d9ad7e38       7  ./.gitignore
-1f4dcf4fa0001867efa06e56acda07d38812cd29bd297fb714c13781b7d1523f      62  ./Makefile
+4f01d8ffb7024a3980cabf8eb1d343c24b78b7614a7bb301af351dd18b846cd5       6  ./.gitignore
+4f01e863c52420901fc8fff173e41229d6eedea2f49dbf2fc306cffe1a64ca34      65  ./Makefile
 0a4532c02e2726cdc7b695ed25afee8b9320ca0a3d772a61f285fd4c4e68de7c     148  ./docs/API_INDEX.md
 0f36df40dd144fdc6ea735fc3febe5522af9798dc71e4aa58b96d0e981833b8d     346  ./docs/API_Reference.md
-bc57f1d8dfed791b409021965af09e33b217b836abd4742a0dbab9a17e8f6394     433  ./docs/Build_and_Testing.md
-7e989678da59f0032247414263f46bdf33095f2546c45d9e1c38eff6a67a1dd5     293  ./docs/CHANGELOG.md
-352e276423c341ba09adc3e4e8fb71433cb9c2b0424f146af998451c1d491973      86  ./docs/CODE_REVIEW.md
-a67000b6cda45b4d7ad7306bf8c1342acfd9f93d182447d3f0d3aade54eb0b13      29  ./docs/COVERAGE.md
+3cbdf245e27417235912f24d67bed698979ba826a92a5b3c478ea2e6989eb079     432  ./docs/Build_and_Testing.md
+fb3465370bad67908ffc4c4a91f271dffb8d5263c4e442b664892dc5d56058a6     314  ./docs/CHANGELOG.md
+c129aa8c8f917701f9e5e97b698dc70462d65803c0880e3c9366fa9141c6002f      91  ./docs/CODE_REVIEW.md
+fe8683dd68b256655197f635e76c53c5d2faaa3246946aa8e2dd76261a7dd2cb      34  ./docs/COVERAGE.md
 d329cd82aee8b550128afc60405c28342cc52712602172ebfbf604119f24a792     178  ./docs/README.md
-259cbb43a27a38c82ec13cd48c1a1745272fb78334fe3009ea0e6d00907a74b9     673  ./docs/Roadmap.md
+ffb1ed162731e6213120f553e295dff4bd81f311d687c07c9fa15f73eff62233     681  ./docs/Roadmap.md
 1a962624dbef1cab3ee1238a1d2f13e7b64fbb1bcad4fe06a2b0328d4dde4742      27  ./include/smaug.h
 963e21a0d5b9b1857da7bbe7310a4a9340057fcf7560272f062e4e83727c5da3      40  ./include/smaug_bool.h
 b10e6e4b8703cf71abad70679b000d650ed37c891f644e53e80902f4cc805b2d      58  ./include/smaug_core.h
@@ -24,14 +24,15 @@ e415b73427647932669bbbba016f4485343a7d5fed7d735ece1a05de2896b384     336  ./lua/
 e975d8bfce374d4fccb55e51826c6d7eabd8b109235b96d98dee9fbf173e85f7     520  ./lua/smaug/core/series.lua
 a3dd7d425b6e154cf3782a00f245e100ac45f9e7e7254779d73b9e8c3435add8     213  ./lua/smaug/ffi_loader.lua
 09044a60cd7891600013e3bb7f15ddc7b9e741db8f4499ed93499e355aadea17      28  ./lua/smaug/init.lua
-c74289a44ca645f7632766313d441adb874dae44cb54d9f35f0e7c6573bca4f0      98  ./scripts/make_coverage.sh
+abfbdc6b2cd8c19a527ab2087e11efed1517b73d70292f555bd8021bb1c693a0     103  ./scripts/make_coverage.sh
 cb828add8f90f2e44bd826cc4053f524b73fe65d62f3fa90bebbb936f19ac04e      34  ./scripts/make_manifest.sh
 fb4bd0d81c1aafbcfcd927314da5f1c9d2fa1dce0a07c5bab85d01ad1ce42405     150  ./scripts/windows-build.ps1
-d97f781b9cf6fc4a5de826ca16c74439f4aeaabe1704421baf8a651c5e5d67c6     354  ./src/smaug_core.c
+8b39dd4df2ae706d545b863e0c4780d3225e974cad491e115c02283fc1b41bae     362  ./src/smaug_core.c
 267958936286e557235eb7d884c5032e4cd72d6c544d7e24d639c6d1f7f669a8     134  ./src/smaug_ops_bool.c
 d62d2a02baae0454ff043212ce086de002b2eaf85f791c60e83c4bcf8c3da864     457  ./src/smaug_ops_f64.c
 c2654288985151bb30a29195e3cfdded0daf657bf372ceac4738040b2911c44d     445  ./src/smaug_ops_i64.c
 427253b1234873224e0053bec67a3d894c74278bd8b5579b6440ec6234de3678     209  ./tests/test_alloc.c
+855de5b73f29f1e682659ffeb8f384ef8da201192867a1b2d0e201e6a1e6ee59     333  ./tests/test_allocfail.c
 c3a4e968b31bf94327b9b87be8e912861bbc0cb54563bf02a5aeb6583eff2c93      80  ./tests/test_bool.c
 0e6f8b602e9dd802dd0cec139a37220e570bb0bb444b47cc9c27f8c37df1d7b3     105  ./tests/test_dataset.lua
 ad131f2ede73174853f770f75d1a81a584655e6e2a06fb3f03f575436983b8c7     162  ./tests/test_edge.lua
@@ -42,4 +43,4 @@ c1f1a08db58d897a367d83b92ff1f22e932d86b53c62d88a4d4567fc9c0f882a      22  ./test
 c61324b82dfb664a245874174c5c3fac80715d11f230b7cc190ddb13aa91995a     190  ./tests/test_series.lua
 95b96ff3b9f6eb462c664326f654abe94262db625000b21e4f20f12afbb8a448     151  ./tests/test_special.lua
 #
-# total de arquivos: 39
+# total de arquivos: 40

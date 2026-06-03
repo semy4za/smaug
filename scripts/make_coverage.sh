@@ -88,6 +88,11 @@ br_pct=$(awk "BEGIN{printf \"%.2f\", ($tot_br? $cov_br*100/$tot_br : 0)}")
   echo "não cobertos hoje são majoritariamente **caminhos de erro** (falha de"
   echo "alocação, entrada inválida) — atacados pelo \`test_allocfail.c\` e por"
   echo "testes de entrada inválida. Evolução incremental, medida a cada commit."
+  echo ""
+  echo "> **Nota:** \`test_allocfail.c\` (falha de alocação via \`--wrap\`) exercita"
+  echo "> caminhos de erro adicionais **não refletidos neste número**, pois usa"
+  echo "> instrumentação incompatível com a \`.so\` medida aqui. Agregá-lo à medição"
+  echo "> é dívida técnica registrada. Ele roda em \`make test\`/\`make valgrind\`."
 } > "$OUT"
 
 echo "COVERAGE gerado: $OUT"

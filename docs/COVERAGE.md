@@ -10,11 +10,11 @@
 
 | Arquivo | Linhas | Branch (taken) |
 |---------|--------|----------------|
-| `smaug_core.c` | 92.92% | 57.53% |
+| `smaug_core.c` | 92.06% | 56.00% |
 | `smaug_ops_f64.c` | 81.01% | 58.33% |
 | `smaug_ops_i64.c` | 96.28% | 67.83% |
 | `smaug_ops_bool.c` | 100.00% | 77.56% |
-| **TOTAL (ponderado)** | **90.65%** | **64.53%** |
+| **TOTAL (ponderado)** | **90.54%** | **64.34%** |
 
 ## Gate da Fase 1.6
 
@@ -27,3 +27,8 @@ Meta futura: **branch 100%** (cobertura MC/DC, como o SQLite). Os ramos
 não cobertos hoje são majoritariamente **caminhos de erro** (falha de
 alocação, entrada inválida) — atacados pelo `test_allocfail.c` e por
 testes de entrada inválida. Evolução incremental, medida a cada commit.
+
+> **Nota:** `test_allocfail.c` (falha de alocação via `--wrap`) exercita
+> caminhos de erro adicionais **não refletidos neste número**, pois usa
+> instrumentação incompatível com a `.so` medida aqui. Agregá-lo à medição
+> é dívida técnica registrada. Ele roda em `make test`/`make valgrind`.

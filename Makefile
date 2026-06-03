@@ -22,15 +22,18 @@ test: build
 	$(CC) $(TEST_CFLAGS) tests/test_alloc.c $(SRCS) -lm -o build/test_alloc
 	$(CC) $(TEST_CFLAGS) tests/test_ops.c   $(SRCS) -lm -o build/test_ops
 	$(CC) $(TEST_CFLAGS) tests/test_bool.c  $(SRCS) -lm -o build/test_bool
+	$(CC) $(TEST_CFLAGS) -Wl,--wrap=malloc -Wl,--wrap=realloc tests/test_allocfail.c $(SRCS) -lm -o build/test_allocfail
 	./build/test_alloc
 	./build/test_ops
 	./build/test_bool
+	./build/test_allocfail
 
 # Roda os testes sob Valgrind (requer valgrind instalado)
 valgrind: test
 	valgrind --leak-check=full --error-exitcode=1 ./build/test_alloc
 	valgrind --leak-check=full --error-exitcode=1 ./build/test_ops
 	valgrind --leak-check=full --error-exitcode=1 ./build/test_bool
+	valgrind --leak-check=full --error-exitcode=1 ./build/test_allocfail
 
 # Smoke test do frontend Lua (requer luajit e a .so compilada)
 test-lua: $(TARGET)

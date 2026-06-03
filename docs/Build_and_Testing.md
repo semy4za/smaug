@@ -327,8 +327,7 @@ tests/
 ├── test_fillna.lua # ✅ fillna (Series + DataSet), preservação de NaN, sem coerção
 ├── test_props.lua  # ✅ property-based: 10 invariantes × 3 seeds × 400 casos (~222k checks)
 ├── test_i64.lua    # ✅ int64 dedicado (aritmética, reduções, sort, take/filter, lifecycle)
-└── (Fase 1.6, ainda planejado)
-    └── test_allocfail.c # falha de alocação injetada (caminho de erro do grow)
+└── test_allocfail.c # ✅ falha de alocação (--wrap malloc/realloc): varre cada ponto, f64+i64
 ```
 
 Rode os C com `make test` (ou `make valgrind` para checar leaks) e o frontend

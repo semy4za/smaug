@@ -4,6 +4,27 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Adicionado (Fase 1.6 — falha de alocação; FASE FECHADA)
+- `tests/test_allocfail.c`: teste de falha de alocação no padrão SQLite —
+  intercepta `malloc`/`realloc` via `-Wl,--wrap` e faz a N-ésima alocação falhar,
+  varrendo **cada ponto** de alocação de cada operação (create, from_array,
+  clone, view, append/grow, add, add_scalar, comparações, argsort, sort) em
+  **f64 e i64**. Verifica recuperação graciosa (NULL/erro, sem crash) e, sob
+  Valgrind, ausência de vazamento em todos os ~215 cenários. Integrado a
+  `make test`/`make valgrind`.
+
+### Corrigido
+- **Double-free no caminho de reversão do `grow`** (f64 e i64), exposto pelo
+  test_allocfail: quando `capacity == 0`, o `realloc(data, 0)` de reversão
+  liberava o buffer e deixava `s->data` pendente. Agora a reversão só ocorre se
+  `capacity > 0`. Validado por mutation testing. Ver CODE_REVIEW A5.
+
+### Marco
+- **Fase 1.6 (endurecimento) FECHADA** — todos os 5 critérios do gate atingidos:
+  cobertura de linha ≥90% (medida), testes sistemáticos + Valgrind, property-based
+  (~222k checks), fillna, e dívida registrada. Próxima fase: contrato defensivo
+  do backend C, antes da string.
+
 ### Adicionado (Fase 1.6 — cobertura do int64)
 - `tests/test_i64.lua`: suíte dedicada ao int64 (58 checks) — aritmética
   (add/sub/mul/div inteira, /0→null, propagação de NA), escalares, reduções

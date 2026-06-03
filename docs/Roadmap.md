@@ -121,12 +121,20 @@ A Fase 1.6 só fecha quando **todos** os itens abaixo forem verdadeiros:
    (`smaug_ops_i64.c`: 56%→96%). Branch em ~65% segue como norte de longo prazo
    (rumo a 100%, via caminhos de erro).
 2. Bateria de testes sistemáticos (Frente 1) passando, Valgrind-clean.
+   ✅ **FEITO** — test_edge, test_special, test_fillna, test_i64 (Lua) +
+   test_allocfail (C, falha de alocação via `--wrap` varrendo cada ponto, f64+i64).
+   Tudo Valgrind-clean. O test_allocfail expôs e levou à correção de um double-free
+   no caminho de reversão do `grow` (ver CODE_REVIEW A5).
 3. Property-based tests (Frente 1) passando em N≥1000 casos aleatórios por
    invariante, com seed fixa para reprodutibilidade. ✅ **FEITO** (~222k checks,
    validado por mutation testing)
 4. `fillna` implementado, testado e documentado (Series + DataSet). ✅ **FEITO**
 5. Dívida técnica registrada (seção "Dívida técnica") — o que ficou de fora é
-   decisão explícita, não esquecimento.
+   decisão explícita, não esquecimento. ✅ **FEITO**
+
+> **Gate da Fase 1.6: todos os 5 critérios ATINGIDOS.** A fase está fechada.
+> Próxima fase planejada: endurecer o contrato do backend C (validação defensiva
+> de entrada), antes da `string` — ver "Dívida técnica" e a discussão de contrato.
 
 ### Frente 1 — Testes sistemáticos (nível aviação)
 

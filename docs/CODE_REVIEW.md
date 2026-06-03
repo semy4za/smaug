@@ -40,10 +40,15 @@ mas precisa ser **testado e documentado** como comportamento conhecido. Há aind
 a colisão: uma soma que legitimamente dê `INT64_MIN` é indistinguível do
 sentinela de erro (já documentado em API_Reference). **Ação:** teste + nota.
 
-### A5 — Caminho de falha de `realloc` (grow) nunca exercitado
-O fix do realloc parcial (encolher `data` de volta se `null_mask` falha) está
-correto por inspeção, mas nenhum teste força o `realloc` a falhar. **Ação:**
-teste em C com `malloc`/`realloc` interceptados (Fase 1.6, Frente 1).
+### A5 — Caminho de falha de `realloc` (grow) — RESOLVIDO, com bug corrigido
+O `test_allocfail.c` (Fase 1.6) passou a forçar `malloc`/`realloc` a falhar em
+cada ponto (via `-Wl,--wrap`), varrendo todas as operações f64/i64. Isso
+**expôs um bug real** no caminho de reversão do `grow`: quando `capacity == 0`,
+o `realloc(s->data, 0)` de reversão liberava o buffer e devolvia NULL, deixando
+`s->data` pendente → **double-free** no `free` seguinte. **Corrigido:** a
+reversão só roda se `capacity > 0` (quando 0, o buffer maior permanece, que é
+seguro). Bug encontrado pelo teste e validado por mutation testing (reintroduzir
+o bug faz o teste abortar). f64 e i64 corrigidos.
 
 ### A6 — `take` não valida `idx == NULL` por elemento, só o ponteiro
 `smaug_*_take` checa `!idx` (o array) e cada `idx[i] >= size`, o que está

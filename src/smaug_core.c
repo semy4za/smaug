@@ -27,12 +27,17 @@ static int f64_grow(smaug_series_f64_t *s) {
 
     smaug_mask_t *nm = realloc(s->null_mask, new_cap * sizeof(smaug_mask_t));
     if (!nm) {
-        /* null_mask falhou. data já cresceu — encolhe de volta para preservar
-           o invariante (data e null_mask sempre com 'capacity' elementos).
-           realloc para menor não invalida os dados; se ela falhar, o buffer
-           maior permanece, o que ainda é seguro. capacity fica inalterado. */
-        double *back = realloc(s->data, s->capacity * sizeof(double));
-        if (back) s->data = back;
+        /* null_mask falhou. data já cresceu — tenta encolher de volta para
+           preservar o invariante (data e null_mask sempre com 'capacity'
+           elementos). Encolher só faz sentido se capacity > 0: realloc(p, 0) é
+           tratado como free(p) e devolve NULL, o que deixaria s->data pendente
+           (dangling) e causaria double-free depois. Quando capacity == 0, o
+           buffer maior simplesmente permanece — seguro (só usa um pouco mais de
+           memória até o próximo grow). capacity fica inalterado em ambos os casos. */
+        if (s->capacity > 0) {
+            double *back = realloc(s->data, s->capacity * sizeof(double));
+            if (back) s->data = back;
+        }
         return -1;
     }
     s->null_mask = nm;
@@ -50,9 +55,12 @@ static int i64_grow(smaug_series_i64_t *s) {
 
     smaug_mask_t *nm = realloc(s->null_mask, new_cap * sizeof(smaug_mask_t));
     if (!nm) {
-        /* Ver f64_grow: encolhe data de volta para preservar o invariante. */
-        int64_t *back = realloc(s->data, s->capacity * sizeof(int64_t));
-        if (back) s->data = back;
+        /* Ver f64_grow: encolhe data de volta só se capacity > 0 (realloc(p,0)
+           liberaria o buffer e deixaria s->data pendente → double-free). */
+        if (s->capacity > 0) {
+            int64_t *back = realloc(s->data, s->capacity * sizeof(int64_t));
+            if (back) s->data = back;
+        }
         return -1;
     }
     s->null_mask = nm;
