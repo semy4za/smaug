@@ -4,6 +4,18 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Adicionado (Fase 1.6 — cobertura do int64)
+- `tests/test_i64.lua`: suíte dedicada ao int64 (58 checks) — aritmética
+  (add/sub/mul/div inteira, /0→null, propagação de NA), escalares, reduções
+  (min/max/mean/var/std populacionais, sentinela INT64_MIN→nil), comparações
+  (gt/lt/eq + NA), ordenação (sort asc/desc, argsort, recusa de NULL), seleção
+  (take/filter), lifecycle (clone independente, view, append-grow) e astype.
+  Cada caso **asserta** o resultado (valores verificados por sondagem, não
+  supostos). Integrado a `make test-lua` e ao `make coverage`. Valgrind-clean.
+- **Cobertura de linha: 77% → 90.65%** — gate da Fase 1.6 (linha ≥90%) agora
+  **ATINGIDO**. `smaug_ops_i64.c`: 56% → 96%. Branch ~65% segue como norte de
+  longo prazo. (Rótulo de conversa "opção A" também removido da doc de cobertura.)
+
 ### Adicionado (Fase 1.6 — medição de cobertura)
 - `make coverage` (via `scripts/make_coverage.sh`): mede a cobertura do backend
   C e **gera** `docs/COVERAGE.md` (artefato gerado, como o MANIFEST — nunca

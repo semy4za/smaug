@@ -40,6 +40,7 @@ test-lua: $(TARGET)
 	luajit tests/test_special.lua
 	luajit tests/test_fillna.lua
 	luajit tests/test_props.lua
+	luajit tests/test_i64.lua
 
 # Mede cobertura do backend C e gera docs/COVERAGE.md (requer gcov; só Linux)
 coverage:

@@ -34,7 +34,7 @@ done
 
 # 4. roda os testes Lua contra a MESMA .so (o loader procura em build/)
 cp "$COVDIR/libsmaug.so" build/libsmaug.so
-for t in test_series test_dataset test_edge test_special test_fillna test_props; do
+for t in test_series test_dataset test_edge test_special test_fillna test_props test_i64; do
     luajit "tests/$t.lua" >/dev/null 2>&1
 done
 
@@ -79,7 +79,7 @@ br_pct=$(awk "BEGIN{printf \"%.2f\", ($tot_br? $cov_br*100/$tot_br : 0)}")
   echo ""
   echo "## Gate da Fase 1.6"
   echo ""
-  echo "- Critério atual (opção A): **linha ≥ 90%**."
+  echo "- Critério do gate (Fase 1.6): **linha ≥ 90%**."
   echo "- Status: $(awk "BEGIN{print ($line_pct>=90)?\"ATINGIDO ✅\":\"NÃO atingido ❌ (faltam \"  90-$line_pct  \" pontos)\"}")"
   echo ""
   echo "## Norte de longo prazo (cover real, padrão SQLite)"

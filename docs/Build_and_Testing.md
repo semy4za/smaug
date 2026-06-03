@@ -298,8 +298,8 @@ Artefatos intermediários (`cov/`, `*.gcda`, `*.gcno`, `*.gcov`) são limpos ao
 final e ignorados pelo git.
 
 **Métrica.** O relatório mostra **linha** (básica) e **branch / "taken at least
-once"** (rigorosa — padrão SQLite/aviônica). O gate da Fase 1.6 usa linha ≥ 90%
-(opção A); a meta de longo prazo é branch 100%. Ver `docs/COVERAGE.md` para o
+once"** (rigorosa — padrão SQLite/aviônica). O gate da Fase 1.6 usa linha ≥ 90%;
+a meta de longo prazo é branch 100%. Ver `docs/COVERAGE.md` para o
 número atual e o plano.
 
 **Regenerar a cada mudança.** Sempre que código ou testes mudarem, rode
@@ -326,6 +326,7 @@ tests/
 ├── test_special.lua# ✅ valores especiais f64 (Inf, NaN distinto de null, -0.0)
 ├── test_fillna.lua # ✅ fillna (Series + DataSet), preservação de NaN, sem coerção
 ├── test_props.lua  # ✅ property-based: 10 invariantes × 3 seeds × 400 casos (~222k checks)
+├── test_i64.lua    # ✅ int64 dedicado (aritmética, reduções, sort, take/filter, lifecycle)
 └── (Fase 1.6, ainda planejado)
     └── test_allocfail.c # falha de alocação injetada (caminho de erro do grow)
 ```
