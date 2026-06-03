@@ -1,178 +1,149 @@
 # 🐉 Smaug
 
-**Análise de dados em Lua, com a performance do C.**
+**Análise de dados tabulares em Lua, com um backend em C.**
 
-Smaug é uma biblioteca que traz funcionalidades estilo Pandas para o Lua, usando
-um backend em C otimizado conectado via LuaJIT FFI (zero-copy). O objetivo é uma
-ferramenta de análise tabular **leve** o suficiente para edge computing, game
-engines e IoT, com performance numérica próxima a NumPy.
+Smaug traz uma API estilo pandas/numpy para Lua, sobre um backend em C conectado
+via LuaJIT FFI. O alvo é uma ferramenta de dados **leve** o bastante para edge
+computing, IoT e game engines — onde Python+pandas é pesado demais — sem abrir
+mão de performance numérica.
+
+```lua
+local smaug = require("smaug")
+
+-- Uma coluna de dados, com suporte a nulos (NA)
+local s = smaug.Series.from_table({10, 20, smaug.NA, 40}, "float64")
+print(s:sum())            -- 70      (ignora NA por padrão)
+print(s:mean())           -- 23.33
+print(s:count_nonnull())  -- 3
+
+-- Uma tabela com colunas tipadas
+local df = smaug.DataSet.from_columns({
+  {"idade",   {25, 30, 35},              "int64"},
+  {"salario", {5000.0, 7000.0, 9000.0},  "float64"},
+})
+
+-- Filtra linhas: quem tem mais de 27 anos
+local senior = df:filter(df:col("idade"):gt(27))
+print(senior:nrows())     -- 2
+```
+
+> **Status:** backend numérico (float64, int64, bool) e frontend (`Series`,
+> `BoolSeries`, `DataSet`) implementados e endurecidos. `string`, I/O (CSV/JSON)
+> e demais tipos são fases futuras — ver [Roadmap](Roadmap.md).
 
 ---
 
 ## Por quê
 
-Python + Pandas é a ferramenta padrão para dados tabulares, mas é pesado:
-import lento, footprint alto e difícil de embarcar. Lua é o oposto — runtime de
-~400KB, e o LuaJIT traz JIT + FFI nativo. Smaug junta os dois: **frontend Lua
-expressivo, backend C rápido**.
+Python + pandas é o padrão para dados tabulares, mas é pesado: import lento,
+footprint alto, difícil de embarcar. Lua é o oposto — runtime de ~400 KB — e o
+LuaJIT traz JIT + FFI nativo. Smaug junta os dois: **frontend Lua expressivo,
+backend C rápido**, com a passagem de dados pela fronteira FFI sem cópia.
+
+## Como rodar
+
+Requer **LuaJIT** e um compilador C (gcc/clang). No Linux:
+
+```bash
+make                       # compila o backend -> build/libsmaug.so
+make test                  # testes em C (inclui falha de alocacao)
+make test-lua              # testes do frontend Lua
+```
+
+No Windows há o script `scripts/windows-build.ps1` (compila a `smaug.dll` e roda
+os testes); detalhes em [Build_and_Testing.md](Build_and_Testing.md).
+
+Para usar na sua aplicação, garanta que o `package.path` encontre `lua/` e que a
+biblioteca compilada esteja em `build/`, e então `require("smaug")`.
+
+## O que existe hoje
+
+| Componente | Estado |
+|------------|--------|
+| Backend C — `float64`, `int64` (lifecycle + aritmética/reduções/comparações/sort/take/filter) | ✅ |
+| Backend C — `bool` (lógica de Kleene, 3 valores) | ✅ |
+| Frontend — `Series` (despacho por dtype), `BoolSeries`, `DataSet` | ✅ |
+| `fillna`, `astype`, `clone`, `view`, `describe` | ✅ |
+| Build (`Makefile`) + portabilidade Windows | ✅ |
+| **Endurecimento (Fase 1.6)** — cobertura medida, property-based, falha de alocação | ✅ **fechada** |
+| Tipo `string` | ❌ próxima fase |
+| Contrato defensivo do backend C (validação de entrada) | ❌ planejado, antes da `string` |
+| I/O — CSV, JSON, XML, SQL | ❌ fase futura |
+
+O **rigor de teste** é parte do projeto, não um acréscimo. A suíte atual: 4
+testes em C (incluindo `test_allocfail`, que força `malloc`/`realloc` a falhar em
+cada ponto), 7 suítes em Lua (~222 mil verificações somando o property-based),
+tudo Valgrind-clean, com cobertura de linha **medida** em ~90%. O modelo de
+referência é o SQLite; ver [Build_and_Testing.md](Build_and_Testing.md) e
+[COVERAGE.md](COVERAGE.md).
+
+---
 
 ## Stack
 
 | Camada | Tecnologia | Responsabilidade |
 |--------|-----------|------------------|
-| Frontend | Lua 5.1 / LuaJIT | Classes `Series`/`DataSet`, API, metamétodos |
-| Bridge | LuaJIT FFI | Passagem de dados zero-copy, chamadas nativas |
-| Backend | C11 | Operações numéricas, malloc/free, loops SIMD-friendly |
-| Build | Makefile / CMake | Portabilidade Linux/macOS/Windows |
+| Frontend | Lua 5.1 / LuaJIT | `Series`/`BoolSeries`/`DataSet`, API, metamétodos, validação |
+| Bridge | LuaJIT FFI | Passagem de dados sem cópia, `ffi.gc` para limpeza |
+| Backend | C11 | Operações numéricas, gerência de memória, bitmask de nulos |
 
-## Alvos não-funcionais
-
-| Aspecto | Alvo |
-|---------|------|
-| Footprint compilado | < 2 MB |
-| Startup (require + init) | < 100 ms |
-| Performance numérica | ≥ 80% de NumPy em operações grandes |
-| Type safety | zero segfaults silenciosos |
-| Compatibilidade de API | ~90% Pandas |
-
----
-
-## Arquitetura em camadas
-
-```
-┌─────────────────────────────────────────────┐
-│  Aplicação do usuário (Lua)                  │
-│  local df = smaug.read_csv("dados.csv")      │
-│  local total = df["salario"]:sum()           │
-├─────────────────────────────────────────────┤
-│  Frontend Lua                                │
-│  Series, DataSet, metamétodos, validação     │
-├─────────────────────────────────────────────┤
-│  Bridge FFI (ffi.cdef + ffi.load + ffi.gc)   │
-│  Assinaturas C, hooks de GC, sem lógica       │
-├─────────────────────────────────────────────┤
-│  Backend C (libsmaug.so)                │
-│  Structs tipadas, arrays contíguos, bitmasks  │
-└─────────────────────────────────────────────┘
-```
-
-Fluxo de uma chamada como `df["idade"]:sum()`: o `__index` do DataSet devolve a
-`Series` da coluna, o método `:sum()` em Lua chama `C.smaug_f64_sum(ptr, ...)`
-via FFI, o C executa o loop acumulador e devolve um `double` direto ao Lua.
-
-## Formatos de dados suportados
-
-O Smaug lê e escreve **quatro** formatos — e apenas estes:
-
-| Formato | Fonte | Tipos |
-|---------|-------|-------|
-| **CSV** | `.csv` / `.tsv` | inferência heurística |
-| **JSON** | `.json` (records ou columnar) | nativos do JSON |
-| **XML** | `.xml` (convenção `row_tag`) | inferência heurística |
-| **SQL** | SQLite (dependência opcional) | do schema |
-
-Design completo em `Roadmap.md` (Fase 6). Ainda não implementados.
-
-## Tipos de dados (dtypes)
-
-O Smaug adota um conjunto curado de tipos, em camadas (detalhe em
-`Roadmap.md` → "Sistema de tipos"):
-
-| Camada | Tipos | Status |
-|--------|-------|--------|
-| Núcleo | `float64`, `int64`, `bool`, `string` | f64/i64/bool ✅; string (Fase 5, próxima) |
-| Alto valor | `datetime`, `categorical` | pós-MVP |
-| Otimização | `float32`, `int32`, `int8/16`, `uint*` | mesma API, storage estreito; só se necessário |
-
-A classe `Series` abstrai o dtype: adicionar um tipo novo é registrar um
-descritor + o backend C, sem mudar o código do usuário. Sem coerção implícita
-entre tipos.
-
----
+Fluxo de uma chamada como `df:col("idade"):sum()`: o frontend devolve a `Series`
+da coluna, `:sum()` chama `C.smaug_i64_sum(ptr, ...)` via FFI, o C roda o loop e
+devolve o número direto ao Lua.
 
 ## Decisões de design
 
+Estas são as escolhas que moldam o comportamento do Smaug — úteis para quem vai
+contribuir ou depender do projeto:
+
 **Tipos separados, sem coerção implícita.** Cada tipo numérico tem sua própria
-struct (`smaug_series_f64_t`, `smaug_series_i64_t`) e seu próprio conjunto de
-funções. Sem casting silencioso — o usuário decide explicitamente. Evita classes
-inteiras de bugs e elimina overhead de conversão nos loops.
+struct (`smaug_series_f64_t`, `smaug_series_i64_t`) e seu conjunto de funções.
+Sem casting silencioso — o usuário converte explicitamente (`astype`). Preencher
+um `int64` com `1.5` é erro, não truncamento.
 
-**Null handling por bitmask paralelo.** Cada série carrega um array
-`smaug_mask_t` (`uint8_t`) onde `0xFF` = válido e `0x00` = nulo (NA). É 8× mais
-RAM que bit-packing, mas cache-friendly, sem complexidade bitwise, e funciona
-para qualquer tipo (inteiros e strings não têm NaN nativo).
+**Null ≠ NaN.** Nulo (NA) é *ausência*, registrada num bitmask paralelo
+(`0xFF` = válido, `0x00` = nulo). `NaN` é um valor de ponto flutuante presente,
+porém indefinido. Os dois **nunca** se convertem: `sort` recusa ambos, mas por
+razões distintas; `fillna` preenche nulos e preserva NaN. Inteiros e strings não
+têm NaN — o bitmask dá suporte a nulos para qualquer tipo.
 
-**Imutabilidade por padrão.** Operações (`add`, `mul`, `filter`, …) sempre
-retornam uma série nova; nunca modificam in-place. Só `set`/`set_null`/`append`
-mutam. Isso evita bugs de aliasing. A exceção são **views** (slices sem cópia),
-que são read-only.
+**Imutabilidade por padrão.** Operações (`add`, `filter`, `sort`, …) retornam uma
+série nova; nunca modificam in-place. Só `set`/`set_null`/`append` mutam. Evita
+bugs de aliasing. A exceção são **views** (fatias sem cópia), que compartilham a
+memória da série-pai e não devem sobreviver a ela (use `clone` se precisar).
 
-**Views são zero-copy e têm dono externo.** `smaug_f64_view(s, start, len)`
-aponta para dentro do array da série-pai. A flag `external_alloc=true` impede que
-o `free` da view libere a memória da pai — mas a view **não pode sobreviver** à
-pai (use `clone` se precisar).
-
-**Indexação 1-based no Lua, 0-based no C.** Convenção de cada mundo respeitada; a
-conversão acontece no wrapper Lua.
+**Indexação 1-based no Lua, 0-based no C.** Cada mundo na sua convenção; a
+conversão acontece no wrapper Lua, que também valida os índices.
 
 **Memória manual no C, `ffi.gc` no Lua.** O backend controla seu próprio
-malloc/free (sem overhead de GC). No Lua, cada struct retornado é registrado com
-`ffi.gc(ptr, C.smaug_f64_free)` para limpeza automática.
-
----
+malloc/free. No Lua, cada ponteiro é registrado com `ffi.gc(...)` para liberação
+automática — sem o usuário gerenciar memória.
 
 ## Estrutura do projeto
 
 ```
 smaug/
-├── include/
-│   ├── smaug_types.h      # Tipos base (mask, metadata, structs) — zero funções
-│   ├── smaug_core.h       # Lifecycle, get/set, append, smaug_free
-│   ├── smaug_numeric.h    # Aritmética/reduções/comparações/sort/utils (f64+i64)
-│   ├── smaug_bool.h       # Lógica booleana (Kleene)
-│   └── smaug.h            # Umbrella (inclui os de operação)
-├── src/
-│   ├── smaug_core.c        # Lifecycle: create/free/clone/view, get/set, append
-│   ├── smaug_ops_f64.c     # Operações float64
-│   ├── smaug_ops_i64.c     # Operações int64
-│   └── smaug_ops_bool.c    # Lógica booleana (Kleene)
-├── docs/
-│   ├── README.md           # Este arquivo
-│   ├── API_Reference.md    # Referência da API C
-│   ├── Build_and_Testing.md# Compilação e testes
-│   └── Roadmap.md          # Fases futuras + design do frontend Lua
-├── lua/
-│   └── smaug/
-│       └── ffi_loader.lua  # ✅ Ponte FFI: cdef completo + ffi.load
-└── build/                  # Output da compilação (libsmaug.so)
+├── include/          # 5 headers, separados por responsabilidade
+│   ├── smaug_types.h    # tipos base (mask, metadata, structs) — zero funções
+│   ├── smaug_core.h     # lifecycle, get/set, append, smaug_free
+│   ├── smaug_numeric.h  # aritmetica/reducoes/comparacoes/sort/utils (f64+i64)
+│   ├── smaug_bool.h     # logica de Kleene
+│   └── smaug.h          # umbrella
+├── src/              # backend C (core, ops_f64, ops_i64, ops_bool)
+├── lua/smaug/        # frontend: init, ffi_loader, core/{series,boolseries,dataset}
+├── tests/            # 4 em C + 7 suites Lua (ver Build_and_Testing.md)
+├── scripts/          # make_manifest.sh, make_coverage.sh, windows-build.ps1
+└── docs/             # esta doc
 ```
 
-A criar (ver `Roadmap.md`): resto do frontend (`core/series.lua`, `init.lua`),
-`DataSet`, CSV I/O.
+## Documentação
 
----
-
-## Status rápido
-
-| Camada | Status |
-|--------|--------|
-| Headers (5, separados por responsabilidade) | ✅ Completo e estável |
-| Backend C — f64 (lifecycle + ops) | ✅ Completo |
-| Backend C — i64 (lifecycle + ops) | ✅ Completo |
-| Backend C — bool (lógica Kleene) | ✅ `smaug_ops_bool.c` |
-| Sistema de build (`Makefile`) | ✅ Completo |
-| Testes C (`test_ops` + `test_alloc` + `test_bool`) | ✅ Passam (Valgrind-clean) |
-| Frontend Lua — `ffi_loader.lua` | ✅ Completo e validado |
-| Frontend Lua — `Series` (f64 + i64) | ✅ Implementada (despacho por dtype) |
-| Frontend Lua — `BoolSeries` + comparações + `filter` | ✅ Implementada |
-| Frontend Lua — `DataSet` | ✅ Implementada (Fase 3) |
-| Frontend Lua — `init.lua` | ✅ Entry point |
-| Portabilidade Windows (`smaug_free` + PowerShell) | ✅ Build + testes no Windows |
-| **Endurecimento (Fase 1.6)** | ⏳ **Em andamento — gate atual** |
-| Tipo `string` (Tier 1) | ❌ Fase 5 (próxima, pré-requisito do I/O) |
-| I/O — CSV + JSON (deploy) | ❌ Fase 6 |
-
-> **Gate de qualidade.** Nenhuma fase nova começa antes de a anterior estar
-> validada em nível "aviação": testes sistemáticos, property-based, e cobertura
-> **medida** (gcov) ≥ 90%. A Fase 1.6 (endurecimento) é o gate atual; ver
-> `Roadmap.md`.
+| Documento | Conteúdo |
+|-----------|----------|
+| [Roadmap.md](Roadmap.md) | Fases, visão de longo prazo (viz, ML, ORM, port Lua 5.4), dívida técnica |
+| [API_INDEX.md](API_INDEX.md) | Catálogo de todos os métodos (Series, BoolSeries, DataSet) e funções C |
+| [API_Reference.md](API_Reference.md) | Referência detalhada da API |
+| [Build_and_Testing.md](Build_and_Testing.md) | Compilação, testes, estratégia de qualidade |
+| [COVERAGE.md](COVERAGE.md) | Cobertura medida (gerado por `make coverage`) |
+| [CODE_REVIEW.md](CODE_REVIEW.md) | Achados de revisão e seu tratamento |
+| [CHANGELOG.md](CHANGELOG.md) | Histórico de mudanças |

@@ -4,6 +4,23 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Documentação
+- **README reescrito** para o recém-chegado: exemplo de código funcional no topo
+  (verificado), status atualizado (Fase 1.6 fechada), inconsistências do antigo
+  corrigidas (frontend descrito como feito, testes/cobertura reais), promessas
+  não-medidas removidas.
+- **Roadmap reformulado** (681 → 213 linhas): separa **✅ feito (resumo)** /
+  **🔨 DECIDIDO** (contrato C → string → CSV/JSON) / **💭 CONCEITUAL** (SQL,
+  GroupBy/Join/Window, Lazy por último) / **visão de longo prazo** / dívida.
+  Marcadores visuais distinguem decisão batida de ideia. Removido o código de
+  implementação duplicado das fases concluídas (vive no código/API_INDEX).
+  Decisões incorporadas: string simples + categorical-dictionary depois (não
+  dictionary-first); SQL focado em SQLite (abstração de dialeto adiada, fronteira
+  concentrada); XML pós-release; ORM pós-release com roadmap próprio (migrações
+  inspiradas no Alembic); lazy como camada sobre operações imutáveis existentes.
+  Incorpora parecer técnico externo (Matrix/Tensor2D para ML, broadcasting como
+  pré-requisito, string bem-encapsulada).
+
 ### Adicionado (Fase 1.6 — falha de alocação; FASE FECHADA)
 - `tests/test_allocfail.c`: teste de falha de alocação no padrão SQLite —
   intercepta `malloc`/`realloc` via `-Wl,--wrap` e faz a N-ésima alocação falhar,
