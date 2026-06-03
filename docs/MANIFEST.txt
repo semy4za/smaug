@@ -2,20 +2,19 @@
 # Gerado por scripts/make_manifest.sh
 # Formato: <sha256>  <linhas>  <caminho>
 #
-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
-ed7d63f5177cc7d7fbfee9c7c18ebeb4d6fd7da02680ec7778cfe23be1d15b03      31  ./.gitattributes
-26e281a7e231eaae4da5faea0183e310b4d223ec6798eeecd6830d8f492f29a1       2  ./.gitignore
-3a1c3e01bfe09c6ecef0728ff681fd66078188541fe4912fc83a8acd6a0a5806      57  ./Makefile
 0a4532c02e2726cdc7b695ed25afee8b9320ca0a3d772a61f285fd4c4e68de7c     148  ./docs/API_INDEX.md
 0f36df40dd144fdc6ea735fc3febe5522af9798dc71e4aa58b96d0e981833b8d     346  ./docs/API_Reference.md
-c4931027544ae3611e5c4bdfe528f9dc5a7ce535f0924a3457b769fc20f5120b     397  ./docs/Build_and_Testing.md
+d242928b46bb7a29aaeb7d9cfd09a9225f56a533004ea5c1ef26ff7cffbedbbd     415  ./docs/Build_and_Testing.md
 7186b63c49352f84b63c53008eebb8c34cd5c37e9994ff49ce497628179663bf     266  ./docs/CHANGELOG.md
 352e276423c341ba09adc3e4e8fb71433cb9c2b0424f146af998451c1d491973      86  ./docs/CODE_REVIEW.md
 d329cd82aee8b550128afc60405c28342cc52712602172ebfbf604119f24a792     178  ./docs/README.md
-2e8e32ddbe7f360a3de3320ed6b9821781e6ad7d914d5d05ebcb4e81d33a2f26     656  ./docs/Roadmap.md
-1a962624dbef1cab3ee1238a1d2f13e7b64fbb1bcad4fe06a2b0328d4dde4742      27  ./include/smaug.h
+2769ea5f08ba6d5e56006f2099bd6cf4afefcf763668e48bd3256eb83af78a00     670  ./docs/Roadmap.md
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
+ed7d63f5177cc7d7fbfee9c7c18ebeb4d6fd7da02680ec7778cfe23be1d15b03      31  ./.gitattributes
+e5f2572d70cb0b8b69d4f258f6ec7a3a7d7bd846f07a2c62c64ec37d766e2f8f       2  ./.gitignore
 963e21a0d5b9b1857da7bbe7310a4a9340057fcf7560272f062e4e83727c5da3      40  ./include/smaug_bool.h
 b10e6e4b8703cf71abad70679b000d650ed37c891f644e53e80902f4cc805b2d      58  ./include/smaug_core.h
+1a962624dbef1cab3ee1238a1d2f13e7b64fbb1bcad4fe06a2b0328d4dde4742      27  ./include/smaug.h
 3299b0ce0035dda28a919d504830019a29bca7aa1ef77f63259d8cd70a34da43      86  ./include/smaug_numeric.h
 686b957dac70dc6d906a3ca723cbabb9a626349588bc1f5872d44051e6f4661a      51  ./include/smaug_types.h
 bb305e8d5b91ac7ab9a2634cb1d5ee50b7db7fa740ccfd867fc815e803c47f25     141  ./lua/smaug/core/boolseries.lua
@@ -23,13 +22,13 @@ e415b73427647932669bbbba016f4485343a7d5fed7d735ece1a05de2896b384     336  ./lua/
 e975d8bfce374d4fccb55e51826c6d7eabd8b109235b96d98dee9fbf173e85f7     520  ./lua/smaug/core/series.lua
 a3dd7d425b6e154cf3782a00f245e100ac45f9e7e7254779d73b9e8c3435add8     213  ./lua/smaug/ffi_loader.lua
 09044a60cd7891600013e3bb7f15ddc7b9e741db8f4499ed93499e355aadea17      28  ./lua/smaug/init.lua
+3a1c3e01bfe09c6ecef0728ff681fd66078188541fe4912fc83a8acd6a0a5806      57  ./Makefile
 cb828add8f90f2e44bd826cc4053f524b73fe65d62f3fa90bebbb936f19ac04e      34  ./scripts/make_manifest.sh
 fb4bd0d81c1aafbcfcd927314da5f1c9d2fa1dce0a07c5bab85d01ad1ce42405     150  ./scripts/windows-build.ps1
 d97f781b9cf6fc4a5de826ca16c74439f4aeaabe1704421baf8a651c5e5d67c6     354  ./src/smaug_core.c
 267958936286e557235eb7d884c5032e4cd72d6c544d7e24d639c6d1f7f669a8     134  ./src/smaug_ops_bool.c
 d62d2a02baae0454ff043212ce086de002b2eaf85f791c60e83c4bcf8c3da864     457  ./src/smaug_ops_f64.c
 c2654288985151bb30a29195e3cfdded0daf657bf372ceac4738040b2911c44d     445  ./src/smaug_ops_i64.c
-3dd317d43fabfe2df06518449194fbc7b6704417d0fbfb6bbf29639d123e6c8c      22  ./test_load.lua
 427253b1234873224e0053bec67a3d894c74278bd8b5579b6440ec6234de3678     209  ./tests/test_alloc.c
 c3a4e968b31bf94327b9b87be8e912861bbc0cb54563bf02a5aeb6583eff2c93      80  ./tests/test_bool.c
 0e6f8b602e9dd802dd0cec139a37220e570bb0bb444b47cc9c27f8c37df1d7b3     105  ./tests/test_dataset.lua
@@ -40,4 +39,4 @@ c1f1a08db58d897a367d83b92ff1f22e932d86b53c62d88a4d4567fc9c0f882a      22  ./test
 c61324b82dfb664a245874174c5c3fac80715d11f230b7cc190ddb13aa91995a     190  ./tests/test_series.lua
 95b96ff3b9f6eb462c664326f654abe94262db625000b21e4f20f12afbb8a448     151  ./tests/test_special.lua
 #
-# total de arquivos: 37
+# total de arquivos: 36

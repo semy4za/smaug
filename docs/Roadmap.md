@@ -82,6 +82,20 @@ SQLAlchemy), o plano de longo prazo tem três bibliotecas que consomem o Smaug:
    **I/O de SQL** já planejado (Fase 6). *Implicação para hoje:* praticamente
    nenhuma; encaixa naturalmente depois do I/O.
 
+4. **Port para Lua 5.4** (quando o projeto estiver fechado). Hoje o frontend usa
+   **LuaJIT** (Lua 5.1 + FFI), e o FFI é o que liga Lua ao C sem código de
+   ligação. **Lua 5.4 não tem FFI** — portar exige escrever **bindings C
+   manuais** (via API C do Lua: `lua_pushnumber`, `luaL_check*`, etc.) ou manter
+   as duas vias (FFI para LuaJIT + bindings para 5.4). É uma mudança
+   **arquitetural**, não só troca de interpretador. *Implicações para hoje:*
+   - Manter a fronteira Lua↔C **enxuta e centralizada** (hoje no `ffi_loader.lua`)
+     facilita o port futuro — quanto menos lugares falam com o C, menos bindings
+     reescrever.
+   - É o que pode justificar o **CMake** (ver "Opção 3" em `Build_and_Testing.md`):
+     compilar bindings para uma versão específica do Lua é onde o CMake (com
+     `FindLua`) ajuda mais que o Makefile atual. A decisão sobre o CMake fica
+     atrelada a esta.
+
 Consequência transversal: por ser fundação de três bibliotecas, **cada fraqueza
 no Smaug se multiplica**. Isso reforça a decisão de endurecer agora (Fase 1.6)
 antes de avançar — o rigor "nível aviação" não é exagero, é o que sustenta o
@@ -285,7 +299,7 @@ contrato "caller libera".
 
 ```lua
 local ffi = require("ffi")
-ffi.cdef([[ /* tipos e assinaturas de smaug_math.h + void free(void*) */ ]])
+ffi.cdef([[ /* tipos e assinaturas de smaug.h + void smaug_free(void*) */ ]])
 
 local function load_library()
     local name = ({ Windows="smaug.dll", OSX="libsmaug.dylib" })[ffi.os]
@@ -295,7 +309,7 @@ local function load_library()
         local ok, lib = pcall(ffi.load, p)
         if ok then return lib end
     end
-    error("Falha ao carregar smaug_math — compile com 'make' primeiro")
+    error("Falha ao carregar a lib Smaug — compile com 'make' primeiro")
 end
 
 return load_library()

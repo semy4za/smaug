@@ -68,6 +68,18 @@ gcc -std=c11 -fPIC -Wall -Wextra -O2 -I./include -shared \
 
 ## Opção 3 — CMake (cross-platform)
 
+> **⚠️ Bloco desatualizado / decisão pendente.** Este CMake é um rascunho antigo
+> e **não** está em uso (o desenvolvimento usa o Makefile no Linux e
+> `scripts/windows-build.ps1` no Windows). Problemas conhecidos: usa o nome
+> antigo `smaug_math` (geraria `libsmaug_math`, que o `ffi_loader` não procura
+> mais — hoje é `libsmaug`/`smaug.dll`); e usa `-ffast-math`, **incompatível com
+> o contrato de NaN** (permite ao compilador assumir que NaN não ocorre).
+> O futuro deste bloco depende da decisão sobre portar para Lua 5.4 (ver
+> "Visão de longo prazo" no Roadmap): se mantivermos só LuaJIT/FFI, o CMake pode
+> ser removido; se portarmos para 5.4 com bindings C, ele será revisado e
+> provavelmente promovido (CMake facilita achar headers/libs do Lua). Até lá,
+> **não use este bloco como está.**
+
 ```cmake
 cmake_minimum_required(VERSION 3.10)
 project(smaug_math C)
@@ -155,8 +167,8 @@ Windows — ela continua sendo feita no Linux com `make valgrind`. Os testes de
 correção são os mesmos nos dois sistemas.
 
 A ponte FFI oficial é `lua/smaug/ffi_loader.lua` — ela declara o `ffi.cdef`
-completo (f64 + i64 + `free`) e faz o `ffi.load` com fallback de paths e
-detecção de SO, devolvendo o namespace `C`.
+completo (f64 + i64 + bool + `smaug_free`) e faz o `ffi.load` com fallback de
+paths e detecção de SO, devolvendo o namespace `C`.
 
 ```lua
 -- smoke test usando o loader oficial
@@ -170,14 +182,6 @@ C.smaug_f64_set(s, 2, 3.0)
 assert(math.abs(C.smaug_f64_sum(s, true) - 6.0) < 1e-9)
 C.smaug_f64_free(s)
 print("OK — soma = 6")
-```
-
-O `test_load.lua` na raiz é um smoke test histórico com `cdef` mínimo inline
-(carrega só 4 funções). Ele continua válido, mas para código novo use o
-`ffi_loader.lua`.
-
-```bash
-luajit test_load.lua   # → OK — soma = 6, série liberada
 ```
 
 ---
@@ -209,12 +213,26 @@ bash, inclusive no MSYS2/Git Bash no Windows).
 
 ---
 
-## Estratégia de testes (nível aviação)
+## Estratégia de testes
 
-O padrão de teste do projeto é "rotina de aviação": não basta cobrir casos
-felizes; cobre-se o espaço de entradas sistematicamente, mede-se a cobertura, e
-afirma-se invariantes que devem valer **sempre**. Isto é o gate da Fase 1.6
-(ver `Roadmap.md`) e o padrão para todo o projeto.
+O modelo de referência é o **SQLite**, cujo regime de testes define o padrão que
+este projeto adota incrementalmente. Os critérios concretos derivados desse
+modelo:
+
+- Cobre-se o espaço de entradas **sistematicamente** (casos degenerados, valores
+  especiais, overflow), não só os casos felizes.
+- Verificam-se **invariantes** que devem valer sempre, via testes baseados em
+  propriedade (property-based) com entradas aleatórias reprodutíveis.
+- Os próprios testes são **validados por mutação** (injeta-se um bug e confirma-se
+  que o teste falha) — um teste que passa sob bug injetado é falsa confiança.
+- A **cobertura é medida**, não estimada (alvo: cobertura de *branch*, não só de
+  linha — o padrão do SQLite, equivalente ao MC/DC da aviônica).
+- Exercita-se o comportamento sob **falha de alocação** em cada ponto.
+- **Zero** vazamento ou erro de memória (Valgrind-clean).
+
+Nem todos os critérios estão plenamente atingidos ainda; a Fase 1.6 (ver
+`Roadmap.md`) é o gate que os formaliza, e o restante evolui fase a fase. O que
+já se cumpre e o que falta está marcado abaixo e no Roadmap.
 
 Camadas de teste:
 
