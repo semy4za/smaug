@@ -136,6 +136,18 @@ local function check_index(self, i)
     end
 end
 
+-- Valida um valor a gravar, conforme o dtype. int64 não aceita coerção:
+-- sem este guard, o FFI truncaria não-inteiros (1.5 -> 1) e Inf/NaN virariam
+-- lixo. float64 aceita qualquer número (incl. NaN/Inf, que são valores válidos).
+-- Usado por set e append (CODE_REVIEW A7). Nível de pilha configurável p/ a
+-- mensagem de erro apontar para a chamada do usuário.
+local function check_value(self, v, level)
+    if self._dtype == "int64" and (type(v) ~= "number" or v % 1 ~= 0) then
+        error("smaug: valor para int64 deve ser inteiro (sem coerção); "
+              .. "recebido " .. tostring(v), level or 3)
+    end
+end
+
 -- =====================================================================
 -- Factories
 -- =====================================================================
@@ -179,6 +191,7 @@ function methods.set(self, i, v)
     if is_na(v) then
         self._d.set_null(self._c, i - 1)
     else
+        check_value(self, v, 3)
         self._d.set(self._c, i - 1, v)
     end
 end
@@ -200,6 +213,7 @@ function methods.append(self, v)
     if is_na(v) then
         rc = self._d.append_null(self._c)
     else
+        check_value(self, v, 3)
         rc = self._d.append(self._c, v)
     end
     if rc ~= 0 then error("smaug: append falhou (OOM)", 2) end
@@ -332,16 +346,37 @@ function methods.to_table(self, na_value)
 end
 
 -- astype: nova série de outro dtype, convertendo valor a valor. Nulos
--- permanecem nulos. f64->i64 trunca em direção a zero (semântica C).
+-- permanecem nulos. f64->i64 trunca em direção a zero (semântica C) — esta é a
+-- conversão EXPLÍCITA e intencional (diferente de set/append, que recusam
+-- não-inteiros em i64 para evitar coerção acidental; ver CODE_REVIEW A7).
+local function trunc_to_int(x)
+    -- trunca em direção a zero (igual ao cast (int64_t) do C)
+    return x >= 0 and math.floor(x) or math.ceil(x)
+end
+
 function methods.astype(self, dtype, name)
     if not DTYPES[dtype] then
         error("smaug: dtype desconhecido '"..tostring(dtype).."'", 2)
     end
     local n = self:len()
     local out = Series.new(dtype, n, name or self._name)
+    local to_int = (dtype == "int64")
     for i = 1, n do
         local v = self:get(i)
-        if v == nil then out:set_null(i) else out:set(i, v) end
+        if v == nil then
+            out:set_null(i)
+        elseif to_int then
+            -- f64 -> i64: NaN não tem representação em inteiro → vira null
+            -- (coerente: NaN = indefinido; em i64, indefinido = ausente).
+            -- Inf idem (não cabe em int64). Demais: truncagem em direção a zero.
+            if v ~= v or v == math.huge or v == -math.huge then
+                out:set_null(i)
+            else
+                out:set(i, trunc_to_int(v))
+            end
+        else
+            out:set(i, v)
+        end
     end
     return out
 end

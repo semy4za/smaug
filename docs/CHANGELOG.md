@@ -4,6 +4,21 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Corrigido / documentado (contrato de entrada do backend)
+- **Contrato de acesso do backend C documentado** no `smaug_core.h`: as funções
+  get/set/set_null/is_null/view **já validam** ponteiro/índice (não corrompem
+  memória), mas falham silenciosamente — o frontend Lua é quem sinaliza erro ao
+  usuário (check_index). Tornar a sinalização explícita no C (assinaturas com
+  código de retorno) foi **adiado** até existir um cliente em C que use o backend
+  sem o frontend Lua (decisão registrada no Roadmap; evita mudança grande sem
+  caso de uso concreto). A sondagem revelou que o backend não era "inseguro" como
+  se supunha — só silencioso.
+- **A7 corrigido — `set`/`append` em int64 não truncam mais.** Guard comum
+  (`check_value`) recusa não-inteiro/NaN/Inf em int64 com erro claro (a truncagem
+  ocorria na conversão FFI, então a validação fica no Lua). Conversão explícita
+  segue via `astype("int64")` (trunca em direção a zero; NaN/Inf → null).
+  `test_i64.lua`: +11 checks (58 → 69), validado por mutation testing.
+
 ### Documentação
 - **README reescrito** para o recém-chegado: exemplo de código funcional no topo
   (verificado), status atualizado (Fase 1.6 fechada), inconsistências do antigo

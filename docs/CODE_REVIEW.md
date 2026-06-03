@@ -54,15 +54,16 @@ o bug faz o teste abortar). f64 e i64 corrigidos.
 `smaug_*_take` checa `!idx` (o array) e cada `idx[i] >= size`, o que está
 correto. Sem ação — registrado só para confirmar que foi revisado.
 
-### A7 — `set` em i64 trunca não-inteiro silenciosamente (a corrigir)
-`Series:set(i, 1.5)` numa série i64 grava `1` silenciosamente (truncagem),
-violando o princípio "sem coerção implícita". Pior: `set(i, NaN)` em i64 grava
-lixo (`INT64_MIN` reinterpretado), pois i64 não tem NaN. **Decisão:** o `set`
-deve **rejeitar** valor não-inteiro em i64 com erro claro. Mudança de base
-(afeta `from_table`/`append`/`astype`), portanto será feita em peça dedicada,
-sondando dependências e com teste próprio — não junto do `fillna`. O `fillna`
-faz sua própria validação antes do `set`, então cumpre o contrato mesmo antes
-desta correção.
+### A7 — `set` em i64 truncava não-inteiro silenciosamente — RESOLVIDO
+`Series:set(i, 1.5)` numa série i64 gravava `1` silenciosamente (o FFI trunca
+`int64_t` antes de chegar ao C); `set(i, NaN)` gravava lixo. Violava "sem coerção
+implícita". **Corrigido:** `set` e `append` agora usam um guard comum
+(`check_value`) que **recusa** não-inteiro/NaN/Inf em i64 com erro claro — a
+validação fica no Lua porque a truncagem acontece na conversão FFI (o C nunca vê
+o valor original). A conversão **explícita** continua possível via
+`astype("int64")`, que trunca em direção a zero (semântica C) e mapeia NaN/Inf →
+null (sem representação em inteiro). Testado em `test_i64.lua` (set/append
+recusam; astype trunca/trata especiais) e validado por mutation testing.
 
 ## Pontos confirmados como corretos (revisados, sem ação)
 

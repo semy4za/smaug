@@ -197,4 +197,32 @@ do
     check(back._dtype == "int64", "i64 astype preserva dtype final")
 end
 
+-- ===================================================================
+-- Sem coerção: set/append em int64 recusam não-inteiro (CODE_REVIEW A7).
+-- astype f64->i64 é a conversão EXPLÍCITA (trunca em direção a zero).
+-- ===================================================================
+do
+    local s = S.int64(2)
+    -- set recusa não-inteiro, NaN e Inf (não trunca silenciosamente)
+    check(pcall(function() s:set(1, 1.5) end) == false, "i64 set recusa 1.5")
+    check(pcall(function() s:set(1, 0/0) end) == false, "i64 set recusa NaN")
+    check(pcall(function() s:set(1, 1/0) end) == false, "i64 set recusa Inf")
+    s:set(1, 5)  -- inteiro funciona
+    check(s:get(1) == 5, "i64 set aceita inteiro")
+    -- append idem
+    local a = S.int64(0)
+    check(pcall(function() a:append(2.7) end) == false, "i64 append recusa 2.7")
+    a:append(7)
+    check(a:get(1) == 7, "i64 append aceita inteiro")
+
+    -- astype f64->i64: conversão explícita TRUNCA em direção a zero
+    local f = S.from_table({1.9, 2.1, -3.7, 0/0, 1/0}, "float64")
+    local i = f:astype("int64")
+    check(i:get(1) == 1,  "astype trunca 1.9 -> 1")
+    check(i:get(2) == 2,  "astype trunca 2.1 -> 2")
+    check(i:get(3) == -3, "astype trunca -3.7 -> -3 (direção a zero)")
+    check(i:is_null(4),   "astype NaN -> null (sem repr. em int64)")
+    check(i:is_null(5),   "astype Inf -> null (sem repr. em int64)")
+end
+
 print(string.format("OK — %d checks passaram (int64 dedicado)", n_ok))
