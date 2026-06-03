@@ -4,6 +4,21 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Adicionado (Fase 1.6 — medição de cobertura)
+- `make coverage` (via `scripts/make_coverage.sh`): mede a cobertura do backend
+  C e **gera** `docs/COVERAGE.md` (artefato gerado, como o MANIFEST — nunca
+  escrito à mão). Compila uma `.so` instrumentada e roda os testes C **e** Lua
+  contra ela (acumula os dois caminhos), agrega com gcov, reporta linha e branch
+  ("taken at least once", métrica SQLite), com commit/data e status do gate.
+- `docs/COVERAGE.md`: baseline medido — **~77% linha, ~55% branch**. Gate da
+  1.6 (linha ≥90%) **NÃO atingido**; o buraco é `smaug_ops_i64.c` (56%, pouco
+  exercitado — os testes usam mais f64). Regenerar e commitar a cada mudança de
+  código/testes.
+- `.gitignore`: ignora artefatos de cobertura (`cov/`, `*.gcda/gcno/gcov`).
+- Norte de longo prazo registrado (Roadmap/COVERAGE): meta **branch 100%**
+  (padrão SQLite), atingida incrementalmente atacando os caminhos de erro via
+  `test_allocfail.c` e testes de entrada inválida.
+
 ### Adicionado (Fase 1.6 — property-based)
 - `tests/test_props.lua`: testes baseados em propriedades — 10 invariantes ×
   3 seeds fixas × 400 casos (~222 mil checks). Invariantes: clone independente

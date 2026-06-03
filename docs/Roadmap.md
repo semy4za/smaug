@@ -116,7 +116,10 @@ A Fase 1.6 só fecha quando **todos** os itens abaixo forem verdadeiros:
 
 1. **Cobertura medida ≥ 90%** de linhas no backend C (`gcov`/`lcov`), com cada
    ramo não-coberto identificado e justificado por escrito. O número é
-   **medido**, nunca estimado.
+   **medido**, nunca estimado. 🟡 **Ferramenta pronta** (`make coverage` gera
+   `docs/COVERAGE.md`); **baseline medido: ~77% de linha, ~55% de branch — gate
+   NÃO atingido.** Falta cobrir principalmente `smaug_ops_i64.c` (56%), pouco
+   exercitado pelos testes (que usam mais f64).
 2. Bateria de testes sistemáticos (Frente 1) passando, Valgrind-clean.
 3. Property-based tests (Frente 1) passando em N≥1000 casos aleatórios por
    invariante, com seed fixa para reprodutibilidade. ✅ **FEITO** (~222k checks,

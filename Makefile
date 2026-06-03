@@ -41,6 +41,10 @@ test-lua: $(TARGET)
 	luajit tests/test_fillna.lua
 	luajit tests/test_props.lua
 
+# Mede cobertura do backend C e gera docs/COVERAGE.md (requer gcov; só Linux)
+coverage:
+	bash scripts/make_coverage.sh
+
 # Gera docs/MANIFEST.txt (sha256 + linhas de cada arquivo versionável)
 manifest:
 	bash scripts/make_manifest.sh
@@ -54,4 +58,4 @@ verify:
 clean:
 	rm -rf build
 
-.PHONY : clean test valgrind test-lua manifest verify
+.PHONY : clean test valgrind test-lua coverage manifest verify

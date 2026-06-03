@@ -282,15 +282,32 @@ O que a bateria sistemática cobre, por categoria:
 
 ### Cobertura medida (gcov)
 
-A cobertura é **medida, não estimada**. O alvo `make coverage` compila com
-`--coverage`, roda toda a suíte e gera relatório via `gcov` (HTML opcional via
-`lcov`/`genhtml`). Gate da Fase 1.6: **≥ 90% de linhas no backend C**, com cada
-ramo não-coberto identificado e justificado. O relatório é registrado a cada
-fechamento de fase.
+A cobertura é **medida, não estimada**, e o relatório é um **artefato gerado**
+(como o `MANIFEST.txt`), não escrito à mão — assim nunca desatualiza.
 
 ```bash
-make coverage    # compila com --coverage, roda a suíte, imprime o resumo gcov
+make coverage    # mede e (re)gera docs/COVERAGE.md
 ```
+
+O alvo (via `scripts/make_coverage.sh`) compila uma `.so` instrumentada com
+`--coverage`, linka os testes C contra ela e roda **os testes C e os testes Lua**
+(que carregam a mesma `.so` via FFI) — assim a cobertura acumula os dois
+caminhos de execução. Agrega com `gcov` e escreve `docs/COVERAGE.md` com a tabela
+por arquivo, o total ponderado, o commit/data medidos e o status do gate.
+Artefatos intermediários (`cov/`, `*.gcda`, `*.gcno`, `*.gcov`) são limpos ao
+final e ignorados pelo git.
+
+**Métrica.** O relatório mostra **linha** (básica) e **branch / "taken at least
+once"** (rigorosa — padrão SQLite/aviônica). O gate da Fase 1.6 usa linha ≥ 90%
+(opção A); a meta de longo prazo é branch 100%. Ver `docs/COVERAGE.md` para o
+número atual e o plano.
+
+**Regenerar a cada mudança.** Sempre que código ou testes mudarem, rode
+`make coverage` e committe o `COVERAGE.md` atualizado junto — o histórico do git
+passa a registrar a evolução da cobertura, commit a commit.
+
+> Requer `gcov` (vem com o gcc no Linux). Não é confiável no Windows; a medição
+> de cobertura é tarefa de Linux, como o Valgrind.
 
 ---
 

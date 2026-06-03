@@ -4,11 +4,12 @@
 #
 0a4532c02e2726cdc7b695ed25afee8b9320ca0a3d772a61f285fd4c4e68de7c     148  ./docs/API_INDEX.md
 0f36df40dd144fdc6ea735fc3febe5522af9798dc71e4aa58b96d0e981833b8d     346  ./docs/API_Reference.md
-d242928b46bb7a29aaeb7d9cfd09a9225f56a533004ea5c1ef26ff7cffbedbbd     415  ./docs/Build_and_Testing.md
-7186b63c49352f84b63c53008eebb8c34cd5c37e9994ff49ce497628179663bf     266  ./docs/CHANGELOG.md
+9fcf36d7823727bcee284a784cb5aaffdb7519a8e82562f3386185d15908caa8     432  ./docs/Build_and_Testing.md
+ae7337d4df00fb8ca76e8852af3ba4d0f05bb4fd4ddd776c919904acf8835be9     281  ./docs/CHANGELOG.md
 352e276423c341ba09adc3e4e8fb71433cb9c2b0424f146af998451c1d491973      86  ./docs/CODE_REVIEW.md
+fcd1523e9c11b8cc48409c0a8dc158d1644e7d4c6038042e7573b76f0b2fc650      29  ./docs/COVERAGE.md
 d329cd82aee8b550128afc60405c28342cc52712602172ebfbf604119f24a792     178  ./docs/README.md
-2769ea5f08ba6d5e56006f2099bd6cf4afefcf763668e48bd3256eb83af78a00     670  ./docs/Roadmap.md
+6003e0aaf283f4ddc362dcfdc0f7c5b451dffbe7dede8c00e531f2ce490763d7     673  ./docs/Roadmap.md
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
 ed7d63f5177cc7d7fbfee9c7c18ebeb4d6fd7da02680ec7778cfe23be1d15b03      31  ./.gitattributes
 e5f2572d70cb0b8b69d4f258f6ec7a3a7d7bd846f07a2c62c64ec37d766e2f8f       2  ./.gitignore
@@ -22,7 +23,8 @@ e415b73427647932669bbbba016f4485343a7d5fed7d735ece1a05de2896b384     336  ./lua/
 e975d8bfce374d4fccb55e51826c6d7eabd8b109235b96d98dee9fbf173e85f7     520  ./lua/smaug/core/series.lua
 a3dd7d425b6e154cf3782a00f245e100ac45f9e7e7254779d73b9e8c3435add8     213  ./lua/smaug/ffi_loader.lua
 09044a60cd7891600013e3bb7f15ddc7b9e741db8f4499ed93499e355aadea17      28  ./lua/smaug/init.lua
-3a1c3e01bfe09c6ecef0728ff681fd66078188541fe4912fc83a8acd6a0a5806      57  ./Makefile
+0cde600d5e9cad52c6732b62d96df6ab1c39907220ed44ce7a2dd738f74cee2c      61  ./Makefile
+043cdfedd08aec084e4bf969a7fa5ab4506fd8d705c066caf6754424d5f74174      98  ./scripts/make_coverage.sh
 cb828add8f90f2e44bd826cc4053f524b73fe65d62f3fa90bebbb936f19ac04e      34  ./scripts/make_manifest.sh
 fb4bd0d81c1aafbcfcd927314da5f1c9d2fa1dce0a07c5bab85d01ad1ce42405     150  ./scripts/windows-build.ps1
 d97f781b9cf6fc4a5de826ca16c74439f4aeaabe1704421baf8a651c5e5d67c6     354  ./src/smaug_core.c
@@ -39,4 +41,4 @@ c1f1a08db58d897a367d83b92ff1f22e932d86b53c62d88a4d4567fc9c0f882a      22  ./test
 c61324b82dfb664a245874174c5c3fac80715d11f230b7cc190ddb13aa91995a     190  ./tests/test_series.lua
 95b96ff3b9f6eb462c664326f654abe94262db625000b21e4f20f12afbb8a448     151  ./tests/test_special.lua
 #
-# total de arquivos: 36
+# total de arquivos: 38
