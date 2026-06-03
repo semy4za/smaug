@@ -4,6 +4,19 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Adicionado (Fase string — esqueleto)
+- **Tipo `string` iniciado** (representação offset-based, estilo Arrow). Struct
+  `smaug_series_str_t` em `smaug_types.h`: buffer de bytes concatenados + array
+  de offsets (`size+1` marcadores) + bitmask de nulos. Comprimento O(1); string
+  vazia distinta de NULL.
+- **6º header `smaug_string.h`** (irmão de `smaug_core.h`): assinaturas de
+  lifecycle (create/with_capacity/from_array/free/clone) e acesso
+  (get/set/set_null/is_null/append/count_nonnull). Inclui só `smaug_types.h`
+  (lifecycle próprio). Adicionado ao umbrella `smaug.h`. Headers compilam; build
+  da lib intacto (ainda sem `.c` — só declarações).
+- Implementação (`src/smaug_ops_str.c`), registro do dtype no frontend e testes
+  são as próximas peças (ver Roadmap).
+
 ### Corrigido / documentado (contrato de entrada do backend)
 - **Contrato de acesso do backend C documentado** no `smaug_core.h`: as funções
   get/set/set_null/is_null/view **já validam** ponteiro/índice (não corrompem

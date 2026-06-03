@@ -16,6 +16,7 @@
      smaug_core.h     — lifecycle, get/set, append, smaug_free. (inclui types)
      smaug_numeric.h  — aritmética/reduções/comparações/sort/utils f64+i64. (inclui core)
      smaug_bool.h     — lógica booleana Kleene. (inclui types)
+     smaug_string.h   — tipo string (offset-based), lifecycle e acesso. (inclui types)
      smaug.h          — este; inclui os de operação.
    =================================================================== */
 
@@ -23,5 +24,6 @@
 #include "smaug_core.h"
 #include "smaug_numeric.h"
 #include "smaug_bool.h"
+#include "smaug_string.h"
 
 #endif /* SMAUG_H */

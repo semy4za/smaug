@@ -61,22 +61,27 @@ frontend Lua; sem validação defensiva, entrada inválida vira corrupção de m
 silenciosa. Mudança de assinaturas (afeta FFI + frontend + call sites) — por isso
 é fase própria, antes da `string`. (Origem: discussão do `test_alloc.c`.)
 
-### 2. Tipo `string` (Tier 1)
+### 2. Tipo `string` (Tier 1) ⏳ EM ANDAMENTO
 
 O maior buraco para trabalho estilo pandas (CSV real tem texto). **Decisão de
-arquitetura (revista):** a string **nasce simples e bem-encapsulada** — provável
-representação offset-based (buffer de bytes + offsets, estilo Arrow), mais simples
-e já eficiente — com a interface de acesso (get/set/compare) encapsulada. O
-**dictionary encoding** (IDs inteiros + dicionário) **não** entra agora: ele é a
-essência do tipo `categorical` (Tier 2) e entrará como tipo separado depois. Assim
-há string básica já, e a otimização de cardinalidade-baixa vem como `categorical`,
-sem migração destrutiva. (Decisão tomada após parecer externo que recomendava
-dictionary-first; optou-se por evitar otimização prematura.)
+arquitetura (batida):** representação **offset-based estilo Arrow** — um buffer
+de bytes com todas as strings concatenadas + array de offsets (`size+1`
+marcadores; comprimento de cada string = `offsets[i+1]-offsets[i]`). Eficiente
+em memória/cache e O(1) para comprimento; strings são imutáveis em tamanho
+(combina com a imutabilidade por padrão; construção em lote via `from_table`). O
+**dictionary encoding** NÃO entra aqui — é a essência do `categorical` (Tier 2),
+tipo separado, depois. Sem migração destrutiva.
 
-> **Encaixe nos headers.** `string` entra como 6º header (`smaug_string.h`),
-> incluindo só `smaug_types.h` + lifecycle próprio (tamanho variável). Nenhum
-> `.c` existente é tocado — adição, não modificação. Foi para viabilizar isso que
-> os tipos foram isolados em `smaug_types.h`.
+**Progresso:** struct `smaug_series_str_t` em `smaug_types.h` ✅; header
+`smaug_string.h` (6º header, lifecycle + acesso) ✅; incluído no umbrella ✅.
+**Falta:** implementação `src/smaug_ops_str.c` (create/free/clone/get/set/append),
+registro do dtype no frontend Lua, testes (`test_string`), e depois comparações/
+sort. (Esqueleto criado; implementação pesada a seguir, com validação no Linux.)
+
+> **Encaixe nos headers.** `smaug_string.h` inclui só `smaug_types.h` + lifecycle
+> próprio (tamanho variável). Nenhum `.c` existente é tocado — adição, não
+> modificação. Foi para viabilizar isso que os tipos foram isolados em
+> `smaug_types.h`.
 
 ### 3. I/O — CSV + JSON
 
