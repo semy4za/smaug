@@ -73,10 +73,11 @@ em memória/cache e O(1) para comprimento; strings são imutáveis em tamanho
 tipo separado, depois. Sem migração destrutiva.
 
 **Progresso:** struct `smaug_series_str_t` em `smaug_types.h` ✅; header
-`smaug_string.h` (6º header, lifecycle + acesso) ✅; incluído no umbrella ✅.
-**Falta:** implementação `src/smaug_ops_str.c` (create/free/clone/get/set/append),
-registro do dtype no frontend Lua, testes (`test_string`), e depois comparações/
-sort. (Esqueleto criado; implementação pesada a seguir, com validação no Linux.)
+`smaug_string.h` (6º header) ✅; **backend C completo** em `src/smaug_ops_str.c`
+✅ (lifecycle, get/set/append, clone, count_nonnull — 62 checks, Valgrind-clean,
+o `set` faz deslocamento O(n) do buffer com `memmove`). **Falta:** registrar o
+dtype `string` no frontend Lua (descritor da `Series` + `ffi_loader`), e depois
+comparações/sort/take/filter. (Backend pronto; frontend a seguir.)
 
 > **Encaixe nos headers.** `smaug_string.h` inclui só `smaug_types.h` + lifecycle
 > próprio (tamanho variável). Nenhum `.c` existente é tocado — adição, não

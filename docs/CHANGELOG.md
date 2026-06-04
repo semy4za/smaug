@@ -4,6 +4,27 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Adicionado (Fase string — backend C completo)
+- **`src/smaug_ops_str.c`** implementa o tipo string (offset-based) no C:
+  - Lifecycle: `create`, `create_with_capacity`, `create_from_array`, `clone`
+    (cópia profunda independente), `free`.
+  - Acesso: `get` (devolve ponteiro+comprimento, sem cópia), `is_null`.
+  - Mutação: `set` (3 casos — igual sobrescreve in-place; maior/menor deslocam o
+    buffer via `memmove` e recalculam offsets, com realocação quando preciso),
+    `set_null`, `append`, `append_null`.
+  - Utilidade: `count_nonnull`.
+  - String vazia `""` distinta de NULL; trata bytes crus (validação UTF-8 fica
+    como enriquecimento futuro — ver Roadmap/dívida).
+- **`tests/test_string.c`** (62 checks): lifecycle, construção em lote, os 3
+  casos do `set` (incl. no meio e sobre NULL), `set_null`, append com NULL
+  intercalado, e independência do `clone`. Integrado a `make test`/`make valgrind`
+  (agora 5 testes C). Validado sob Valgrind (0 errors, no leaks) em todos os
+  caminhos — incluindo o deslocamento de buffer.
+
+### Próximo
+- Frontend Lua: registrar o dtype `string` na `Series` (descritor + ffi_loader).
+- Depois: comparações (eq/lt/gt), sort/argsort, take/filter para string.
+
 ### Adicionado (Fase string — esqueleto)
 - **Tipo `string` iniciado** (representação offset-based, estilo Arrow). Struct
   `smaug_series_str_t` em `smaug_types.h`: buffer de bytes concatenados + array
