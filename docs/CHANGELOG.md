@@ -4,6 +4,20 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Build/teste — review e correção (causa raiz do commit quebrado)
+- **Makefile: listas de teste centralizadas.** Antes os testes C apareciam em 3
+  blocos (compilar/rodar/valgrind) e os Lua noutro — adicionar um teste exigia
+  editar 4 lugares, e esquecer um quebrava o build (foi o que aconteceu). Agora
+  há **fonte única**: `C_TESTS_PLAIN`, `C_TEST_WRAP`, `LUA_TESTS`; os alvos
+  iteram sobre elas. Adicionar teste = editar uma linha.
+- **`windows-build.ps1` atualizado** (estava bem defasado): rodava só 3 testes C
+  (faltavam `test_string`, `test_allocfail`) e 2 suítes Lua (faltavam 6). Agora
+  cobre os 5 testes C (incl. `test_allocfail` com `--wrap`) e as 8 suítes Lua,
+  alinhado ao Makefile. Mantido ASCII puro. Checagem de saída corrigida para
+  aceitar "PASS: ..." (testes com texto após PASS).
+- `make_manifest.sh` revisado: já pega arquivos por extensão (sem lista
+  hardcoded), acompanha arquivos novos sozinho — sem mudança necessária.
+
 ### Cobertura — dívida paga (agregação de todos os testes)
 - **`make coverage` agora mede TODOS os testes do projeto.** Antes media só via
   `.so` + testes Lua; `test_allocfail` (caminhos de erro/OOM) e `test_string`

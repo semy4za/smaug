@@ -6,8 +6,10 @@
 #   1. (opcional, com -Setup) instala MSYS2 + gcc + luajit.
 #   2. Compila o backend C em build\smaug.dll (nome que o ffi_loader
 #      procura no Windows).
-#   3. Compila e roda os testes em C (test_alloc, test_ops, test_bool).
-#   4. Roda os testes Lua (test_series.lua, test_dataset.lua) com luajit.
+#   3. Compila e roda os testes em C (test_alloc, test_ops, test_bool,
+#      test_string, e test_allocfail com -Wl,--wrap).
+#   4. Roda as 8 suites Lua com luajit (series, dataset, edge, special, fillna,
+#      props, i64, string).
 #
 # Uso (a partir da raiz do projeto):
 #   powershell -ExecutionPolicy Bypass -File .\scripts\windows-build.ps1
@@ -110,7 +112,8 @@ Write-Host "== Compilando build\smaug.dll ==" -ForegroundColor Cyan
 if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar a DLL." }
 Write-Host "OK -> build\smaug.dll" -ForegroundColor Green
 
-$cTests = @("test_alloc", "test_ops", "test_bool")
+$cTests = @("test_alloc", "test_ops", "test_bool", "test_string")
+$cTestsWrap = @("test_allocfail")
 $allPass = $true
 
 Write-Host ""
@@ -122,15 +125,29 @@ foreach ($t in $cTests) {
 
     $out = (& ".\$exe") | Out-String
     $out = $out.Trim()
-    Write-Host ("{0,-12} -> {1}" -f $t, $out)
-    if ($out -ne "PASS") { $allPass = $false }
+    Write-Host ("{0,-14} -> {1}" -f $t, $out)
+    if ($out -notlike "PASS*") { $allPass = $false }
+}
+# Testes com -Wl,--wrap (falha de alocacao injetada). Saida "PASS: ...".
+foreach ($t in $cTestsWrap) {
+    $exe = "build\$t.exe"
+    & $gcc -std=c11 -g -O0 -Wall -Wextra -I".\include" `
+        -Wl,--wrap=malloc -Wl,--wrap=realloc "tests\$t.c" @sources -lm -o $exe
+    if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar $t." }
+
+    $out = (& ".\$exe") | Out-String
+    $out = $out.Trim()
+    Write-Host ("{0,-14} -> {1}" -f $t, $out)
+    if ($out -notlike "PASS*") { $allPass = $false }
 }
 
 if ($luajit -and -not $SkipLua) {
     Write-Host ""
     Write-Host "== Testes em Lua ==" -ForegroundColor Cyan
-    foreach ($lt in @("tests\test_series.lua", "tests\test_dataset.lua")) {
-        $out = (& $luajit $lt) | Out-String
+    $luaTests = @("test_series", "test_dataset", "test_edge", "test_special",
+                  "test_fillna", "test_props", "test_i64", "test_string")
+    foreach ($lt in $luaTests) {
+        $out = (& $luajit "tests\$lt.lua") | Out-String
         $out = $out.Trim()
         Write-Host $out
         if ($out -notlike "OK*") { $allPass = $false }

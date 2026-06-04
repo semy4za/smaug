@@ -1,14 +1,26 @@
 CC      = gcc
-CFLAGS	= -std=c11 -fPIC -Wall -Wextra -O2 -I./include
+CFLAGS  = -std=c11 -fPIC -Wall -Wextra -O2 -I./include
 LDFLAGS = -shared
 
-# Backend C completo (f64 + i64 + bool)
+# Backend C completo (f64 + i64 + bool + string)
 SRCS = src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c src/smaug_ops_bool.c src/smaug_str.c
 
 TARGET = build/libsmaug.so
 
 # Flags para os binários de teste (debug, sem -fPIC/-shared)
 TEST_CFLAGS = -std=c11 -g -O0 -Wall -Wextra -I./include
+
+# === Listas de teste centralizadas (FONTE ÚNICA) ============================
+# Adicionar um teste = editar AQUI e em mais nenhum lugar. Os alvos test,
+# valgrind e test-lua iteram sobre estas listas.
+#   C_TESTS_PLAIN : testes C linkados normalmente (contra os SRCS).
+#   C_TEST_WRAP   : teste(s) que exigem -Wl,--wrap (falha de alocação).
+#   LUA_TESTS     : suítes do frontend Lua.
+C_TESTS_PLAIN = test_alloc test_ops test_bool test_string
+C_TEST_WRAP   = test_allocfail
+LUA_TESTS     = test_series test_dataset test_edge test_special test_fillna \
+                test_props test_i64 test_string
+WRAP_FLAGS    = -Wl,--wrap=malloc -Wl,--wrap=realloc
 
 $(TARGET): $(SRCS) | build
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
@@ -17,37 +29,32 @@ $(TARGET): $(SRCS) | build
 build:
 	mkdir -p build
 
-# Compila e roda os testes em C
+# Compila e roda os testes em C (plain + wrap), iterando sobre as listas.
 test: build
-	$(CC) $(TEST_CFLAGS) tests/test_alloc.c $(SRCS) -lm -o build/test_alloc
-	$(CC) $(TEST_CFLAGS) tests/test_ops.c   $(SRCS) -lm -o build/test_ops
-	$(CC) $(TEST_CFLAGS) tests/test_bool.c  $(SRCS) -lm -o build/test_bool
-	$(CC) $(TEST_CFLAGS) tests/test_string.c $(SRCS) -lm -o build/test_string
-	$(CC) $(TEST_CFLAGS) -Wl,--wrap=malloc -Wl,--wrap=realloc tests/test_allocfail.c $(SRCS) -lm -o build/test_allocfail
-	./build/test_alloc
-	./build/test_ops
-	./build/test_bool
-	./build/test_string
-	./build/test_allocfail
+	@for t in $(C_TESTS_PLAIN); do \
+		echo "  CC    $$t"; \
+		$(CC) $(TEST_CFLAGS) tests/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
+	done
+	@for t in $(C_TEST_WRAP); do \
+		echo "  CC    $$t (--wrap)"; \
+		$(CC) $(TEST_CFLAGS) $(WRAP_FLAGS) tests/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
+	done
+	@for t in $(C_TESTS_PLAIN) $(C_TEST_WRAP); do \
+		echo "  RUN   $$t"; ./build/$$t || exit 1; \
+	done
 
-# Roda os testes sob Valgrind (requer valgrind instalado)
+# Roda todos os testes C sob Valgrind (requer valgrind instalado)
 valgrind: test
-	valgrind --leak-check=full --error-exitcode=1 ./build/test_alloc
-	valgrind --leak-check=full --error-exitcode=1 ./build/test_ops
-	valgrind --leak-check=full --error-exitcode=1 ./build/test_bool
-	valgrind --leak-check=full --error-exitcode=1 ./build/test_string
-	valgrind --leak-check=full --error-exitcode=1 ./build/test_allocfail
+	@for t in $(C_TESTS_PLAIN) $(C_TEST_WRAP); do \
+		echo "  VALGRIND $$t"; \
+		valgrind --leak-check=full --error-exitcode=1 ./build/$$t || exit 1; \
+	done
 
 # Smoke test do frontend Lua (requer luajit e a .so compilada)
 test-lua: $(TARGET)
-	luajit tests/test_series.lua
-	luajit tests/test_dataset.lua
-	luajit tests/test_edge.lua
-	luajit tests/test_special.lua
-	luajit tests/test_fillna.lua
-	luajit tests/test_props.lua
-	luajit tests/test_i64.lua
-	luajit tests/test_string.lua
+	@for t in $(LUA_TESTS); do \
+		luajit tests/$$t.lua || exit 1; \
+	done
 
 # Mede cobertura do backend C e gera docs/COVERAGE.md (requer gcov; só Linux)
 coverage:
