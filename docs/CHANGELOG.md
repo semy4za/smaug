@@ -4,6 +4,20 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Cobertura — dívida paga (agregação de todos os testes)
+- **`make coverage` agora mede TODOS os testes do projeto.** Antes media só via
+  `.so` + testes Lua; `test_allocfail` (caminhos de erro/OOM) e `test_string`
+  (lifecycle/set/clone em C) ficavam de fora. Reescrito para compilar os
+  `src/*.c` como `.o` instrumentados compartilhados — `.so`, testes C diretos e
+  `test_allocfail` (via `--wrap` + `--coverage`) linkam contra os mesmos `.o`, e
+  os `.gcda` agregam no gcov. Paga a dívida "agregar test_allocfail à cobertura".
+- **Resultado (medido, honesto — não infla, conta testes que já existiam):**
+  linha **89.54% → 92.96%**, branch **62.45% → 68.31%**. `smaug_str.c`: linha
+  52% → 97.58% (o `test_string.c` em C agora conta). Ganho de branch em core
+  (56%→70.67%), i64 (67.83%→70.54%), str (52%→67.14%).
+- Gap de branch restante: caminhos de erro de **string** (o allocfail cobre
+  f64/i64/core, ainda não string) e ramos de valores especiais. Registrado.
+
 ### Adicionado (Fase string — frontend Lua, núcleo)
 - **Dtype `string` registrado na `Series`** (`series.lua` + `ffi_loader.lua`):
   `from_table`/`Series.string`, `get` (devolve string Lua via `ffi.string`),
