@@ -176,6 +176,39 @@ ffi.cdef([[
     size_t smaug_bool_count_true(const uint8_t *a, const smaug_mask_t *am, size_t n);
     bool   smaug_bool_any(const uint8_t *a, const smaug_mask_t *am, size_t n);
     bool   smaug_bool_all(const uint8_t *a, const smaug_mask_t *am, size_t n);
+
+    /* ===================================================================
+       Series String (offset-based)
+       =================================================================== */
+
+    typedef struct {
+        char             *buffer;
+        size_t           *offsets;
+        smaug_mask_t     *null_mask;
+        size_t            size;
+        size_t            capacity;
+        size_t            buffer_len;
+        size_t            buffer_capacity;
+        smaug_metadata_t  meta;
+    } smaug_series_str_t;
+
+    /* --- Lifecycle --- */
+    smaug_series_str_t* smaug_str_create(size_t size);
+    smaug_series_str_t* smaug_str_create_with_capacity(size_t size, size_t buffer_capacity);
+    smaug_series_str_t* smaug_str_create_from_array(const char *const *array, size_t len);
+    void                smaug_str_free(smaug_series_str_t *s);
+    smaug_series_str_t* smaug_str_clone(const smaug_series_str_t *s);
+
+    /* --- Acesso --- */
+    const char* smaug_str_get(const smaug_series_str_t *s, size_t idx, size_t *out_len);
+    int  smaug_str_set(smaug_series_str_t *s, size_t idx, const char *str, size_t len);
+    void smaug_str_set_null(smaug_series_str_t *s, size_t idx);
+    bool smaug_str_is_null(const smaug_series_str_t *s, size_t idx);
+    int  smaug_str_append(smaug_series_str_t *s, const char *str, size_t len);
+    int  smaug_str_append_null(smaug_series_str_t *s);
+
+    /* --- Utilidades --- */
+    size_t smaug_str_count_nonnull(const smaug_series_str_t *s);
 ]])
 
 -- Nome do arquivo da lib conforme o SO.

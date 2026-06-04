@@ -44,6 +44,9 @@ local DTYPES = {
         create      = C.smaug_f64_create,
         clone       = C.smaug_f64_clone,
         get         = C.smaug_f64_get,
+        -- get_value: converte o retorno C para o tipo Lua certo deste dtype.
+        -- (o método genérico Series:get apenas repassa, sem saber o tipo)
+        get_value   = function(c, i) return tonumber(C.smaug_f64_get(c, i)) end,
         set         = C.smaug_f64_set,
         set_null    = C.smaug_f64_set_null,
         is_null     = C.smaug_f64_is_null,
@@ -72,6 +75,7 @@ local DTYPES = {
         create      = C.smaug_i64_create,
         clone       = C.smaug_i64_clone,
         get         = C.smaug_i64_get,
+        get_value   = function(c, i) return tonumber(C.smaug_i64_get(c, i)) end,
         set         = C.smaug_i64_set,
         set_null    = C.smaug_i64_set_null,
         is_null     = C.smaug_i64_is_null,
@@ -92,6 +96,32 @@ local DTYPES = {
         argsort = C.smaug_i64_argsort,
         -- sum/min/max do i64 retornam INT64_MIN quando há nulo + !ignore_na.
         is_int_sentinel = function(v) return v == I64_MIN end,
+    },
+    string = {
+        name        = "string",
+        free        = C.smaug_str_free,
+        create      = C.smaug_str_create,
+        clone       = C.smaug_str_clone,
+        -- Acesso: a string passa ponteiro+comprimento pelo FFI (não valor).
+        -- Os wrappers escondem essa diferença; o método genérico não sabe.
+        get_value   = function(c, i)
+            local len = ffi.new("size_t[1]")
+            local p   = C.smaug_str_get(c, i, len)
+            if p == nil then return nil end       -- elemento NULL
+            return ffi.string(p, len[0])          -- bytes -> string Lua
+        end,
+        set         = function(c, i, v)
+            -- v é string Lua; passa ponteiro + comprimento. Retorna rc do C.
+            return C.smaug_str_set(c, i, v, #v)
+        end,
+        set_null    = C.smaug_str_set_null,
+        is_null     = C.smaug_str_is_null,
+        append      = function(c, v) return C.smaug_str_append(c, v, #v) end,
+        append_null = C.smaug_str_append_null,
+        count_nonnull = C.smaug_str_count_nonnull,
+        -- string NÃO tem ops numéricas (add/sum/sort/...) nem comparações ainda.
+        -- O método genérico checa a existência do campo e recusa com erro claro.
+        is_int_sentinel = function(_) return false end,
     },
 }
 
@@ -142,9 +172,22 @@ end
 -- Usado por set e append (CODE_REVIEW A7). Nível de pilha configurável p/ a
 -- mensagem de erro apontar para a chamada do usuário.
 local function check_value(self, v, level)
-    if self._dtype == "int64" and (type(v) ~= "number" or v % 1 ~= 0) then
-        error("smaug: valor para int64 deve ser inteiro (sem coerção); "
-              .. "recebido " .. tostring(v), level or 3)
+    local dt = self._dtype
+    if dt == "int64" then
+        if type(v) ~= "number" or v % 1 ~= 0 then
+            error("smaug: valor para int64 deve ser inteiro (sem coerção); "
+                  .. "recebido " .. tostring(v), level or 3)
+        end
+    elseif dt == "string" then
+        if type(v) ~= "string" then
+            error("smaug: valor para string deve ser uma string Lua; "
+                  .. "recebido " .. type(v), level or 3)
+        end
+    else  -- float64
+        if type(v) ~= "number" then
+            error("smaug: valor para " .. dt .. " deve ser número; "
+                  .. "recebido " .. type(v), level or 3)
+        end
     end
 end
 
@@ -154,13 +197,14 @@ end
 function Series.new(dtype, size, name)
     if not DTYPES[dtype] then
         error("smaug: dtype desconhecido '"..tostring(dtype)..
-              "'. Suportados: float64, int64.", 2)
+              "'. Suportados: float64, int64, string.", 2)
     end
     return wrap(DTYPES[dtype].create(size or 0), dtype, name)
 end
 
 function Series.float64(size, name) return Series.new("float64", size, name) end
 function Series.int64(size, name)   return Series.new("int64",   size, name) end
+function Series.string(size, name)  return Series.new("string",  size, name) end
 
 -- Cria a partir de uma tabela Lua. `nil` na tabela vira null.
 function Series.from_table(arr, dtype, name)
@@ -182,7 +226,8 @@ end
 function methods.get(self, i)
     check_index(self, i)
     if self._d.is_null(self._c, i - 1) then return nil end
-    return tonumber(self._d.get(self._c, i - 1))
+    -- get_value do descritor devolve já no tipo Lua certo (number, string, ...).
+    return self._d.get_value(self._c, i - 1)
 end
 
 function methods.set(self, i, v)
@@ -223,7 +268,19 @@ end
 -- =====================================================================
 -- Reduções. ignore_na default = true (comportamento pandas-like).
 -- =====================================================================
+-- Garante que o dtype suporta a operação `fn_name`; senão, erro claro.
+-- (string, por ex., não tem sum/add/sort — em vez do críptico "call a nil
+-- value", explica que a operação não se aplica ao dtype.)
+local function require_op(self, fn_name, level)
+    if self._d[fn_name] == nil then
+        error("smaug: operação '" .. fn_name .. "' não se aplica a séries do tipo "
+              .. self._dtype, level or 3)
+    end
+    return self._d[fn_name]
+end
+
 local function reduce_num(self, fn_name, ignore_na)
+    require_op(self, fn_name, 3)
     if ignore_na == nil then ignore_na = true end
     local v = self._d[fn_name](self._c, ignore_na)
     -- min/max/sum do i64: INT64_MIN é sentinela de "nulo encontrado"

@@ -4,6 +4,33 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Adicionado (Fase string — frontend Lua, núcleo)
+- **Dtype `string` registrado na `Series`** (`series.lua` + `ffi_loader.lua`):
+  `from_table`/`Series.string`, `get` (devolve string Lua via `ffi.string`),
+  `set`/`append` (passam ponteiro+comprimento), `set_null`, `is_null`,
+  `count_nonnull`, `clone`. Encapsulamento limpo: a diferença de assinatura da
+  string (ponteiro+len vs. valor) fica em **wrappers no descritor do dtype**; os
+  métodos genéricos não foram ramificados. Para isso, a conversão de tipo no
+  `get` migrou do método genérico (`tonumber`) para `get_value` em cada descritor
+  — cada dtype converte seu próprio valor para o tipo Lua certo.
+- **Recusa clara de operações inaplicáveis:** `require_op` faz `sum`/`add`/`sort`
+  etc. em string darem erro explicativo ("operação X não se aplica ao tipo
+  string") em vez do críptico "call a nil value". `check_value` estendido: string
+  só aceita string Lua; numéricos só aceitam número.
+- **DataSet com coluna de string** funciona de graça (composição: DataSet é
+  coleção de Series).
+- **`tests/test_string.lua`** (33 checks): acesso, vazia≠NULL, mutação (set 3
+  casos, set_null, append com NA), clone independente, recusas, integração com
+  DataSet. Integrado a `make test-lua` (8 suítes) e `make coverage`. Valgrind-clean.
+
+### Cobertura
+- Revisada ao integrar a string: `smaug_ops_str.c` agora medido via Lua (84.85%
+  linha). Total **90.54% → 89.54%** — não é regressão; é o número passando a
+  contar um arquivo novo cujo caminho de `set` (deslocamento) o frontend básico
+  não exercita todo (o `test_string.c` em C cobre, mas não entra na medição via
+  .so, como o allocfail). Gap registrado na dívida; fechar com testes Lua de
+  `set` de string ou aceitar conscientemente.
+
 ### Adicionado (Fase string — backend C completo)
 - **`src/smaug_ops_str.c`** implementa o tipo string (offset-based) no C:
   - Lifecycle: `create`, `create_with_capacity`, `create_from_array`, `clone`

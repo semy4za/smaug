@@ -208,6 +208,24 @@ array — pré-requisito de ML); `apply`/`map` (função Lua elemento a elemento
 reconciliar assimetria de div/0 entre f64 (IEEE: ±Inf/NaN) e i64 (→ NULL);
 correção do `set` i64 que trunca não-inteiro silenciosamente (CODE_REVIEW A7).
 
+**Operações de string (`.str`, roadmap próprio incremental).** O núcleo (lifecycle,
+get/set/append, e — em peças seguintes — comparações/sort/filter) torna a string
+utilizável como coluna de dados. A API rica do pandas (`.str`) entra **por camadas,
+conforme o uso real pedir**, não num big-bang. Mapa priorizado:
+- *Tier A (mais usados):* `len`, `lower`/`upper`, `strip`/`lstrip`/`rstrip`,
+  `contains`, `startswith`/`endswith`, `replace` (literal).
+- *Tier B:* `split`, `cat`/join, `slice`, `pad`/`zfill`, `repeat`, `find`.
+- *Tier C (caro/complexo):* regex (`extract`/`findall`/`match` — subprojeto à
+  parte), `get_dummies`, normalização/validação **UTF-8** (hoje trata bytes crus;
+  case-folding Unicode-aware exige tabelas de caso). Cada tier é uma fase testada e
+  Valgrind-clean. `categorical` (dictionary, Tier 2) acelera muitas dessas sobre
+  strings repetidas — e, como observado, torna o `set` O(1) sobre IDs.
+
+**Cobertura:** ao entrar no frontend, `smaug_ops_str.c` passa a ser medido via os
+testes Lua; o frontend básico não exercita todos os caminhos do `set` (3 casos de
+deslocamento), então o total pode baixar — gap a fechar com testes Lua de string
+ou registrar conscientemente. Revisar ao fechar a fase string.
+
 **Performance/robustez:** benchmarks e estresse (10⁷+ elementos); avaliação de
 SIMD; `ffi.gc` em hot paths; agregar `test_allocfail` à medição de cobertura.
 
