@@ -1,11 +1,14 @@
-/* src/smaug_ops_str.c
+/* src/smaug_str.c
  *
- * Implementação do tipo string (offset-based, estilo Arrow).
- * Ver smaug_string.h para o contrato e smaug_types.h para a struct.
+ * Lifecycle e acesso do tipo string (offset-based, estilo Arrow).
+ * Espelha o papel do smaug_core.c para os numéricos, mas em arquivo próprio
+ * porque o lifecycle da string é de natureza diferente: alocação de tamanho
+ * variável (buffer de bytes + offsets), com duas dimensões independentes
+ * (nº de strings e total de bytes). Ver smaug_string.h e smaug_types.h.
  *
- * Esta peça: lifecycle básico (create / create_with_capacity / free).
- * Demais funções (from_array, get, set, append, clone, count_nonnull) e
- * comparações/sort vêm nas peças seguintes.
+ * As operações sobre string (comparações, sort, take/filter — fases futuras)
+ * ficarão em src/smaug_ops_str.c, separando lifecycle de operações como nos
+ * numéricos (core vs ops).
  */
 
 #include "smaug_string.h"

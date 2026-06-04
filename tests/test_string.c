@@ -1,7 +1,7 @@
 /* tests/test_string.c
  *
  * Testes do tipo string (offset-based). Construído peça a peça junto com
- * src/smaug_ops_str.c. Rode sob Valgrind — o tipo string faz gerência manual
+ * src/smaug_str.c. Rode sob Valgrind — o tipo string faz gerência manual
  * de buffer de tamanho variável, então ausência de leak/erro é essencial.
  *
  * Peça 1: lifecycle (create / create_with_capacity / free).

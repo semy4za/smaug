@@ -3,7 +3,7 @@ CFLAGS	= -std=c11 -fPIC -Wall -Wextra -O2 -I./include
 LDFLAGS = -shared
 
 # Backend C completo (f64 + i64 + bool)
-SRCS = src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c src/smaug_ops_bool.c src/smaug_ops_str.c
+SRCS = src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c src/smaug_ops_bool.c src/smaug_str.c
 
 TARGET = build/libsmaug.so
 
@@ -47,6 +47,7 @@ test-lua: $(TARGET)
 	luajit tests/test_fillna.lua
 	luajit tests/test_props.lua
 	luajit tests/test_i64.lua
+	luajit tests/test_string.lua
 
 # Mede cobertura do backend C e gera docs/COVERAGE.md (requer gcov; só Linux)
 coverage:

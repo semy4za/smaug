@@ -3,8 +3,8 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh`
 > (`make coverage`). Não editar à mão — é regenerado a cada medição.
 
-- Commit medido: `8f90940`
-- Data do commit: 2026-06-03 23:31:08 -0300
+- Commit medido: `1facb5e`
+- Data do commit: 2026-05-31 20:33:12 -0300
 - Linha: métrica básica.  **Branch** ("taken at least once"): métrica
   rigorosa, padrão SQLite/aviônica — é a que perseguimos rumo a 100%.
 
@@ -14,12 +14,13 @@
 | `smaug_ops_f64.c` | 81.01% | 58.33% |
 | `smaug_ops_i64.c` | 96.28% | 67.83% |
 | `smaug_ops_bool.c` | 100.00% | 77.56% |
-| **TOTAL (ponderado)** | **90.54%** | **64.34%** |
+| `smaug_str.c` | 84.85% | 52.14% |
+| **TOTAL (ponderado)** | **89.54%** | **62.45%** |
 
 ## Gate da Fase 1.6
 
 - Critério do gate (Fase 1.6): **linha ≥ 90%**.
-- Status: ATINGIDO ✅
+- Status: NÃO atingido ❌ (faltam 0.46 pontos)
 
 ## Norte de longo prazo (cover real, padrão SQLite)
 

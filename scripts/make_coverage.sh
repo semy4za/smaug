@@ -10,7 +10,7 @@
 # Requer: gcc, luajit, gcov. (Linux — gcov não é confiável no Windows.)
 set -euo pipefail
 
-SRCS="smaug_core smaug_ops_f64 smaug_ops_i64 smaug_ops_bool"
+SRCS="smaug_core smaug_ops_f64 smaug_ops_i64 smaug_ops_bool smaug_str"
 COVDIR=cov
 OUT=docs/COVERAGE.md
 
@@ -20,7 +20,7 @@ mkdir -p "$COVDIR" build
 # 1. .so instrumentada
 gcc -std=c11 -fPIC --coverage -O0 -I./include -shared \
     -o "$COVDIR/libsmaug.so" \
-    src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c src/smaug_ops_bool.c
+    src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c src/smaug_ops_bool.c src/smaug_str.c
 
 # 2. testes C linkados contra a .so instrumentada
 for t in test_alloc test_ops test_bool; do
@@ -34,7 +34,7 @@ done
 
 # 4. roda os testes Lua contra a MESMA .so (o loader procura em build/)
 cp "$COVDIR/libsmaug.so" build/libsmaug.so
-for t in test_series test_dataset test_edge test_special test_fillna test_props test_i64; do
+for t in test_series test_dataset test_edge test_special test_fillna test_props test_i64 test_string; do
     luajit "tests/$t.lua" >/dev/null 2>&1
 done
 
