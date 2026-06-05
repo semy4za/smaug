@@ -34,7 +34,7 @@ done
 gcc --coverage -shared -o "$COVDIR/libsmaug.so" $objs
 
 # 3. testes C diretos, linkados contra a .so (sem --wrap)
-for t in test_alloc test_ops test_bool test_string; do
+for t in test_alloc test_ops test_ops_edge test_bool test_string; do
     gcc -std=c11 -O0 -I./include "tests/$t.c" -L"./$COVDIR" -lsmaug -lm -o "$COVDIR/$t"
     LD_LIBRARY_PATH="./$COVDIR" "./$COVDIR/$t" >/dev/null 2>&1
 done

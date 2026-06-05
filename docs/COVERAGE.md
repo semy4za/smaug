@@ -3,8 +3,8 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh`
 > (`make coverage`). Nao editar a mao -- e regenerado a cada medicao.
 
-- Commit medido: `f6b2bb6`
-- Data do commit: 2026-06-05 01:14:46 -0300
+- Commit medido: `be12929`
+- Data do commit: 2026-06-05 01:22:01 -0300
 - Linha: metrica basica.  **Branch** ("taken at least once"): metrica
   rigorosa, padrao SQLite/avionica -- e a que perseguimos rumo a 100%.
 - **Mede TODOS os testes do projeto**: testes C diretos, testes Lua (via
@@ -14,12 +14,12 @@
 | Arquivo | Linhas | Branch (taken) |
 |---------|--------|----------------|
 | `smaug_core.c` | 97.20% | 70.67% |
-| `smaug_ops_f64.c` | 81.01% | 61.11% |
-| `smaug_ops_i64.c` | 96.28% | 70.54% |
+| `smaug_ops_f64.c` | 89.45% | 73.81% |
+| `smaug_ops_i64.c` | 97.93% | 74.81% |
 | `smaug_ops_bool.c` | 100.00% | 77.56% |
 | `smaug_str.c` | 98.79% | 77.14% |
 | `smaug_ops_str.c` | 100.00% | 83.64% |
-| **TOTAL (ponderado)** | **93.86%** | **71.20%** |
+| **TOTAL (ponderado)** | **96.16%** | **75.42%** |
 
 ## Gate da Fase 1.6
 

@@ -4,6 +4,21 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Endurecimento — cobertura de branch dos numéricos (+6 pontos)
+- **`tests/test_ops_edge.c`** (novo, 65 checks): cobre os ramos defensivos e de
+  valores especiais de `smaug_ops_f64.c`/`smaug_ops_i64.c` que o frontend não
+  exercita (usa quase sempre o caminho "feliz"): reduções com `ignore_na=false`
+  sobre NULL (-> NaN/sentinela), reduções em série vazia e toda-NULL, operações
+  binárias com argumento NULL ou tamanhos incompatíveis (-> NULL), `*_scalar`
+  com guarda NULL e divisão por zero (f64: Inf; i64: NULL), comparações com
+  `out_mask=NULL` e NULL no elemento, e `sort`/`argsort` recusando NULL/NaN.
+  Integrado a `make test`/`valgrind` (6 testes C) e à cobertura. Valgrind-clean.
+- **Branch coverage: 69.32% -> 75.42%** (+6.1). `smaug_ops_f64.c` 61% -> 73.81%;
+  `smaug_ops_i64.c` 70% -> 74.81%. Linha total 93.86% -> 96.16%. Ganho honesto —
+  todos os casos exercitam comportamento real e correto. Os ~1pt restante para
+  +7 está em ramos defensivos muito específicos do core (overflow guards) e
+  possivelmente inalcançáveis; não perseguidos para evitar cobertura cosmética.
+
 ### Endurecimento — allocfail estendido para string (dívida paga)
 - **`test_allocfail` agora cobre os caminhos de erro (OOM) da string.** Antes
   varria apenas f64/i64/core; a string (lifecycle, `set` com realocação de
