@@ -1,175 +1,225 @@
 # Smaug — Roadmap
 
-> Como ler este documento: ele separa **o que já existe** (resumido), do que é
-> **🔨 DECISÃO** (batido no martelo, vai ser feito nesta ordem), do que é
-> **💭 CONCEITUAL** (ideia/aspiração, ainda não comprometida). A distinção é
-> proposital: uma decisão conceitual não deve ser tratada como compromisso.
-> Detalhes de implementação do que já existe ficam no código e no `API_INDEX.md`,
-> não aqui.
+Este documento descreve a direção do projeto e o estado de cada frente de
+trabalho. Ele separa o que já existe, o que está comprometido para a primeira
+entrega (v1.0.0) e o que é visão de longo prazo ainda não comprometida.
+
+Marcadores de status: `[Done]`, `[In progress]`, `[Planned]`, `[Concept]`,
+`[Deferred]`. O histórico detalhado de mudanças fica no `CHANGELOG.md`; detalhes
+de API ficam no `API_INDEX.md` e no `API_Reference.md`.
+
+> Versionamento: o trabalho anterior a este documento é tratado como base
+> consolidada (não recebe versões retroativas — não houve releases tagueados). O
+> versionamento formal começa agora, mirando o **v1.0.0** como primeira entrega
+> de produto.
+
+---
+
+## Princípio orientador
+
+O Smaug é uma engine de dados em C e Lua: o backend existe em C, a API pública
+existe em Lua. O objetivo não é competir com visualização, dashboards ou ML —
+essas áreas são **consumidoras** da engine, não o foco dela. O foco é uma
+fundação sólida para manipulação, transformação e análise de dados tabulares.
+
+Toda decisão responde a uma pergunta: **isso fortalece a engine?** Se não,
+provavelmente ainda não é prioridade. O ativo mais importante do projeto não é a
+interface nem o ecossistema futuro — é a **confiabilidade da engine**. Toda
+decisão deve preservar essa propriedade.
+
+A arquitetura tem três camadas, e a ordem importa: o núcleo existe primeiro, o
+ecossistema vem depois.
+
+1. **Core Engine (C)** — memória, tipos, nulls, operações, estruturas e
+   algoritmos. Deve ter API estável, comportamento previsível, semântica
+   consistente e testes extensivos.
+2. **Runtime Lua** — ergonomia, DSL, abstrações, integração. A API Lua é a
+   linguagem principal do Smaug.
+3. **Ecossistema** — analytics, visualização, telemetria, ML, aplicações.
+   Nenhuma dessas áreas deve influenciar negativamente o desenho do núcleo.
 
 ---
 
 ## Estado atual
 
-O Smaug tem o backend numérico (`float64`, `int64`, `bool`) e o frontend
-(`Series`, `BoolSeries`, `DataSet`) implementados e **endurecidos** — a Fase 1.6
-(endurecimento) está fechada. A próxima decisão batida é o **contrato defensivo
-do backend C**, seguida do tipo **`string`** e do **I/O (CSV/JSON)**.
+Base consolidada (pré-versionamento). O backend numérico (`float64`, `int64`,
+`bool`) e o frontend (`Series`, `BoolSeries`, `DataSet`) estão implementados e
+endurecidos. O tipo `string` (Tier 1) está completo — lifecycle, acesso,
+mutação, comparações, `filter`/`take` e `sort`/`argsort`, validado nos dois
+sistemas operacionais.
 
----
+Métricas: cobertura 96.16% linha / 75.42% branch; suíte de 6 testes em C (inclui
+`test_allocfail` via `--wrap` e `test_ops_edge`) e 8 suítes em Lua (incluindo
+property-based, ~222k checks). Valgrind-clean no Linux; build e testes validados
+no Windows (MSYS2) via `windows-build.ps1`. Modelo de referência de teste:
+SQLite.
 
-## ✅ O que já está feito (resumo)
-
-Detalhes no código e no `API_INDEX.md`. Em alto nível:
-
-| Fase | Entrega | Estado |
-|------|---------|--------|
-| 1 | Backend C: structs, lifecycle, ops `f64`/`i64`, null por bitmask | ✅ |
-| 2 | `Series` (despacho por dtype, `ffi.gc`, metamétodos) | ✅ |
-| 3 | `DataSet` (slicing, filter, sort_by, select, CRUD de colunas) | ✅ |
-| 4 | `BoolSeries`, comparações, `filter` (lógica de Kleene, 3 valores) | ✅ (falta `dropna`, ver dívida) |
-| 1.6 | **Endurecimento**: cobertura medida ≥90% linha, testes sistemáticos, property-based (~222k checks), falha de alocação, `fillna` | ✅ **fechada** |
-
-A suíte: 4 testes em C (incl. `test_allocfail` via `--wrap`) + 7 suítes em Lua,
-Valgrind-clean, cobertura medida (`make coverage` → `COVERAGE.md`). Modelo de
-referência de teste: SQLite.
+| Frente | Entrega | Status |
+|--------|---------|--------|
+| Backend numérico | structs, lifecycle, ops `f64`/`i64`, null por bitmask | `[Done]` |
+| Frontend | `Series` (despacho por dtype, `ffi.gc`, metamétodos) | `[Done]` |
+| DataSet | slicing, filter, sort_by, select, CRUD de colunas | `[Done]` |
+| BoolSeries | comparações, `filter`, lógica de Kleene (3 valores) | `[Done]` |
+| Endurecimento | cobertura medida, property-based, allocfail, `fillna` | `[Done]` |
+| Tipo `string` | offset-based (Arrow-like); ops completas | `[Done]` |
+| `dropna` (Series) | remove nulos; habilita sort em série com nulos | `[Done]` |
 
 ### Contrato de valores especiais (decidido e implementado)
 
-1. **`NaN` ≠ `null`.** `null` (bitmask) = ausência; `NaN` (IEEE 754) = valor
+1. **`NaN` ≠ `null`.** `null` (bitmask) é ausência; `NaN` (IEEE 754) é valor
    presente porém indefinido. Nunca se convertem — vantagem do Smaug sobre
-   pandas/numpy. Implementado.
-2. **`NaN` é contagioso** na aritmética (IEEE 754); comparações com `NaN` → `false`.
+   pandas/numpy.
+2. **`NaN` é contagioso** na aritmética (IEEE 754); comparações com `NaN` dão
+   `false`.
 3. **`sort`/`argsort` recusam `NaN`** (além de `null`): valor sem ordem definida
-   → recusa, não ordenação errada. `±Inf` são ordenáveis.
-4. **`sum` com `min_count`**: default `0` (compatível pandas); `min_count=1` →
-   `null` se não houver valor válido. *(min_count ainda a implementar — ver dívida.)*
+   é recusado, não ordenado errado. `±Inf` são ordenáveis.
+4. **`sum` com `min_count`**: default `0` (compatível com pandas); `min_count=1`
+   dá `null` se não houver valor válido. *(min_count ainda a implementar — ver
+   dívida técnica.)*
 
 ---
 
-## 🔨 DECIDIDO — próximas fases (nesta ordem)
+## Caminho até v1.0.0 — maturidade do núcleo
 
-Estas são decisões batidas no martelo. A ordem é firme.
+A primeira entrega de produto é o **v1.0.0**. A régua não é quantidade de
+features — é confiança. O objetivo desta fase não é adicionar funcionalidades, é
+aumentar a confiança no que já existe. A pergunta correta não é "quantas features
+existem?", e sim "quão confiável é o que já existe?".
 
-### 1. Contrato defensivo do backend C *(próxima)*
+Robustez é funcionalidade: testes não são suporte às funcionalidades, são
+funcionalidades; cobertura é ferramenta de confiança, não métrica de vaidade;
+Valgrind é parte do desenvolvimento, não etapa final. A capacidade de sobreviver
+a entradas inválidas é tão importante quanto qualquer operação matemática.
 
-Hoje o backend C confia no caller (validação fica no frontend Lua). **Decisão:**
-mudar para validação defensiva no C — as funções de fronteira (`set`/`get`/`view`
-etc.) passam a validar índice/ponteiro e sinalizar erro. Motivo: o Smaug será
-fundação de um ecossistema (viz, ML) que chamará o C **direto**, sem passar pelo
-frontend Lua; sem validação defensiva, entrada inválida vira corrupção de memória
-silenciosa. Mudança de assinaturas (afeta FFI + frontend + call sites) — por isso
-é fase própria, antes da `string`. (Origem: discussão do `test_alloc.c`.)
+O v1.0.0 fecha quando estes itens estiverem completos:
 
-### 2. Tipo `string` (Tier 1) ⏳ EM ANDAMENTO
+### 1. Contrato defensivo do backend C — `[Planned]` (prioridade máxima)
 
-O maior buraco para trabalho estilo pandas (CSV real tem texto). **Decisão de
-arquitetura (batida):** representação **offset-based estilo Arrow** — um buffer
-de bytes com todas as strings concatenadas + array de offsets (`size+1`
-marcadores; comprimento de cada string = `offsets[i+1]-offsets[i]`). Eficiente
-em memória/cache e O(1) para comprimento; strings são imutáveis em tamanho
-(combina com a imutabilidade por padrão; construção em lote via `from_table`). O
-**dictionary encoding** NÃO entra aqui — é a essência do `categorical` (Tier 2),
-tipo separado, depois. Sem migração destrutiva.
+Hoje o backend confia no caller; a validação mora no frontend Lua. Isso é
+aceitável enquanto o único consumidor é o frontend, mas não para uma engine que
+pretende durar anos e ser chamada direto do C por consumidores do ecossistema.
 
-**Progresso:** struct `smaug_series_str_t` em `smaug_types.h` ✅; header
-`smaug_string.h` (6º header) ✅; **backend C completo** em `src/smaug_ops_str.c`
-✅ (lifecycle, get/set/append, clone, count_nonnull — 62 checks, Valgrind-clean,
-o `set` faz deslocamento O(n) do buffer com `memmove`). **Falta:** registrar o
-dtype `string` no frontend Lua (descritor da `Series` + `ffi_loader`), e depois
-comparações/sort/take/filter. (Backend pronto; frontend a seguir.)
+Toda fronteira pública em C deve lidar com ponteiros inválidos, índices
+inválidos, parâmetros inconsistentes e estados inesperados — sem comportamento
+indefinido, sem corrupção de memória, sem crashes evitáveis. Isso muda
+assinaturas das funções de fronteira (`set`/`get`/`view` etc.), afetando FFI,
+frontend e call sites — por isso é fase própria. Decisão de design a tomar quando
+a fase começar: como o C sinaliza erro (provável referência: códigos de retorno
+estilo SQLite).
 
-> **Encaixe nos headers.** `smaug_string.h` inclui só `smaug_types.h` + lifecycle
-> próprio (tamanho variável). Nenhum `.c` existente é tocado — adição, não
-> modificação. Foi para viabilizar isso que os tipos foram isolados em
-> `smaug_types.h`.
+### 2. String completa — `[Done]`
 
-### 3. I/O — CSV + JSON
+A string é a primeira expansão real da engine além dos tipos numéricos. Ela
+validou ownership, realocação, semântica de null, operações de cópia e
+crescimento dinâmico — por isso é um marco arquitetural, não apenas mais um
+dtype. A representação é offset-based estilo Arrow (buffer de bytes concatenados
++ array de offsets). O dictionary encoding não entra aqui — é a essência do
+`categorical` (Tier 2), tipo separado, depois.
 
-Alvo de deploy do MVP. Lê/escreve CSV (`.csv`/`.tsv`, inferência de tipo) e JSON
-(records ou columnar). Depende da `string` existir (por isso vem depois dela).
-Sem coerção implícita entre dtypes.
+### 3. Semântica fechada — `[Planned]`
 
-**MVP = backend endurecido + contrato C + `string` + I/O (CSV/JSON).**
+Definir de forma permanente o comportamento de `null`, `NaN`, ordenação,
+comparação e agregações, de modo que mudanças futuras sejam mínimas. O contrato
+de valores especiais (acima) é a base; esta frente o consolida como estável e
+versionado, fechando ambiguidades antes que o ecossistema dependa dele.
+
+### 4. Testes de stress — `[Planned]`
+
+Aumentar a confiança em datasets grandes, operações encadeadas, crescimento de
+memória e cenários extremos. Complementa a cobertura e o allocfail já existentes
+com pressão real sobre a engine.
+
+### 5. Consistência da API — `[In progress]`
+
+Eliminar divergências entre documentação, roadmap e implementação. A
+documentação deve refletir o código real. (Esta reformulação do Roadmap é o
+primeiro passo; seguem `API_INDEX.md` e `API_Reference.md`.)
 
 ---
 
-## 💭 CONCEITUAL — ainda não batido no martelo
+## Pós-v1.0.0 — expansão sobre núcleo confiável
 
-Ideias e aspirações. Ordem **provável**, não comprometida. Cada uma será
-detalhada (e decidida) quando chegar sua vez.
+Estas frentes alargam a engine. Vêm depois da maturidade do núcleo: expandir
+antes de consolidar confiança tornaria a fundação instável. Ordem provável, não
+comprometida.
 
-### I/O — SQL (priorizado sobre XML)
+### Enriquecimento de métodos — `[Planned]`
 
-SQL é fonte de dados de produção real; XML é nicho. **Foco inicial: só SQLite.**
-A abstração de dialeto (para MySQL/Postgres depois) **não** será feita agora —
-seria abstração prematura com um banco só. Em vez disso, a disciplina barata:
-concentrar **toda** a interação SQL num único módulo de fronteira (como o
-`ffi_loader` faz para o C), para que adicionar dialetos no futuro seja mexer num
-módulo, não caçar SQL espalhado. **XML fica para pós-release.**
+Sobre um núcleo confiável, alargar a capacidade de trabalho com dados:
+- `.str` Tier A: `len`, `lower`/`upper`, `strip`, `contains`,
+  `startswith`/`endswith`.
+- Numéricas exploratórias: `value_counts`/`unique`, `median`/`quantile`,
+  `abs`/`round`/`clip`.
+- `DataSet:dropna()` (a `Series` já tem).
 
-### Analytics — GroupBy, Join, Window functions
+### I/O — CSV + JSON — `[Planned]`
 
-Diferente de "mais uma operação": cada um exige **estrutura/estratégia nova** que
-não existe hoje. GroupBy precisa de uma estrutura intermediária (grupos →
-agregações); Join precisa de indexação/hashing de chaves e tipos de join; Window
-precisa de janelas deslizantes com estado. Devem ser desenhados quando chegarmos
-lá. Ordem provável: depois do I/O (analytics sem carregar dados de fontes reais
-vale menos).
+Lê/escreve CSV (`.csv`/`.tsv`, com inferência de tipo) e JSON (records ou
+columnar). Depende da string (já pronta). Sem coerção implícita entre dtypes. É o
+que torna o Smaug utilizável com dados de arquivo reais — por isso é a expansão
+de maior valor logo após o núcleo maduro.
 
-### Lazy evaluation *(por último)*
+### I/O — SQL — `[Concept]`
 
-Alvo high-end, crucial para performance em pipelines grandes. **Não exige**
-reescrever o backend nem tornar tudo lazy: é uma camada de orquestração
-(`LazyDataSet` → constrói um plano → `.collect()`) **sobre** as operações eager
-que já existem. O modo eager continua o default. **Pré-requisito de design barato
-e já parcialmente satisfeito:** manter operações **imutáveis e componíveis** (já é
-o caso — imutabilidade por padrão foi decidida cedo) e não introduzir efeitos
-colaterais temporais escondidos. Vem **por último** porque otimiza justamente o
+SQL é fonte de produção real; XML é nicho e fica para depois. Foco inicial: só
+SQLite. A abstração de dialeto (MySQL/Postgres) não será feita agora — seria
+abstração prematura com um banco só. Disciplina barata no lugar: concentrar toda
+a interação SQL num único módulo de fronteira (como o `ffi_loader` faz para o C),
+para que adicionar dialetos no futuro seja mexer num módulo, não caçar SQL
+espalhado.
+
+### Analytics — GroupBy, Join, Window — `[Concept]`
+
+Diferente de "mais uma operação": cada um exige estrutura nova. GroupBy precisa
+de estrutura intermediária (grupos → agregações); Join precisa de
+indexação/hashing de chaves e tipos de join; Window precisa de janelas
+deslizantes com estado. Serão desenhados quando chegar a vez — depois do I/O
+(analytics sem dados de fontes reais vale menos).
+
+### DSL sobre Lua — `[Concept]`
+
+O futuro do Smaug não depende de uma linguagem própria — Lua já é a linguagem do
+projeto. A evolução natural é uma DSL baseada em Lua, encadeável, do tipo
+`dados:filter(...):groupby(...):agg(...)`. O objetivo não é criar sintaxe nova, e
+sim uma forma consistente de expressar operações.
+
+### Lazy evaluation — `[Concept]` (por último)
+
+Camada de orquestração (`LazyDataSet` → plano → `.collect()`) sobre as operações
+eager que já existem; o modo eager continua o default. Pré-requisito de design já
+parcialmente satisfeito: operações imutáveis e componíveis (imutabilidade por
+padrão foi decidida cedo). Vem por último porque otimiza justamente o
 GroupBy/Join — só há o que otimizar depois que eles existem.
 
 ---
 
-## 💭 Visão de longo prazo — o ecossistema
+## Escopo e visão de longo prazo
 
-> Norte, não tarefa. O Smaug é fundação de um ecossistema de dados em Lua, não um
-> fim em si. Inspirado no ecossistema Python (numpy/pandas → matplotlib →
-> scikit-learn → SQLAlchemy/Alembic). Tudo aqui depende de o Smaug estar maduro.
+O Smaug é uma plataforma **single-node**: o objetivo é extrair o máximo de uma
+única máquina. Primeiro corretude, robustez e previsibilidade; só depois
+paralelismo, otimizações e escalabilidade. A excelência local vem antes da
+distribuição.
 
-**1. Visualização (matplotlib-like, HTML/SVG).** Renderiza gráficos a partir de
-dados do Smaug. *Implicação presente:* a interface de exportação (`to_table` e
-afins) é API pública consumida por terceiros — manter limpa e estável.
+A longo prazo, o Smaug deve ser uma fundação reutilizável, com consumidores como
+analytics, telemetria de jogos, ETL, ML, visualização e aplicações embarcadas —
+todos dependendo da mesma fundação. Por isso cada fraqueza no núcleo se
+multiplica, o que justifica o rigor de teste antes de crescer.
 
-**2. Machine Learning (scikit-learn-like; eventualmente TensorFlow-like).** A peça
-mais pesada.
-- Exige **matriz numérica densa 2-D homogênea** (tudo `float64`, contígua) —
-  distinta do `DataSet` (heterogêneo). Será um **tipo novo** (`Matrix`/`Tensor2D`),
-  não uma extensão do DataSet. (Reforçado por parecer externo: não tentar enfiar
-  computação matricial no DataSet heterogêneo.)
-- **Broadcasting** (hoje dívida técnica) é **pré-requisito** de ML — sobe de
-  "talvez" para "vai precisar". *Implicação presente:* novas APIs (ex. operações
-  série-a-série) não devem fechar a porta para broadcasting.
-- Distinguir scikit-like (regressão, k-means, árvores — factível) de TensorFlow-like
-  (autodiff, redes neurais — drasticamente mais difícil em Lua, avaliar escopo).
-
-**3. ORM (pós-release — terá roadmap próprio).** Ciclo de vida de dados:
-carregar → visualizar → manter o banco → **versionar**. Bancos-alvo: SQLite,
-MySQL, Postgres (com camada de abstração de dialeto). Inclui **versionamento de
-schema inspirado no Alembic** (migrações versionadas up/down) — sistema **próprio**
-em Lua inspirado no conceito, não integração com o Alembic real (que é Python).
-Migração de schema é das partes mais complexas de um ORM — aspiração de longo
-prazo, com complexidade explícita. Será planejado em roadmap dedicado.
-
-**4. Port para Lua 5.4.** LuaJIT (Lua 5.1) tem FFI; **Lua 5.4 não**. Portar exige
-**bindings C manuais** (via API C do Lua) ou manter as duas vias — mudança
-arquitetural, não troca de interpretador. *Implicação presente:* manter a fronteira
-Lua↔C **centralizada** (no `ffi_loader`) facilita o port. Pode justificar o CMake
-(`FindLua`) no futuro — ver `Build_and_Testing.md`.
-
-Consequência transversal: por ser fundação de várias bibliotecas, **cada fraqueza
-no Smaug se multiplica**. Isso justifica o rigor de teste (Fase 1.6) antes de
-crescer — confirmado pelo parecer externo, que apontou o crescimento de escopo
-como o maior risco, e o endurecimento da fundação como o maior acerto.
+O ecossistema (todos `[Concept]`, sem compromisso):
+- **Visualização** (HTML/SVG): renderiza a partir de dados do Smaug. Implicação
+  presente: a interface de exportação (`to_table` e afins) é API pública —
+  mantê-la limpa e estável.
+- **Machine Learning**: exige uma matriz numérica densa 2-D homogênea, tipo novo
+  (`Matrix`/`Tensor2D`), distinto do `DataSet` heterogêneo. Broadcasting é
+  pré-requisito. Distinguir scikit-like (factível) de TensorFlow-like (autodiff —
+  drasticamente mais difícil em Lua).
+- **ORM** (roadmap próprio): ciclo carregar → visualizar → manter → versionar,
+  com versionamento de schema inspirado no conceito do Alembic (sistema próprio
+  em Lua, não integração com o Alembic real). Das partes mais complexas;
+  aspiração de longo prazo.
+- **Port para Lua 5.4**: LuaJIT (Lua 5.1) tem FFI, Lua 5.4 não. Exige bindings C
+  manuais. Implicação presente: manter a fronteira Lua↔C centralizada (no
+  `ffi_loader`) facilita o port.
 
 ---
 
@@ -178,60 +228,53 @@ como o maior risco, e o endurecimento da fundação como o maior acerto.
 Conjunto curado, em três camadas. A `Series` abstrai o dtype (descritor +
 backend C), então adicionar tipo não quebra a API.
 
-**Tier 1 — núcleo:** `float64` ✅, `int64` ✅, `bool` ✅, `string` (decidido,
-próxima após contrato C).
+- **Tier 1 — núcleo:** `float64` `[Done]`, `int64` `[Done]`, `bool` `[Done]`,
+  `string` `[Done]`.
+- **Tier 2 — alto valor (pós-v1.0):** `datetime` (`int64` epoch ms);
+  `categorical` (codes `int32` + levels) — é aqui que entra o dictionary encoding
+  (IDs + dicionário), acelerando groupby/comparação/sort com repetição.
+- **Tier 3 — otimização (talvez):** `float32`, `int32/16/8`, `uint*` — mesma
+  semântica, storage estreito. Só se um caso real justificar.
 
-**Tier 2 — alto valor (pós-MVP):** `datetime` (`int64` epoch ms); `categorical`
-(codes `int32` + levels) — **é aqui que entra o dictionary encoding** (IDs +
-dicionário), acelerando groupby/comparação/sort com repetição.
-
-**Tier 3 — otimização (talvez):** `float32`, `int32/16/8`, `uint*` — mesma
-semântica, storage estreito. Só se um caso real justificar.
-
-**Princípios transversais:** sem coerção implícita (conversão explícita via
+Princípios transversais: sem coerção implícita (conversão explícita via
 `astype`); null por bitmask uniforme (inclusive para tipos sem NaN nativo);
-mapeamento NumPy/pandas → Smaug documentado para conversão.
+mapeamento NumPy/pandas → Smaug documentado.
 
 ---
 
-## 📋 Dívida técnica (registrada, não esquecida)
+## Dívida técnica (registrada, não esquecida)
 
-Itens conscientemente adiados. Serão reagendados em fase dedicada após o MVP.
+Itens conscientemente adiados, reagendados em fase dedicada. Os já pagos saíram
+desta lista (ver `CHANGELOG.md`): allocfail estendido à string, cobertura de
+branch dos numéricos, `Series:dropna`, correção do `set` i64 (CODE_REVIEW A7),
+`windows-build.ps1` (auto-descoberta de fontes + todos os testes).
 
 **Estatísticas/utilitárias:** `median`/`quantile` nativos; `abs`/`round`/`clip`;
-`cumsum`/`cumprod`; `diff`/`shift`; `unique`/`value_counts`/`mode`; `dropna`
-(prioritário logo após o I/O — destrava sort em dados com nulos); `fillna` por
-método (fwd/bwd-fill); `sum(min_count)` (implementação).
+`cumsum`/`cumprod`; `diff`/`shift`; `unique`/`value_counts`/`mode`; `fillna` por
+método (fwd/bwd-fill); `sum(min_count)` (implementação). *(Os mais usados entram
+no enriquecimento pós-v1.0.)*
 
-**Semântica numérica:** **broadcasting** (Series de tamanhos diferentes / Series ×
+**Semântica numérica:** broadcasting (Series de tamanhos diferentes / Series ×
 array — pré-requisito de ML); `apply`/`map` (função Lua elemento a elemento);
-reconciliar assimetria de div/0 entre f64 (IEEE: ±Inf/NaN) e i64 (→ NULL);
-correção do `set` i64 que trunca não-inteiro silenciosamente (CODE_REVIEW A7).
+reconciliar assimetria de div/0 entre f64 (IEEE: ±Inf/NaN) e i64 (→ NULL).
 
-**Operações de string (`.str`, roadmap próprio incremental).** O núcleo (lifecycle,
-get/set/append, e — em peças seguintes — comparações/sort/filter) torna a string
-utilizável como coluna de dados. A API rica do pandas (`.str`) entra **por camadas,
-conforme o uso real pedir**, não num big-bang. Mapa priorizado:
+**Operações de string (`.str`, incremental por camadas):**
 - *Tier A (mais usados):* `len`, `lower`/`upper`, `strip`/`lstrip`/`rstrip`,
   `contains`, `startswith`/`endswith`, `replace` (literal).
 - *Tier B:* `split`, `cat`/join, `slice`, `pad`/`zfill`, `repeat`, `find`.
 - *Tier C (caro/complexo):* regex (`extract`/`findall`/`match` — subprojeto à
-  parte), `get_dummies`, normalização/validação **UTF-8** (hoje trata bytes crus;
-  case-folding Unicode-aware exige tabelas de caso). Cada tier é uma fase testada e
-  Valgrind-clean. `categorical` (dictionary, Tier 2) acelera muitas dessas sobre
-  strings repetidas — e, como observado, torna o `set` O(1) sobre IDs.
+  parte), `get_dummies`, normalização/validação UTF-8 (hoje trata bytes crus;
+  case-folding Unicode-aware exige tabelas de caso).
 
-**Cobertura:** ao entrar no frontend, `smaug_ops_str.c` passa a ser medido via os
-testes Lua; o frontend básico não exercita todos os caminhos do `set` (3 casos de
-deslocamento), então o total pode baixar — gap a fechar com testes Lua de string
-ou registrar conscientemente. Revisar ao fechar a fase string.
+**DataSet:** `DataSet:dropna()` (remover linhas com nulo, com possível `subset`
+de colunas como no pandas) — o `sort_by` ainda menciona "use dropna primeiro" no
+nível DataSet.
 
 **Performance/robustez:** benchmarks e estresse (10⁷+ elementos); avaliação de
-SIMD; `ffi.gc` em hot paths; agregar `test_allocfail` à medição de cobertura.
+SIMD; `ffi.gc` em hot paths. *(Os testes de stress são item do v1.0.0.)*
 
-**Observabilidade (fase dedicada):** sistema de **warnings** unificado (ex.: avisar
-opt-in quando operação encontra `NaN`, overflow de i64) — tratado de forma
-sistemática, não ad-hoc, sem penalizar os loops quentes.
+**Observabilidade (fase dedicada):** sistema de warnings unificado (ex.: avisar
+opt-in quando uma operação encontra `NaN`, overflow de i64), de forma sistemática
+e sem penalizar os loops quentes.
 
-**Build:** atualizar `windows-build.ps1` para rodar todos os testes; decidir o
-futuro do bloco CMake (atrelado à decisão Lua 5.4).
+**Build:** decidir o futuro do bloco CMake (atrelado à decisão Lua 5.4).
