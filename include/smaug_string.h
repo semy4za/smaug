@@ -67,8 +67,19 @@ int  smaug_str_append_null(smaug_series_str_t *s);
 
 size_t smaug_str_count_nonnull(const smaug_series_str_t *s);
 
-/* NOTA: comparações (eq/lt/gt), ordenação (sort/argsort), take/filter e a
+/* ===================== Comparações ===================== */
+/* Comparam cada elemento contra uma string-alvo (target + target_len). Retornam
+   um array uint8_t* (1/0) de tamanho s->size e, via out_mask, a máscara de
+   validade (elemento NULL -> resultado 0, máscara 0x00 — comparar com ausência
+   é indefinido). String vazia "" é valor válido e compara normalmente.
+   Ordem lexicográfica por BYTES (não Unicode-aware; ver Roadmap sobre UTF-8).
+   Retornam NULL em falha de alocação. O caller libera result e *out_mask. */
+uint8_t* smaug_str_eq(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
+uint8_t* smaug_str_lt(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
+uint8_t* smaug_str_gt(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
+
+/* NOTA: comparações (eq/lt/gt) — ESTA peça. sort/argsort, take/filter e a
    evolução para dictionary encoding (via tipo `categorical`, Tier 2) são fases
-   posteriores — ver Roadmap. Este header cobre o lifecycle e o acesso básico. */
+   posteriores — ver Roadmap. */
 
 #endif /* SMAUG_STRING_H */

@@ -64,6 +64,10 @@ local DTYPES = {
         view = C.smaug_f64_view, take = C.smaug_f64_take,
         filter = C.smaug_f64_filter,
         gt = C.smaug_f64_gt, lt = C.smaug_f64_lt, eq = C.smaug_f64_eq,
+        -- wrappers de comparação: validam escalar numérico e chamam a função C.
+        cmp_gt = function(c, t, om) if type(t)~="number" then error("smaug: comparação f64 espera número",4) end return C.smaug_f64_gt(c,t,om) end,
+        cmp_lt = function(c, t, om) if type(t)~="number" then error("smaug: comparação f64 espera número",4) end return C.smaug_f64_lt(c,t,om) end,
+        cmp_eq = function(c, t, om) if type(t)~="number" then error("smaug: comparação f64 espera número",4) end return C.smaug_f64_eq(c,t,om) end,
         argsort = C.smaug_f64_argsort,
         -- Uma redução int (sum/min/max) devolveu o sentinela de erro?
         -- No f64 isso é detectado por NaN no próprio valor.
@@ -93,6 +97,9 @@ local DTYPES = {
         view = C.smaug_i64_view, take = C.smaug_i64_take,
         filter = C.smaug_i64_filter,
         gt = C.smaug_i64_gt, lt = C.smaug_i64_lt, eq = C.smaug_i64_eq,
+        cmp_gt = function(c, t, om) if type(t)~="number" then error("smaug: comparação i64 espera número",4) end return C.smaug_i64_gt(c,t,om) end,
+        cmp_lt = function(c, t, om) if type(t)~="number" then error("smaug: comparação i64 espera número",4) end return C.smaug_i64_lt(c,t,om) end,
+        cmp_eq = function(c, t, om) if type(t)~="number" then error("smaug: comparação i64 espera número",4) end return C.smaug_i64_eq(c,t,om) end,
         argsort = C.smaug_i64_argsort,
         -- sum/min/max do i64 retornam INT64_MIN quando há nulo + !ignore_na.
         is_int_sentinel = function(v) return v == I64_MIN end,
@@ -119,6 +126,10 @@ local DTYPES = {
         append      = function(c, v) return C.smaug_str_append(c, v, #v) end,
         append_null = C.smaug_str_append_null,
         count_nonnull = C.smaug_str_count_nonnull,
+        -- comparações: validam string Lua e passam ponteiro + comprimento.
+        cmp_eq = function(c, t, om) if type(t)~="string" then error("smaug: comparação de string espera string",4) end return C.smaug_str_eq(c,t,#t,om) end,
+        cmp_lt = function(c, t, om) if type(t)~="string" then error("smaug: comparação de string espera string",4) end return C.smaug_str_lt(c,t,#t,om) end,
+        cmp_gt = function(c, t, om) if type(t)~="string" then error("smaug: comparação de string espera string",4) end return C.smaug_str_gt(c,t,#t,om) end,
         -- string NÃO tem ops numéricas (add/sum/sort/...) nem comparações ainda.
         -- O método genérico checa a existência do campo e recusa com erro claro.
         is_int_sentinel = function(_) return false end,
@@ -502,19 +513,25 @@ end
 -- =====================================================================
 -- Comparações -> BoolSeries, e filtragem
 -- =====================================================================
-local function compare(self, cfn, threshold)
-    if type(threshold) ~= "number" then
-        error("smaug: comparação espera um escalar numérico", 3)
+local function compare(self, cmp_name, target)
+    -- cada dtype tem seu wrapper de comparação no descritor (cmp_eq/cmp_lt/
+    -- cmp_gt): ele valida o alvo no tipo certo e chama a função C com a
+    -- assinatura adequada (numéricos passam escalar; string passa ponteiro+len).
+    -- Mantém os métodos genéricos agnósticos ao dtype (encapsulamento limpo).
+    local wrapper = self._d[cmp_name]
+    if wrapper == nil then
+        error("smaug: comparação '" .. cmp_name .. "' não se aplica ao tipo "
+              .. self._dtype, 3)
     end
     local om = ffi.new("smaug_mask_t*[1]")
-    local vals = cfn(self._c, threshold, om)
+    local vals = wrapper(self._c, target, om)
     if vals == nil then error("smaug: comparação falhou", 3) end
     return BoolSeries._own(vals, om[0], self:len(), self._name)
 end
 
-function methods.gt(self, threshold) return compare(self, self._d.gt, threshold) end
-function methods.lt(self, threshold) return compare(self, self._d.lt, threshold) end
-function methods.eq(self, threshold) return compare(self, self._d.eq, threshold) end
+function methods.gt(self, target) return compare(self, "cmp_gt", target) end
+function methods.lt(self, target) return compare(self, "cmp_lt", target) end
+function methods.eq(self, target) return compare(self, "cmp_eq", target) end
 
 -- filter(bool_series): nova Series só com as linhas onde a máscara é true.
 -- NA na máscara conta como false (linha descartada).

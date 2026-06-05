@@ -118,4 +118,36 @@ do
     check(df:col("pop"):sum() == 82, "coluna numerica ao lado funciona")
 end
 
+-- ===================================================================
+-- Comparações (eq/lt/gt) -> BoolSeries
+-- ===================================================================
+do
+    local s = S.from_table({"SP", "RJ", smaug.NA, "MG", "SP"}, "string")
+
+    local eq = s:eq("SP")
+    check(eq:get(1) == true and eq:get(5) == true, "eq casa SP")
+    check(eq:get(2) == false, "eq nao casa RJ")
+    check(eq:get(3) == nil, "eq NULL -> nil")
+    check(eq:count_true() == 2, "eq count_true")
+
+    local lt = s:lt("RJ")
+    check(lt:get(4) == true, "lt: MG < RJ")
+    check(lt:get(1) == false, "lt: SP nao < RJ")
+    check(lt:get(3) == nil, "lt NULL -> nil")
+
+    local gt = s:gt("RJ")
+    check(gt:get(1) == true, "gt: SP > RJ")
+    check(gt:get(4) == false, "gt: MG nao > RJ")
+
+    -- string vazia compara normalmente
+    local s2 = S.from_table({"", "a"}, "string")
+    check(s2:eq(""):get(1) == true, "eq '' casa vazia")
+    check(s2:lt("a"):get(1) == true, "lt: '' < 'a'")
+
+    -- recusa de tipo (sem coerção), nos dois sentidos
+    check(rejects(function() return s:eq(42) end), "string:eq(numero) recusa")
+    local n = S.from_table({1, 2}, "int64")
+    check(rejects(function() return n:eq("x") end), "int64:eq(string) recusa")
+end
+
 print(string.format("OK — %d checks passaram (string frontend)", n_ok))

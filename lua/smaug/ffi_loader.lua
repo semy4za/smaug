@@ -209,6 +209,11 @@ ffi.cdef([[
 
     /* --- Utilidades --- */
     size_t smaug_str_count_nonnull(const smaug_series_str_t *s);
+
+    /* --- Comparações (contra string-alvo; retornam uint8_t* + out_mask) --- */
+    uint8_t* smaug_str_eq(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
+    uint8_t* smaug_str_lt(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
+    uint8_t* smaug_str_gt(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
 ]])
 
 -- Nome do arquivo da lib conforme o SO.

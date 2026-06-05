@@ -10,6 +10,7 @@
 #include "../include/smaug_string.h"
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static int n_checks = 0;
@@ -197,6 +198,50 @@ int main(void) {
 
         smaug_str_free(orig);
         smaug_str_free(c);
+    }
+
+    /* ---- Comparações (eq/lt/gt) contra string-alvo ---- */
+    {
+        const char *arr[] = {"SP", "RJ", NULL, "MG", "SP", ""};
+        smaug_series_str_t *s = smaug_str_create_from_array(arr, 6);
+        smaug_mask_t *m = NULL;
+        uint8_t *r;
+
+        /* eq "SP": 1 0 N 0 1 0 */
+        r = smaug_str_eq(s, "SP", 2, &m);
+        OK(r && m, "eq retorna result+mask");
+        OK(r[0]==1 && r[1]==0 && r[3]==0 && r[4]==1 && r[5]==0, "eq valores");
+        OK(m[2]==0x00 && m[0]==0xFF, "eq NULL->mascara 0x00, valido->0xFF");
+        free(r); free(m); m=NULL;
+
+        /* eq "" : só a vazia (idx5) */
+        r = smaug_str_eq(s, "", 0, &m);
+        OK(r[5]==1 && r[0]==0 && r[1]==0, "eq '' casa so a vazia");
+        OK(m[5]==0xFF, "vazia e valida (compara normal)");
+        free(r); free(m); m=NULL;
+
+        /* lt "RJ": MG e '' antes; SP depois -> 0 0 N 1 0 1 */
+        r = smaug_str_lt(s, "RJ", 2, &m);
+        OK(r[3]==1 && r[5]==1 && r[0]==0 && r[1]==0 && r[4]==0, "lt lexicografico");
+        OK(m[2]==0x00, "lt NULL->mascara 0");
+        free(r); free(m); m=NULL;
+
+        /* gt "RJ": SP depois -> 1 0 N 0 1 0 */
+        r = smaug_str_gt(s, "RJ", 2, &m);
+        OK(r[0]==1 && r[4]==1 && r[1]==0 && r[3]==0, "gt lexicografico");
+        free(r); free(m); m=NULL;
+
+        /* desempate por comprimento: "MG" < "MGA" (prefixo igual, mais curta antes) */
+        r = smaug_str_lt(s, "MGA", 3, &m);
+        OK(r[3]==1, "lt desempata por comprimento (MG < MGA)");
+        free(r); free(m); m=NULL;
+
+        /* eq sem out_mask (NULL) nao deve crashar */
+        r = smaug_str_eq(s, "SP", 2, NULL);
+        OK(r && r[0]==1, "eq sem out_mask funciona");
+        free(r);
+
+        smaug_str_free(s);
     }
 
     printf("PASS: string lifecycle (%d checks)\n", n_checks);

@@ -4,6 +4,29 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Adicionado (Fase string — comparações eq/lt/gt)
+- **`src/smaug_ops_str.c`** (arquivo de ops da string, antes reservado vazio na
+  refatoração — agora ganha conteúdo): `smaug_str_eq/lt/gt` comparam cada
+  elemento contra uma string-alvo, retornando `uint8_t*` + máscara (NULL ->
+  resultado 0, máscara 0x00). Ordem lexicográfica por **bytes** (não
+  Unicode-aware; ver Roadmap). Otimização honesta (a mesma dos modelos para
+  string simples): `eq` compara comprimento primeiro (O(1) via offsets), só faz
+  `memcmp` se baterem; `lt`/`gt` fazem `memcmp` até o menor comprimento e
+  desempatam pelo comprimento. A otimização real (dictionary) é o `categorical`
+  futuro — a interface encapsulada permite trocar por baixo sem mudar o frontend.
+- **Frontend Lua:** `series:eq/lt/gt("alvo")` para dtype string -> BoolSeries.
+  O `compare` genérico passou a delegar a wrappers `cmp_eq/cmp_lt/cmp_gt` no
+  descritor de cada dtype (numéricos validam escalar; string valida string Lua e
+  passa ponteiro+len) — métodos genéricos seguem agnósticos ao dtype. Recusa de
+  tipo nos dois sentidos (string:eq(número) e número:eq(string)).
+- Testes: `test_string.c` 62 -> 72 checks (C); `test_string.lua` 33 -> 46
+  (frontend). Valgrind-clean. Cobertura: `smaug_ops_str.c` 100% linha / 78.57%
+  branch; total 92.96% -> 93.25% / branch 68.31% -> 68.64%.
+
+### Próximo (fase string)
+- `take`/`filter` para string (destrava `series:filter(series:eq("SP"))`).
+- `sort`/`argsort` para string (usa lt/gt — ordem alfabética).
+
 ### Build/teste — review e correção (causa raiz do commit quebrado)
 - **Makefile: listas de teste centralizadas.** Antes os testes C apareciam em 3
   blocos (compilar/rodar/valgrind) e os Lua noutro — adicionar um teste exigia

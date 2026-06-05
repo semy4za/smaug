@@ -16,7 +16,7 @@
 # Requer: gcc, luajit, gcov. (Linux -- gcov nao e confiavel no Windows.)
 set -euo pipefail
 
-SRCS="smaug_core smaug_ops_f64 smaug_ops_i64 smaug_ops_bool smaug_str"
+SRCS="smaug_core smaug_ops_f64 smaug_ops_i64 smaug_ops_bool smaug_str smaug_ops_str"
 COVDIR=cov
 OUT=docs/COVERAGE.md
 
