@@ -2,20 +2,21 @@
 # Gerado por scripts/make_manifest.sh
 # Formato: <sha256>  <linhas>  <caminho>
 #
-0a4532c02e2726cdc7b695ed25afee8b9320ca0a3d772a61f285fd4c4e68de7c     148  ./docs/API_INDEX.md
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
+ed7d63f5177cc7d7fbfee9c7c18ebeb4d6fd7da02680ec7778cfe23be1d15b03      31  ./.gitattributes
+4f01d8ffb7024a3980cabf8eb1d343c24b78b7614a7bb301af351dd18b846cd5       6  ./.gitignore
+548d697bd4b3e83a47f1a12b59a3d670fe517deb03a17cf817788299e005cdfa      76  ./Makefile
+50a6073ca69e58083260116e48395b52bbbb358a0f150c79bbe90db5d08a346c     175  ./docs/API_INDEX.md
 0f36df40dd144fdc6ea735fc3febe5522af9798dc71e4aa58b96d0e981833b8d     346  ./docs/API_Reference.md
 3cbdf245e27417235912f24d67bed698979ba826a92a5b3c478ea2e6989eb079     432  ./docs/Build_and_Testing.md
 8856887ef035683f2d4a424100daef8e8a00de870d1e9827842fb5ec09fbaeb6     533  ./docs/CHANGELOG.md
 782c0cd5e77586591368cbff4faf8ee584c6e2a2bd23c3990500b92e8e6b765c      92  ./docs/CODE_REVIEW.md
 07e88827d568178f1dd91d84dc3f3f398f53a9fccbd9b9abc376133d05bbf2bc      36  ./docs/COVERAGE.md
 29e30dd42a134830024e793b106c23198d13ddc122cf0d2b899e049e2272c45e     149  ./docs/README.md
-31e19dfce3f5cb79131b2438ffa8ce252f739c3104a6bafdbcaa62a7759ec1db     237  ./docs/Roadmap.md
-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
-ed7d63f5177cc7d7fbfee9c7c18ebeb4d6fd7da02680ec7778cfe23be1d15b03      31  ./.gitattributes
-4f01d8ffb7024a3980cabf8eb1d343c24b78b7614a7bb301af351dd18b846cd5       6  ./.gitignore
+dbccc0e2799e9b21b925cc9ed818f204d7b53086f4a3a84ba56c4165dfecb9b2     280  ./docs/Roadmap.md
+ec1ae8442e32984127948c7e126da19f84f85193023143dc36ee82b8e352544d      29  ./include/smaug.h
 963e21a0d5b9b1857da7bbe7310a4a9340057fcf7560272f062e4e83727c5da3      40  ./include/smaug_bool.h
 83f6fcfec97f425355dedf7609c3a2d2f1570b13fd12ca81c863d3f8af31d252      79  ./include/smaug_core.h
-ec1ae8442e32984127948c7e126da19f84f85193023143dc36ee82b8e352544d      29  ./include/smaug.h
 3299b0ce0035dda28a919d504830019a29bca7aa1ef77f63259d8cd70a34da43      86  ./include/smaug_numeric.h
 28447fecbf19d03b22f92be16130bcf703501fd9e945ed470b952afed7168237     103  ./include/smaug_string.h
 1de3aefef72ef7a2975cee3295840136d48d8b509643149eafb14ca96677887e      84  ./include/smaug_types.h
@@ -24,10 +25,9 @@ e415b73427647932669bbbba016f4485343a7d5fed7d735ece1a05de2896b384     336  ./lua/
 c39975285c19a0ae094531471b78118908806093778556f7f7768c0d3f482c14     650  ./lua/smaug/core/series.lua
 a5fc09ec61e7344e2ee8a44ae1f825159a1efb0655e447ac1b44bd6bf8e2db14     259  ./lua/smaug/ffi_loader.lua
 09044a60cd7891600013e3bb7f15ddc7b9e741db8f4499ed93499e355aadea17      28  ./lua/smaug/init.lua
-548d697bd4b3e83a47f1a12b59a3d670fe517deb03a17cf817788299e005cdfa      76  ./Makefile
 93a238639a7c491c8404066c719499f46643117d3157574933e8a5b8f52311e1     117  ./scripts/make_coverage.sh
 cb828add8f90f2e44bd826cc4053f524b73fe65d62f3fa90bebbb936f19ac04e      34  ./scripts/make_manifest.sh
-008fab300798197f9d4256d19b5001bfb699239c8ec3e28bac001417d24b96a0     167  ./scripts/windows-build.ps1
+3d037a8190f34010562e0fabe6b60a141e1961ba2bb181243b39b946d896d274     174  ./scripts/windows-build.ps1
 8b39dd4df2ae706d545b863e0c4780d3225e974cad491e115c02283fc1b41bae     362  ./src/smaug_core.c
 267958936286e557235eb7d884c5032e4cd72d6c544d7e24d639c6d1f7f669a8     134  ./src/smaug_ops_bool.c
 d62d2a02baae0454ff043212ce086de002b2eaf85f791c60e83c4bcf8c3da864     457  ./src/smaug_ops_f64.c

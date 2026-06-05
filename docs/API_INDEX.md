@@ -5,8 +5,7 @@ qualquer função/método novo, consulte aqui se já não existe. É a defesa co
 reimplementação e deriva ("espaguete").
 
 **Como manter:** atualizar a cada função/método adicionado ou removido. Gerado a
-partir do código real (não de memória). Última sincronização: commit `67d8da2`
-(headers separados + `libsmaug` + `.gitattributes`).
+partir do código real (não de memória).
 
 > Convenção: `f64`/`i64` = as duas variantes numéricas. Onde aparece `<t>`, leia
 > as duas (`smaug_f64_*` e `smaug_i64_*`). Índices em C são 0-based; no Lua,
@@ -67,18 +66,44 @@ Notas: f64 `div`/0 segue IEEE (±Inf/NaN); i64 `div`/0 → NULL.
 | `smaug_bool_count_true(a, am, n)` | conta trues (NA ignorado) |
 | `smaug_bool_any/all(a, am, n)` | agregações (NA ignorado; all de vazio=true) |
 
+### String (`smaug_string.h`)
+Representação offset-based (buffer de bytes concatenados + array de offsets).
+Trata bytes crus (UTF-8 = dívida futura). String vazia `""` é distinta de NULL.
+| Função | O que faz |
+|--------|-----------|
+| `smaug_str_create(size)` | cria série de `size` strings, todas NULL |
+| `smaug_str_create_with_capacity(size, buf_cap)` | cria com buffer pré-alocado |
+| `smaug_str_create_from_array(arr, len)` | cria de `char*` array (NULL no array → NULL) |
+| `smaug_str_free(s)` | libera (NULL-safe; respeita external_alloc) |
+| `smaug_str_clone(s)` | cópia profunda independente |
+| `smaug_str_get(s, idx, &out_len)` | → ponteiro p/ bytes + comprimento (NÃO terminado em \0) |
+| `smaug_str_set(s, idx, str, len)` | grava (realoca o buffer via memmove; 0=ok, -1=erro) |
+| `smaug_str_set_null(s, idx)` / `smaug_str_is_null(s, idx)` | nulos |
+| `smaug_str_append(s, str, len)` / `smaug_str_append_null(s)` | adiciona ao fim (0=ok, -1=erro) |
+| `smaug_str_count_nonnull(s)` | size_t |
+| `smaug_str_eq/lt/gt(s, target, target_len, &out_mask)` | → bool array (uint8_t*); lexicográfico por bytes; caller libera c/ `smaug_free` |
+| `smaug_str_filter(s, mask)` | → nova série onde mask é true (preserva NULL) |
+| `smaug_str_take(s, idx, len)` | → nova série com os índices dados (preserva NULL) |
+| `smaug_str_argsort(s, asc)` | → size_t* (permutação); NULL se há nulos; libera c/ `smaug_free` |
+| `smaug_str_sort(s, asc)` | → nova série ordenada (= argsort+take); NULL se há nulos |
+
 ### Tipos (`smaug_types.h`)
 `smaug_mask_t` (uint8: 0xFF=válido, 0x00=NA), `smaug_metadata_t`,
-`smaug_series_f64_t`, `smaug_series_i64_t`, `smaug_hash_table_t` (opaque, futuro).
+`smaug_series_f64_t`, `smaug_series_i64_t`, `smaug_series_str_t`,
+`smaug_hash_table_t` (opaque, futuro).
 
 ---
 
 ## Camada Lua — frontend (`lua/smaug/`)
 
-### `Series` (`core/series.lua`) — dtypes: float64, int64
+### `Series` (`core/series.lua`) — dtypes: float64, int64, string
 **Factories:** `Series.new(dtype, size, name)`, `Series.float64(size, name)`,
-`Series.int64(size, name)`, `Series.from_table(arr, dtype, name)`.
-`Series.NA` (sentinela de nulo em tabelas).
+`Series.int64(size, name)`, `Series.string(size, name)`,
+`Series.from_table(arr, dtype, name)`. `Series.NA` (sentinela de nulo em tabelas).
+
+> **String:** dtype de primeira classe. Aceita só string Lua (numéricos recusam
+> string e vice-versa — sem coerção). Comparações/sort são lexicográficos por
+> bytes (não Unicode-aware). String vazia `""` ≠ NULL.
 
 > **NaN ≠ null (implementado).** `nil` e `Series.NA` → null (ausente, bitmask).
 > `NaN` (ex.: `0/0` ou `0/0` de operação) → valor **presente** porém indefinido,
@@ -97,6 +122,7 @@ Notas: f64 `div`/0 segue IEEE (±Inf/NaN); i64 `div`/0 → NULL.
 | `:sort(asc)` / `:argsort(asc)` | ordenar / permutação de ordenação |
 | `:view(start, len)` | view zero-copy segura (read-only, segura `_parent`) |
 | `:take(idx)` / `:head(n)` / `:tail(n)` | seleção de linhas → nova Series |
+| `:dropna()` | → nova Series sem NULLs (qualquer dtype; habilita sort em série c/ nulos) |
 | `:astype(dtype)` | conversão de tipo |
 | `:fillna(value)` | nova Series com NULLs→value; sem coerção; NaN intacto; sem arg=erro |
 | `:to_table([na])` | → tabela Lua |
@@ -142,7 +168,8 @@ Notas: f64 `div`/0 segue IEEE (±Inf/NaN); i64 `div`/0 → NULL.
 
 ## NÃO existe ainda (não procure — consulte o Roadmap para a fase)
 
-`dropna`, `median`/`quantile` nativos, `abs`/`round`/`clip`,
-`cumsum`/`cumprod`, `diff`/`shift`, `unique`/`value_counts`, broadcasting,
-`apply`/`map`, tipo `string`, `datetime`, `categorical`, I/O (CSV/JSON/XML/SQL),
-GroupBy/joins. Ver `Roadmap.md` para quando cada um entra.
+`median`/`quantile` nativos, `abs`/`round`/`clip`, `cumsum`/`cumprod`,
+`diff`/`shift`, `unique`/`value_counts`, broadcasting, `apply`/`map`,
+`.str` (lower/upper/strip/contains/...), `DataSet:dropna`, `datetime`,
+`categorical`, I/O (CSV/JSON/XML/SQL), GroupBy/joins. Ver `Roadmap.md` para
+quando cada um entra.
