@@ -99,12 +99,12 @@ if ($luajit) {
 
 New-Item -ItemType Directory -Force -Path "build" | Out-Null
 
-$sources = @(
-    "src\smaug_core.c",
-    "src\smaug_ops_f64.c",
-    "src\smaug_ops_i64.c",
-    "src\smaug_ops_bool.c"
-)
+# Fontes do backend: descobre TODOS os src\*.c automaticamente, para nunca
+# dessincronizar quando um novo .c entra (foi o que aconteceu com a fase string:
+# a lista fixa tinha so os 4 numericos e os testes de string nao linkavam).
+$sources = @(Get-ChildItem -Path "src" -Filter "*.c" | ForEach-Object { "src\$($_.Name)" })
+if ($sources.Count -eq 0) { throw "Nenhum fonte encontrado em src\*.c" }
+Write-Host ("Fontes ({0}): {1}" -f $sources.Count, ($sources -join ", ")) -ForegroundColor DarkGray
 
 Write-Host ""
 Write-Host "== Compilando build\smaug.dll ==" -ForegroundColor Cyan
@@ -112,7 +112,7 @@ Write-Host "== Compilando build\smaug.dll ==" -ForegroundColor Cyan
 if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar a DLL." }
 Write-Host "OK -> build\smaug.dll" -ForegroundColor Green
 
-$cTests = @("test_alloc", "test_ops", "test_bool", "test_string")
+$cTests = @("test_alloc", "test_ops", "test_ops_edge", "test_bool", "test_string")
 $cTestsWrap = @("test_allocfail")
 $allPass = $true
 
@@ -129,10 +129,17 @@ foreach ($t in $cTests) {
     if ($out -notlike "PASS*") { $allPass = $false }
 }
 # Testes com -Wl,--wrap (falha de alocacao injetada). Saida "PASS: ...".
+# Os args -Wl,... comecam com hifen; o PowerShell tentaria interpreta-los como
+# parametros proprios. Montamos a lista como array e usamos splatting (@cargs),
+# que passa cada item literalmente ao gcc.
 foreach ($t in $cTestsWrap) {
     $exe = "build\$t.exe"
-    & $gcc -std=c11 -g -O0 -Wall -Wextra -I".\include" `
-        -Wl,--wrap=malloc -Wl,--wrap=realloc "tests\$t.c" @sources -lm -o $exe
+    $cargs = @(
+        "-std=c11", "-g", "-O0", "-Wall", "-Wextra", "-I.\include",
+        "-Wl,--wrap=malloc", "-Wl,--wrap=realloc",
+        "tests\$t.c"
+    ) + $sources + @("-lm", "-o", $exe)
+    & $gcc @cargs
     if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar $t." }
 
     $out = (& ".\$exe") | Out-String
