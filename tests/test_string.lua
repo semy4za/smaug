@@ -102,7 +102,6 @@ do
     check(rejects(function() return s:sum() end), "sum recusa string")
     check(rejects(function() return s:mean() end), "mean recusa string")
     check(rejects(function() return s:add(s) end), "add recusa string")
-    check(rejects(function() return s:sort() end), "sort recusa string (ainda)")
 end
 
 -- ===================================================================
@@ -182,6 +181,38 @@ do
     local pop_sp = df:col("pop"):filter(df:col("uf"):eq("SP"))
     check(pop_sp:len() == 2 and pop_sp:get(1) == 44 and pop_sp:get(2) == 11,
           "filtrar dataset por coluna de texto")
+end
+
+-- ===================================================================
+-- Ordenação: sort e argsort (lexicográfico; recusa NULL)
+-- ===================================================================
+do
+    local s = S.from_table({"MG", "AC", "SP", "BA", "AC"}, "string")
+
+    local asc = s:sort()
+    check(asc:get(1) == "AC" and asc:get(2) == "AC" and asc:get(3) == "BA"
+          and asc:get(4) == "MG" and asc:get(5) == "SP", "sort ascendente")
+
+    local desc = s:sort(false)
+    check(desc:get(1) == "SP" and desc:get(5) == "AC", "sort descendente")
+
+    -- argsort 1-based, permutação estável
+    local ix = s:argsort()
+    check(ix[1] == 2 and ix[2] == 5 and ix[5] == 3, "argsort 1-based estavel")
+
+    -- vazia ordena primeiro
+    local v = S.from_table({"b", "", "a"}, "string"):sort()
+    check(v:get(1) == "" and v:get(2) == "a" and v:get(3) == "b",
+          "sort: vazia vem primeiro")
+
+    -- NULL recusa (sort levanta erro; argsort retorna nil)
+    local sn = S.from_table({"x", smaug.NA, "a"}, "string")
+    check(rejects(function() return sn:sort() end), "sort recusa NULL")
+    check(sn:argsort() == nil, "argsort com NULL -> nil")
+
+    -- sort + take coerentes: ordenar e reordenar dá o mesmo
+    local sorted = s:sort()
+    check(sorted:len() == 5, "sort preserva tamanho")
 end
 
 print(string.format("OK — %d checks passaram (string frontend)", n_ok))

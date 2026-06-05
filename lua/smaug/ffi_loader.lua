@@ -218,6 +218,10 @@ ffi.cdef([[
     /* --- Seleção --- */
     smaug_series_str_t* smaug_str_filter(const smaug_series_str_t *s, const uint8_t *mask);
     smaug_series_str_t* smaug_str_take(const smaug_series_str_t *s, const size_t *idx, size_t len);
+
+    /* --- Ordenação --- */
+    size_t*             smaug_str_argsort(const smaug_series_str_t *s, bool ascending);
+    smaug_series_str_t* smaug_str_sort(const smaug_series_str_t *s, bool ascending);
 ]])
 
 -- Nome do arquivo da lib conforme o SO.

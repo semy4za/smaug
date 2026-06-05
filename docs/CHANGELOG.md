@@ -4,6 +4,24 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Adicionado (Fase string — ordenação: sort/argsort) — FASE STRING COMPLETA
+- **`smaug_str_argsort`** (permutação de índices, lexicográfica por bytes, via
+  `qsort` com desempate estável por índice) e **`smaug_str_sort`** (= argsort +
+  take) em `src/smaug_ops_str.c`. Política coerente com os numéricos: **recusam
+  séries com qualquer NULL** (retornam NULL — ordenar com ausência é indefinido;
+  use dropna antes). String vazia `""` ordena normalmente (vem primeiro).
+  `ascending` controla crescente/decrescente. Reusa `take` (já existente).
+- **Frontend Lua:** `series:sort([ascending])` e `series:argsort([ascending])`
+  para dtype string (os métodos genéricos já delegavam ao descritor).
+- Testes: `test_string.c` 79 -> 87; `test_string.lua` 53 -> 59. Removido um teste
+  obsoleto que assertava "sort recusa string (ainda)" — agora sort existe.
+  Valgrind-clean. Cobertura: total 93.48% -> 93.67% / branch 68.88% -> 69.32%.
+
+**Com isto a string é um dtype de primeira classe**, com paridade às operações
+dos numéricos onde fazem sentido: lifecycle, acesso, mutação, comparações
+(eq/lt/gt), seleção (filter/take) e ordenação (sort/argsort). Próximo marco do
+projeto: I/O (CSV/JSON) para carregar dados reais.
+
 ### Adicionado (Fase string — seleção: filter e take)
 - **`smaug_str_filter`** (nova série com os elementos onde a máscara é 1) e
   **`smaug_str_take`** (nova série com os elementos nos índices dados, na ordem

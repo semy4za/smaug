@@ -87,6 +87,15 @@ uint8_t* smaug_str_gt(const smaug_series_str_t *s, const char *target, size_t ta
 smaug_series_str_t* smaug_str_filter(const smaug_series_str_t *s, const uint8_t *mask);
 smaug_series_str_t* smaug_str_take  (const smaug_series_str_t *s, const size_t *idx, size_t len);
 
+/* ===================== Ordenação ===================== */
+/* argsort: permutação de índices que ordena a série (lexicográfico por bytes);
+   o caller é dono do array (free). sort: nova série ordenada (= argsort+take).
+   Política: RECUSAM séries com qualquer NULL (retornam NULL) — ordenar com
+   ausência é indefinido; use dropna antes. String vazia "" ordena normalmente.
+   ascending=true ordem crescente; false decrescente. NULL em falha de alocação. */
+size_t*             smaug_str_argsort(const smaug_series_str_t *s, bool ascending);
+smaug_series_str_t* smaug_str_sort   (const smaug_series_str_t *s, bool ascending);
+
 /* NOTA: comparações (eq/lt/gt) — ESTA peça. sort/argsort, take/filter e a
    evolução para dictionary encoding (via tipo `categorical`, Tier 2) são fases
    posteriores — ver Roadmap. */

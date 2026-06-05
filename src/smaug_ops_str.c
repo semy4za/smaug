@@ -160,3 +160,62 @@ smaug_series_str_t *smaug_str_take(const smaug_series_str_t *s,
     }
     return r;
 }
+
+/* ===================================================================
+   Ordenação: argsort (permutação de índices) e sort (nova série ordenada)
+   Política (coerente com os numéricos): RECUSA séries com qualquer NULL —
+   ordenar com ausência é indefinido (use dropna antes). Retorna NULL nesse
+   caso. String vazia "" é valor válido e ordena normalmente (vem primeiro).
+   Ordem lexicográfica por bytes (reusa str_cmp_at). sort = argsort + take.
+   =================================================================== */
+
+/* Contexto para a comparação do qsort (que não recebe argumento de usuário).
+   Single-thread: o projeto não usa threads. Documentado como limitação. */
+static const smaug_series_str_t *g_sort_series = NULL;
+static bool g_sort_ascending = true;
+
+static int sort_cmp(const void *pa, const void *pb) {
+    size_t ia = *(const size_t *)pa;
+    size_t ib = *(const size_t *)pb;
+    const smaug_series_str_t *s = g_sort_series;
+
+    size_t sa = s->offsets[ia], la = s->offsets[ia + 1] - sa;
+    size_t sb = s->offsets[ib], lb = s->offsets[ib + 1] - sb;
+    size_t min = la < lb ? la : lb;
+    int c = (min > 0) ? memcmp(s->buffer + sa, s->buffer + sb, min) : 0;
+    if (c == 0) {                       /* prefixo igual: mais curta antes */
+        c = (la < lb) ? -1 : (la > lb) ? 1 : 0;
+    }
+    /* desempate estável por índice (qsort não é estável; isto torna
+       determinístico para elementos iguais) */
+    if (c == 0) c = (ia < ib) ? -1 : (ia > ib) ? 1 : 0;
+    return g_sort_ascending ? c : -c;
+}
+
+size_t *smaug_str_argsort(const smaug_series_str_t *s, bool ascending) {
+    if (!s) return NULL;
+
+    /* recusa se houver qualquer NULL (coerente com os numéricos) */
+    for (size_t i = 0; i < s->size; i++)
+        if (s->null_mask[i] == 0x00) return NULL;
+
+    size_t *idx = malloc((s->size ? s->size : 1) * sizeof(size_t));
+    if (!idx) return NULL;
+    for (size_t i = 0; i < s->size; i++) idx[i] = i;
+
+    g_sort_series    = s;
+    g_sort_ascending = ascending;
+    qsort(idx, s->size, sizeof(size_t), sort_cmp);
+    g_sort_series    = NULL;            /* limpa o contexto global */
+
+    return idx;
+}
+
+smaug_series_str_t *smaug_str_sort(const smaug_series_str_t *s, bool ascending) {
+    if (!s) return NULL;
+    size_t *idx = smaug_str_argsort(s, ascending);
+    if (!idx) return NULL;              /* NULL presente, ou OOM */
+    smaug_series_str_t *r = smaug_str_take(s, idx, s->size);
+    free(idx);
+    return r;
+}

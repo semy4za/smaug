@@ -284,6 +284,51 @@ int main(void) {
         smaug_str_free(s);
     }
 
+    /* ---- Ordenação: sort e argsort ---- */
+    {
+        const char *arr[] = {"MG", "AC", "SP", "BA", "AC"};
+        smaug_series_str_t *s = smaug_str_create_from_array(arr, 5);
+
+        /* sort ascendente */
+        smaug_series_str_t *asc = smaug_str_sort(s, true);
+        OK(asc && asc->size == 5, "sort asc conta");
+        OK(STR_EQ(asc,0,"AC") && STR_EQ(asc,1,"AC") && STR_EQ(asc,2,"BA")
+           && STR_EQ(asc,3,"MG") && STR_EQ(asc,4,"SP"), "sort asc ordem");
+        smaug_str_free(asc);
+
+        /* sort descendente */
+        smaug_series_str_t *desc = smaug_str_sort(s, false);
+        OK(STR_EQ(desc,0,"SP") && STR_EQ(desc,4,"AC"), "sort desc ordem");
+        smaug_str_free(desc);
+
+        /* argsort: permutação estável (os dois AC em ordem original: 1 antes de 4) */
+        size_t *ix = smaug_str_argsort(s, true);
+        OK(ix && ix[0]==1 && ix[1]==4 && ix[2]==3 && ix[3]==0 && ix[4]==2,
+           "argsort permutacao estavel");
+        free(ix);
+
+        smaug_str_free(s);
+    }
+
+    /* sort com vazia (vem primeiro) */
+    {
+        const char *arr[] = {"b", "", "a"};
+        smaug_series_str_t *s = smaug_str_create_from_array(arr, 3);
+        smaug_series_str_t *r = smaug_str_sort(s, true);
+        { size_t l; smaug_str_get(r,0,&l); OK(l==0, "sort: vazia vem primeiro"); }
+        OK(STR_EQ(r,1,"a") && STR_EQ(r,2,"b"), "sort com vazia");
+        smaug_str_free(s); smaug_str_free(r);
+    }
+
+    /* sort/argsort RECUSAM NULL */
+    {
+        const char *arr[] = {"x", NULL, "a"};
+        smaug_series_str_t *s = smaug_str_create_from_array(arr, 3);
+        OK(smaug_str_sort(s, true) == NULL, "sort recusa NULL");
+        OK(smaug_str_argsort(s, true) == NULL, "argsort recusa NULL");
+        smaug_str_free(s);
+    }
+
     printf("PASS: string lifecycle (%d checks)\n", n_checks);
     return 0;
 }

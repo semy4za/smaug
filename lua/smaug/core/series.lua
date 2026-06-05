@@ -133,6 +133,9 @@ local DTYPES = {
         -- seleção: filter (por máscara) e take (por índices) -> nova série string
         filter = C.smaug_str_filter,
         take   = C.smaug_str_take,
+        -- ordenação: lexicográfica por bytes; recusa NULL (como os numéricos)
+        sort    = C.smaug_str_sort,
+        argsort = C.smaug_str_argsort,
         -- string NÃO tem ops numéricas (add/sum/sort/...) nem comparações ainda.
         -- O método genérico checa a existência do campo e recusa com erro claro.
         is_int_sentinel = function(_) return false end,
