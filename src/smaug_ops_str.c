@@ -104,13 +104,10 @@ smaug_series_str_t *smaug_str_filter(const smaug_series_str_t *s,
                                      const uint8_t *mask) {
     if (!s || !mask) return NULL;
 
-    /* passo 1: conta quantos passam e soma os bytes (dimensiona o buffer) */
-    size_t count = 0, bytes = 0;
+    /* passo 1: soma os bytes dos que passam (dimensiona o buffer) */
+    size_t bytes = 0;
     for (size_t i = 0; i < s->size; i++) {
-        if (mask[i]) {
-            count++;
-            bytes += s->offsets[i + 1] - s->offsets[i];
-        }
+        if (mask[i]) bytes += s->offsets[i + 1] - s->offsets[i];
     }
 
     smaug_series_str_t *r = smaug_str_create_with_capacity(0, bytes ? bytes : 1);
