@@ -293,6 +293,131 @@ static void af_i64_sort(void) {
 }
 
 /* ======================================================================
+   string — varre os pontos de alocação do lifecycle, mutação, seleção e
+   ordenação. Onde há série-base, ela é criada com reset(-1) (sem falha) e a
+   falha é injetada só na operação testada.
+   ====================================================================== */
+static void af_str_create(void) {
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_str_t *s = smaug_str_create(5);
+        if (s) { OK(s->size == 5, "str create size"); smaug_str_free(s); }
+    }
+}
+static void af_str_create_from_array(void) {
+    const char *arr[] = {"AC", "BA", "MG"};
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_str_t *s = smaug_str_create_from_array(arr, 3);
+        if (s) { OK(s->size == 3, "str from_array size"); smaug_str_free(s); }
+    }
+}
+static void af_str_clone(void) {
+    const char *arr[] = {"x", "yy", "zzz"};
+    reset(-1);
+    smaug_series_str_t *base = smaug_str_create_from_array(arr, 3);
+    assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_str_t *c = smaug_str_clone(base);
+        if (c) { OK(c->size == 3, "str clone size"); smaug_str_free(c); }
+    }
+    smaug_str_free(base);
+}
+static void af_str_set_grow(void) {
+    /* set com string MAIOR força realocação do buffer — caminho de erro crítico */
+    const char *arr[] = {"a", "b", "c"};
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_str_t *s = smaug_str_create_from_array(arr, 3);
+        assert(s);
+        reset(k);
+        int rc = smaug_str_set(s, 0, "MUITO_GRANDE", 12);  /* cresce o buffer */
+        if (rc == 0) {
+            size_t l; const char *p = smaug_str_get(s, 0, &l);
+            OK(p && l == 12, "str set grow conteudo");
+        }
+        /* rc != 0 = falha de alocação injetada (esperado); série segue íntegra */
+        smaug_str_free(s);
+    }
+}
+static void af_str_append_grow(void) {
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_str_t *s = smaug_str_create(0);
+        assert(s);
+        reset(k);
+        smaug_str_append(s, "alpha", 5);
+        smaug_str_append(s, "beta", 4);
+        smaug_str_append_null(s);
+        smaug_str_free(s);
+    }
+}
+static void af_str_compare(void) {
+    const char *arr[] = {"SP", "RJ", "MG"};
+    reset(-1);
+    smaug_series_str_t *s = smaug_str_create_from_array(arr, 3);
+    assert(s);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *m = NULL;
+        uint8_t *r = smaug_str_eq(s, "SP", 2, &m);
+        if (r) { OK(1, "str eq ok"); free(r); free(m); }
+    }
+    smaug_str_free(s);
+}
+static void af_str_filter(void) {
+    const char *arr[] = {"a", "bb", "ccc", "d"};
+    uint8_t mask[] = {1, 0, 1, 1};
+    reset(-1);
+    smaug_series_str_t *s = smaug_str_create_from_array(arr, 4);
+    assert(s);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_str_t *f = smaug_str_filter(s, mask);
+        if (f) { OK(f->size == 3, "str filter size"); smaug_str_free(f); }
+    }
+    smaug_str_free(s);
+}
+static void af_str_take(void) {
+    const char *arr[] = {"a", "bb", "ccc"};
+    size_t idx[] = {2, 0, 1};
+    reset(-1);
+    smaug_series_str_t *s = smaug_str_create_from_array(arr, 3);
+    assert(s);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_str_t *t = smaug_str_take(s, idx, 3);
+        if (t) { OK(t->size == 3, "str take size"); smaug_str_free(t); }
+    }
+    smaug_str_free(s);
+}
+static void af_str_argsort(void) {
+    const char *arr[] = {"MG", "AC", "SP"};
+    reset(-1);
+    smaug_series_str_t *s = smaug_str_create_from_array(arr, 3);
+    assert(s);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        size_t *ix = smaug_str_argsort(s, true);
+        if (ix) { OK(1, "str argsort ok"); free(ix); }
+    }
+    smaug_str_free(s);
+}
+static void af_str_sort(void) {
+    const char *arr[] = {"MG", "AC", "SP"};
+    reset(-1);
+    smaug_series_str_t *s = smaug_str_create_from_array(arr, 3);
+    assert(s);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_str_t *r = smaug_str_sort(s, true);
+        if (r) { OK(r->size == 3, "str sort size"); smaug_str_free(r); }
+    }
+    smaug_str_free(s);
+}
+
+/* ======================================================================
    sanidade: sem falha injetada, tudo funciona (garante que o teste não
    está sabotando além da conta)
    ====================================================================== */
@@ -325,6 +450,17 @@ int main(void) {
     af_i64_compare();
     af_i64_argsort();
     af_i64_sort();
+
+    af_str_create();
+    af_str_create_from_array();
+    af_str_clone();
+    af_str_set_grow();
+    af_str_append_grow();
+    af_str_compare();
+    af_str_filter();
+    af_str_take();
+    af_str_argsort();
+    af_str_sort();
 
     sanity_no_fail();
 

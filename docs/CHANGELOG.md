@@ -4,6 +4,17 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Endurecimento — allocfail estendido para string (dívida paga)
+- **`test_allocfail` agora cobre os caminhos de erro (OOM) da string.** Antes
+  varria apenas f64/i64/core; a string (lifecycle, `set` com realocação de
+  buffer, `append`, `filter`, `take`, `sort`/`argsort`) não tinha teste de falha
+  de alocação — era código de gerência de memória sem cobertura de erro. Agora
+  10 helpers `af_str_*` varrem cada ponto de alocação (215 -> 291 verificações).
+  Valgrind-clean: nenhum caminho de falha vaza ou corrompe, incluindo o `set`
+  que desloca o buffer e realoca. Era a dívida crítica registrada.
+- Cobertura: branch total 69.32% -> 71.20%; `smaug_str.c` 77.14% e
+  `smaug_ops_str.c` 83.64% de branch (caminhos de erro agora exercitados).
+
 ### Adicionado (Fase string — ordenação: sort/argsort) — FASE STRING COMPLETA
 - **`smaug_str_argsort`** (permutação de índices, lexicográfica por bytes, via
   `qsort` com desempate estável por índice) e **`smaug_str_sort`** (= argsort +

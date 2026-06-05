@@ -5,9 +5,9 @@
 0a4532c02e2726cdc7b695ed25afee8b9320ca0a3d772a61f285fd4c4e68de7c     148  ./docs/API_INDEX.md
 0f36df40dd144fdc6ea735fc3febe5522af9798dc71e4aa58b96d0e981833b8d     346  ./docs/API_Reference.md
 3cbdf245e27417235912f24d67bed698979ba826a92a5b3c478ea2e6989eb079     432  ./docs/Build_and_Testing.md
-998b6e9afffd7b1df086158844c8cae39891e80f849c20347035b89b06b822d6     494  ./docs/CHANGELOG.md
+fde934cd95ee197002bf05e214d8c4a7c289ffa43cc76e356f58555fdb2b897d     505  ./docs/CHANGELOG.md
 782c0cd5e77586591368cbff4faf8ee584c6e2a2bd23c3990500b92e8e6b765c      92  ./docs/CODE_REVIEW.md
-77eef40040c3098ccedaa8f5a26c1b622f88d3ae1c7c3cbe3e828bcc078e00a6      36  ./docs/COVERAGE.md
+32535afc507a42165d3b4d71771701eb1bbe837615517fdaac10b806cc705e46      36  ./docs/COVERAGE.md
 29e30dd42a134830024e793b106c23198d13ddc122cf0d2b899e049e2272c45e     149  ./docs/README.md
 31e19dfce3f5cb79131b2438ffa8ce252f739c3104a6bafdbcaa62a7759ec1db     237  ./docs/Roadmap.md
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
@@ -35,7 +35,7 @@ c2654288985151bb30a29195e3cfdded0daf657bf372ceac4738040b2911c44d     445  ./src/
 8289fa82c78aef26734c1323fbc51072f59f1d54e14cfbbfc56cdbb21d3db554     221  ./src/smaug_ops_str.c
 e02bffe52eab607594a9b07297c6316f9eef9b61a8e4955485caa19412d8e051     329  ./src/smaug_str.c
 427253b1234873224e0053bec67a3d894c74278bd8b5579b6440ec6234de3678     209  ./tests/test_alloc.c
-855de5b73f29f1e682659ffeb8f384ef8da201192867a1b2d0e201e6a1e6ee59     333  ./tests/test_allocfail.c
+825aafae82c837196f63739d100b44b34250c1704ea1c799b51f4363dad8355a     469  ./tests/test_allocfail.c
 c3a4e968b31bf94327b9b87be8e912861bbc0cb54563bf02a5aeb6583eff2c93      80  ./tests/test_bool.c
 0e6f8b602e9dd802dd0cec139a37220e570bb0bb444b47cc9c27f8c37df1d7b3     105  ./tests/test_dataset.lua
 ad131f2ede73174853f770f75d1a81a584655e6e2a06fb3f03f575436983b8c7     162  ./tests/test_edge.lua
