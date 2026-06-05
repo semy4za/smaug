@@ -244,6 +244,46 @@ int main(void) {
         smaug_str_free(s);
     }
 
+    /* ---- Seleção: filter e take ---- */
+    {
+        const char *arr[] = {"SP", "RJ", NULL, "MG", "SP"};
+        smaug_series_str_t *s = smaug_str_create_from_array(arr, 5);
+
+        /* filter por máscara {1,0,0,0,1} -> SP SP */
+        uint8_t m1[] = {1,0,0,0,1};
+        smaug_series_str_t *f = smaug_str_filter(s, m1);
+        OK(f && f->size == 2, "filter conta certo");
+        OK(STR_EQ(f, 0, "SP") && STR_EQ(f, 1, "SP"), "filter valores");
+        smaug_str_free(f);
+
+        /* filter incluindo NULL {0,0,1,1,0} -> [NULL] MG */
+        uint8_t m2[] = {0,0,1,1,0};
+        f = smaug_str_filter(s, m2);
+        OK(f->size == 2 && smaug_str_is_null(f, 0) && STR_EQ(f, 1, "MG"),
+           "filter preserva NULL");
+        smaug_str_free(f);
+
+        /* filter vazio */
+        uint8_t mz[] = {0,0,0,0,0};
+        f = smaug_str_filter(s, mz);
+        OK(f && f->size == 0, "filter vazio = serie vazia");
+        smaug_str_free(f);
+
+        /* take reordenado {3,0,2} -> MG SP NULL */
+        size_t idx[] = {3,0,2};
+        smaug_series_str_t *t = smaug_str_take(s, idx, 3);
+        OK(t && t->size == 3, "take conta certo");
+        OK(STR_EQ(t, 0, "MG") && STR_EQ(t, 1, "SP") && smaug_str_is_null(t, 2),
+           "take reordena e preserva NULL");
+        smaug_str_free(t);
+
+        /* take fora dos limites -> NULL */
+        size_t bad[] = {99};
+        OK(smaug_str_take(s, bad, 1) == NULL, "take fora-limites = NULL");
+
+        smaug_str_free(s);
+    }
+
     printf("PASS: string lifecycle (%d checks)\n", n_checks);
     return 0;
 }

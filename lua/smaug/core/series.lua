@@ -130,6 +130,9 @@ local DTYPES = {
         cmp_eq = function(c, t, om) if type(t)~="string" then error("smaug: comparação de string espera string",4) end return C.smaug_str_eq(c,t,#t,om) end,
         cmp_lt = function(c, t, om) if type(t)~="string" then error("smaug: comparação de string espera string",4) end return C.smaug_str_lt(c,t,#t,om) end,
         cmp_gt = function(c, t, om) if type(t)~="string" then error("smaug: comparação de string espera string",4) end return C.smaug_str_gt(c,t,#t,om) end,
+        -- seleção: filter (por máscara) e take (por índices) -> nova série string
+        filter = C.smaug_str_filter,
+        take   = C.smaug_str_take,
         -- string NÃO tem ops numéricas (add/sum/sort/...) nem comparações ainda.
         -- O método genérico checa a existência do campo e recusa com erro claro.
         is_int_sentinel = function(_) return false end,

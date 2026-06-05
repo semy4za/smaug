@@ -78,6 +78,15 @@ uint8_t* smaug_str_eq(const smaug_series_str_t *s, const char *target, size_t ta
 uint8_t* smaug_str_lt(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
 uint8_t* smaug_str_gt(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
 
+/* ===================== Seleção ===================== */
+/* filter: nova série com os elementos onde mask[i] != 0 (mask tem s->size
+   entradas; tipicamente vinda de uma comparação). NULL é preservado.
+   take: nova série com os elementos nos índices idx[0..len) (na ordem dada);
+   índice fora dos limites -> NULL. Ambos retornam NULL em falha de alocação.
+   O caller é dono da série retornada (smaug_str_free). */
+smaug_series_str_t* smaug_str_filter(const smaug_series_str_t *s, const uint8_t *mask);
+smaug_series_str_t* smaug_str_take  (const smaug_series_str_t *s, const size_t *idx, size_t len);
+
 /* NOTA: comparações (eq/lt/gt) — ESTA peça. sort/argsort, take/filter e a
    evolução para dictionary encoding (via tipo `categorical`, Tier 2) são fases
    posteriores — ver Roadmap. */

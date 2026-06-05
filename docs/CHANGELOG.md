@@ -4,6 +4,24 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Adicionado (Fase string — seleção: filter e take)
+- **`smaug_str_filter`** (nova série com os elementos onde a máscara é 1) e
+  **`smaug_str_take`** (nova série com os elementos nos índices dados, na ordem
+  pedida) em `src/smaug_ops_str.c`. Ambos preservam NULL e reusam
+  `append`/`append_null` por baixo (que já gerenciam buffer/offsets de tamanho
+  variável, Valgrind-clean) em vez de mexer em offsets na mão. `take` com índice
+  fora dos limites retorna NULL. Valgrind-clean.
+- **Frontend Lua:** `series:filter(bool)` e `series:take({i,...})` para dtype
+  string (e `head`/`slice` ganham string de graça, pois usam take). Destrava o
+  caso de uso central: **filtrar um DataSet por coluna de texto** —
+  `df:col("pop"):filter(df:col("uf"):eq("SP"))`.
+- Testes: `test_string.c` 72 -> 79; `test_string.lua` 46 -> 53 (inclui filtro de
+  DataSet por coluna de texto). Cobertura: total 93.25% -> 93.48%.
+
+### Próximo (fecha a fase string)
+- `sort`/`argsort` para string (ordem alfabética, usa lt/gt). Depois disso, a
+  string é um dtype de primeira classe — e o próximo marco é CSV/JSON (I/O).
+
 ### Adicionado (Fase string — comparações eq/lt/gt)
 - **`src/smaug_ops_str.c`** (arquivo de ops da string, antes reservado vazio na
   refatoração — agora ganha conteúdo): `smaug_str_eq/lt/gt` comparam cada

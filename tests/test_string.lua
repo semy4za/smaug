@@ -150,4 +150,38 @@ do
     check(rejects(function() return n:eq("x") end), "int64:eq(string) recusa")
 end
 
+-- ===================================================================
+-- Seleção: filter (por máscara de comparação) e take (por índices)
+-- ===================================================================
+do
+    local s = S.from_table({"SP", "RJ", smaug.NA, "MG", "SP"}, "string")
+
+    -- o caso de uso principal: filter(eq)
+    local f = s:filter(s:eq("SP"))
+    check(f:len() == 2, "filter(eq SP) conta")
+    check(f:get(1) == "SP" and f:get(2) == "SP", "filter(eq SP) valores")
+
+    -- filter por lt (NULL nao passa)
+    local f2 = s:filter(s:lt("RJ"))
+    check(f2:len() == 1 and f2:get(1) == "MG", "filter(lt RJ) = MG")
+
+    -- take reordenado, preserva NULL
+    local t = s:take({4, 1, 3})
+    check(t:len() == 3, "take conta")
+    check(t:get(1) == "MG" and t:get(2) == "SP" and t:get(3) == nil,
+          "take reordena e preserva NULL")
+
+    -- take fora dos limites recusa
+    check(rejects(function() return s:take({99}) end), "take fora-limites recusa")
+
+    -- DataSet: filtrar linhas por coluna de texto, aplicar noutra coluna
+    local df = smaug.DataSet.from_columns({
+        {"uf",  {"SP", "RJ", "SP"}, "string"},
+        {"pop", {44, 17, 11},       "int64"},
+    })
+    local pop_sp = df:col("pop"):filter(df:col("uf"):eq("SP"))
+    check(pop_sp:len() == 2 and pop_sp:get(1) == 44 and pop_sp:get(2) == 11,
+          "filtrar dataset por coluna de texto")
+end
+
 print(string.format("OK — %d checks passaram (string frontend)", n_ok))

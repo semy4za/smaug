@@ -90,3 +90,76 @@ uint8_t *smaug_str_gt(const smaug_series_str_t *s, const char *target,
                       size_t target_len, smaug_mask_t **out_mask) {
     return str_compare(s, target, target_len, out_mask, 1);
 }
+
+/* ===================================================================
+   Seleção: filter (por máscara booleana) e take (por índices)
+   Ambos retornam uma NOVA série (cópia). Reusam append/append_null, que já
+   gerenciam buffer/offsets de tamanho variável (Valgrind-clean) — evita mexer
+   em offsets na mão aqui. NULL é preservado (append_null). NULL no resultado
+   mantém a semântica: o elemento seguia NULL na origem.
+   =================================================================== */
+
+/* filter: mantém os elementos onde mask[i] != 0. mask tem s->size entradas. */
+smaug_series_str_t *smaug_str_filter(const smaug_series_str_t *s,
+                                     const uint8_t *mask) {
+    if (!s || !mask) return NULL;
+
+    /* passo 1: conta quantos passam e soma os bytes (dimensiona o buffer) */
+    size_t count = 0, bytes = 0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (mask[i]) {
+            count++;
+            bytes += s->offsets[i + 1] - s->offsets[i];
+        }
+    }
+
+    smaug_series_str_t *r = smaug_str_create_with_capacity(0, bytes ? bytes : 1);
+    if (!r) return NULL;
+
+    /* passo 2: copia cada elemento que passa, preservando NULL */
+    for (size_t i = 0; i < s->size; i++) {
+        if (!mask[i]) continue;
+        int rc;
+        if (s->null_mask[i] == 0x00) {
+            rc = smaug_str_append_null(r);
+        } else {
+            size_t start = s->offsets[i];
+            size_t len   = s->offsets[i + 1] - start;
+            rc = smaug_str_append(r, s->buffer + start, len);
+        }
+        if (rc != 0) { smaug_str_free(r); return NULL; }   /* OOM */
+    }
+    return r;
+}
+
+/* take: nova série com os elementos nos índices idx[0..len). Índice fora dos
+   limites -> retorna NULL (erro). */
+smaug_series_str_t *smaug_str_take(const smaug_series_str_t *s,
+                                   const size_t *idx, size_t len) {
+    if (!s || (!idx && len > 0)) return NULL;
+
+    /* passo 1: valida índices e soma bytes */
+    size_t bytes = 0;
+    for (size_t k = 0; k < len; k++) {
+        if (idx[k] >= s->size) return NULL;                /* fora dos limites */
+        bytes += s->offsets[idx[k] + 1] - s->offsets[idx[k]];
+    }
+
+    smaug_series_str_t *r = smaug_str_create_with_capacity(0, bytes ? bytes : 1);
+    if (!r) return NULL;
+
+    /* passo 2: copia na ordem dos índices, preservando NULL */
+    for (size_t k = 0; k < len; k++) {
+        size_t i = idx[k];
+        int rc;
+        if (s->null_mask[i] == 0x00) {
+            rc = smaug_str_append_null(r);
+        } else {
+            size_t start = s->offsets[i];
+            size_t l     = s->offsets[i + 1] - start;
+            rc = smaug_str_append(r, s->buffer + start, l);
+        }
+        if (rc != 0) { smaug_str_free(r); return NULL; }
+    }
+    return r;
+}
