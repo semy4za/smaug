@@ -159,4 +159,37 @@ do
     check(s:filter(b):len() == 1, "cmp-misto: filter descarta NA e false")
 end
 
+-- ===================================================================
+-- dropna: remove NULLs (qualquer dtype); habilita sort em série com nulos
+-- ===================================================================
+do
+    -- f64 com NULL intercalado
+    local a = S.from_table({1, smaug.NA, 3, smaug.NA, 5}, "float64")
+    local c = a:dropna()
+    check(c:len() == 3, "dropna: remove os NULLs (5->3)")
+    check(c:get(1) == 1 and c:get(2) == 3 and c:get(3) == 5, "dropna: mantem ordem dos validos")
+
+    -- a mensagem "use dropna primeiro" agora e verdadeira: dropna+sort funciona
+    local x = S.from_table({3, smaug.NA, 1, 2}, "int64")
+    local sorted = x:dropna():sort()
+    check(sorted:len() == 3 and sorted:get(1) == 1 and sorted:get(3) == 3,
+          "dropna habilita sort em serie com nulos")
+
+    -- string tambem
+    local s = S.from_table({"SP", smaug.NA, "MG"}, "string")
+    check(s:dropna():len() == 2, "dropna string")
+
+    -- tudo NULL -> serie vazia (sem erro)
+    local z = S.from_table({smaug.NA, smaug.NA}, "float64")
+    check(z:dropna():len() == 0, "dropna tudo-NULL = serie vazia")
+
+    -- sem NULL -> copia de mesmo tamanho
+    local f = S.from_table({1, 2, 3}, "float64")
+    check(f:dropna():len() == 3, "dropna sem NULL = copia igual")
+
+    -- string vazia "" NAO e NULL: dropna a mantem
+    local sv = S.from_table({"", smaug.NA, "a"}, "string")
+    check(sv:dropna():len() == 2, "dropna: '' nao e NULL, e mantida")
+end
+
 print(string.format("OK — %d checks passaram (casos degenerados)", n_ok))

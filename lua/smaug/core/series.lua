@@ -392,6 +392,21 @@ function methods.take(self, idx)
     return wrap(r, self._dtype, self._name)
 end
 
+-- dropna: nova série (cópia) sem os elementos NULL. Funciona para qualquer
+-- dtype (reusa take com os índices não-nulos). Útil antes de sort/argsort,
+-- que recusam séries com NULL — daí as mensagens "use dropna primeiro".
+function methods.dropna(self)
+    local n = self:len()
+    local idx = {}
+    local j = 0
+    for i = 1, n do
+        if not self:is_null(i) then j = j + 1; idx[j] = i end
+    end
+    -- take com lista vazia daria série vazia, que é o resultado correto se
+    -- tudo for NULL; take já lida com isso.
+    return self:take(idx)
+end
+
 -- head/tail: nova série (cópia) com as primeiras / últimas n linhas.
 function methods.head(self, n)
     n = math.min(n or 5, self:len())

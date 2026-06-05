@@ -3,8 +3,8 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh`
 > (`make coverage`). Nao editar a mao -- e regenerado a cada medicao.
 
-- Commit medido: `be12929`
-- Data do commit: 2026-06-05 01:22:01 -0300
+- Commit medido: `5795fb6`
+- Data do commit: 2026-06-05 01:29:51 -0300
 - Linha: metrica basica.  **Branch** ("taken at least once"): metrica
   rigorosa, padrao SQLite/avionica -- e a que perseguimos rumo a 100%.
 - **Mede TODOS os testes do projeto**: testes C diretos, testes Lua (via

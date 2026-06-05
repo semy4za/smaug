@@ -4,6 +4,19 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Adicionado — `Series:dropna()` (fecha a promessa "use dropna primeiro")
+- **`series:dropna()`** retorna nova série sem os elementos NULL, para qualquer
+  dtype (reusa `take` com os índices não-nulos — zero código C novo). Fecha uma
+  inconsistência: sort/argsort recusam séries com NULL com a mensagem "use
+  dropna primeiro", mas `dropna` não existia. Agora `s:dropna():sort()` funciona.
+  String vazia `""` não é NULL e é mantida; série toda-NULL vira série vazia.
+- Testes em `test_edge.lua` (59 -> 66): f64/i64/string, dropna+sort, tudo-NULL,
+  sem-NULL, e `""` preservada.
+- **Dívida registrada:** `DataSet:dropna()` (remover linhas com NULL, com possível
+  `subset` de colunas como o pandas) é peça própria — o `sort_by` do DataSet
+  ainda menciona "use dropna primeiro" e essa promessa fica pendente no nível
+  DataSet.
+
 ### Endurecimento — cobertura de branch dos numéricos (+6 pontos)
 - **`tests/test_ops_edge.c`** (novo, 65 checks): cobre os ramos defensivos e de
   valores especiais de `smaug_ops_f64.c`/`smaug_ops_i64.c` que o frontend não
