@@ -206,7 +206,7 @@ todos dependendo da mesma fundação. Por isso cada fraqueza no núcleo se
 multiplica, o que justifica o rigor de teste antes de crescer.
 
 O ecossistema (todos `[Concept]`, sem compromisso):
-- **Visualização** (Matplotlib/UI propria 'Smaug|Vialactea Studio' (c++ futuro)): renderiza a partir de dados do Smaug. Implicação
+- **Visualização** (Matplotlib/UI propria 'Smaug|Vialactea Studio' (c++ futuro distante)): renderiza a partir de dados do Smaug. Implicação
   presente: a interface de exportação (`to_table` e afins) é API pública —
   mantê-la limpa e estável.
 - **Machine Learning**: exige uma matriz numérica densa 2-D homogênea, tipo novo
