@@ -274,15 +274,20 @@ int smaug_str_set(smaug_series_str_t *s, size_t idx, const char *str, size_t len
     return 0;
 }
 
-void smaug_str_set_null(smaug_series_str_t *s, size_t idx) {
-    if (!s || idx >= s->size) return;
+smaug_status_t smaug_str_set_null(smaug_series_str_t *s, size_t idx) {
+    if (!s)            return SMG_ERR_ARGUMENT;
+    if (idx >= s->size) return SMG_ERR_OOB;
     /* Marca como NULL. Por convenção, um elemento NULL tem comprimento zero:
        removemos seus bytes do buffer (fecha o buraco) para manter o invariante
        de que o comprimento de i é offsets[i+1]-offsets[i]. Reusar a lógica do
        set com len 0 faz exatamente isso (grava "" e fecha o buraco), e depois
-       marcamos o mask como NULL. */
-    smaug_str_set(s, idx, "", 0);   /* encolhe para comprimento zero */
+       marcamos o mask como NULL.
+       set("",0) sobre idx já validado não cresce o buffer (encolhe ou no-op),
+       logo não aloca; mas propagamos o status em vez de descartá-lo (o str_set
+       legado devolve -1 só em !s/idx inválido/OOM, todos impossíveis aqui). */
+    if (smaug_str_set(s, idx, "", 0) != 0) return SMG_ERR_ARGUMENT;
     s->null_mask[idx] = 0x00;       /* e marca NULL (set deixou 0xFF) */
+    return SMG_OK;
 }
 
 int smaug_str_append(smaug_series_str_t *s, const char *str, size_t len) {

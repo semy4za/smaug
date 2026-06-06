@@ -278,6 +278,46 @@ static void i64_scalar_compare_sort_edge(void) {
     smaug_i64_free(a);
 }
 
+/* ======================================================================
+   Contrato defensivo: set/set_null comunicam sucesso/falha via smaug_status_t
+   (SMG_OK / SMG_ERR_OOB / SMG_ERR_ARGUMENT). Prova que a falha deixou de ser
+   silenciosa — o caller distingue escrita aplicada de escrita rejeitada — e que
+   em erro NENHUMA escrita ocorre.
+   ====================================================================== */
+static void mutation_status_contract(void) {
+    /* --- f64 --- */
+    smaug_series_f64_t *f = smaug_f64_create(2);
+    OK(smaug_f64_set(f, 0, 1.5)    == SMG_OK,           "f64_set idx valido -> OK");
+    OK(smaug_f64_set_null(f, 1)    == SMG_OK,           "f64_set_null idx valido -> OK");
+    OK(smaug_f64_set(f, 9, 1.0)    == SMG_ERR_OOB,      "f64_set OOB");
+    OK(smaug_f64_set_null(f, 9)    == SMG_ERR_OOB,      "f64_set_null OOB");
+    OK(smaug_f64_set(NULL, 0, 1.0) == SMG_ERR_ARGUMENT, "f64_set serie NULL -> ARGUMENT");
+    OK(smaug_f64_set_null(NULL, 0) == SMG_ERR_ARGUMENT, "f64_set_null serie NULL -> ARGUMENT");
+    OK(smaug_f64_get(f, 0) == 1.5, "f64 erro nao corrompeu idx 0");
+    OK(smaug_f64_is_null(f, 1),    "f64 idx 1 segue NULL");
+    smaug_f64_free(f);
+
+    /* --- i64 --- */
+    smaug_series_i64_t *n = smaug_i64_create(2);
+    OK(smaug_i64_set(n, 0, 42)     == SMG_OK,           "i64_set idx valido -> OK");
+    OK(smaug_i64_set_null(n, 1)    == SMG_OK,           "i64_set_null idx valido -> OK");
+    OK(smaug_i64_set(n, 9, 1)      == SMG_ERR_OOB,      "i64_set OOB");
+    OK(smaug_i64_set_null(n, 9)    == SMG_ERR_OOB,      "i64_set_null OOB");
+    OK(smaug_i64_set(NULL, 0, 1)   == SMG_ERR_ARGUMENT, "i64_set serie NULL -> ARGUMENT");
+    OK(smaug_i64_set_null(NULL, 0) == SMG_ERR_ARGUMENT, "i64_set_null serie NULL -> ARGUMENT");
+    OK(smaug_i64_get(n, 0) == 42,  "i64 erro nao corrompeu idx 0");
+    smaug_i64_free(n);
+
+    /* --- str_set_null (entrou no contrato; antes era void) --- */
+    smaug_series_str_t *s = smaug_str_create(2);
+    OK(smaug_str_set(s, 0, "ab", 2) == 0,                "str_set idx valido (legado 0=ok)");
+    OK(smaug_str_set_null(s, 1)     == SMG_OK,           "str_set_null idx valido -> OK");
+    OK(smaug_str_set_null(s, 9)     == SMG_ERR_OOB,      "str_set_null OOB");
+    OK(smaug_str_set_null(NULL, 0)  == SMG_ERR_ARGUMENT, "str_set_null serie NULL -> ARGUMENT");
+    OK(smaug_str_is_null(s, 1),     "str_set_null marcou NULL idx 1");
+    smaug_str_free(s);
+}
+
 int main(void) {
     f64_reduce_na_false();
     f64_reduce_empty();
@@ -294,6 +334,8 @@ int main(void) {
     i64_binop_guards();
     i64_div_zero();
     i64_scalar_compare_sort_edge();
+
+    mutation_status_contract();
 
     printf("PASS: ops edge (%ld checks)\n", n_checks);
     return 0;

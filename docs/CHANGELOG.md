@@ -4,6 +4,32 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Contrato defensivo do C — peça 1/N: mutações comunicam status `[In progress]`
+- **Princípio adotado:** *o engine não confia no caller*. Toda fronteira pública
+  valida (ponteiro/argumento/índice) e **comunica** o resultado; nunca falha em
+  silêncio. Substitui a antiga nota "o caller garante a validade" em
+  `smaug_core.h` (que dizia o oposto).
+- **Novo `smaug_status_t`** (`smaug_types.h`): `SMG_OK (0)` / `SMG_NULL_VALUE` /
+  `SMG_ERR_OOB` / `SMG_ERR_ARGUMENT`. Também declarado no cdef do FFI.
+- **5 mutações migradas `void → smaug_status_t`:** `f64_set`, `f64_set_null`,
+  `i64_set`, `i64_set_null` e `str_set_null` (este último era `void` e ainda
+  *descartava* o retorno do `str_set` que chama por dentro — agora propaga).
+  Validação separada para distinguir OOB de ARGUMENT; em erro, nenhuma escrita.
+- **Frontend (`series.lua`):** `set`/`set_null` checam o status via `checkrc` —
+  como o frontend já valida antes, status ≠ `SMG_OK` aqui é invariante interno
+  violado (ou cdef dessincronizado) e falha alto, em vez de passar batido.
+- **Testes:** `test_ops_edge.c` 65 → 85 checks (contrato de `set`/`set_null`/
+  `str_set_null`: OK em índice válido, OOB, ARGUMENT, e "erro não corrompe").
+  C + Lua (222k checks) verdes, build sem warnings, Valgrind-clean, allocfail OK.
+- **Pendente nesta frente:** migração do `get` (Shape 1: valor + `smaug_status_t*`
+  anulável) elimina a colisão índice-inválido vs NaN — próxima peça. `get`
+  segue com sentinela até lá.
+- **Decisão registrada (próxima peça grande):** views adotam **Copy-on-Write**
+  (compartilham até a 1ª escrita, então materializam buffer privado; preserva o
+  original — alinhado ao pandas 3.0). Não toca o `set` in-place desta peça;
+  entra como materialização explícita + flip do `assert_mutable`. Vai exigir
+  `SMG_ERR_NOMEM` no enum (materializar pode falhar alocação).
+
 ### Adicionado — `Series:dropna()` (fecha a promessa "use dropna primeiro")
 - **`series:dropna()`** retorna nova série sem os elementos NULL, para qualquer
   dtype (reusa `take` com os índices não-nulos — zero código C novo). Fecha uma

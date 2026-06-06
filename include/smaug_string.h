@@ -56,7 +56,7 @@ const char* smaug_str_get(const smaug_series_str_t *s, size_t idx, size_t *out_l
    sucesso, -1 em erro (idx inválido, OOM). */
 int  smaug_str_set(smaug_series_str_t *s, size_t idx, const char *str, size_t len);
 
-void smaug_str_set_null(smaug_series_str_t *s, size_t idx);
+smaug_status_t smaug_str_set_null(smaug_series_str_t *s, size_t idx);
 bool smaug_str_is_null(const smaug_series_str_t *s, size_t idx);
 
 /* Acrescenta uma string ao final (cresce a série). 0 = ok, -1 = erro. */

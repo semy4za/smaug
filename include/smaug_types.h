@@ -15,6 +15,16 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+/* Códigos de status do contrato defensivo das funções de fronteira.
+   Princípio: o engine valida e COMUNICA — nunca confia que o caller validou.
+   SMG_OK == 0 por convenção (testável como `if (!status)`). */
+typedef enum {
+    SMG_OK = 0,        /* operação concluída com sucesso          */
+    SMG_NULL_VALUE,    /* leitura: elemento é NULL (não é erro)   */
+    SMG_ERR_OOB,       /* índice fora dos limites                 */
+    SMG_ERR_ARGUMENT   /* ponteiro nulo / argumento inconsistente */
+} smaug_status_t;
+
 /* Tipo opaque para hash table (uso futuro: GroupBy/joins) */
 typedef struct smaug_hash_table smaug_hash_table_t;
 

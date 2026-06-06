@@ -26,6 +26,14 @@ ffi.cdef([[
         bool        external_alloc;
     } smaug_metadata_t;
 
+    /* ===== Contrato defensivo: códigos de status (SMG_OK == 0) ===== */
+    typedef enum {
+        SMG_OK = 0,
+        SMG_NULL_VALUE,
+        SMG_ERR_OOB,
+        SMG_ERR_ARGUMENT
+    } smaug_status_t;
+
     /* ===================================================================
        Series Float64
        =================================================================== */
@@ -48,8 +56,8 @@ ffi.cdef([[
 
     /* --- Getters / Setters --- */
     double smaug_f64_get(smaug_series_f64_t *s, size_t idx);
-    void   smaug_f64_set(smaug_series_f64_t *s, size_t idx, double val);
-    void   smaug_f64_set_null(smaug_series_f64_t *s, size_t idx);
+    smaug_status_t smaug_f64_set(smaug_series_f64_t *s, size_t idx, double val);
+    smaug_status_t smaug_f64_set_null(smaug_series_f64_t *s, size_t idx);
     bool   smaug_f64_is_null(smaug_series_f64_t *s, size_t idx);
 
     /* --- Append dinamico --- */
@@ -112,8 +120,8 @@ ffi.cdef([[
 
     /* --- Getters / Setters --- */
     int64_t smaug_i64_get(smaug_series_i64_t *s, size_t idx);
-    void    smaug_i64_set(smaug_series_i64_t *s, size_t idx, int64_t val);
-    void    smaug_i64_set_null(smaug_series_i64_t *s, size_t idx);
+    smaug_status_t smaug_i64_set(smaug_series_i64_t *s, size_t idx, int64_t val);
+    smaug_status_t smaug_i64_set_null(smaug_series_i64_t *s, size_t idx);
     bool    smaug_i64_is_null(smaug_series_i64_t *s, size_t idx);
 
     /* --- Append dinamico --- */
@@ -202,7 +210,7 @@ ffi.cdef([[
     /* --- Acesso --- */
     const char* smaug_str_get(const smaug_series_str_t *s, size_t idx, size_t *out_len);
     int  smaug_str_set(smaug_series_str_t *s, size_t idx, const char *str, size_t len);
-    void smaug_str_set_null(smaug_series_str_t *s, size_t idx);
+    smaug_status_t smaug_str_set_null(smaug_series_str_t *s, size_t idx);
     bool smaug_str_is_null(const smaug_series_str_t *s, size_t idx);
     int  smaug_str_append(smaug_series_str_t *s, const char *str, size_t len);
     int  smaug_str_append_null(smaug_series_str_t *s);

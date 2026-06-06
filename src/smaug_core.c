@@ -168,16 +168,20 @@ double smaug_f64_get(smaug_series_f64_t *s, size_t idx) {
     return s->data[idx];
 }
 
-void smaug_f64_set(smaug_series_f64_t *s, size_t idx, double val) {
-    if (!s || idx >= s->size) return;
+smaug_status_t smaug_f64_set(smaug_series_f64_t *s, size_t idx, double val) {
+    if (!s)            return SMG_ERR_ARGUMENT;
+    if (idx >= s->size) return SMG_ERR_OOB;
     s->data[idx]      = val;
     s->null_mask[idx] = 0xFF;
+    return SMG_OK;
 }
 
-void smaug_f64_set_null(smaug_series_f64_t *s, size_t idx) {
-    if (!s || idx >= s->size) return;
+smaug_status_t smaug_f64_set_null(smaug_series_f64_t *s, size_t idx) {
+    if (!s)            return SMG_ERR_ARGUMENT;
+    if (idx >= s->size) return SMG_ERR_OOB;
     s->null_mask[idx] = 0x00;
     s->data[idx]      = 0.0;   /* limpa o dado (opcional, mas consistente) */
+    return SMG_OK;
 }
 
 bool smaug_f64_is_null(smaug_series_f64_t *s, size_t idx) {
@@ -314,16 +318,20 @@ int64_t smaug_i64_get(smaug_series_i64_t *s, size_t idx) {
     return s->data[idx];
 }
 
-void smaug_i64_set(smaug_series_i64_t *s, size_t idx, int64_t val) {
-    if (!s || idx >= s->size) return;
+smaug_status_t smaug_i64_set(smaug_series_i64_t *s, size_t idx, int64_t val) {
+    if (!s)            return SMG_ERR_ARGUMENT;
+    if (idx >= s->size) return SMG_ERR_OOB;
     s->data[idx]      = val;
     s->null_mask[idx] = 0xFF;
+    return SMG_OK;
 }
 
-void smaug_i64_set_null(smaug_series_i64_t *s, size_t idx) {
-    if (!s || idx >= s->size) return;
+smaug_status_t smaug_i64_set_null(smaug_series_i64_t *s, size_t idx) {
+    if (!s)            return SMG_ERR_ARGUMENT;
+    if (idx >= s->size) return SMG_ERR_OOB;
     s->null_mask[idx] = 0x00;
     s->data[idx]      = 0;
+    return SMG_OK;
 }
 
 bool smaug_i64_is_null(smaug_series_i64_t *s, size_t idx) {

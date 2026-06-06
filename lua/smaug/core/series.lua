@@ -208,9 +208,16 @@ local function check_value(self, v, level)
     end
 end
 
--- =====================================================================
--- Factories
--- =====================================================================
+-- Contrato defensivo: o backend devolve smaug_status_t (0 == SMG_OK; o str_set
+-- legado também usa 0 == ok). Como o frontend já validou índice/valor/mutabilidade
+-- ANTES de chamar o C, qualquer status ≠ 0 aqui é invariante do backend violado
+-- (ou dessincronização do cdef FFI) — falha-rápido e barulhento, não silencioso.
+local function checkrc(rc, what)
+    if rc ~= 0 then
+        error("smaug: backend "..what.." devolveu status "..tonumber(rc)..
+              " (esperado SMG_OK=0); invariante interno violado", 3)
+    end
+end
 function Series.new(dtype, size, name)
     if not DTYPES[dtype] then
         error("smaug: dtype desconhecido '"..tostring(dtype)..
@@ -251,10 +258,10 @@ function methods.set(self, i, v)
     assert_mutable(self)
     check_index(self, i)
     if is_na(v) then
-        self._d.set_null(self._c, i - 1)
+        checkrc(self._d.set_null(self._c, i - 1), "set_null")
     else
         check_value(self, v, 3)
-        self._d.set(self._c, i - 1, v)
+        checkrc(self._d.set(self._c, i - 1, v), "set")
     end
 end
 
@@ -266,7 +273,7 @@ end
 function methods.set_null(self, i)
     assert_mutable(self)
     check_index(self, i)
-    self._d.set_null(self._c, i - 1)
+    checkrc(self._d.set_null(self._c, i - 1), "set_null")
 end
 
 function methods.append(self, v)

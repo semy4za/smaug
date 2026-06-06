@@ -11,6 +11,12 @@ partir do código real (não de memória).
 > as duas (`smaug_f64_*` e `smaug_i64_*`). Índices em C são 0-based; no Lua,
 > 1-based.
 
+> **Contrato de status (`smaug_types.h`):** `smaug_status_t` =
+> `SMG_OK (0)` / `SMG_NULL_VALUE` / `SMG_ERR_OOB` / `SMG_ERR_ARGUMENT`.
+> Princípio: o engine valida e comunica — não confia que o caller validou. As
+> mutações (`set`/`set_null`) devolvem este código; em erro não há escrita.
+> `get` ainda usa sentinela (migração para status anulável é peça pendente).
+
 ---
 
 ## Camada C — backend (`include/*.h`, `src/*.c`)
@@ -25,8 +31,8 @@ partir do código real (não de memória).
 | `smaug_<t>_clone(s)` | cópia profunda independente |
 | `smaug_<t>_view(s, start, len)` | view zero-copy (external_alloc=true) |
 | `smaug_<t>_get(s, idx)` | lê valor (f64: NAN se nulo; i64: cheque is_null antes) |
-| `smaug_<t>_set(s, idx, val)` | grava valor |
-| `smaug_<t>_set_null(s, idx)` | marca posição como NULL |
+| `smaug_<t>_set(s, idx, val)` | grava valor → `smaug_status_t` (`SMG_OK`/`SMG_ERR_OOB`/`SMG_ERR_ARGUMENT`); em erro não escreve |
+| `smaug_<t>_set_null(s, idx)` | marca posição como NULL → `smaug_status_t` (idem) |
 | `smaug_<t>_is_null(s, idx)` | testa se posição é NULL |
 | `smaug_<t>_append(s, val)` | adiciona valor ao fim (0=ok, -1=erro) |
 | `smaug_<t>_append_null(s)` | adiciona NULL ao fim |
@@ -78,7 +84,7 @@ Trata bytes crus (UTF-8 = dívida futura). String vazia `""` é distinta de NULL
 | `smaug_str_clone(s)` | cópia profunda independente |
 | `smaug_str_get(s, idx, &out_len)` | → ponteiro p/ bytes + comprimento (NÃO terminado em \0) |
 | `smaug_str_set(s, idx, str, len)` | grava (realoca o buffer via memmove; 0=ok, -1=erro) |
-| `smaug_str_set_null(s, idx)` / `smaug_str_is_null(s, idx)` | nulos |
+| `smaug_str_set_null(s, idx)` / `smaug_str_is_null(s, idx)` | nulos (`set_null` → `smaug_status_t`) |
 | `smaug_str_append(s, str, len)` / `smaug_str_append_null(s)` | adiciona ao fim (0=ok, -1=erro) |
 | `smaug_str_count_nonnull(s)` | size_t |
 | `smaug_str_eq/lt/gt(s, target, target_len, &out_mask)` | → bool array (uint8_t*); lexicográfico por bytes; caller libera c/ `smaug_free` |
