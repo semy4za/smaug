@@ -105,7 +105,7 @@ indefinido, sem corrupção de memória, sem crashes evitáveis. Isso muda
 assinaturas das funções de fronteira (`set`/`get`/`view` etc.), afetando FFI,
 frontend e call sites — por isso é fase própria. Decisão de design a tomar quando
 a fase começar: como o C sinaliza erro (provável referência: códigos de retorno
-estilo SQLite).
+estilo RUST).
 
 ### 2. String completa — `[Done]`
 
@@ -206,7 +206,7 @@ todos dependendo da mesma fundação. Por isso cada fraqueza no núcleo se
 multiplica, o que justifica o rigor de teste antes de crescer.
 
 O ecossistema (todos `[Concept]`, sem compromisso):
-- **Visualização** (HTML/SVG): renderiza a partir de dados do Smaug. Implicação
+- **Visualização** (Matplotlib/UI propria 'Smaug|Vialactea Studio' (c++ futuro)): renderiza a partir de dados do Smaug. Implicação
   presente: a interface de exportação (`to_table` e afins) é API pública —
   mantê-la limpa e estável.
 - **Machine Learning**: exige uma matriz numérica densa 2-D homogênea, tipo novo
