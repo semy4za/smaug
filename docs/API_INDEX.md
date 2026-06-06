@@ -15,7 +15,9 @@ partir do código real (não de memória).
 > `SMG_OK (0)` / `SMG_NULL_VALUE` / `SMG_ERR_OOB` / `SMG_ERR_ARGUMENT`.
 > Princípio: o engine valida e comunica — não confia que o caller validou. As
 > mutações (`set`/`set_null`) devolvem este código; em erro não há escrita.
-> `get` ainda usa sentinela (migração para status anulável é peça pendente).
+> `get` devolve o valor + `smaug_status_t*` anulável (Shape 1), distinguindo
+> `SMG_OK` / `SMG_NULL_VALUE` / `SMG_ERR_OOB` / `SMG_ERR_ARGUMENT` — sem colisão
+> com NaN/valor; sentinela definida (NAN/0) se `status == NULL`.
 
 ---
 
@@ -30,7 +32,7 @@ partir do código real (não de memória).
 | `smaug_<t>_free(s)` | libera a série (NULL-safe; respeita external_alloc) |
 | `smaug_<t>_clone(s)` | cópia profunda independente |
 | `smaug_<t>_view(s, start, len)` | view zero-copy (external_alloc=true) |
-| `smaug_<t>_get(s, idx)` | lê valor (f64: NAN se nulo; i64: cheque is_null antes) |
+| `smaug_<t>_get(s, idx, status)` | lê valor + `smaug_status_t*` anulável (OK/NULL_VALUE/OOB/ARGUMENT); sentinela definida em erro (f64: NAN, i64: 0) |
 | `smaug_<t>_set(s, idx, val)` | grava valor → `smaug_status_t` (`SMG_OK`/`SMG_ERR_OOB`/`SMG_ERR_ARGUMENT`); em erro não escreve |
 | `smaug_<t>_set_null(s, idx)` | marca posição como NULL → `smaug_status_t` (idem) |
 | `smaug_<t>_is_null(s, idx)` | testa se posição é NULL |

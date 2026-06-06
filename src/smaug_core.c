@@ -162,9 +162,11 @@ smaug_series_f64_t *smaug_f64_view(smaug_series_f64_t *s, size_t start, size_t l
 
 /* --- Getters / Setters --- */
 
-double smaug_f64_get(smaug_series_f64_t *s, size_t idx) {
-    if (!s || idx >= s->size) return NAN;
-    if (s->null_mask[idx] != 0xFF) return NAN;
+double smaug_f64_get(const smaug_series_f64_t *s, size_t idx, smaug_status_t *status) {
+    if (!s)             { if (status) *status = SMG_ERR_ARGUMENT; return NAN; }
+    if (idx >= s->size) { if (status) *status = SMG_ERR_OOB;      return NAN; }
+    if (s->null_mask[idx] != 0xFF) { if (status) *status = SMG_NULL_VALUE; return NAN; }
+    if (status) *status = SMG_OK;
     return s->data[idx];
 }
 
@@ -313,8 +315,11 @@ smaug_series_i64_t *smaug_i64_view(smaug_series_i64_t *s, size_t start, size_t l
 /* --- Getters / Setters --- */
 
 /* Nota: int64_t não tem NAN. O caller DEVE verificar is_null() antes de get(). */
-int64_t smaug_i64_get(smaug_series_i64_t *s, size_t idx) {
-    if (!s || idx >= s->size) return 0;
+int64_t smaug_i64_get(const smaug_series_i64_t *s, size_t idx, smaug_status_t *status) {
+    if (!s)             { if (status) *status = SMG_ERR_ARGUMENT; return 0; }
+    if (idx >= s->size) { if (status) *status = SMG_ERR_OOB;      return 0; }
+    if (s->null_mask[idx] != 0xFF) { if (status) *status = SMG_NULL_VALUE; return 0; }
+    if (status) *status = SMG_OK;
     return s->data[idx];
 }
 

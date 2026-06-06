@@ -4,6 +4,28 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
+### Contrato defensivo do C — peça 2/N: leituras comunicam status (`get` Shape 1) `[In progress]`
+- **`f64_get`/`i64_get` migrados para Shape 1:** `T get(const S *s, size_t idx,
+  smaug_status_t *status)`. Devolvem o valor; escrevem `*status` se `status !=
+  NULL` (`SMG_OK`/`SMG_NULL_VALUE`/`SMG_ERR_OOB`/`SMG_ERR_ARGUMENT`). Em erro/null
+  devolvem sentinela definida (NAN p/ f64, 0 p/ i64) — segura mesmo com
+  `status == NULL`. Agora também `const`-corretos (leitura não muda a série).
+- **Colisão eliminada:** antes, índice inválido e valor legítimo eram
+  indistinguíveis (NaN no f64; *qualquer* inteiro no i64, inclusive 0). Agora o
+  status separa "é NaN/0 de verdade" de "deu erro/é NULL". `i64_get` passou a
+  detectar NULL (devolve 0 + `SMG_NULL_VALUE`).
+- **Churn baixo (Shape 1, não Shape 2):** valor segue como retorno; call sites
+  só ganham o 3º argumento. Frontend inalterado no fluxo (os wrappers
+  `get_value` passam `status = nil`, pois o frontend já valida e checa `is_null`
+  antes). 17 call sites de teste ajustados mecanicamente.
+- **Testes:** `test_ops_edge.c` 85 → 96 checks — novo `get_status_contract`
+  prova o fim da colisão (NaN legítimo → `SMG_OK`; zero legítimo i64 → `SMG_OK`,
+  distinto de NULL), além de OOB/ARGUMENT e do caminho `status == NULL`. C + Lua
+  (222k) verdes, build sem warnings, Valgrind-clean, allocfail OK.
+- **Frente do contrato encerrada para mutação+leitura.** Restam, fora desta
+  frente: convergir `append`/`str_set` (0/-1) para o enum, e a **CoW** das views
+  (peça grande, 3 forks em aberto + `SMG_ERR_NOMEM`).
+
 ### Contrato defensivo do C — peça 1/N: mutações comunicam status `[In progress]`
 - **Princípio adotado:** *o engine não confia no caller*. Toda fronteira pública
   valida (ponteiro/argumento/índice) e **comunica** o resultado; nunca falha em

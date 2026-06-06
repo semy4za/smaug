@@ -46,7 +46,7 @@ local DTYPES = {
         get         = C.smaug_f64_get,
         -- get_value: converte o retorno C para o tipo Lua certo deste dtype.
         -- (o método genérico Series:get apenas repassa, sem saber o tipo)
-        get_value   = function(c, i) return tonumber(C.smaug_f64_get(c, i)) end,
+        get_value   = function(c, i) return tonumber(C.smaug_f64_get(c, i, nil)) end,
         set         = C.smaug_f64_set,
         set_null    = C.smaug_f64_set_null,
         is_null     = C.smaug_f64_is_null,
@@ -79,7 +79,7 @@ local DTYPES = {
         create      = C.smaug_i64_create,
         clone       = C.smaug_i64_clone,
         get         = C.smaug_i64_get,
-        get_value   = function(c, i) return tonumber(C.smaug_i64_get(c, i)) end,
+        get_value   = function(c, i) return tonumber(C.smaug_i64_get(c, i, nil)) end,
         set         = C.smaug_i64_set,
         set_null    = C.smaug_i64_set_null,
         is_null     = C.smaug_i64_is_null,

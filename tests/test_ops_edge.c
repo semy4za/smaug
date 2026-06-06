@@ -100,8 +100,8 @@ static void f64_div_zero_and_null(void) {
     smaug_series_f64_t *r = smaug_f64_div(a, b);
     OK(r != NULL, "f64 div ok");
     /* 10/0 = Inf (IEEE), 20/4 = 5, NULL/2 = NULL */
-    OK(isinf(smaug_f64_get(r, 0)), "f64 div por zero = Inf");
-    OK(smaug_f64_get(r, 1) == 5.0, "f64 div normal");
+    OK(isinf(smaug_f64_get(r, 0, NULL)), "f64 div por zero = Inf");
+    OK(smaug_f64_get(r, 1, NULL) == 5.0, "f64 div normal");
     OK(smaug_f64_is_null(r, 2), "f64 div com NULL preserva NULL");
 
     smaug_f64_free(a); smaug_f64_free(b); smaug_f64_free(r);
@@ -157,7 +157,7 @@ static void i64_div_zero(void) {
     smaug_series_i64_t *r = smaug_i64_div(a, b);
     OK(r != NULL, "i64 div ok");
     OK(smaug_i64_is_null(r, 0), "i64 div por zero -> NULL");
-    OK(smaug_i64_get(r, 1) == 4, "i64 div normal (20/5=4)");
+    OK(smaug_i64_get(r, 1, NULL) == 4, "i64 div normal (20/5=4)");
 
     smaug_i64_free(a); smaug_i64_free(b); smaug_i64_free(r);
 }
@@ -174,13 +174,13 @@ static void f64_scalar_edge(void) {
     /* preserva NULL do elemento */
     smaug_series_f64_t *r = smaug_f64_add_scalar(a, 5);
     OK(r && r->size == 2, "f64 add_scalar ok");
-    OK(smaug_f64_get(r, 0) == 15.0, "f64 add_scalar valor");
+    OK(smaug_f64_get(r, 0, NULL) == 15.0, "f64 add_scalar valor");
     OK(smaug_f64_is_null(r, 1), "f64 add_scalar preserva NULL");
     smaug_f64_free(r);
 
     /* div_scalar por zero: 10/0 = Inf (IEEE) */
     smaug_series_f64_t *dz = smaug_f64_div_scalar(a, 0);
-    OK(dz && isinf(smaug_f64_get(dz, 0)), "f64 div_scalar por zero = Inf");
+    OK(dz && isinf(smaug_f64_get(dz, 0, NULL)), "f64 div_scalar por zero = Inf");
     smaug_f64_free(dz);
 
     smaug_f64_free(a);
@@ -249,7 +249,7 @@ static void i64_scalar_compare_sort_edge(void) {
     /* scalar guarda NULL + preserva NULL do elemento */
     OK(smaug_i64_add_scalar(NULL, 1) == NULL, "i64 add_scalar NULL -> NULL");
     smaug_series_i64_t *r = smaug_i64_add_scalar(a, 5);
-    OK(r && smaug_i64_get(r, 0) == 15, "i64 add_scalar valor");
+    OK(r && smaug_i64_get(r, 0, NULL) == 15, "i64 add_scalar valor");
     OK(smaug_i64_is_null(r, 1), "i64 add_scalar preserva NULL");
     smaug_i64_free(r);
 
@@ -293,7 +293,7 @@ static void mutation_status_contract(void) {
     OK(smaug_f64_set_null(f, 9)    == SMG_ERR_OOB,      "f64_set_null OOB");
     OK(smaug_f64_set(NULL, 0, 1.0) == SMG_ERR_ARGUMENT, "f64_set serie NULL -> ARGUMENT");
     OK(smaug_f64_set_null(NULL, 0) == SMG_ERR_ARGUMENT, "f64_set_null serie NULL -> ARGUMENT");
-    OK(smaug_f64_get(f, 0) == 1.5, "f64 erro nao corrompeu idx 0");
+    OK(smaug_f64_get(f, 0, NULL) == 1.5, "f64 erro nao corrompeu idx 0");
     OK(smaug_f64_is_null(f, 1),    "f64 idx 1 segue NULL");
     smaug_f64_free(f);
 
@@ -305,7 +305,7 @@ static void mutation_status_contract(void) {
     OK(smaug_i64_set_null(n, 9)    == SMG_ERR_OOB,      "i64_set_null OOB");
     OK(smaug_i64_set(NULL, 0, 1)   == SMG_ERR_ARGUMENT, "i64_set serie NULL -> ARGUMENT");
     OK(smaug_i64_set_null(NULL, 0) == SMG_ERR_ARGUMENT, "i64_set_null serie NULL -> ARGUMENT");
-    OK(smaug_i64_get(n, 0) == 42,  "i64 erro nao corrompeu idx 0");
+    OK(smaug_i64_get(n, 0, NULL) == 42,  "i64 erro nao corrompeu idx 0");
     smaug_i64_free(n);
 
     /* --- str_set_null (entrou no contrato; antes era void) --- */
@@ -316,6 +316,45 @@ static void mutation_status_contract(void) {
     OK(smaug_str_set_null(NULL, 0)  == SMG_ERR_ARGUMENT, "str_set_null serie NULL -> ARGUMENT");
     OK(smaug_str_is_null(s, 1),     "str_set_null marcou NULL idx 1");
     smaug_str_free(s);
+}
+
+/* ======================================================================
+   Contrato defensivo: get (Shape 1) — valor + smaug_status_t* anulável.
+   Prova que a COLISÃO acabou: um NaN legítimo (f64) e um zero legítimo (i64)
+   retornam SMG_OK, distinguíveis de NULL (SMG_NULL_VALUE) e de índice inválido
+   (SMG_ERR_OOB) — que antes eram indistinguíveis do valor.
+   ====================================================================== */
+static void get_status_contract(void) {
+    smaug_status_t st;
+
+    /* --- f64: o caso que prova o fim da colisão NaN --- */
+    smaug_series_f64_t *f = smaug_f64_create(3);
+    smaug_f64_set(f, 0, 3.14);
+    smaug_f64_set(f, 1, NAN);      /* NaN LEGÍTIMO como valor */
+    smaug_f64_set_null(f, 2);      /* NULL */
+
+    st = SMG_ERR_OOB;
+    OK(smaug_f64_get(f, 0, &st) == 3.14 && st == SMG_OK, "f64 get valor -> OK");
+    double vnan = smaug_f64_get(f, 1, &st);              /* valor NaN, status OK */
+    OK(isnan(vnan) && st == SMG_OK, "f64 get NaN legitimo -> NaN + OK (colisao resolvida)");
+    smaug_f64_get(f, 2, &st); OK(st == SMG_NULL_VALUE,   "f64 get NULL -> SMG_NULL_VALUE");
+    smaug_f64_get(f, 9, &st); OK(st == SMG_ERR_OOB,      "f64 get OOB -> SMG_ERR_OOB");
+    smaug_f64_get(NULL, 0, &st); OK(st == SMG_ERR_ARGUMENT, "f64 get serie NULL -> ARGUMENT");
+    OK(smaug_f64_get(f, 0, NULL) == 3.14, "f64 get status=NULL ainda devolve valor");
+    smaug_f64_free(f);
+
+    /* --- i64: aqui a colisão era TOTAL (0 é um valor comum) --- */
+    smaug_series_i64_t *n = smaug_i64_create(2);
+    smaug_i64_set(n, 0, 0);        /* ZERO legítimo */
+    smaug_i64_set_null(n, 1);      /* NULL (também devolve 0) */
+    st = SMG_ERR_OOB;
+    OK(smaug_i64_get(n, 0, &st) == 0 && st == SMG_OK, "i64 get zero legitimo -> 0 + OK");
+    OK(smaug_i64_get(n, 1, &st) == 0 && st == SMG_NULL_VALUE,
+       "i64 get NULL -> 0 + NULL_VALUE (distingue do zero)");
+    smaug_i64_get(n, 9, &st); OK(st == SMG_ERR_OOB,      "i64 get OOB -> SMG_ERR_OOB");
+    smaug_i64_get(NULL, 0, &st); OK(st == SMG_ERR_ARGUMENT, "i64 get serie NULL -> ARGUMENT");
+    OK(smaug_i64_get(n, 0, NULL) == 0, "i64 get status=NULL ainda devolve valor");
+    smaug_i64_free(n);
 }
 
 int main(void) {
@@ -336,6 +375,7 @@ int main(void) {
     i64_scalar_compare_sort_edge();
 
     mutation_status_contract();
+    get_status_contract();
 
     printf("PASS: ops edge (%ld checks)\n", n_checks);
     return 0;

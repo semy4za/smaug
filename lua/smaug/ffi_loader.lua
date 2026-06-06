@@ -55,7 +55,7 @@ ffi.cdef([[
     smaug_series_f64_t* smaug_f64_view(smaug_series_f64_t *s, size_t start, size_t len);
 
     /* --- Getters / Setters --- */
-    double smaug_f64_get(smaug_series_f64_t *s, size_t idx);
+    double smaug_f64_get(const smaug_series_f64_t *s, size_t idx, smaug_status_t *status);
     smaug_status_t smaug_f64_set(smaug_series_f64_t *s, size_t idx, double val);
     smaug_status_t smaug_f64_set_null(smaug_series_f64_t *s, size_t idx);
     bool   smaug_f64_is_null(smaug_series_f64_t *s, size_t idx);
@@ -119,7 +119,7 @@ ffi.cdef([[
     smaug_series_i64_t* smaug_i64_view(smaug_series_i64_t *s, size_t start, size_t len);
 
     /* --- Getters / Setters --- */
-    int64_t smaug_i64_get(smaug_series_i64_t *s, size_t idx);
+    int64_t smaug_i64_get(const smaug_series_i64_t *s, size_t idx, smaug_status_t *status);
     smaug_status_t smaug_i64_set(smaug_series_i64_t *s, size_t idx, int64_t val);
     smaug_status_t smaug_i64_set_null(smaug_series_i64_t *s, size_t idx);
     bool    smaug_i64_is_null(smaug_series_i64_t *s, size_t idx);

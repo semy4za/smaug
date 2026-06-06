@@ -36,17 +36,19 @@ smaug_series_f64_t* smaug_f64_view(smaug_series_f64_t *s, size_t start, size_t l
  *
  *   - set/set_null  -> smaug_status_t (SMG_OK / SMG_ERR_OOB / SMG_ERR_ARGUMENT).
  *                      Em erro, NENHUMA escrita ocorre.
+ *   - get(s, idx, &st) -> valor + status anulável (Shape 1). Distingue
+ *                      SMG_OK / SMG_NULL_VALUE / SMG_ERR_OOB / SMG_ERR_ARGUMENT,
+ *                      eliminando a colisão índice-inválido vs NaN/valor. Em
+ *                      erro/null devolve sentinela definida (NAN p/ f64, 0 p/
+ *                      i64), segura mesmo se o caller passar status = NULL.
  *   - is_null(idx inválido) -> true    (resposta conservadora e segura)
  *   - view(faixa inválida)  -> NULL    (sinal de erro não-colidente)
- *   - get(idx inválido)     -> NAN     [MIGRAÇÃO PENDENTE: próxima peça do
- *                      contrato move get p/ Shape 1 (valor + smaug_status_t*
- *                      anulável), eliminando a colisão índice-inválido vs NaN].
  *
  * O frontend Lua valida o índice (check_index) e lança erro claro ANTES de
  * chamar o C; um caller em C direto recebe o status e decide. */
 
 /* Getters / Setters */
-double smaug_f64_get(smaug_series_f64_t *s, size_t idx);        /* NAN se nulo OU índice inválido (migração get pendente) */
+double smaug_f64_get(const smaug_series_f64_t *s, size_t idx, smaug_status_t *status);
 smaug_status_t smaug_f64_set(smaug_series_f64_t *s, size_t idx, double val);
 smaug_status_t smaug_f64_set_null(smaug_series_f64_t *s, size_t idx);
 bool   smaug_f64_is_null(smaug_series_f64_t *s, size_t idx);
@@ -64,7 +66,7 @@ smaug_series_i64_t* smaug_i64_clone(const smaug_series_i64_t *s);
 smaug_series_i64_t* smaug_i64_view(smaug_series_i64_t *s, size_t start, size_t len);
 
 /* Getters / Setters */
-int64_t smaug_i64_get(smaug_series_i64_t *s, size_t idx);      /* caller verifica is_null() (migração get pendente) */
+int64_t smaug_i64_get(const smaug_series_i64_t *s, size_t idx, smaug_status_t *status);
 smaug_status_t smaug_i64_set(smaug_series_i64_t *s, size_t idx, int64_t val);
 smaug_status_t smaug_i64_set_null(smaug_series_i64_t *s, size_t idx);
 bool    smaug_i64_is_null(smaug_series_i64_t *s, size_t idx);

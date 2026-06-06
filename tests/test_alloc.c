@@ -64,8 +64,8 @@ static void test_create_from_array(void) {
     assert(s->size == 4);
     /* from_array marca tudo como VÁLIDO (ao contrário de create) */
     assert(smaug_f64_count_nonnull(s) == 4);
-    assert(smaug_f64_get(s, 0) == 1.5);
-    assert(smaug_f64_get(s, 3) == 4.5);
+    assert(smaug_f64_get(s, 0, NULL) == 1.5);
+    assert(smaug_f64_get(s, 3, NULL) == 4.5);
 
     assert(smaug_f64_create_from_array(NULL, 4) == NULL);  /* NULL safe */
 
@@ -98,8 +98,8 @@ static void test_clone_independence(void) {
 
     /* mutar o clone não afeta o original */
     smaug_f64_set(c, 0, 999.0);
-    assert(smaug_f64_get(s, 0) == 10.0);
-    assert(smaug_f64_get(c, 0) == 999.0);
+    assert(smaug_f64_get(s, 0, NULL) == 10.0);
+    assert(smaug_f64_get(c, 0, NULL) == 999.0);
 
     /* o estado de null foi copiado */
     assert(smaug_f64_is_null(c, 2));
@@ -126,7 +126,7 @@ static void test_view_aliasing(void) {
 
     /* mutar a pai reflete na view (mesma memória) */
     smaug_f64_set(s, 1, 100.0);
-    assert(smaug_f64_get(v, 0) == 100.0);
+    assert(smaug_f64_get(v, 0, NULL) == 100.0);
 
     /* view é read-only: append falha */
     assert(smaug_f64_append(v, 7.0) == -1);
@@ -136,7 +136,7 @@ static void test_view_aliasing(void) {
 
     /* liberar a view NÃO libera os dados da pai (external_alloc) */
     smaug_f64_free(v);
-    assert(smaug_f64_get(s, 1) == 100.0);  /* pai ainda válida */
+    assert(smaug_f64_get(s, 1, NULL) == 100.0);  /* pai ainda válida */
 
     smaug_f64_free(s);
 }
@@ -156,8 +156,8 @@ static void test_append_grow(void) {
     assert(s->size == N);
     assert(s->capacity >= N);              /* invariante: capacity >= size */
     assert(smaug_f64_count_nonnull(s) == N);
-    assert(smaug_f64_get(s, 0) == 0.0);
-    assert(smaug_f64_get(s, N - 1) == (double)(N - 1));
+    assert(smaug_f64_get(s, 0, NULL) == 0.0);
+    assert(smaug_f64_get(s, N - 1, NULL) == (double)(N - 1));
 
     /* append_null intercalado */
     assert(smaug_f64_append_null(s) == 0);
@@ -183,7 +183,7 @@ static void test_i64_lifecycle(void) {
     smaug_series_i64_t *c = smaug_i64_clone(s);
     assert(c != NULL && c->data != s->data);
     smaug_i64_set(c, 0, -1);
-    assert(smaug_i64_get(s, 0) == 0);      /* original intacto */
+    assert(smaug_i64_get(s, 0, NULL) == 0);      /* original intacto */
 
     smaug_series_i64_t *v = smaug_i64_view(s, 10, 5);
     assert(v != NULL && v->meta.external_alloc == true);
