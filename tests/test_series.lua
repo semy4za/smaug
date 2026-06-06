@@ -93,24 +93,36 @@ check(not sort_fail, "sort com NA dá erro")
 -- ---- tostring não crasha ----
 check(type(tostring(s)) == "string", "__tostring")
 
--- ---- view: zero-copy, read-only, reflete a pai, _parent segura a pai ----
+-- ---- view: zero-copy, COW-writable, reflete a pai até o primeiro set ----
 local base = Series.from_table({10, 20, 30, 40, 50}, "float64", "base")
 local vw = base:view(2, 3)                       -- [20, 30, 40]
 check(vw:len() == 3, "view len")
 check(vw:get(1) == 20.0 and vw:get(3) == 40.0, "view valores")
-check(vw._is_view == true, "view marcada como view")
-base:set(2, 99.0)                                -- muta a pai
-check(vw:get(1) == 99.0, "view reflete mutação da pai (zero-copy)")
-local vw_ro = pcall(function() vw:set(1, 0.0) end)
-check(not vw_ro, "view é read-only (set falha)")
-local vw_ap = pcall(function() vw:append(1.0) end)
-check(not vw_ap, "view é read-only (append falha)")
+check(vw._c.meta.is_view == true, "view marcada como view no struct C")
+
+-- Enquanto não escrita, a view reflete mutações da pai (zero-copy)
+base:set(2, 99.0)
+check(vw:get(1) == 99.0, "view reflete mutação da pai antes do detach (zero-copy)")
+
+-- COW: set na view destaca o buffer, preserva a pai
+local vw_cow_ok = pcall(function() vw:set(1, 0.0) end)
+check(vw_cow_ok,                      "set em view via COW não dá erro")
+check(vw._c.meta.is_view == false,    "view detachada após primeiro set")
+check(vw:get(1) == 0.0,               "set em view gravou o valor correto")
+check(base:get(2) == 99.0,            "pai preservada pelo COW (não foi modificada)")
+
+-- append ainda pendente (Phase B): testar em view fresca para estado limpo
+local vw2 = base:view(1, 2)
+local vw_ap = pcall(function() vw2:append(1.0) end)
+check(not vw_ap, "append em view dá erro (Phase B pendente)")
 local vw_oob = pcall(function() return base:view(4, 5) end)
 check(not vw_oob, "view fora dos limites dá erro")
--- clone de view -> série independente e mutável
-local vw_clone = vw:clone()
+
+-- clone de view → série independente e mutável (view fresca para estado limpo)
+local vw3 = base:view(2, 3)
+local vw_clone = vw3:clone()
 vw_clone:set(1, -1.0)
-check(vw_clone:get(1) == -1.0 and vw:get(1) == 99.0, "clone de view é independente/mutável")
+check(vw_clone:get(1) == -1.0 and vw3:get(1) == 99.0, "clone de view é independente/mutável")
 
 -- ---- take: seleção por índices (cópia independente) ----
 local src = Series.from_table({100, 200, 300, 400}, "float64")

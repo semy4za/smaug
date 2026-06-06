@@ -160,6 +160,28 @@ smaug_series_f64_t *smaug_f64_view(smaug_series_f64_t *s, size_t start, size_t l
     return v;
 }
 
+/* --- Copy-on-Write detach ---
+   Quando uma view recebe a primeira mutação (set/set_null), ela precisa de um
+   buffer privado — senão a escrita corromperia o pai.  Este helper aloca data e
+   null_mask de tamanho `s->size` (a janela da view), copia os elementos e
+   atualiza as flags.  Chamado DEPOIS da validação de ponteiro/OOB, logo a série
+   é garantidamente não-vazia quando chegamos aqui.
+   Retorna 0 se ok, -1 se OOM (série permanece intacta — falha segura). */
+static int f64_cow_detach(smaug_series_f64_t *s) {
+    if (!s->meta.is_view) return 0;            /* já é privada, nada a fazer */
+    double       *nd = malloc(s->size * sizeof *nd);
+    smaug_mask_t *nm = malloc(s->size * sizeof *nm);
+    if (!nd || !nm) { free(nd); free(nm); return -1; }
+    memcpy(nd, s->data,      s->size * sizeof *nd);
+    memcpy(nm, s->null_mask, s->size * sizeof *nm);
+    s->data                = nd;
+    s->null_mask           = nm;
+    s->capacity            = s->size;          /* buffer privado = janela exata */
+    s->meta.is_view        = false;
+    s->meta.external_alloc = false;
+    return 0;
+}
+
 /* --- Getters / Setters --- */
 
 double smaug_f64_get(const smaug_series_f64_t *s, size_t idx, smaug_status_t *status) {
@@ -171,16 +193,18 @@ double smaug_f64_get(const smaug_series_f64_t *s, size_t idx, smaug_status_t *st
 }
 
 smaug_status_t smaug_f64_set(smaug_series_f64_t *s, size_t idx, double val) {
-    if (!s)            return SMG_ERR_ARGUMENT;
+    if (!s)             return SMG_ERR_ARGUMENT;
     if (idx >= s->size) return SMG_ERR_OOB;
+    if (f64_cow_detach(s) != 0) return SMG_ERR_NOMEM;
     s->data[idx]      = val;
     s->null_mask[idx] = 0xFF;
     return SMG_OK;
 }
 
 smaug_status_t smaug_f64_set_null(smaug_series_f64_t *s, size_t idx) {
-    if (!s)            return SMG_ERR_ARGUMENT;
+    if (!s)             return SMG_ERR_ARGUMENT;
     if (idx >= s->size) return SMG_ERR_OOB;
+    if (f64_cow_detach(s) != 0) return SMG_ERR_NOMEM;
     s->null_mask[idx] = 0x00;
     s->data[idx]      = 0.0;   /* limpa o dado (opcional, mas consistente) */
     return SMG_OK;
@@ -312,6 +336,24 @@ smaug_series_i64_t *smaug_i64_view(smaug_series_i64_t *s, size_t start, size_t l
     return v;
 }
 
+/* --- Copy-on-Write detach (i64) ---
+   Análogo ao f64_cow_detach.  Chamado após validação de ponteiro/OOB,
+   antes da primeira escrita sobre uma view. */
+static int i64_cow_detach(smaug_series_i64_t *s) {
+    if (!s->meta.is_view) return 0;
+    int64_t      *nd = malloc(s->size * sizeof *nd);
+    smaug_mask_t *nm = malloc(s->size * sizeof *nm);
+    if (!nd || !nm) { free(nd); free(nm); return -1; }
+    memcpy(nd, s->data,      s->size * sizeof *nd);
+    memcpy(nm, s->null_mask, s->size * sizeof *nm);
+    s->data                = nd;
+    s->null_mask           = nm;
+    s->capacity            = s->size;
+    s->meta.is_view        = false;
+    s->meta.external_alloc = false;
+    return 0;
+}
+
 /* --- Getters / Setters --- */
 
 /* Nota: int64_t não tem NAN. O caller DEVE verificar is_null() antes de get(). */
@@ -324,16 +366,18 @@ int64_t smaug_i64_get(const smaug_series_i64_t *s, size_t idx, smaug_status_t *s
 }
 
 smaug_status_t smaug_i64_set(smaug_series_i64_t *s, size_t idx, int64_t val) {
-    if (!s)            return SMG_ERR_ARGUMENT;
+    if (!s)             return SMG_ERR_ARGUMENT;
     if (idx >= s->size) return SMG_ERR_OOB;
+    if (i64_cow_detach(s) != 0) return SMG_ERR_NOMEM;
     s->data[idx]      = val;
     s->null_mask[idx] = 0xFF;
     return SMG_OK;
 }
 
 smaug_status_t smaug_i64_set_null(smaug_series_i64_t *s, size_t idx) {
-    if (!s)            return SMG_ERR_ARGUMENT;
+    if (!s)             return SMG_ERR_ARGUMENT;
     if (idx >= s->size) return SMG_ERR_OOB;
+    if (i64_cow_detach(s) != 0) return SMG_ERR_NOMEM;
     s->null_mask[idx] = 0x00;
     s->data[idx]      = 0;
     return SMG_OK;

@@ -156,24 +156,17 @@ local function wrap(c_ptr, dtype, name, parent)
     local d = DTYPES[dtype]
     ffi.gc(c_ptr, d.free)   -- limpeza automática quando o objeto Lua morrer
     -- Para views, c_ptr tem external_alloc=true: o free só libera o struct da
-    -- view, nunca os dados da pai. E guardamos `_parent` para impedir que o GC
+    -- view, nunca os dados da pai. Guardamos `_parent` para impedir que o GC
     -- do Lua colete a pai enquanto a view viver (evita use-after-free).
+    -- Após o primeiro COW-detach (set/set_null), a view tem buffer privado e
+    -- não depende mais da memória da pai — manter _parent é seguro (harmless).
     return setmetatable({
         _c      = c_ptr,
         _d      = d,
         _dtype  = dtype,
         _name   = name or "unnamed",
         _parent = parent,                     -- nil exceto em views
-        _is_view = c_ptr.meta.is_view,        -- fonte da verdade: o struct C
     }, Series)
-end
-
--- Bloqueia mutação em views (read-only por contrato). O C só impede `append`;
--- set/set_null escreveriam na memória da pai, então a guarda fica aqui.
-local function assert_mutable(self)
-    if self._is_view then
-        error("smaug: view é read-only; use :clone() para uma cópia mutável", 3)
-    end
 end
 
 local function check_index(self, i)
@@ -209,14 +202,18 @@ local function check_value(self, v, level)
 end
 
 -- Contrato defensivo: o backend devolve smaug_status_t (0 == SMG_OK; o str_set
--- legado também usa 0 == ok). Como o frontend já validou índice/valor/mutabilidade
--- ANTES de chamar o C, qualquer status ≠ 0 aqui é invariante do backend violado
--- (ou dessincronização do cdef FFI) — falha-rápido e barulhento, não silencioso.
+-- legado também usa 0 == ok). Qualquer status ≠ 0 após validação de índice/valor
+-- é tratado como segue:
+--   SMG_ERR_NOMEM (4): COW-detach falhou por OOM — erro de usuário propagado.
+--   Qualquer outro: invariante do backend violado (ou dessincronização do cdef).
+local SMG_ERR_NOMEM = 4   -- espelha smaug_types.h (enum fixo, 0-indexed)
 local function checkrc(rc, what)
-    if rc ~= 0 then
-        error("smaug: backend "..what.." devolveu status "..tonumber(rc)..
-              " (esperado SMG_OK=0); invariante interno violado", 3)
+    if rc == 0 then return end
+    if tonumber(rc) == SMG_ERR_NOMEM then
+        error("smaug: falha de memória ao materializar view (COW detach)", 3)
     end
+    error("smaug: backend "..what.." devolveu status "..tonumber(rc)..
+          " (esperado SMG_OK=0); invariante interno violado", 3)
 end
 function Series.new(dtype, size, name)
     if not DTYPES[dtype] then
@@ -255,7 +252,6 @@ function methods.get(self, i)
 end
 
 function methods.set(self, i, v)
-    assert_mutable(self)
     check_index(self, i)
     if is_na(v) then
         checkrc(self._d.set_null(self._c, i - 1), "set_null")
@@ -271,13 +267,17 @@ function methods.is_null(self, i)
 end
 
 function methods.set_null(self, i)
-    assert_mutable(self)
     check_index(self, i)
     checkrc(self._d.set_null(self._c, i - 1), "set_null")
 end
 
 function methods.append(self, v)
-    assert_mutable(self)
+    -- Phase B pendente: COW-detach para append/append_null ainda não implementado.
+    -- Quando Phase B estiver pronto esta guarda é removida. Enquanto isso, a leitura
+    -- de is_view é feita ao vivo (sem cache) para não depender de estado stale.
+    if self._c.meta.is_view then
+        error("smaug: append em view não suportado ainda; use :set() ou :clone():append()", 2)
+    end
     local rc
     if is_na(v) then
         rc = self._d.append_null(self._c)

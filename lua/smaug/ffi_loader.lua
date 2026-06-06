@@ -31,7 +31,8 @@ ffi.cdef([[
         SMG_OK = 0,
         SMG_NULL_VALUE,
         SMG_ERR_OOB,
-        SMG_ERR_ARGUMENT
+        SMG_ERR_ARGUMENT,
+        SMG_ERR_NOMEM
     } smaug_status_t;
 
     /* ===================================================================

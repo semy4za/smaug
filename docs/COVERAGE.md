@@ -3,8 +3,8 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh`
 > (`make coverage`). Nao editar a mao -- e regenerado a cada medicao.
 
-- Commit medido: `9129aad`
-- Data do commit: 2026-06-05 21:02:47 -0300
+- Commit medido: `19e6e96`
+- Data do commit: 2026-06-06 00:16:13 -0300
 - Linha: metrica basica.  **Branch** ("taken at least once"): metrica
   rigorosa, padrao SQLite/avionica -- e a que perseguimos rumo a 100%.
 - **Mede TODOS os testes do projeto**: testes C diretos, testes Lua (via
@@ -13,14 +13,14 @@
 
 | Arquivo | Linhas | Branch (taken) |
 |---------|--------|----------------|
-| `smaug_core.c` | 97.36% | 77.98% |
+| `smaug_core.c` | 93.39% | 74.47% |
 | `smaug_ops_f64.c` | 89.45% | 73.81% |
 | `smaug_ops_i64.c` | 97.93% | 74.81% |
 | `smaug_ops_bool.c` | 100.00% | 77.56% |
 | `smaug_str.c` | 98.80% | 78.17% |
 | `smaug_ops_str.c` | 100.00% | 83.64% |
-| **TOTAL (ponderado)** | **96.12%** | **76.70%** |
-
+| **TOTAL (ponderado)** | **95.22%** | **76.13%** |
+g
 
 ## Norte de longo prazo (cover real, padrao SQLite)
 
