@@ -93,7 +93,7 @@ br_pct=$(awk "BEGIN{printf \"%.2f\", ($tot_br? $cov_br*100/$tot_br : 0)}")
   echo "|---------|--------|----------------|"
   printf "%s" "$rows"
   echo "| **TOTAL (ponderado)** | **${line_pct}%** | **${br_pct}%** |"
-  echo ""
+  echo ""g
   echo ""
   echo "## Norte de longo prazo (cover real, padrao SQLite)"
   echo ""
