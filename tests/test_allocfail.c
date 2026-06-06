@@ -418,6 +418,133 @@ static void af_str_sort(void) {
 }
 
 /* ======================================================================
+   COW detach — falha de alocação em set/set_null em views
+   O detach faz exatamente 2 mallocs (nd, nm). Varremos k=0 (nd falha) e
+   k=1 (nd ok, nm falha) verificando:
+     - retorno SMG_ERR_NOMEM, view continua sendo view, pai inalterada;
+     - nd alocado e depois descartado no caminho k=1 não vaza (Valgrind).
+   Para k >= 2 o detach sucede: verificamos view destacada e pai intacta.
+   ====================================================================== */
+static void af_f64_cow_set(void) {
+    double arr[4] = {10.0, 20.0, 30.0, 40.0};
+    reset(-1);
+    smaug_series_f64_t *pai = smaug_f64_create_from_array(arr, 4);
+    assert(pai);
+
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        /* view sem falha; falha injetada apenas no set (dentro do detach) */
+        reset(-1);
+        smaug_series_f64_t *v = smaug_f64_view(pai, 1, 2);   /* [20, 30] */
+        assert(v);
+
+        reset(k);
+        smaug_status_t rc = smaug_f64_set(v, 0, 99.0);
+
+        if (rc == SMG_OK) {
+            OK(v->meta.is_view        == false, "f64 cow_set: view detachada");
+            OK(v->meta.external_alloc == false, "f64 cow_set: external_alloc false");
+            OK(pai->data[1] == 20.0,            "f64 cow_set: pai preservada");
+        } else {
+            OK(rc == SMG_ERR_NOMEM,             "f64 cow_set OOM: status NOMEM");
+            OK(v->meta.is_view        == true,  "f64 cow_set OOM: view nao detachada");
+            OK(pai->data[1] == 20.0,            "f64 cow_set OOM: pai preservada");
+        }
+
+        reset(-1);
+        smaug_f64_free(v);
+    }
+    smaug_f64_free(pai);
+}
+
+static void af_f64_cow_set_null(void) {
+    double arr[4] = {10.0, 20.0, 30.0, 40.0};
+    reset(-1);
+    smaug_series_f64_t *pai = smaug_f64_create_from_array(arr, 4);
+    assert(pai);
+
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_f64_t *v = smaug_f64_view(pai, 0, 4);
+        assert(v);
+
+        reset(k);
+        smaug_status_t rc = smaug_f64_set_null(v, 1);
+
+        if (rc == SMG_OK) {
+            OK(v->meta.is_view == false,    "f64 cow_set_null: view detachada");
+            OK(!smaug_f64_is_null(pai, 1),  "f64 cow_set_null: pai nao virou null");
+        } else {
+            OK(rc == SMG_ERR_NOMEM,         "f64 cow_set_null OOM: status NOMEM");
+            OK(v->meta.is_view == true,     "f64 cow_set_null OOM: view nao detachada");
+            OK(!smaug_f64_is_null(pai, 1),  "f64 cow_set_null OOM: pai preservada");
+        }
+
+        reset(-1);
+        smaug_f64_free(v);
+    }
+    smaug_f64_free(pai);
+}
+
+static void af_i64_cow_set(void) {
+    int64_t arr[4] = {10, 20, 30, 40};
+    reset(-1);
+    smaug_series_i64_t *pai = smaug_i64_create_from_array(arr, 4);
+    assert(pai);
+
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_i64_t *v = smaug_i64_view(pai, 1, 2);   /* [20, 30] */
+        assert(v);
+
+        reset(k);
+        smaug_status_t rc = smaug_i64_set(v, 0, 99);
+
+        if (rc == SMG_OK) {
+            OK(v->meta.is_view        == false, "i64 cow_set: view detachada");
+            OK(v->meta.external_alloc == false, "i64 cow_set: external_alloc false");
+            OK(pai->data[1] == 20,              "i64 cow_set: pai preservada");
+        } else {
+            OK(rc == SMG_ERR_NOMEM,             "i64 cow_set OOM: status NOMEM");
+            OK(v->meta.is_view        == true,  "i64 cow_set OOM: view nao detachada");
+            OK(pai->data[1] == 20,              "i64 cow_set OOM: pai preservada");
+        }
+
+        reset(-1);
+        smaug_i64_free(v);
+    }
+    smaug_i64_free(pai);
+}
+
+static void af_i64_cow_set_null(void) {
+    int64_t arr[4] = {10, 20, 30, 40};
+    reset(-1);
+    smaug_series_i64_t *pai = smaug_i64_create_from_array(arr, 4);
+    assert(pai);
+
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_i64_t *v = smaug_i64_view(pai, 0, 4);
+        assert(v);
+
+        reset(k);
+        smaug_status_t rc = smaug_i64_set_null(v, 2);
+
+        if (rc == SMG_OK) {
+            OK(v->meta.is_view == false,    "i64 cow_set_null: view detachada");
+            OK(!smaug_i64_is_null(pai, 2),  "i64 cow_set_null: pai nao virou null");
+        } else {
+            OK(rc == SMG_ERR_NOMEM,         "i64 cow_set_null OOM: status NOMEM");
+            OK(v->meta.is_view == true,     "i64 cow_set_null OOM: view nao detachada");
+            OK(!smaug_i64_is_null(pai, 2),  "i64 cow_set_null OOM: pai preservada");
+        }
+
+        reset(-1);
+        smaug_i64_free(v);
+    }
+    smaug_i64_free(pai);
+}
+
+/* ======================================================================
    sanidade: sem falha injetada, tudo funciona (garante que o teste não
    está sabotando além da conta)
    ====================================================================== */
@@ -461,6 +588,11 @@ int main(void) {
     af_str_take();
     af_str_argsort();
     af_str_sort();
+
+    af_f64_cow_set();
+    af_f64_cow_set_null();
+    af_i64_cow_set();
+    af_i64_cow_set_null();
 
     sanity_no_fail();
 
