@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mede a cobertura do backend C (src/*.c) e gera docs/COVERAGE.md.
+# Mede a cobertura do backend C (src/*.c) e gera docs/COVERAGE.md com barras visuais.
 #
 # Como funciona: compila cada src/*.c como um .o instrumentado (--coverage) UMA
 # vez, e TODOS os executores de teste linkam contra esses MESMOS .o (mesmos
@@ -66,7 +66,14 @@ for obj in $SRCS; do
     bp=$(echo "$out" | grep -m1 "Taken at least once" | grep -oE "[0-9.]+%" | head -1 | tr -d '%')
     bn=$(echo "$out" | grep -m1 "Taken at least once" | grep -oE "of [0-9]+" | grep -oE "[0-9]+")
     lp=${lp:-0}; ln=${ln:-0}; bp=${bp:-0}; bn=${bn:-0}
-    rows="${rows}| \`$obj.c\` | ${lp}% | ${bp}% |"$'\n'
+    
+    # Tema Dracula: Fundo #44475a (Current Line), Linhas #50fa7b (Green), Branch #bd93f9 (Purple)
+    bar_lines="<div style=\"background:#44475a; border-radius:4px; width:100px; display:inline-block; vertical-align:middle; overflow:hidden\"><div style=\"background:#50fa7b; width:${lp}%; height:14px; border-radius:4px;\"></div></div>"
+    bar_branch="<div style=\"background:#44475a; border-radius:4px; width:100px; display:inline-block; vertical-align:middle; overflow:hidden\"><div style=\"background:#bd93f9; width:${bp}%; height:14px; border-radius:4px;\"></div></div>"
+    
+    # Removido o <br>, agora barra e texto ficam na mesma linha
+    rows="${rows}| \`$obj.c\` | **${lp}%** &nbsp; ${bar_lines} | **${bp}%** &nbsp; ${bar_branch} |"$'\n'
+    
     cl=$(awk "BEGIN{printf \"%d\", $ln*$lp/100}")
     cb=$(awk "BEGIN{printf \"%d\", $bn*$bp/100}")
     tot_lines=$((tot_lines+ln)); cov_lines=$((cov_lines+cl))
@@ -74,6 +81,10 @@ for obj in $SRCS; do
 done
 line_pct=$(awk "BEGIN{printf \"%.2f\", ($tot_lines? $cov_lines*100/$tot_lines : 0)}")
 br_pct=$(awk "BEGIN{printf \"%.2f\", ($tot_br? $cov_br*100/$tot_br : 0)}")
+
+# Barras para o total - Tema Dracula: Linhas #8be9fd (Cyan), Branch #ff79c6 (Pink)
+total_bar_line="<div style=\"background:#44475a; border-radius:4px; width:150px; display:inline-block; vertical-align:middle; overflow:hidden\"><div style=\"background:#8be9fd; width:${line_pct}%; height:16px; border-radius:4px;\"></div></div>"
+total_bar_br="<div style=\"background:#44475a; border-radius:4px; width:150px; display:inline-block; vertical-align:middle; overflow:hidden\"><div style=\"background:#ff79c6; width:${br_pct}%; height:16px; border-radius:4px;\"></div></div>"
 
 {
   echo "# Cobertura -- Smaug (backend C)"
@@ -92,8 +103,8 @@ br_pct=$(awk "BEGIN{printf \"%.2f\", ($tot_br? $cov_br*100/$tot_br : 0)}")
   echo "| Arquivo | Linhas | Branch (taken) |"
   echo "|---------|--------|----------------|"
   printf "%s" "$rows"
-  echo "| **TOTAL (ponderado)** | **${line_pct}%** | **${br_pct}%** |"
-  echo ""g
+  echo "| **TOTAL** | **${line_pct}%** &nbsp; ${total_bar_line} | **${br_pct}%** &nbsp; ${total_bar_br} |"
+  echo ""
   echo ""
   echo "## Norte de longo prazo (cover real, padrao SQLite)"
   echo ""
@@ -103,6 +114,7 @@ br_pct=$(awk "BEGIN{printf \"%.2f\", ($tot_br? $cov_br*100/$tot_br : 0)}")
   echo "pelo allocfail (que cobre f64/i64/core, nao string -- ver divida); (b)"
   echo "ramos de valores especiais (NaN/Inf/sentinela) menos testados. Evolucao"
   echo "incremental, medida a cada commit."
+  echo ""
 } > "$OUT"
 
 echo "COVERAGE gerado: $OUT"
