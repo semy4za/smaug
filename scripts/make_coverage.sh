@@ -67,24 +67,57 @@ for obj in $SRCS; do
     bn=$(echo "$out" | grep -m1 "Taken at least once" | grep -oE "of [0-9]+" | grep -oE "[0-9]+")
     lp=${lp:-0}; ln=${ln:-0}; bp=${bp:-0}; bn=${bn:-0}
     
-    # Tema Dracula: Fundo #44475a (Current Line), Linhas #50fa7b (Green), Branch #bd93f9 (Purple)
-    bar_lines="<div style=\"background:#44475a; border-radius:4px; width:100px; display:inline-block; vertical-align:middle; overflow:hidden\"><div style=\"background:#50fa7b; width:${lp}%; height:14px; border-radius:4px;\"></div></div>"
-    bar_branch="<div style=\"background:#44475a; border-radius:4px; width:100px; display:inline-block; vertical-align:middle; overflow:hidden\"><div style=\"background:#bd93f9; width:${bp}%; height:14px; border-radius:4px;\"></div></div>"
+    # Cálculo da barra de linhas (escala de 10 blocos)
+    val_l=$(awk "BEGIN {printf \"%.0f\", $lp}")
+    filled_l=$((val_l / 10))
+    if [ $filled_l -gt 10 ]; then filled_l=10; fi
+    if [ $filled_l -lt 0 ]; then filled_l=0; fi
+    empty_l=$((10 - filled_l))
+    bar_lines=""
+    for ((i=0; i<filled_l; i++)); do bar_lines="${bar_lines}█"; done
+    for ((i=0; i<empty_l; i++)); do bar_lines="${bar_lines}░"; done
     
-    # Removido o <br>, agora barra e texto ficam na mesma linha
-    rows="${rows}| \`$obj.c\` | **${lp}%** &nbsp; ${bar_lines} | **${bp}%** &nbsp; ${bar_branch} |"$'\n'
+    # Cálculo da barra de branches (escala de 10 blocos)
+    val_b=$(awk "BEGIN {printf \"%.0f\", $bp}")
+    filled_b=$((val_b / 10))
+    if [ $filled_b -gt 10 ]; then filled_b=10; fi
+    if [ $filled_b -lt 0 ]; then filled_b=0; fi
+    empty_b=$((10 - filled_b))
+    bar_branch=""
+    for ((i=0; i<filled_b; i++)); do bar_branch="${bar_branch}█"; done
+    for ((i=0; i<empty_b; i++)); do bar_branch="${bar_branch}░"; done
+    
+    # Monta a linha com alinhamento uniforme usando backticks
+    rows="${rows}| \`$obj.c\` | \`${lp}%\` \`[${bar_lines}]\` | \`${bp}%\` \`[${bar_branch}]\` |"$'\n'
     
     cl=$(awk "BEGIN{printf \"%d\", $ln*$lp/100}")
     cb=$(awk "BEGIN{printf \"%d\", $bn*$bp/100}")
     tot_lines=$((tot_lines+ln)); cov_lines=$((cov_lines+cl))
     tot_br=$((tot_br+bn)); cov_br=$((cov_br+cb))
 done
-line_pct=$(awk "BEGIN{printf \"%.2f\", ($tot_lines? $cov_lines*100/$tot_lines : 0)}")
-br_pct=$(awk "BEGIN{printf \"%.2f\", ($tot_br? $cov_br*100/$tot_br : 0)}")
 
-# Barras para o total - Tema Dracula: Linhas #8be9fd (Cyan), Branch #ff79c6 (Pink)
-total_bar_line="<div style=\"background:#44475a; border-radius:4px; width:150px; display:inline-block; vertical-align:middle; overflow:hidden\"><div style=\"background:#8be9fd; width:${line_pct}%; height:16px; border-radius:4px;\"></div></div>"
-total_bar_br="<div style=\"background:#44475a; border-radius:4px; width:150px; display:inline-block; vertical-align:middle; overflow:hidden\"><div style=\"background:#ff79c6; width:${br_pct}%; height:16px; border-radius:4px;\"></div></div>"
+line_pct=$(awk "BEGIN {printf \"%.2f\", ($tot_lines? $cov_lines*100/$tot_lines : 0)}")
+br_pct=$(awk "BEGIN {printf \"%.2f\", ($tot_br? $cov_br*100/$tot_br : 0)}")
+
+# Barra para o Total de Linhas
+val_tl=$(awk "BEGIN {printf \"%.0f\", $line_pct}")
+filled_tl=$((val_tl / 10))
+if [ $filled_tl -gt 10 ]; then filled_tl=10; fi
+if [ $filled_tl -lt 0 ]; then filled_tl=0; fi
+empty_tl=$((10 - filled_tl))
+total_bar_line=""
+for ((i=0; i<filled_tl; i++)); do total_bar_line="${total_bar_line}█"; done
+for ((i=0; i<empty_tl; i++)); do total_bar_line="${total_bar_line}░"; done
+
+# Barra para o Total de Branches
+val_tb=$(awk "BEGIN {printf \"%.0f\", $br_pct}")
+filled_tb=$((val_tb / 10))
+if [ $filled_tb -gt 10 ]; then filled_tb=10; fi
+if [ $filled_tb -lt 0 ]; then filled_tb=0; fi
+empty_tb=$((10 - filled_tb))
+total_bar_br=""
+for ((i=0; i<filled_tb; i++)); do total_bar_br="${total_bar_br}█"; done
+for ((i=0; i<empty_tb; i++)); do total_bar_br="${total_bar_br}░"; done
 
 {
   echo "# Cobertura -- Smaug (backend C)"
@@ -101,9 +134,9 @@ total_bar_br="<div style=\"background:#44475a; border-radius:4px; width:150px; d
   echo "  mesmos .o instrumentados, entao os caminhos de erro (OOM) contam."
   echo ""
   echo "| Arquivo | Linhas | Branch (taken) |"
-  echo "|---------|--------|----------------|"
+  echo "| :--- | :--- | :--- |"
   printf "%s" "$rows"
-  echo "| **TOTAL** | **${line_pct}%** &nbsp; ${total_bar_line} | **${br_pct}%** &nbsp; ${total_bar_br} |"
+  echo "| **TOTAL** | \`${line_pct}%\` \`[${total_bar_line}]\` | \`${br_pct}%\` \`[${total_bar_br}]\` |"
   echo ""
   echo ""
   echo "## Norte de longo prazo (cover real, padrao SQLite)"
