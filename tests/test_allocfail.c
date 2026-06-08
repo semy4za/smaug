@@ -544,6 +544,125 @@ static void af_i64_cow_set_null(void) {
     smaug_i64_free(pai);
 }
 
+static void af_f64_cow_append(void) {
+    /* O append numa view faz: detach (2 mallocs) + grow (até 2 reallocs).
+       Varremos todos os pontos de falha; em qualquer um, pai deve permanecer
+       intacta e o retorno deve ser -1. */
+    double arr[3] = {10.0, 20.0, 30.0};
+    reset(-1);
+    smaug_series_f64_t *pai = smaug_f64_create_from_array(arr, 3);
+    assert(pai);
+
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_f64_t *v = smaug_f64_view(pai, 0, 3);
+        assert(v);
+
+        reset(k);
+        int rc = smaug_f64_append(v, 99.0);
+
+        if (rc == 0) {
+            OK(v->meta.is_view == false, "f64 cow_append: view detachada");
+            OK(v->size == 4,             "f64 cow_append: size incrementado");
+            OK(pai->data[0] == 10.0,     "f64 cow_append: pai preservada");
+        } else {
+            OK(rc == -1,             "f64 cow_append OOM: rc=-1");
+            OK(pai->data[0] == 10.0, "f64 cow_append OOM: pai preservada");
+        }
+
+        reset(-1);
+        smaug_f64_free(v);
+    }
+    smaug_f64_free(pai);
+}
+
+static void af_f64_cow_append_null(void) {
+    double arr[3] = {10.0, 20.0, 30.0};
+    reset(-1);
+    smaug_series_f64_t *pai = smaug_f64_create_from_array(arr, 3);
+    assert(pai);
+
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_f64_t *v = smaug_f64_view(pai, 0, 3);
+        assert(v);
+
+        reset(k);
+        int rc = smaug_f64_append_null(v);
+
+        if (rc == 0) {
+            OK(v->meta.is_view == false,  "f64 cow_append_null: view detachada");
+            OK(v->size == 4,              "f64 cow_append_null: size incrementado");
+            OK(!smaug_f64_is_null(pai,0), "f64 cow_append_null: pai preservada");
+        } else {
+            OK(rc == -1,                  "f64 cow_append_null OOM: rc=-1");
+            OK(!smaug_f64_is_null(pai,0), "f64 cow_append_null OOM: pai preservada");
+        }
+
+        reset(-1);
+        smaug_f64_free(v);
+    }
+    smaug_f64_free(pai);
+}
+
+static void af_i64_cow_append(void) {
+    int64_t arr[3] = {10, 20, 30};
+    reset(-1);
+    smaug_series_i64_t *pai = smaug_i64_create_from_array(arr, 3);
+    assert(pai);
+
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_i64_t *v = smaug_i64_view(pai, 0, 3);
+        assert(v);
+
+        reset(k);
+        int rc = smaug_i64_append(v, 99);
+
+        if (rc == 0) {
+            OK(v->meta.is_view == false, "i64 cow_append: view detachada");
+            OK(v->size == 4,             "i64 cow_append: size incrementado");
+            OK(pai->data[0] == 10,       "i64 cow_append: pai preservada");
+        } else {
+            OK(rc == -1,           "i64 cow_append OOM: rc=-1");
+            OK(pai->data[0] == 10, "i64 cow_append OOM: pai preservada");
+        }
+
+        reset(-1);
+        smaug_i64_free(v);
+    }
+    smaug_i64_free(pai);
+}
+
+static void af_i64_cow_append_null(void) {
+    int64_t arr[3] = {10, 20, 30};
+    reset(-1);
+    smaug_series_i64_t *pai = smaug_i64_create_from_array(arr, 3);
+    assert(pai);
+
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_i64_t *v = smaug_i64_view(pai, 0, 3);
+        assert(v);
+
+        reset(k);
+        int rc = smaug_i64_append_null(v);
+
+        if (rc == 0) {
+            OK(v->meta.is_view == false,  "i64 cow_append_null: view detachada");
+            OK(v->size == 4,              "i64 cow_append_null: size incrementado");
+            OK(!smaug_i64_is_null(pai,0), "i64 cow_append_null: pai preservada");
+        } else {
+            OK(rc == -1,                  "i64 cow_append_null OOM: rc=-1");
+            OK(!smaug_i64_is_null(pai,0), "i64 cow_append_null OOM: pai preservada");
+        }
+
+        reset(-1);
+        smaug_i64_free(v);
+    }
+    smaug_i64_free(pai);
+}
+
 /* ======================================================================
    sanidade: sem falha injetada, tudo funciona (garante que o teste não
    está sabotando além da conta)
@@ -593,6 +712,10 @@ int main(void) {
     af_f64_cow_set_null();
     af_i64_cow_set();
     af_i64_cow_set_null();
+    af_f64_cow_append();
+    af_f64_cow_append_null();
+    af_i64_cow_append();
+    af_i64_cow_append_null();
 
     sanity_no_fail();
 

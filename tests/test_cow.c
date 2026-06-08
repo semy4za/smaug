@@ -273,6 +273,137 @@ static void test_cow_oob_does_not_detach(void) {
 }
 
 /* ===================================================================
+   F64 — append: COW destaca, grow acontece, pai intacta
+   ================================================================= */
+static void test_f64_append_detaches_view(void) {
+    smaug_series_f64_t *pai = make_f64(4);   /* [0, 1, 2, 3] */
+    smaug_series_f64_t *v   = smaug_f64_view(pai, 1, 3);  /* [1, 2, 3] */
+    assert(v);
+
+    assert(smaug_f64_append(v, 99.0) == 0);
+    assert(v->meta.is_view        == false);
+    assert(v->meta.external_alloc == false);
+    assert(v->size     == 4);
+    assert(v->capacity >= 4);
+    assert(smaug_f64_get(v, 3, NULL) == 99.0);
+
+    /* elementos copiados do pai antes do grow */
+    assert(smaug_f64_get(v, 0, NULL) == 1.0);
+    assert(smaug_f64_get(v, 1, NULL) == 2.0);
+    assert(smaug_f64_get(v, 2, NULL) == 3.0);
+
+    /* pai inalterada */
+    assert(smaug_f64_get(pai, 1, NULL) == 1.0);
+    assert(smaug_f64_get(pai, 3, NULL) == 3.0);
+
+    smaug_f64_free(v);
+    smaug_f64_free(pai);
+}
+
+/* ===================================================================
+   F64 — append_null: também destaca
+   ================================================================= */
+static void test_f64_append_null_detaches_view(void) {
+    smaug_series_f64_t *pai = make_f64(3);
+    smaug_series_f64_t *v   = smaug_f64_view(pai, 0, 3);
+    assert(v);
+
+    assert(smaug_f64_append_null(v) == 0);
+    assert(v->meta.is_view == false);
+    assert(v->size == 4);
+    assert(smaug_f64_is_null(v, 3));       /* elemento appended é null */
+    assert(!smaug_f64_is_null(pai, 0));    /* pai inalterada */
+
+    smaug_f64_free(v);
+    smaug_f64_free(pai);
+}
+
+/* ===================================================================
+   F64 — view de tamanho zero: append destaca (sem malloc) e adiciona
+   ================================================================= */
+static void test_f64_append_zero_size_view(void) {
+    smaug_series_f64_t *pai = make_f64(3);
+    smaug_series_f64_t *v   = smaug_f64_view(pai, 1, 0);  /* view vazia */
+    assert(v);
+    assert(v->size == 0);
+
+    assert(smaug_f64_append(v, 42.0) == 0);
+    assert(v->meta.is_view == false);
+    assert(v->size == 1);
+    assert(smaug_f64_get(v, 0, NULL) == 42.0);
+
+    /* pai intacta */
+    assert(smaug_f64_get(pai, 0, NULL) == 0.0);
+
+    smaug_f64_free(v);
+    smaug_f64_free(pai);
+}
+
+/* ===================================================================
+   F64 — após append-detach, mais appends crescem normalmente
+   ================================================================= */
+static void test_f64_append_then_grow(void) {
+    smaug_series_f64_t *pai = make_f64(2);
+    smaug_series_f64_t *v   = smaug_f64_view(pai, 0, 2);
+    assert(v);
+
+    /* primeiro append: detach + grow */
+    assert(smaug_f64_append(v, 10.0) == 0);
+    assert(v->meta.is_view == false);
+    double *ptr_after_first = v->data;
+
+    /* segundo append: sem detach (já private), grow se necessário */
+    assert(smaug_f64_append(v, 20.0) == 0);
+    assert(v->size == 4);
+    assert(smaug_f64_get(v, 2, NULL) == 10.0);
+    assert(smaug_f64_get(v, 3, NULL) == 20.0);
+    (void)ptr_after_first;  /* ponteiro pode mudar após grow — apenas confirma não crash */
+
+    smaug_f64_free(v);
+    smaug_f64_free(pai);
+}
+
+/* ===================================================================
+   I64 — append: COW destaca, pai intacta
+   ================================================================= */
+static void test_i64_append_detaches_view(void) {
+    smaug_series_i64_t *pai = make_i64(4);
+    smaug_series_i64_t *v   = smaug_i64_view(pai, 0, 4);
+    assert(v);
+
+    assert(smaug_i64_append(v, 99) == 0);
+    assert(v->meta.is_view == false);
+    assert(v->size == 5);
+    assert(smaug_i64_get(v, 4, NULL) == 99);
+
+    /* pai inalterada */
+    assert(smaug_i64_get(pai, 0, NULL) == 0);
+    assert(smaug_i64_get(pai, 3, NULL) == 3);
+    assert(pai->size == 4);
+
+    smaug_i64_free(v);
+    smaug_i64_free(pai);
+}
+
+/* ===================================================================
+   I64 — append_null: também destaca
+   ================================================================= */
+static void test_i64_append_null_detaches_view(void) {
+    smaug_series_i64_t *pai = make_i64(3);
+    smaug_series_i64_t *v   = smaug_i64_view(pai, 1, 2);
+    assert(v);
+
+    assert(smaug_i64_append_null(v) == 0);
+    assert(v->meta.is_view == false);
+    assert(v->size == 3);
+    assert(smaug_i64_is_null(v, 2));
+    assert(!smaug_i64_is_null(pai, 1));
+
+    smaug_i64_free(v);
+    smaug_i64_free(pai);
+}
+
+/* ===================================================================
    main
    ================================================================= */
 int main(void) {
@@ -285,7 +416,13 @@ int main(void) {
     test_i64_set_null_detaches_view();
     test_i64_view_outlives_parent();
     test_cow_oob_does_not_detach();
+    test_f64_append_detaches_view();
+    test_f64_append_null_detaches_view();
+    test_f64_append_zero_size_view();
+    test_f64_append_then_grow();
+    test_i64_append_detaches_view();
+    test_i64_append_null_detaches_view();
 
-    printf("PASS: COW (9 checks)\n");
+    printf("PASS: COW (15 checks)\n");
     return 0;
 }

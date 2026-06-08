@@ -111,7 +111,7 @@ static void test_clone_independence(void) {
 }
 
 /* ===================================================================
-   view: zero-copy, aliasing, read-only, external_alloc
+   view: zero-copy, aliasing, COW-writable, external_alloc
    =================================================================== */
 static void test_view_aliasing(void) {
     smaug_series_f64_t *s = smaug_f64_create(5);
@@ -124,17 +124,22 @@ static void test_view_aliasing(void) {
     assert(v->meta.external_alloc == true);
     assert(v->data == s->data + 1);        /* aponta para dentro da pai */
 
-    /* mutar a pai reflete na view (mesma memória) */
+    /* mutar a pai reflete na view (mesma memória, ainda não desatada) */
     smaug_f64_set(s, 1, 100.0);
     assert(smaug_f64_get(v, 0, NULL) == 100.0);
 
-    /* view é read-only: append falha */
-    assert(smaug_f64_append(v, 7.0) == -1);
+    /* COW: append destaca a view e adiciona o elemento; pai preservada */
+    assert(smaug_f64_append(v, 7.0) == 0);
+    assert(v->meta.is_view        == false);
+    assert(v->meta.external_alloc == false);
+    assert(v->size == 4);
+    assert(smaug_f64_get(v, 3, NULL) == 7.0);
+    assert(smaug_f64_get(s, 1, NULL) == 100.0);   /* pai inalterada */
 
     /* out of bounds → NULL */
     assert(smaug_f64_view(s, 3, 5) == NULL);
 
-    /* liberar a view NÃO libera os dados da pai (external_alloc) */
+    /* liberar a view NÃO libera os dados da pai (agora private, não external) */
     smaug_f64_free(v);
     assert(smaug_f64_get(s, 1, NULL) == 100.0);  /* pai ainda válida */
 
@@ -187,7 +192,11 @@ static void test_i64_lifecycle(void) {
 
     smaug_series_i64_t *v = smaug_i64_view(s, 10, 5);
     assert(v != NULL && v->meta.external_alloc == true);
-    assert(smaug_i64_append(v, 1) == -1);  /* view read-only */
+    assert(smaug_i64_append(v, 1) == 0);       /* COW: destaca e adiciona */
+    assert(v->meta.is_view == false);
+    assert(v->size == 6);
+    assert(smaug_i64_get(v, 5, NULL) == 1);
+    assert(smaug_i64_get(s, 10, NULL) == 10);  /* pai preservada */
 
     smaug_i64_free(v);
     smaug_i64_free(c);

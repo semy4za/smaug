@@ -161,14 +161,21 @@ smaug_series_f64_t *smaug_f64_view(smaug_series_f64_t *s, size_t start, size_t l
 }
 
 /* --- Copy-on-Write detach ---
-   Quando uma view recebe a primeira mutação (set/set_null), ela precisa de um
-   buffer privado — senão a escrita corromperia o pai.  Este helper aloca data e
-   null_mask de tamanho `s->size` (a janela da view), copia os elementos e
-   atualiza as flags.  Chamado DEPOIS da validação de ponteiro/OOB, logo a série
-   é garantidamente não-vazia quando chegamos aqui.
+   Chamado antes de qualquer mutação numa view (set, set_null, append,
+   append_null).  Aloca data e null_mask privados de tamanho `s->size` (a janela
+   da view), copia os elementos e atualiza as flags, preservando o pai.
+   Guarda size==0: view vazia não precisa de malloc; desvincula as flags.
    Retorna 0 se ok, -1 se OOM (série permanece intacta — falha segura). */
 static int f64_cow_detach(smaug_series_f64_t *s) {
     if (!s->meta.is_view) return 0;            /* já é privada, nada a fazer */
+    if (s->size == 0) {                        /* view vazia: sem dados a copiar */
+        s->data                = NULL;
+        s->null_mask           = NULL;
+        s->capacity            = 0;
+        s->meta.is_view        = false;
+        s->meta.external_alloc = false;
+        return 0;
+    }
     double       *nd = malloc(s->size * sizeof *nd);
     smaug_mask_t *nm = malloc(s->size * sizeof *nm);
     if (!nd || !nm) { free(nd); free(nm); return -1; }
@@ -219,7 +226,7 @@ bool smaug_f64_is_null(smaug_series_f64_t *s, size_t idx) {
 
 int smaug_f64_append(smaug_series_f64_t *s, double val) {
     if (!s) return -1;
-    if (s->meta.is_view) return -1;   /* views são read-only */
+    if (f64_cow_detach(s) != 0) return -1;   /* COW: destaca se for view; -1 se OOM */
 
     if (s->size >= s->capacity) {
         if (f64_grow(s) != 0) return -1;
@@ -233,7 +240,7 @@ int smaug_f64_append(smaug_series_f64_t *s, double val) {
 
 int smaug_f64_append_null(smaug_series_f64_t *s) {
     if (!s) return -1;
-    if (s->meta.is_view) return -1;
+    if (f64_cow_detach(s) != 0) return -1;
 
     if (s->size >= s->capacity) {
         if (f64_grow(s) != 0) return -1;
@@ -337,10 +344,18 @@ smaug_series_i64_t *smaug_i64_view(smaug_series_i64_t *s, size_t start, size_t l
 }
 
 /* --- Copy-on-Write detach (i64) ---
-   Análogo ao f64_cow_detach.  Chamado após validação de ponteiro/OOB,
-   antes da primeira escrita sobre uma view. */
+   Análogo ao f64_cow_detach.  Cobre set, set_null, append e append_null.
+   Guarda size==0: view vazia desvincula sem malloc. */
 static int i64_cow_detach(smaug_series_i64_t *s) {
     if (!s->meta.is_view) return 0;
+    if (s->size == 0) {
+        s->data                = NULL;
+        s->null_mask           = NULL;
+        s->capacity            = 0;
+        s->meta.is_view        = false;
+        s->meta.external_alloc = false;
+        return 0;
+    }
     int64_t      *nd = malloc(s->size * sizeof *nd);
     smaug_mask_t *nm = malloc(s->size * sizeof *nm);
     if (!nd || !nm) { free(nd); free(nm); return -1; }
@@ -392,7 +407,7 @@ bool smaug_i64_is_null(smaug_series_i64_t *s, size_t idx) {
 
 int smaug_i64_append(smaug_series_i64_t *s, int64_t val) {
     if (!s) return -1;
-    if (s->meta.is_view) return -1;
+    if (i64_cow_detach(s) != 0) return -1;   /* COW: destaca se for view; -1 se OOM */
 
     if (s->size >= s->capacity) {
         if (i64_grow(s) != 0) return -1;
@@ -406,7 +421,7 @@ int smaug_i64_append(smaug_series_i64_t *s, int64_t val) {
 
 int smaug_i64_append_null(smaug_series_i64_t *s) {
     if (!s) return -1;
-    if (s->meta.is_view) return -1;
+    if (i64_cow_detach(s) != 0) return -1;
 
     if (s->size >= s->capacity) {
         if (i64_grow(s) != 0) return -1;

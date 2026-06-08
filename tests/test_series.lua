@@ -111,10 +111,14 @@ check(vw._c.meta.is_view == false,    "view detachada após primeiro set")
 check(vw:get(1) == 0.0,               "set em view gravou o valor correto")
 check(base:get(2) == 99.0,            "pai preservada pelo COW (não foi modificada)")
 
--- append ainda pendente (Phase B): testar em view fresca para estado limpo
+-- COW: append em view fresca destaca e adiciona o elemento
 local vw2 = base:view(1, 2)
-local vw_ap = pcall(function() vw2:append(1.0) end)
-check(not vw_ap, "append em view dá erro (Phase B pendente)")
+local vw_ap_ok = pcall(function() vw2:append(1.0) end)
+check(vw_ap_ok,                    "append em view via COW não dá erro")
+check(vw2._c.meta.is_view == false,"view detachada após append")
+check(vw2:len() == 3,              "append em view incrementou o tamanho")
+check(vw2:get(3) == 1.0,          "append em view gravou o valor correto")
+check(base:get(1) == 10.0,        "pai preservada após append COW")
 local vw_oob = pcall(function() return base:view(4, 5) end)
 check(not vw_oob, "view fora dos limites dá erro")
 

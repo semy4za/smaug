@@ -272,12 +272,6 @@ function methods.set_null(self, i)
 end
 
 function methods.append(self, v)
-    -- Phase B pendente: COW-detach para append/append_null ainda não implementado.
-    -- Quando Phase B estiver pronto esta guarda é removida. Enquanto isso, a leitura
-    -- de is_view é feita ao vivo (sem cache) para não depender de estado stale.
-    if self._c.meta.is_view then
-        error("smaug: append em view não suportado ainda; use :set() ou :clone():append()", 2)
-    end
     local rc
     if is_na(v) then
         rc = self._d.append_null(self._c)
