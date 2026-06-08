@@ -14,9 +14,14 @@
 --   * todas as colunas têm o mesmo _length;
 --   * _col_names e _columns sempre sincronizados (mesma cardinalidade/chaves).
 --
--- Posse: add_column assume a posse da Series passada (não clona). Operações que
--- derivam linhas (filter/head/tail/take/iloc/sample/sort_by) produzem colunas
--- novas via Series:take/:filter, então o DataSet derivado é independente.
+-- Posse por contrato (Modelo 3 — transferência de ownership lógica):
+-- `add_column` assume a posse lógica da Series passada; ela não é clonada
+-- (zero-copy, consistente com a filosofia COW da engine). O caller deve tratar
+-- esta chamada como transferência de ownership — continuar usando `series`
+-- para mutações após add_column é uma violação de contrato e produz aliasing.
+-- Lua não impede tecnicamente essa violação; o contrato é semântico, não mecânico.
+-- Operações de derivação (filter/take/sort_by/…) produzem colunas novas e
+-- independentes, portanto DataSets derivados são sempre seguros.
 
 local Series     = require("smaug.core.series")
 local BoolSeries = require("smaug.core.boolseries")
@@ -100,6 +105,13 @@ end
 -- =====================================================================
 -- Acesso / metadados
 -- =====================================================================
+-- col(): acesso mutável explícito à coluna interna. Devolve a mesma referência
+-- Lua armazenada no DataSet; mutações via esta referência afetam o DataSet
+-- diretamente (aliasing intencional, coerente com o Modelo 3 de ownership).
+-- COW funciona corretamente: se a coluna for uma view e receber um set/append,
+-- o detach ocorre no struct em si — o DataSet passa a apontar para o buffer
+-- privado sem que o pai seja afetado. Se quiser uma cópia independente, use
+-- :col(name):clone().
 function methods.column(self, name)
     local c = self._columns[name]
     if c == nil then error("smaug: coluna '"..name.."' não existe", 2) end
@@ -149,12 +161,15 @@ local function map_columns(self, fn, new_name)
     return df
 end
 
--- select: novo DataSet só com as colunas nomeadas, na ordem dada.
+-- select: novo DataSet com as colunas nomeadas, na ordem dada.
+-- Cada coluna é CLONADA para garantir independência: mutations no DataSet
+-- derivado não afetam o original e vice-versa. Esta é a semântica correta
+-- para uma operação de derivação (projeção), não um alias.
 function methods.select(self, names)
     if type(names) ~= "table" then error("smaug: select espera uma tabela de nomes", 2) end
     local df = DataSet.new(self._name)
     for _, n in ipairs(names) do
-        df:add_column(n, self:column(n))   -- compartilha a Series (imutável por padrão)
+        df:add_column(n, self:column(n):clone())   -- clone garante independência
     end
     return df
 end
@@ -248,6 +263,34 @@ function methods.sort_by(self, col, ascending)
               "' (use dropna primeiro)", 2)
     end
     return self:take(idx)
+end
+
+-- dropna: novo DataSet sem as linhas que têm pelo menos um NULL.
+--   dropna()         → verifica TODAS as colunas
+--   dropna({"a","b"})→ verifica apenas as colunas listadas (subset)
+-- Produz DataSet independente via take() (colunas novas via Series:take).
+function methods.dropna(self, subset)
+    local cols_to_check = subset or self._col_names
+    if type(cols_to_check) ~= "table" then
+        error("smaug: dropna espera nil ou uma lista de nomes de colunas", 2)
+    end
+    for _, n in ipairs(cols_to_check) do
+        if self._columns[n] == nil then
+            error("smaug: dropna: coluna '"..n.."' não existe", 2)
+        end
+    end
+    local keep = {}
+    for i = 1, self:nrows() do
+        local row_ok = true
+        for _, n in ipairs(cols_to_check) do
+            if self._columns[n]:is_null(i) then
+                row_ok = false
+                break
+            end
+        end
+        if row_ok then keep[#keep + 1] = i end
+    end
+    return self:take(keep)
 end
 
 -- =====================================================================

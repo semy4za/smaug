@@ -201,11 +201,11 @@ local function check_value(self, v, level)
     end
 end
 
--- Contrato defensivo: o backend devolve smaug_status_t (0 == SMG_OK; o str_set
--- legado também usa 0 == ok). Qualquer status ≠ 0 após validação de índice/valor
--- é tratado como segue:
---   SMG_ERR_NOMEM (4): COW-detach falhou por OOM — erro de usuário propagado.
---   Qualquer outro: invariante do backend violado (ou dessincronização do cdef).
+-- Contrato defensivo: todas as funções de fronteira devolvem smaug_status_t
+-- (0 == SMG_OK). str_set foi convertido de int (0/-1) para smaug_status_t,
+-- portanto o aviso sobre "legado" é removido.
+--   SMG_ERR_NOMEM (4): COW-detach ou alocação falhou — erro propagado.
+--   Qualquer outro: invariante do backend violado.
 local SMG_ERR_NOMEM = 4   -- espelha smaug_types.h (enum fixo, 0-indexed)
 local function checkrc(rc, what)
     if rc == 0 then return end

@@ -54,7 +54,7 @@ const char* smaug_str_get(const smaug_series_str_t *s, size_t idx, size_t *out_l
    Como a representação é offset-based, isto pode exigir remontar o buffer —
    operação O(n) no pior caso; a construção típica é em lote. Retorna 0 em
    sucesso, -1 em erro (idx inválido, OOM). */
-int  smaug_str_set(smaug_series_str_t *s, size_t idx, const char *str, size_t len);
+smaug_status_t smaug_str_set(smaug_series_str_t *s, size_t idx, const char *str, size_t len);
 
 smaug_status_t smaug_str_set_null(smaug_series_str_t *s, size_t idx);
 bool smaug_str_is_null(const smaug_series_str_t *s, size_t idx);

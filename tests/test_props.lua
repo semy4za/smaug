@@ -226,11 +226,107 @@ PROPERTIES["kleene_de_morgan"] = function()
 end
 
 -- ---------- runner ----------
+
+-- Gerador de série string com valores aleatórios e ~20% nulls
+local WORDS = {"alpha", "beta", "gamma", "delta", "epsilon",
+               "zeta", "eta", "theta", "iota", "kappa"}
+local function gen_str(n)
+    local s = S.new("string", n)
+    for i = 1, n do
+        if math.random() < 0.2 then
+            s:set_null(i)
+        else
+            s:set(i, WORDS[math.random(#WORDS)])
+        end
+    end
+    return s
+end
+
+-- INV-STR-1: set → get devolve o mesmo valor (round-trip)
+PROPERTIES["str_set_get"] = function()
+    local n = math.random(1, 20)
+    local s = S.new("string", n)
+    local vals = {}
+    for i = 1, n do
+        vals[i] = WORDS[math.random(#WORDS)]
+        s:set(i, vals[i])
+    end
+    for i = 1, n do
+        check(s:get(i) == vals[i], "str set_get round-trip idx " .. i)
+        check(not s:is_null(i),    "str set_get: não é null idx " .. i)
+    end
+end
+
+-- INV-STR-2: clone é independente — mutar o clone não afeta o original
+PROPERTIES["str_clone_independente"] = function()
+    local n = math.random(2, 20)
+    local s = gen_str(n)
+    -- snapshot dos valores originais
+    local snap = {}
+    for i = 1, n do snap[i] = s:get(i) end  -- nil se null
+    local c = s:clone()
+    -- muta o clone em posições não-null
+    for i = 1, n do
+        if not c:is_null(i) then c:set(i, "mutado") end
+    end
+    -- original deve estar intacto
+    for i = 1, n do
+        check(s:get(i) == snap[i], "str clone: original alterado no idx " .. i)
+    end
+end
+
+-- INV-STR-3: sort produz sequência não-decrescente (valores não-null)
+PROPERTIES["str_sort_ordenado"] = function()
+    local n = math.random(2, 30)
+    -- série sem nulls para sort ser aplicável
+    local s = S.new("string", n)
+    for i = 1, n do s:set(i, WORDS[math.random(#WORDS)]) end
+    local sorted = s:sort(true)
+    for i = 1, n - 1 do
+        local a, b = sorted:get(i), sorted:get(i + 1)
+        check(a <= b, "str sort: ordem violada entre idx " .. i .. " e " .. (i+1))
+    end
+end
+
+-- INV-STR-4: count_nonnull é consistente com is_null
+PROPERTIES["str_count_nonnull"] = function()
+    local n = math.random(1, 30)
+    local s = gen_str(n)
+    local manual = 0
+    for i = 1, n do
+        if not s:is_null(i) then manual = manual + 1 end
+    end
+    check(s:count_nonnull() == manual,
+          "str count_nonnull: " .. s:count_nonnull() .. " ≠ " .. manual)
+end
+
+-- INV-STR-5: filter reduz o tamanho proporcionalmente à máscara
+PROPERTIES["str_filter_reduz"] = function()
+    local n = math.random(2, 30)
+    local s = gen_str(n)
+    -- máscara aleatória
+    local mask_vals = {}
+    local count_true = 0
+    for i = 1, n do
+        mask_vals[i] = math.random() < 0.5
+        if mask_vals[i] then count_true = count_true + 1 end
+    end
+    local mask = S.new("float64", n)
+    for i = 1, n do mask:set(i, mask_vals[i] and 1.0 or 0.0) end
+    local bool_mask = mask:gt(0.5)
+    local filtered = s:filter(bool_mask)
+    check(filtered:len() == count_true,
+          "str filter: tamanho " .. filtered:len() .. " ≠ " .. count_true)
+end
+
 local order = {
     "clone_independente", "view_compartilha", "sort_permutacao",
     "sort_recusa_null_nan", "filter_count_true", "take_inversa",
     "astype_ida_volta", "fillna_remove_null",
     "kleene_dupla_negacao", "kleene_de_morgan",
+    -- string
+    "str_set_get", "str_clone_independente", "str_sort_ordenado",
+    "str_count_nonnull", "str_filter_reduz",
 }
 
 for _, name in ipairs(order) do

@@ -210,7 +210,7 @@ ffi.cdef([[
 
     /* --- Acesso --- */
     const char* smaug_str_get(const smaug_series_str_t *s, size_t idx, size_t *out_len);
-    int  smaug_str_set(smaug_series_str_t *s, size_t idx, const char *str, size_t len);
+    smaug_status_t smaug_str_set(smaug_series_str_t *s, size_t idx, const char *str, size_t len);
     smaug_status_t smaug_str_set_null(smaug_series_str_t *s, size_t idx);
     bool smaug_str_is_null(const smaug_series_str_t *s, size_t idx);
     int  smaug_str_append(smaug_series_str_t *s, const char *str, size_t len);

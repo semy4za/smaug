@@ -102,4 +102,56 @@ check(df["preco"]:sum() == before, "operações derivadas não mutam o original"
 check(type(tostring(df)) == "string", "__tostring")
 check(tostring(smaug.DataSet.new("vazio")):find("vazio") ~= nil, "tostring vazio")
 
+-- ---- select(): independência (deve clonar, não alias) ----
+local df_sel = df:select({"id", "preco"})
+check(df_sel:ncols() == 2,                       "select: ncols")
+check(df_sel:col("id"):get(1) == 1,              "select: valor ok")
+-- mutation no derivado NÃO afeta o original
+df_sel:col("preco"):set(1, 999.0)
+check(df:col("preco"):get(1) == 10.0,            "select: independente — original intacto")
+check(df_sel:col("preco"):get(1) == 999.0,       "select: derivado tem o valor novo")
+
+-- ---- dropna(): remove linhas com NULL ----
+local df_nulls = smaug.dataset({
+    {"x", Series.from_table({1, 2, 3, 4, 5}, "float64")},
+    {"y", Series.from_table({10, 20, 30, 40, 50}, "float64")},
+}, "nulltest")
+df_nulls:col("x"):set_null(2)           -- linha 2 tem null em x
+df_nulls:col("y"):set_null(4)           -- linha 4 tem null em y
+df_nulls:col("x"):set_null(5)           -- linha 5 tem null em x e y
+df_nulls:col("y"):set_null(5)
+
+local clean = df_nulls:dropna()
+check(clean:nrows() == 2,                "dropna: remove linhas com null (sobram 2)")
+check(clean:col("x"):get(1) == 1.0,     "dropna: linha 1 preservada")
+check(clean:col("x"):get(2) == 3.0,     "dropna: linha 3 preservada como linha 2")
+
+-- dropna com subset: só verifica coluna x
+local clean_x = df_nulls:dropna({"x"})
+check(clean_x:nrows() == 3,             "dropna(subset): ignora null em y (3 linhas)")
+
+-- dropna em dataset limpo: retorna tudo
+local all = df:dropna()
+check(all:nrows() == df:nrows(),        "dropna sem nulls: nrows igual")
+
+-- dropna em dataset todo-null: retorna vazio
+local df_all_null = smaug.dataset({
+    {"z", Series.from_table({1, 2}, "float64")},
+}, "allnull")
+df_all_null:col("z"):set_null(1)
+df_all_null:col("z"):set_null(2)
+local empty = df_all_null:dropna()
+check(empty:nrows() == 0,               "dropna todo-null: dataset vazio")
+
+-- dropna no sort_by (resolve a promessa do erro 'use dropna primeiro')
+local df_sort = smaug.dataset({
+    {"val",   Series.from_table({3, 1, 2}, "float64")},
+    {"label", Series.from_table({1, 2, 3}, "int64")},
+}, "sorttest")
+df_sort:col("val"):set_null(2)         -- null na linha 2
+local df_clean = df_sort:dropna()
+local df_sorted = df_clean:sort_by("val")
+check(df_sorted:col("val"):get(1) == 2.0, "dropna + sort_by: primeiro = 2.0")
+check(df_sorted:col("val"):get(2) == 3.0, "dropna + sort_by: segundo = 3.0")
+
 print(string.format("OK — %d checks passaram (DataSet)", n_ok))

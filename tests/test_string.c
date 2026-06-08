@@ -123,22 +123,22 @@ int main(void) {
         smaug_series_str_t *s = smaug_str_create_from_array(arr, 3);
 
         /* IGUAL: SP->RJ (mesmo tamanho, in-place) */
-        OK(smaug_str_set(s, 0, "RJ", 2) == 0, "set igual ok");
+        OK(smaug_str_set(s, 0, "RJ", 2) == SMG_OK, "set igual ok");
         OK(STR_EQ(s, 0, "RJ"), "set igual valor");
         OK(STR_EQ(s, 1, "RJ") && STR_EQ(s, 2, "MG"), "set igual nao afeta vizinhos");
 
         /* MAIOR: idx0 RJ->Bahia (2->5), desloca o rabo */
-        OK(smaug_str_set(s, 0, "Bahia", 5) == 0, "set maior ok");
+        OK(smaug_str_set(s, 0, "Bahia", 5) == SMG_OK, "set maior ok");
         OK(STR_EQ(s, 0, "Bahia"), "set maior valor");
         OK(STR_EQ(s, 1, "RJ") && STR_EQ(s, 2, "MG"), "set maior preserva rabo");
 
         /* MENOR: idx0 Bahia->AC (5->2), fecha o buraco */
-        OK(smaug_str_set(s, 0, "AC", 2) == 0, "set menor ok");
+        OK(smaug_str_set(s, 0, "AC", 2) == SMG_OK, "set menor ok");
         OK(STR_EQ(s, 0, "AC"), "set menor valor");
         OK(STR_EQ(s, 1, "RJ") && STR_EQ(s, 2, "MG"), "set menor preserva rabo");
 
         /* MAIOR no meio: idx1 RJ->Parana (2->6) */
-        OK(smaug_str_set(s, 1, "Parana", 6) == 0, "set meio maior ok");
+        OK(smaug_str_set(s, 1, "Parana", 6) == SMG_OK, "set meio maior ok");
         OK(STR_EQ(s, 0, "AC") && STR_EQ(s, 1, "Parana") && STR_EQ(s, 2, "MG"),
            "set meio preserva ambas as pontas");
 
@@ -148,16 +148,16 @@ int main(void) {
         OK(STR_EQ(s, 0, "AC") && STR_EQ(s, 2, "MG"), "set_null preserva vizinhos");
 
         /* set sobre NULL: torna válido */
-        OK(smaug_str_set(s, 1, "novo", 4) == 0, "set sobre NULL ok");
+        OK(smaug_str_set(s, 1, "novo", 4) == SMG_OK, "set sobre NULL ok");
         OK(!smaug_str_is_null(s, 1) && STR_EQ(s, 1, "novo"), "set sobre NULL torna valido");
 
         /* set para "" (vazia, válida) */
-        OK(smaug_str_set(s, 0, "", 0) == 0, "set vazia ok");
+        OK(smaug_str_set(s, 0, "", 0) == SMG_OK, "set vazia ok");
         { size_t l; const char *p = smaug_str_get(s, 0, &l);
           OK(p != NULL && l == 0 && !smaug_str_is_null(s, 0), "set '' = vazia valida"); }
 
         /* set fora dos limites: erro */
-        OK(smaug_str_set(s, 99, "x", 1) == -1, "set fora-limites = erro");
+        OK(smaug_str_set(s, 99, "x", 1) == SMG_ERR_OOB, "set fora-limites = erro");
 
         smaug_str_free(s);
     }

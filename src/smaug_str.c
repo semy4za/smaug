@@ -224,9 +224,10 @@ static int str_slots_reserve_one(smaug_series_str_t *s) {
     return 0;
 }
 
-int smaug_str_set(smaug_series_str_t *s, size_t idx, const char *str, size_t len) {
-    if (!s || idx >= s->size) return -1;
-    if (!str && len > 0) return -1;                    /* ponteiro nulo com len>0 */
+smaug_status_t smaug_str_set(smaug_series_str_t *s, size_t idx, const char *str, size_t len) {
+    if (!s)             return SMG_ERR_ARGUMENT;
+    if (idx >= s->size) return SMG_ERR_OOB;
+    if (!str && len > 0) return SMG_ERR_ARGUMENT;   /* ponteiro nulo com len>0 */
 
     size_t start   = s->offsets[idx];
     size_t old_len = s->offsets[idx + 1] - start;
@@ -235,7 +236,7 @@ int smaug_str_set(smaug_series_str_t *s, size_t idx, const char *str, size_t len
     if (len > old_len) {
         /* MAIOR: precisa de (len - old_len) bytes extras. Reserva ANTES de mexer. */
         size_t extra = len - old_len;
-        if (str_buffer_reserve(s, extra) != 0) return -1;   /* OOM, série intacta */
+        if (str_buffer_reserve(s, extra) != 0) return SMG_ERR_NOMEM;
 
         /* abre espaço: move o "rabo" (bytes após a string idx) para frente.
            memmove (regiões se sobrepõem). O rabo vai de [start+old_len, buffer_len)
@@ -271,7 +272,7 @@ int smaug_str_set(smaug_series_str_t *s, size_t idx, const char *str, size_t len
     }
 
     s->null_mask[idx] = 0xFF;       /* set sempre torna válido */
-    return 0;
+    return SMG_OK;
 }
 
 smaug_status_t smaug_str_set_null(smaug_series_str_t *s, size_t idx) {
@@ -285,7 +286,8 @@ smaug_status_t smaug_str_set_null(smaug_series_str_t *s, size_t idx) {
        set("",0) sobre idx já validado não cresce o buffer (encolhe ou no-op),
        logo não aloca; mas propagamos o status em vez de descartá-lo (o str_set
        legado devolve -1 só em !s/idx inválido/OOM, todos impossíveis aqui). */
-    if (smaug_str_set(s, idx, "", 0) != 0) return SMG_ERR_ARGUMENT;
+    smaug_status_t rc = smaug_str_set(s, idx, "", 0);
+    if (rc != SMG_OK) return rc;   /* propaga (na prática impossível após validação acima) */
     s->null_mask[idx] = 0x00;       /* e marca NULL (set deixou 0xFF) */
     return SMG_OK;
 }
