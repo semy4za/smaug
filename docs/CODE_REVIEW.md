@@ -14,32 +14,35 @@ sólida. Os achados abaixo são de robustez/consistência tratados na Fase 1.6,
 
 ## Achados (para tratar na Fase 1.6)
 
-### A1 — `sum` de série vazia retorna 0.0, mas `mean`/`min`/`max` retornam NAN
-`smaug_f64_sum`/`smaug_i64_sum` de uma série vazia retornam 0/0.0 (soma neutra),
-enquanto `mean`/`min`/`max` retornam NAN/`INT64_MIN`. É uma assimetria de
-"empty reduction". Pandas retorna 0 para `sum()` de vazio e NaN para `mean()`,
-então o comportamento atual até **coincide** com pandas — mas não está testado
-nem documentado explicitamente. **Ação:** decidir e fixar em teste + doc (não
-necessariamente mudar o código).
+### A1 — `sum` de série vazia retorna 0.0, mas `mean`/`min`/`max` retornam NAN — RESOLVIDO
 
-### A2 — Possível overflow de `size_t` em `view(start, len)`
-`start + len > s->size` pode dar wrap-around se `start`+`len` estourar `size_t`.
-Hoje os índices vêm validados do Lua (1-based, checados), então não é
-explorável na prática. **Ação:** endurecer a checagem em C
-(`start > s->size || len > s->size - start`) e cobrir com teste de borda.
+Comportamento confirmado e pinado em `test_ops_edge.c` (`f64_reduce_empty`,
+`i64_reduce_empty`, `f64_reduce_all_null`): `sum` de série vazia ou toda-NULL = 0
+(soma neutra, comportamento pandas); `mean`/`min`/`max`/`var`/`std` de vazio =
+NaN. Documentado no Roadmap em "Contrato de valores especiais".
 
-### A3 — Valores especiais do f64 não testados
-`+Inf`, `-Inf`, `NaN` fornecido pelo usuário (distinto de nulo) e `-0.0` não têm
-comportamento testado em `sum`/`min`/`max`/`sort`/comparações. O código os trata
-como valores comuns (ex.: um `NaN` do usuário num `gt` dá 0 — falso). **Ação:**
-definir o contrato e cobrir com testes (Fase 1.6, Frente 1).
+### A2 — Possível overflow de `size_t` em `view(start, len)` — RESOLVIDO
 
-### A4 — Overflow aritmético do i64 é silencioso
-`add`/`mul` de i64 perto de `INT64_MAX` dá overflow (UB para sinalizados em C,
-na prática wrap). Pandas/numpy também fazem wrap em int64, então é aceitável,
-mas precisa ser **testado e documentado** como comportamento conhecido. Há ainda
-a colisão: uma soma que legitimamente dê `INT64_MIN` é indistinguível do
-sentinela de erro (já documentado em API_Reference). **Ação:** teste + nota.
+**Corrigido:** `smaug_f64_view` e `smaug_i64_view` agora usam a checagem
+overflow-safe `start > s->size || len > s->size - start` em vez de
+`start + len > s->size`. O teste `view_overflow_boundary` em `test_ops_edge.c`
+verifica o caso `len = SIZE_MAX` que a checagem antiga deixaria passar.
+
+### A3 — Valores especiais do f64 não testados — RESOLVIDO
+
+Cobertos em `tests/test_special.lua` (35 checks: `+Inf`/`-Inf`, NaN distinto de
+null, NaN contagioso, sort/argsort recusam NaN, comparações com NaN → false
+válido, `-0.0 == +0.0`) e em `test_ops_edge.c` (`nan_in_compare`: gt/lt/eq com
+NaN ao nível C, verificando máscara válida vs NA). Contrato documentado no
+Roadmap.
+
+### A4 — Overflow aritmético do i64 é silencioso — RESOLVIDO
+
+Comportamento documentado como aceito (wrap em complemento de 2, mesmo que
+pandas/numpy). Testado em `i64_overflow_behavior` (`test_ops_edge.c`): operações
+com `INT64_MAX` não travam, não produzem NULL — produzem um valor presente cujo
+conteúdo é platform-wrap. Documentado no Roadmap em "Contrato de valores
+especiais".
 
 ### A5 — Caminho de falha de `realloc` (grow) — RESOLVIDO, com bug corrigido
 O `test_allocfail.c` (Fase 1.6) passou a forçar `malloc`/`realloc` a falhar em

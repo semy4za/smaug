@@ -114,12 +114,33 @@ dtype. A representação é offset-based estilo Arrow (buffer de bytes concatena
 + array de offsets). O dictionary encoding não entra aqui — é a essência do
 `categorical` (Tier 2), tipo separado, depois.
 
-### 3. Semântica fechada — `[Planned]`
+### 3. Semântica fechada — `[Done]`
 
-Definir de forma permanente o comportamento de `null`, `NaN`, ordenação,
-comparação e agregações, de modo que mudanças futuras sejam mínimas. O contrato
-de valores especiais (acima) é a base; esta frente o consolida como estável e
-versionado, fechando ambiguidades antes que o ecossistema dependa dele.
+Comportamento de `null`, `NaN`, ordenação, comparação e agregações definido de
+forma permanente e coberto por testes. Mudanças futuras que contradigam estes
+contratos serão intencionais e versionadas.
+
+Contratos pinados (ver `tests/test_special.lua` e `tests/test_ops_edge.c`):
+
+- **`NaN` ≠ `null`.** `set(NaN)` grava um valor válido; `is_null` devolve
+  `false`. `set_null` marca ausência. Nunca se convertem.
+- **`NaN` é contagioso** na aritmética (IEEE 754). `ignore_na` pula `null`, não
+  `NaN` — um `NaN` presente contamina reduções.
+- **`sort`/`argsort` recusam `NaN`** (e `null`). Valores sem ordem total são
+  rejeitados, não silenciados.
+- **`±Inf` são ordenáveis.** `−Inf` no começo, `+Inf` no fim. `sum(+Inf, −Inf) =
+  NaN` (IEEE).
+- **Comparações com `NaN` devolvem `false` com máscara válida** (não NA). Um
+  `null` em comparação devolve `false` com máscara `0x00` (NA) — distinção
+  explícita.
+- **`−0.0 == +0.0`** em todas as comparações. Soma neutra.
+- **`sum` de série vazia ou toda-null = 0** (neutro de soma). `mean`/`min`/`max`
+  de série vazia = `NaN`.
+- **`i64` overflow faz wrap** (complemento de 2, igual a pandas/numpy). Resultado
+  é um valor presente, não `null`. Comportamento definido na prática em todas as
+  plataformas suportadas, mesmo sendo UB formal em C.
+- **View `start + len` overflow-safe:** a checagem usa
+  `start > size || len > size − start` (imune a wrap de `size_t`).
 
 ### 4. Testes de stress — `[Planned]`
 

@@ -13,6 +13,8 @@
 #include "../include/smaug.h"
 #include <assert.h>
 #include <math.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -357,6 +359,118 @@ static void get_status_contract(void) {
     smaug_i64_free(n);
 }
 
+/* ======================================================================
+   Semântica Fechada — A2: view com start+len que overflow size_t deve ser
+   rejeitada corretamente. A checagem antiga `start + len > size` pode fazer
+   wrap-around em size_t, permitindo que valores absurdos passem; a forma
+   segura é `start > size || len > size - start`.
+   ====================================================================== */
+static void view_overflow_boundary(void) {
+    smaug_series_f64_t *s = smaug_f64_create(4);
+
+    /* limites normais: deve funcionar */
+    smaug_series_f64_t *v = smaug_f64_view(s, 0, 4);
+    OK(v != NULL,                    "view start=0 len=size valida");
+    smaug_f64_free(v);
+    v = smaug_f64_view(s, 2, 2);
+    OK(v != NULL,                    "view start+len == size valida");
+    smaug_f64_free(v);
+
+    /* além dos limites normais: deve ser rejeitada */
+    OK(smaug_f64_view(s, 0, 5) == NULL,  "view len > size -> NULL");
+    OK(smaug_f64_view(s, 3, 2) == NULL,  "view start+len > size -> NULL");
+
+    /* overflow de size_t: len=SIZE_MAX; com a checagem antiga,
+       start(1)+SIZE_MAX wrappa para 0 < size(4) e passaria — bug real.
+       Com a checagem segura SIZE_MAX > size-start = 3 → rejeitada. */
+    OK(smaug_f64_view(s, 1, SIZE_MAX) == NULL,
+       "view len=SIZE_MAX overflow-safe -> NULL");
+
+    /* i64 — mesma garantia */
+    smaug_series_i64_t *si = smaug_i64_create(4);
+    OK(smaug_i64_view(si, 1, SIZE_MAX) == NULL,
+       "i64 view len=SIZE_MAX overflow-safe -> NULL");
+    smaug_i64_free(si);
+
+    smaug_f64_free(s);
+}
+
+/* ======================================================================
+   Semântica Fechada — A3: NaN em comparações (nível C).
+   NaN > threshold = false (IEEE 754); a máscara é VÁLIDA (0xFF), não NA.
+   Isso é distinto de NULL: um NULL em gt produz máscara 0x00 (NA).
+   ====================================================================== */
+static void nan_in_compare(void) {
+    smaug_series_f64_t *s = smaug_f64_create(3);
+    smaug_f64_set(s, 0, 5.0);
+    smaug_f64_set(s, 1, NAN);   /* NaN como valor presente */
+    smaug_f64_set_null(s, 2);   /* NULL genuíno */
+
+    smaug_mask_t *m = NULL;
+    uint8_t *r = smaug_f64_gt(s, 0.0, &m);
+    OK(r != NULL,      "gt com NaN: retorna resultado");
+    OK(r[0] == 1,      "gt: 5.0 > 0 = true");
+    OK(r[1] == 0,      "gt: NaN > 0 = false (IEEE)");
+    OK(m[1] == 0xFF,   "gt: máscara de NaN = válida (não NA)");
+    OK(r[2] == 0,      "gt: NULL > 0 = false");
+    OK(m[2] == 0x00,   "gt: máscara de NULL = NA (0x00)");
+    free(r); free(m);
+
+    /* lt também */
+    r = smaug_f64_lt(s, 3.0, &m);
+    OK(r != NULL,      "lt com NaN: retorna resultado");
+    OK(r[1] == 0,      "lt: NaN < 3 = false (IEEE)");
+    OK(m[1] == 0xFF,   "lt: máscara de NaN = válida");
+    free(r); free(m);
+
+    /* eq */
+    r = smaug_f64_eq(s, NAN, &m);
+    OK(r != NULL,      "eq NaN==NaN: retorna resultado");
+    OK(r[1] == 0,      "eq: NaN == NaN = false (IEEE)");
+    OK(m[1] == 0xFF,   "eq: máscara NaN = válida");
+    free(r); free(m);
+
+    smaug_f64_free(s);
+}
+
+/* ======================================================================
+   Semântica Fechada — A4: overflow de int64_t em operações aritméticas.
+   C não define o comportamento de overflow de inteiros sinalizados, mas em
+   todas as plataformas suportadas (x86/x64, GCC/Clang -O2) o resultado é
+   wrap-around em complemento de 2 — o mesmo comportamento de pandas/numpy.
+   O contrato do Smaug é: overflow produz um valor presente (não NULL),
+   sendo o valor resultante dependente da plataforma (wrap em C).
+   ====================================================================== */
+static void i64_overflow_behavior(void) {
+    /* Testa que overflow não causa crash, não vira NULL, não corrompe. */
+    smaug_series_i64_t *a = smaug_i64_create(1);
+    smaug_series_i64_t *b = smaug_i64_create(1);
+
+    smaug_i64_set(a, 0, INT64_MAX);
+    smaug_i64_set(b, 0, 1);
+    smaug_series_i64_t *r = smaug_i64_add(a, b);  /* INT64_MAX + 1 */
+    OK(r != NULL,                   "i64 overflow: add retorna serie");
+    OK(!smaug_i64_is_null(r, 0),    "i64 overflow: resultado e valor presente (nao NULL)");
+    /* o valor real é INT64_MIN em complemento de 2 — documentado, não é bug */
+    smaug_i64_free(r);
+
+    /* mul overflow: INT64_MAX * 2 */
+    smaug_i64_set(b, 0, 2);
+    r = smaug_i64_mul(a, b);
+    OK(r != NULL,                   "i64 overflow mul: retorna serie");
+    OK(!smaug_i64_is_null(r, 0),    "i64 overflow mul: resultado presente");
+    smaug_i64_free(r);
+
+    /* scalar: INT64_MAX + 1 via add_scalar */
+    r = smaug_i64_add_scalar(a, 1);
+    OK(r != NULL,                   "i64 overflow add_scalar: retorna serie");
+    OK(!smaug_i64_is_null(r, 0),    "i64 overflow add_scalar: resultado presente");
+    smaug_i64_free(r);
+
+    smaug_i64_free(a);
+    smaug_i64_free(b);
+}
+
 int main(void) {
     f64_reduce_na_false();
     f64_reduce_empty();
@@ -376,6 +490,10 @@ int main(void) {
 
     mutation_status_contract();
     get_status_contract();
+
+    view_overflow_boundary();
+    nan_in_compare();
+    i64_overflow_behavior();
 
     printf("PASS: ops edge (%ld checks)\n", n_checks);
     return 0;

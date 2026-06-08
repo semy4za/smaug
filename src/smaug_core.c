@@ -142,10 +142,12 @@ smaug_series_f64_t *smaug_f64_clone(const smaug_series_f64_t *s) {
     return c;
 }
 
-/* View: fatia sem cópia. O caller é responsável por garantir que
-   a série-pai sobrevive o view. O view é read-only por contrato. */
+/* View: fatia sem cópia. O caller é responsável por garantir que a série-pai
+   sobrevive a view. Mutações na view disparam COW detach (ver smaug_core.h).
+   Checagem de limites overflow-safe: `start + len` pode fazer wrap em size_t
+   se os valores forem muito grandes; a forma segura é `len > size - start`. */
 smaug_series_f64_t *smaug_f64_view(smaug_series_f64_t *s, size_t start, size_t len) {
-    if (!s || start + len > s->size) return NULL;
+    if (!s || start > s->size || len > s->size - start) return NULL;
 
     smaug_series_f64_t *v = malloc(sizeof(smaug_series_f64_t));
     if (!v) return NULL;
@@ -328,7 +330,7 @@ smaug_series_i64_t *smaug_i64_clone(const smaug_series_i64_t *s) {
 }
 
 smaug_series_i64_t *smaug_i64_view(smaug_series_i64_t *s, size_t start, size_t len) {
-    if (!s || start + len > s->size) return NULL;
+    if (!s || start > s->size || len > s->size - start) return NULL;
 
     smaug_series_i64_t *v = malloc(sizeof(smaug_series_i64_t));
     if (!v) return NULL;
