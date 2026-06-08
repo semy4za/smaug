@@ -664,6 +664,66 @@ static void af_i64_cow_append_null(void) {
 }
 
 /* ======================================================================
+   FASE 8 (b) — take/filter numéricos sob falha de alocação.
+   Os equivalentes de string (af_str_take/af_str_filter) já existiam; os
+   numéricos faltavam. São os caminhos C que DataSet:take/dropna/filter/iloc/
+   head/tail/sample exercem em colunas f64/i64. Padrão idêntico ao str:
+   base construída fora da janela de injeção, varredura em reset(k).
+   ====================================================================== */
+static void af_f64_take(void) {
+    double arr[3] = {10, 20, 30};
+    size_t idx[]  = {2, 0, 1};
+    reset(-1);
+    smaug_series_f64_t *s = smaug_f64_create_from_array(arr, 3);
+    assert(s);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_f64_t *t = smaug_f64_take(s, idx, 3);
+        if (t) { OK(t->size == 3, "f64 take size"); smaug_f64_free(t); }
+    }
+    smaug_f64_free(s);
+}
+static void af_f64_filter(void) {
+    double arr[4] = {1, 2, 3, 4};
+    uint8_t mask[] = {1, 0, 1, 1};
+    reset(-1);
+    smaug_series_f64_t *s = smaug_f64_create_from_array(arr, 4);
+    assert(s);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_f64_t *f = smaug_f64_filter(s, mask);
+        if (f) { OK(f->size == 3, "f64 filter size"); smaug_f64_free(f); }
+    }
+    smaug_f64_free(s);
+}
+static void af_i64_take(void) {
+    int64_t arr[3] = {10, 20, 30};
+    size_t  idx[]  = {2, 0, 1};
+    reset(-1);
+    smaug_series_i64_t *s = smaug_i64_create_from_array(arr, 3);
+    assert(s);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_i64_t *t = smaug_i64_take(s, idx, 3);
+        if (t) { OK(t->size == 3, "i64 take size"); smaug_i64_free(t); }
+    }
+    smaug_i64_free(s);
+}
+static void af_i64_filter(void) {
+    int64_t arr[4] = {1, 2, 3, 4};
+    uint8_t mask[] = {1, 0, 1, 1};
+    reset(-1);
+    smaug_series_i64_t *s = smaug_i64_create_from_array(arr, 4);
+    assert(s);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_i64_t *f = smaug_i64_filter(s, mask);
+        if (f) { OK(f->size == 3, "i64 filter size"); smaug_i64_free(f); }
+    }
+    smaug_i64_free(s);
+}
+
+/* ======================================================================
    sanidade: sem falha injetada, tudo funciona (garante que o teste não
    está sabotando além da conta)
    ====================================================================== */
@@ -685,6 +745,8 @@ int main(void) {
     af_f64_compare();
     af_f64_argsort();
     af_f64_sort();
+    af_f64_take();
+    af_f64_filter();
 
     af_i64_create();
     af_i64_create_from_array();
@@ -696,6 +758,8 @@ int main(void) {
     af_i64_compare();
     af_i64_argsort();
     af_i64_sort();
+    af_i64_take();
+    af_i64_filter();
 
     af_str_create();
     af_str_create_from_array();

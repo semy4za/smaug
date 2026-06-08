@@ -159,6 +159,19 @@ int main(void) {
         /* set fora dos limites: erro */
         OK(smaug_str_set(s, 99, "x", 1) == SMG_ERR_OOB, "set fora-limites = erro");
 
+        /* contrato do enum (str_set): ARGUMENT em ponteiro nulo da serie e em
+           str==NULL com len>0; mas str==NULL com len==0 e valido (string vazia). */
+        OK(smaug_str_set(NULL, 0, "x", 1) == SMG_ERR_ARGUMENT, "set serie NULL = ARGUMENT");
+        OK(smaug_str_set(s, 0, NULL, 5)   == SMG_ERR_ARGUMENT, "set str NULL com len>0 = ARGUMENT");
+        OK(smaug_str_set(s, 0, NULL, 0)   == SMG_OK,           "set str NULL com len==0 = ok (vazia)");
+        OK(STR_EQ(s, 0, ""), "set str NULL/len0 deixa vazia");
+
+        /* contrato do enum (str_set_null): OK em idx valido, OOB, ARGUMENT */
+        OK(smaug_str_set_null(s, 2)    == SMG_OK,           "set_null idx valido = ok");
+        OK(smaug_str_is_null(s, 2),                          "set_null idx valido marca NULL");
+        OK(smaug_str_set_null(s, 99)   == SMG_ERR_OOB,      "set_null fora-limites = OOB");
+        OK(smaug_str_set_null(NULL, 0) == SMG_ERR_ARGUMENT, "set_null serie NULL = ARGUMENT");
+
         smaug_str_free(s);
     }
 

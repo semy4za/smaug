@@ -154,4 +154,61 @@ local df_sorted = df_clean:sort_by("val")
 check(df_sorted:col("val"):get(1) == 2.0, "dropna + sort_by: primeiro = 2.0")
 check(df_sorted:col("val"):get(2) == 3.0, "dropna + sort_by: segundo = 3.0")
 
+-- =====================================================================
+-- FASE 8 (b) — endurecimento dos contratos de select()/dropna()
+-- Apenas testes. Nenhuma feature, nenhuma mudança de semântica.
+-- =====================================================================
+
+-- ---- select(): lista vazia -> DataSet vazio (0 col, 0 linha) ----
+local sel_empty = df:select({})
+check(sel_empty:ncols() == 0, "select({}) -> 0 colunas")
+check(sel_empty:nrows() == 0, "select({}) -> 0 linhas")
+
+-- ---- select(): argumento não-tabela -> erro ----
+check(not pcall(function() return df:select("id") end),
+      "select(string) rejeitado (espera tabela)")
+
+-- ---- select(): nome inexistente -> erro ----
+check(not pcall(function() return df:select({"zzz"}) end),
+      "select com coluna inexistente rejeitado")
+
+-- ---- select(): nome duplicado -> erro (sem dedupe; add_column recusa) ----
+check(not pcall(function() return df:select({"id", "id"}) end),
+      "select com nome duplicado rejeitado")
+
+-- ---- select(): independência também no sentido original -> derivado ----
+local base_sel = smaug.dataset({
+    {"a", Series.from_table({1, 2, 3}, "float64")},
+    {"b", Series.from_table({4, 5, 6}, "float64")},
+}, "sel_indep")
+local proj = base_sel:select({"a"})
+base_sel:col("a"):set(1, 111.0)                 -- muta o ORIGINAL
+check(proj:col("a"):get(1) == 1.0, "select: mutar original não afeta o derivado")
+
+-- ---- dropna(): subset vazio -> mantém todas as linhas ----
+local dn_base = smaug.dataset({
+    {"x", Series.from_table({1, 2, 3}, "float64")},
+}, "dn_empty_subset")
+dn_base:col("x"):set_null(2)
+local kept = dn_base:dropna({})
+check(kept:nrows() == 3, "dropna({}) mantém todas as linhas (subset vazio)")
+
+-- ---- dropna(): argumento não-tabela e não-nil -> erro ----
+check(not pcall(function() return dn_base:dropna("x") end),
+      "dropna(string) rejeitado (espera nil ou lista)")
+
+-- ---- dropna(): subset com coluna inexistente -> erro ----
+check(not pcall(function() return dn_base:dropna({"zzz"}) end),
+      "dropna com coluna de subset inexistente rejeitado")
+
+-- ---- dropna(): resultado independente do original ----
+local dn_indep = smaug.dataset({
+    {"v", Series.from_table({10, 20, 30}, "float64")},
+}, "dn_indep")
+dn_indep:col("v"):set_null(2)                   -- linha 2 vira null
+local dn_clean = dn_indep:dropna()              -- sobram linhas 1 e 3
+check(dn_clean:nrows() == 2, "dropna independência: sobram 2 linhas")
+dn_clean:col("v"):set(1, 999.0)                 -- muta o derivado
+check(dn_indep:col("v"):get(1) == 10.0, "dropna: derivado independente do original")
+
 print(string.format("OK — %d checks passaram (DataSet)", n_ok))
