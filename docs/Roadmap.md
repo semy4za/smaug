@@ -142,11 +142,21 @@ Contratos pinados (ver `tests/test_special.lua` e `tests/test_ops_edge.c`):
 - **View `start + len` overflow-safe:** a checagem usa
   `start > size || len > size − start` (imune a wrap de `size_t`).
 
-### 4. Testes de stress — `[Planned]`
+### 4. Testes de stress — `[Done]`
 
-Aumentar a confiança em datasets grandes, operações encadeadas, crescimento de
-memória e cenários extremos. Complementa a cobertura e o allocfail já existentes
-com pressão real sobre a engine.
+Confiança em datasets grandes, operações encadeadas, crescimento de memória e
+cenários extremos. Implementado em `tests/test_stress.c` (alvo `make test-stress`),
+Valgrind-clean com 90k+ allocs:
+
+- **N=1M** (f64 + i64): criação, set em massa, sum/min/max/count/clone — ops
+  lineares sem sort para manter Valgrind viável.
+- **N=50k** (sort): sort + argsort, correctude verificada (extremos e centro).
+- **N=50k** (append stress): 50k appends a partir de série vazia, múltiplos grow.
+- **N=10k** (chain): create → filter → sort → take encadeados.
+- **COW stress**: 200 views sobre série de 1k elementos, cada uma detachada via
+  set; pai verificada como completamente intacta.
+- **String N=1k**: set + sort + clone em escala moderada (alocação por elemento é cara).
+- **10k ciclos** create/clone/view+COW/free sem acumulação de memória.
 
 ### 5. Consistência da API — `[In progress]`
 

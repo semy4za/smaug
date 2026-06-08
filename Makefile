@@ -18,6 +18,7 @@ TEST_CFLAGS = -std=c11 -g -O0 -Wall -Wextra -I./include
 #   LUA_TESTS     : suítes do frontend Lua.
 C_TESTS_PLAIN = test_alloc test_ops test_ops_edge test_bool test_string test_cow
 C_TEST_WRAP   = test_allocfail
+C_TEST_STRESS = test_stress
 LUA_TESTS     = test_series test_dataset test_edge test_special test_fillna \
                 test_props test_i64 test_string
 WRAP_FLAGS    = -Wl,--wrap=malloc -Wl,--wrap=realloc
@@ -43,9 +44,19 @@ test: build
 		echo "  RUN   $$t"; ./build/$$t || exit 1; \
 	done
 
+# Compila e roda os testes de stress (N grande; mais lento que make test)
+test-stress: build
+	@for t in $(C_TEST_STRESS); do \
+		echo "  CC    $$t"; \
+		$(CC) $(TEST_CFLAGS) tests/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
+	done
+	@for t in $(C_TEST_STRESS); do \
+		echo "  RUN   $$t"; ./build/$$t || exit 1; \
+	done
+
 # Roda todos os testes C sob Valgrind (requer valgrind instalado)
-valgrind: test
-	@for t in $(C_TESTS_PLAIN) $(C_TEST_WRAP); do \
+valgrind: test test-stress
+	@for t in $(C_TESTS_PLAIN) $(C_TEST_WRAP) $(C_TEST_STRESS); do \
 		echo "  VALGRIND $$t"; \
 		valgrind --leak-check=full --error-exitcode=1 ./build/$$t || exit 1; \
 	done
@@ -73,4 +84,4 @@ verify:
 clean:
 	rm -rf build
 
-.PHONY : clean test valgrind test-lua coverage manifest verify
+.PHONY : clean test test-stress valgrind test-lua coverage manifest verify
