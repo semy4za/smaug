@@ -93,19 +93,17 @@ a entradas inválidas é tão importante quanto qualquer operação matemática.
 
 O v1.0.0 fecha quando estes itens estiverem completos:
 
-### 1. Contrato defensivo do backend C — `[Planned]` (prioridade máxima)
+### 1. Contrato defensivo do backend C — `[Done]`
 
-Hoje o backend confia no caller; a validação mora no frontend Lua. Isso é
-aceitável enquanto o único consumidor é o frontend, mas não para uma engine que
-pretende durar anos e ser chamada direto do C por consumidores do ecossistema.
-
-Toda fronteira pública em C deve lidar com ponteiros inválidos, índices
-inválidos, parâmetros inconsistentes e estados inesperados — sem comportamento
-indefinido, sem corrupção de memória, sem crashes evitáveis. Isso muda
-assinaturas das funções de fronteira (`set`/`get`/`view` etc.), afetando FFI,
-frontend e call sites — por isso é fase própria. Decisão de design a tomar quando
-a fase começar: como o C sinaliza erro (provável referência: códigos de retorno
-estilo RUST).
+Toda fronteira pública em C valida e comunica. O engine não confia no caller.
+Implementado: `smaug_status_t` (enum com `SMG_OK`, `SMG_NULL_VALUE`,
+`SMG_ERR_OOB`, `SMG_ERR_ARGUMENT`, `SMG_ERR_NOMEM`); mutações `set`/`set_null`
+retornam status; leituras `get` em Shape 1 (valor + status anulável, sem colisão
+NaN/zero); nota de contrato em `smaug_core.h` invertida. Views adotam
+**Copy-on-Write**: toda mutação (`set`, `set_null`, `append`, `append_null`)
+materializa um buffer privado antes de escrever, preservando o pai. Falha de
+alocação no detach retorna `SMG_ERR_NOMEM` com série intacta. Ver `docs/COW.md`
+e `docs/CONTRACT.md` para a especificação completa.
 
 ### 2. String completa — `[Done]`
 

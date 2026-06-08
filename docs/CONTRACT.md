@@ -1,8 +1,8 @@
-# Contrato Defensivo do Backend C — Especificação `[Planned]`
+# Contrato Defensivo do Backend C — `[Done]`
 
-> Fase de maturidade do núcleo (régua v1.0, prioridade máxima). Objetivo desta
-> fase **não** é adicionar features — é aumentar a **confiança** no que já existe.
-> A pergunta-guia não é "quantas features?", e sim "quão confiável é o núcleo?".
+> Fase de maturidade do núcleo (régua v1.0). Objetivo: aumentar a **confiança**
+> no que já existe, não adicionar features. A pergunta-guia não é "quantas
+> features?", e sim "quão confiável é o núcleo?".
 
 ## Princípio fundador: o engine não confia no caller
 
@@ -17,9 +17,8 @@ validou. Garantias incondicionais (independem do que o caller passe):
 3. **Falha segura.** Em erro não há escrita parcial; leitura devolve sentinela
    documentada e o estado permanece consistente.
 
-Este princípio **substitui** a nota anterior em `smaug_core.h` ("modelo 'o caller
-garante a validade'" / "um caller em C deve garantir a validade dos índices"),
-que afirma exatamente o oposto e passa a ser a violação a corrigir.
+Este princípio está registrado em `smaug_core.h` e substituiu a nota anterior
+("o caller garante a validade"), que afirmava exatamente o oposto.
 
 ### Por que isto é coerente com o Shape 1 (get com status anulável)
 
@@ -31,43 +30,53 @@ pede. A segurança nunca depende de o caller checar nada. São eixos distintos.
 
 ## Códigos de status
 
-Definidos em `include/smaug_types.h` (a fundação, incluída por todos os headers):
+Definidos em `include/smaug_types.h` (incluído por todos os headers):
 
 ```c
 typedef enum {
     SMG_OK = 0,        /* operação concluída com sucesso          */
     SMG_NULL_VALUE,    /* leitura: elemento é NULL (não é erro)   */
     SMG_ERR_OOB,       /* índice fora dos limites                 */
-    SMG_ERR_ARGUMENT   /* ponteiro nulo / argumento inconsistente */
+    SMG_ERR_ARGUMENT,  /* ponteiro nulo / argumento inconsistente */
+    SMG_ERR_NOMEM      /* falha de alocação (COW detach)          */
 } smaug_status_t;
 ```
 
+Espelhado no cdef do FFI (`lua/smaug/ffi_loader.lua`).
+
 ## Contrato por categoria
 
-### Mutação (`set` / `set_null`) — `void` → `int`
+### Mutação pontual (`set` / `set_null`) — retorna `smaug_status_t`
 
-Retorna `smaug_status_t`. Em erro, **nenhuma escrita** ocorre.
+Em erro, **nenhuma escrita** ocorre. Em views, dispara COW detach antes de
+escrever (ver seção COW abaixo).
 
 | retorno | condição |
 |---|---|
 | `SMG_OK` | escrita aplicada |
-| `SMG_ERR_OOB` | `idx >= size` |
+| `SMG_ERR_OOB` | `idx >= size` — checado antes do detach |
 | `SMG_ERR_ARGUMENT` | `s == NULL` |
+| `SMG_ERR_NOMEM` | detach COW falhou por OOM — série intacta |
 
-Funções (5): `f64_set`, `f64_set_null`, `i64_set`, `i64_set_null`,
-`str_set_null`.
+Funções (5): `f64_set`, `f64_set_null`, `i64_set`, `i64_set_null`, `str_set_null`.
 
-> `str_set` já retorna `int` (precedente). `str_set_null` hoje é `void` **e
-> descarta** o `int` do `str_set` que chama internamente — incluí-lo fecha a
-> inconsistência interna do próprio tipo string, que é o nosso tipo-modelo do
-> contrato forte.
+> `str_set` já retorna `int` (precedente). `str_set_null` propagava internamente
+> o retorno do `str_set` — agora retorna `smaug_status_t` de forma consistente.
+
+### Append dinâmico (`append` / `append_null`) — retorna `int` (0 / -1)
+
+Convenção histórica mantida (precedente). Em views, dispara COW detach antes do
+grow. Falha (detach-OOM ou grow-OOM) → `-1`; série permanece consistente.
+
+Funções (4 por tipo numérico): `f64_append`, `f64_append_null`, `i64_append`,
+`i64_append_null`.
 
 ### Leitura (`get`) — Shape 1: valor + status anulável
 
 Assinatura: `T smaug_<t>_get(const S *s, size_t idx, smaug_status_t *status)`.
-Retorna o valor; escreve `*status` se `status != NULL`. Em erro/null devolve uma
-sentinela **definida** (`NAN` p/ f64, `0` p/ i64) — segura mesmo para um caller
-que ignore o status.
+Retorna o valor; escreve `*status` se `status != NULL`. Em erro/null devolve
+sentinela **definida** (`NAN` p/ f64, `0` p/ i64) — segura mesmo para caller que
+ignore o status.
 
 | caso | retorno | `*status` |
 |---|---|---|
@@ -76,40 +85,31 @@ que ignore o status.
 | `idx >= size` | sentinela | `SMG_ERR_OOB` |
 | `s == NULL` | sentinela | `SMG_ERR_ARGUMENT` |
 
-Funções (2): `f64_get`, `i64_get`. Resolve a colisão atual em que índice inválido
-e valor legítimo (NaN no f64, qualquer inteiro no i64) eram indistinguíveis.
+Funções (2): `f64_get`, `i64_get`. Elimina a colisão em que índice inválido e
+valor legítimo (NaN no f64, qualquer inteiro no i64) eram indistinguíveis.
 
-> `str_get` já distingue erro de valor via `NULL` + `out_len` (não há colisão).
-> Pode ganhar um `status` opcional por simetria — **opcional**, não obrigatório.
+> `str_get` já distingue erro de valor via `NULL` + `out_len` — sem colisão, sem
+> necessidade de status.
 
-### Já conformes — mantêm (são o precedente)
+### Já conformes — assinatura mantida
 
-`*_append` → `int` (0/-1); `str_set` → `int`; operações `bool` e `view` →
-ponteiro com `NULL` como sinal de erro não-colidente.
+`str_set` → `int`; operações `bool` e `view` → ponteiro com `NULL` como sinal
+de erro.
 
-### Validam e degradam com segurança — assinatura mantida
+### Validam e degradam com segurança — assinatura inalterada
 
 `is_null` (idx inválido → `true`, resposta conservadora) e `view` (faixa
-inválida → `NULL`). Já honram o princípio sem mudar assinatura.
+inválida → `NULL`).
 
-## Questões a fechar antes de codar (precisam do martelo)
+## Copy-on-Write em views
 
-1. **`str_set_null` entra no escopo?** Recomendação: **sim** (consistência do
-   tipo-modelo). Define 5 mutações em vez de 4.
-2. **`set` em uma view.** `append` **rejeita** view (read-only); `set` hoje
-   **permite** (escreve no buffer compartilhado com o pai). Inconsistência a
-   resolver explicitamente: view gravável (estilo NumPy) ou read-only como
-   `append`? Se read-only, qual status — reusar `SMG_ERR_ARGUMENT` ou criar
-   `SMG_ERR_READONLY`?
+O contrato COW é parte central do contrato defensivo. Toda operação que modifica
+uma view a materializa automaticamente antes de escrever, preservando o objeto
+original. Ver `docs/COW.md` para a especificação completa.
 
-## Ordem de implementação (uma peça por vez, validar cada)
+Resumo para este documento:
 
-1. `smaug_status_t` em `smaug_types.h`.
-2. As 5 mutações `void → int` — FFI + frontend (`series.lua`/`dataset.lua`) +
-   call sites + testes, juntos por função/grupo.
-3. As 2 leituras `get` (Shape 1) — idem.
-4. Reescrever a nota de contrato em `smaug_core.h` (inverter "caller garante" →
-   "engine valida e comunica").
-5. A cada peça: build sem warnings, testes C + Lua, Valgrind-clean (Linux),
-   allocfail; atualizar CHANGELOG + COVERAGE + MANIFEST + API_INDEX. Windows
-   valida no fim via `windows-build.ps1`.
+- `set` / `set_null`: retornam `SMG_ERR_NOMEM` se o detach falhar.
+- `append` / `append_null`: retornam `-1` se o detach ou o grow falharem.
+- Em qualquer falha, a view continua apontando para o pai (intacta) e o pai
+  permanece inalterado — falha segura em todos os caminhos.

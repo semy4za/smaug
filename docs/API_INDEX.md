@@ -12,7 +12,8 @@ partir do código real (não de memória).
 > 1-based.
 
 > **Contrato de status (`smaug_types.h`):** `smaug_status_t` =
-> `SMG_OK (0)` / `SMG_NULL_VALUE` / `SMG_ERR_OOB` / `SMG_ERR_ARGUMENT`.
+> `SMG_OK (0)` / `SMG_NULL_VALUE` / `SMG_ERR_OOB` / `SMG_ERR_ARGUMENT` /
+> `SMG_ERR_NOMEM` (falha de alocação no COW detach).
 > Princípio: o engine valida e comunica — não confia que o caller validou. As
 > mutações (`set`/`set_null`) devolvem este código; em erro não há escrita.
 > `get` devolve o valor + `smaug_status_t*` anulável (Shape 1), distinguindo
@@ -31,13 +32,13 @@ partir do código real (não de memória).
 | `smaug_<t>_create_from_array(arr, len)` | cria a partir de array C, tudo válido |
 | `smaug_<t>_free(s)` | libera a série (NULL-safe; respeita external_alloc) |
 | `smaug_<t>_clone(s)` | cópia profunda independente |
-| `smaug_<t>_view(s, start, len)` | view zero-copy (external_alloc=true) |
+| `smaug_<t>_view(s, start, len)` | view zero-copy; COW na primeira mutação (ver `docs/COW.md`) |
 | `smaug_<t>_get(s, idx, status)` | lê valor + `smaug_status_t*` anulável (OK/NULL_VALUE/OOB/ARGUMENT); sentinela definida em erro (f64: NAN, i64: 0) |
-| `smaug_<t>_set(s, idx, val)` | grava valor → `smaug_status_t` (`SMG_OK`/`SMG_ERR_OOB`/`SMG_ERR_ARGUMENT`); em erro não escreve |
+| `smaug_<t>_set(s, idx, val)` | grava valor → `smaug_status_t` (OK/OOB/ARGUMENT/NOMEM); COW detach se view; em erro não escreve |
 | `smaug_<t>_set_null(s, idx)` | marca posição como NULL → `smaug_status_t` (idem) |
 | `smaug_<t>_is_null(s, idx)` | testa se posição é NULL |
-| `smaug_<t>_append(s, val)` | adiciona valor ao fim (0=ok, -1=erro) |
-| `smaug_<t>_append_null(s)` | adiciona NULL ao fim |
+| `smaug_<t>_append(s, val)` | adiciona valor ao fim; COW detach se view (0=ok, -1=erro) |
+| `smaug_<t>_append_null(s)` | adiciona NULL ao fim; COW detach se view |
 | `smaug_free(ptr)` | libera buffers crus (compare/argsort/bool); use SEMPRE esta |
 
 ### Aritmética (`smaug_numeric.h`)
@@ -128,7 +129,7 @@ Trata bytes crus (UTF-8 = dívida futura). String vazia `""` é distinta de NULL
 | `:count_nonnull()` | nº de não-nulos |
 | `:clone()` | cópia independente |
 | `:sort(asc)` / `:argsort(asc)` | ordenar / permutação de ordenação |
-| `:view(start, len)` | view zero-copy segura (read-only, segura `_parent`) |
+| `:view(start, len)` | view zero-copy COW-gravável (detach automático na primeira mutação) |
 | `:take(idx)` / `:head(n)` / `:tail(n)` | seleção de linhas → nova Series |
 | `:dropna()` | → nova Series sem NULLs (qualquer dtype; habilita sort em série c/ nulos) |
 | `:astype(dtype)` | conversão de tipo |

@@ -6,10 +6,11 @@ ver `MANIFEST.txt`. Escopo: todo o backend C e o frontend Lua.
 ## Veredito
 
 O código está **correto e consistente** — compila sem warnings (`-Wall
--Wextra`), os 3 testes C passam Valgrind-clean, e os 99 checks Lua passam. A
+-Wextra`), os testes C passam Valgrind-clean (7 suítes incluindo `test_cow` e
+`test_allocfail` via `--wrap`), e as 8 suítes Lua somam ~222k checks. A
 arquitetura (despacho por dtype, backend em camadas, null por bitmask) está
-sólida e pronta para receber `string` sem reescrita. Os achados abaixo são de
-robustez/consistência para a Fase 1.6, **não** bugs que quebram o uso atual.
+sólida. Os achados abaixo são de robustez/consistência tratados na Fase 1.6,
+**não** bugs que quebram o uso atual.
 
 ## Achados (para tratar na Fase 1.6)
 
@@ -77,8 +78,10 @@ recusam; astype trunca/trata especiais) e validado por mutation testing.
   para `smaug_free` (Windows).
 - `argsort`/`sort` recusam séries com NULL (retornam NULL) — comportamento
   documentado.
-- Frontend: `ffi.gc` libera structs e arrays brutos; view segura via `_parent`;
-  read-only forçado; conversões 1-based↔0-based e `nil`↔NA/sentinela.
+- Frontend: `ffi.gc` libera structs e arrays brutos; view segura via `_parent`
+  (ancora o pai no GC enquanto a view viver); views **COW-graváveis** (detach
+  automático na primeira mutação — ver `docs/COW.md`); conversões 1-based↔0-based
+  e `nil`↔NA/sentinela.
 
 ## Arquitetura — nota sobre o header (RESOLVIDO)
 

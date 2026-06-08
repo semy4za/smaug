@@ -107,14 +107,34 @@ s = NULL;   /* boa prática contra use-after-free */
 
 | Função | Retorno | Comportamento |
 |--------|---------|---------------|
-| `get(s, idx)` | `double` | valor se válido; **NAN se nulo ou fora dos limites** (f64) |
-| `set(s, idx, val)` | void | grava `val`, marca **válido**; sem efeito se `idx >= size` |
-| `set_null(s, idx)` | void | marca **nulo** e zera o dado; sem efeito se fora dos limites |
-| `is_null(s, idx)` | `bool` | `true` se nulo (ou fora dos limites) |
+| `get(s, idx, status*)` | `double`/`int64_t` | valor se válido; sentinela + `*status` em erro/null |
+| `set(s, idx, val)` | `smaug_status_t` | grava `val`; COW detach se view; `SMG_ERR_NOMEM` se detach falhar |
+| `set_null(s, idx)` | `smaug_status_t` | marca nulo; COW detach se view; mesmas garantias |
+| `is_null(s, idx)` | `bool` | `true` se nulo ou fora dos limites |
+
+**`get` — Shape 1:** o terceiro argumento `status*` é anulável. Se `NULL`, o
+retorno é a sentinela segura sem comunicar o motivo. Se não-NULL, recebe o código
+de status. Sentinela: `NAN` (f64) ou `0` (i64).
+
+| caso | retorno | `*status` |
+|---|---|---|
+| sucesso | valor real | `SMG_OK` |
+| elemento NULL | sentinela | `SMG_NULL_VALUE` |
+| `idx >= size` | sentinela | `SMG_ERR_OOB` |
+| `s == NULL` | sentinela | `SMG_ERR_ARGUMENT` |
+
+**`set` / `set_null` — status de retorno:**
+
+| retorno | condição |
+|---|---|
+| `SMG_OK` | escrita aplicada |
+| `SMG_ERR_OOB` | `idx >= size` — checado antes de qualquer escrita |
+| `SMG_ERR_ARGUMENT` | `s == NULL` |
+| `SMG_ERR_NOMEM` | view: detach COW falhou por OOM (série intacta) |
 
 `set` sempre marca como válido — mesmo com `val == NAN`. Para marcar nulo, use
-`set_null`. Ou seja, *NaN não é o mesmo que NA*: um `set(NAN)` produz um valor
-válido cujo conteúdo é NaN, enquanto `set_null` marca a posição como ausente.
+`set_null`. *NaN não é o mesmo que NA*: um `set(NAN)` produz um valor válido cujo
+conteúdo é NaN, enquanto `set_null` marca a posição como ausente.
 
 ---
 
@@ -122,12 +142,12 @@ válido cujo conteúdo é NaN, enquanto `set_null` marca a posição como ausent
 
 | Função | Retorno | Notas |
 |--------|---------|-------|
-| `append(s, val)` | `0` ok / `-1` erro | adiciona ao fim, marca válido |
-| `append_null(s)` | `0` ok / `-1` erro | adiciona posição nula |
+| `append(s, val)` | `0` ok / `-1` erro | adiciona ao fim, marca válido; COW detach se view |
+| `append_null(s)` | `0` ok / `-1` erro | adiciona posição nula; COW detach se view |
 
 Grow strategy: quando `size >= capacity`, a capacidade cresce **1.5×**
 (`capacity + capacity/2`), com guarda de overflow. Capacidade vazia cresce para
-4. Append em uma **view** falha (`-1`): views são read-only.
+4. Append em uma view dispara COW detach antes do grow — ver `docs/COW.md`.
 
 ```
 Progressão típica: 4 → 6 → 9 → 13 → 19 → 28 → 42 → ...
@@ -304,6 +324,33 @@ semânticas:
 
 Use i64 para contadores, IDs, índices e timestamps. Evite para razões,
 proporções ou medições que exijam precisão fracionária.
+
+---
+
+## Views e Copy-on-Write
+
+Uma view é uma janela sobre uma faixa de elementos de uma série existente,
+criada em O(1) sem copiar dados.
+
+```c
+smaug_series_f64_t *v = smaug_f64_view(s, start, len);
+/* v->data == s->data + start  (ponteiro compartilhado) */
+```
+
+**Semântica COW:** a primeira operação de escrita em `v` (qualquer de `set`,
+`set_null`, `append`, `append_null`) dispara um detach automático: `v` recebe
+um buffer privado com cópia dos seus `len` elementos, e torna-se completamente
+independente de `s`.
+
+| operação em view | resultado |
+|---|---|
+| `get`, `is_null`, `clone`, `filter`, `take`, `sort` | sem detach — lê o armazenamento compartilhado |
+| `set`, `set_null` | detach → escreve; `SMG_ERR_NOMEM` se OOM |
+| `append`, `append_null` | detach → grow → escreve; `-1` se OOM |
+| detach OOM | série intacta, pai intacto (falha segura) |
+
+Após o detach: `is_view = false`, `external_alloc = false`, `capacity = len`.
+O pai nunca é modificado. Para a especificação completa, ver `docs/COW.md`.
 
 ---
 

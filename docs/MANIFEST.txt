@@ -1,4 +1,4 @@
-MANIFEST gerado: docs/MANIFEST.txt (48 arquivos)
+MANIFEST gerado: docs/MANIFEST.txt (49 arquivos)
 cripts/make_manifest.sh
 # Formato: <sha256>  <linhas>  <caminho>
 #
@@ -6,15 +6,16 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env
 ed7d63f5177cc7d7fbfee9c7c18ebeb4d6fd7da02680ec7778cfe23be1d15b03      31  ./.gitattributes
 4f01d8ffb7024a3980cabf8eb1d343c24b78b7614a7bb301af351dd18b846cd5       6  ./.gitignore
 a856ed3489af44db3fe766073bca57584333e71a624481a217956425ef447f78      76  ./Makefile
-4e7466eb0d1d48a4b4d0e162d1a9e1f97e632c7dc856ae0b0a08394e5cb27074     183  ./docs/API_INDEX.md
-0f36df40dd144fdc6ea735fc3febe5522af9798dc71e4aa58b96d0e981833b8d     346  ./docs/API_Reference.md
+0be2e0399e8583198ce1e815c81e244fc3a97b02e572948ae842936edb7be239     184  ./docs/API_INDEX.md
+d4ed6aa15e5f2f6f42a5384755ce52703be12d198f0e25ec1f312fb48be666e6     393  ./docs/API_Reference.md
 3cbdf245e27417235912f24d67bed698979ba826a92a5b3c478ea2e6989eb079     432  ./docs/Build_and_Testing.md
 2a2d489204aec33d85c847bf44a98393f77396f75a78003704765ad987e00f4e     581  ./docs/CHANGELOG.md
-782c0cd5e77586591368cbff4faf8ee584c6e2a2bd23c3990500b92e8e6b765c      92  ./docs/CODE_REVIEW.md
-d0a037f608b81ed3373f73efb070b08fb46e00a8c319b7f655c61df1a9b3644c     115  ./docs/CONTRACT.md
+34451df1534348ecab8abef6cb31622f2ad68ea28681cd8e376c8300438f4bb8      95  ./docs/CODE_REVIEW.md
+0622a8800fedbb7dcb44c580ac157239c881fc8d72816a294c005591a9f41a49     115  ./docs/CONTRACT.md
 171bd4131c05cea29b288b731a5f9d39c3ec07121a75dd77156bed6c3a8e950e      33  ./docs/COVERAGE.md
+256e0c7b49824267619e53f32ad66d1b3b76eec75943c7bb05d776477cf8be6f     138  ./docs/COW.md
 2e3e16f922282958be33af0aec189f6c6954b73c0af6bacf1f4026415bbbf09b     254  ./docs/README.md
-8e61685a09e5f37fc220c22e35b9005184392794c143c0d34d7fb3a85dc5e7d0     280  ./docs/Roadmap.md
+affb49e8374c91304d58ed81485c427536a62d2a2120be96a620dd03ed3e4b06     278  ./docs/Roadmap.md
 ec1ae8442e32984127948c7e126da19f84f85193023143dc36ee82b8e352544d      29  ./include/smaug.h
 963e21a0d5b9b1857da7bbe7310a4a9340057fcf7560272f062e4e83727c5da3      40  ./include/smaug_bool.h
 31d4d936c265d46e39016d7e1861f01d2633cf476fed8f4798012bc385a009c3      78  ./include/smaug_core.h
@@ -51,4 +52,4 @@ c3eaa9b8d9204fa3e00a24e74029820ba5b6befc2f7a96deb7a6624ad2299629     206  ./test
 86ded203123075bd406a3cb297c39f583a022ee697deceaf4345d9efd793458f     334  ./tests/test_string.c
 0893dc2fc0a5769be76fd04f568651c7fce5d80015026182bf9f065c78094eeb     218  ./tests/test_string.lua
 #
-# total de arquivos: 48
+# total de arquivos: 49
