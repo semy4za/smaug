@@ -6,8 +6,9 @@
 #   1. (opcional, com -Setup) instala MSYS2 + gcc + luajit.
 #   2. Compila o backend C em build\smaug.dll (nome que o ffi_loader
 #      procura no Windows).
-#   3. Compila e roda os testes em C (test_alloc, test_ops, test_bool,
-#      test_string, e test_allocfail com -Wl,--wrap).
+#   3. Compila e roda os testes em C (test_alloc, test_ops, test_ops_edge,
+#      test_bool, test_string, test_cow, test_allocfail com -Wl,--wrap,
+#      e test_stress com N grande).
 #   4. Roda as 8 suites Lua com luajit (series, dataset, edge, special, fillna,
 #      props, i64, string).
 #
@@ -146,6 +147,23 @@ foreach ($t in $cTestsWrap) {
     $out = $out.Trim()
     Write-Host ("{0,-14} -> {1}" -f $t, $out)
     if ($out -notlike "PASS*") { $allPass = $false }
+}
+
+# Testes de stress (N grande; roda rapido no Windows sem Valgrind).
+$cTestsStress = @("test_stress")
+Write-Host ""
+Write-Host "== Testes de Stress ==" -ForegroundColor Cyan
+foreach ($t in $cTestsStress) {
+    $exe = "build\$t.exe"
+    & $gcc -std=c11 -g -O0 -Wall -Wextra -I".\include" "tests\$t.c" @sources -lm -o $exe
+    if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar $t." }
+
+    $out = (& ".\$exe") | Out-String
+    $out = $out.Trim()
+    # Mostra apenas a ultima linha (o PASS: stress ... das impressoes de progresso)
+    $lastLine = ($out -split "`n")[-1].Trim()
+    Write-Host ("{0,-14} -> {1}" -f $t, $lastLine)
+    if ($lastLine -notlike "PASS*") { $allPass = $false }
 }
 
 if ($luajit -and -not $SkipLua) {
