@@ -342,6 +342,47 @@ int main(void) {
         smaug_str_free(s);
     }
 
+    /* ==================================================================
+       FASE 8 / frente A1 (string) — varredura de input inválido.
+       Guards de ponteiro NULL e sub-args (str/target NULL com len>0, idx/mask
+       NULL) ainda não exercitados. set/set_null e from_array(NULL) já cobertos;
+       argsort/sort aqui é o PONTEIRO NULL (distinto da série-com-null já testada).
+       ================================================================== */
+    {
+        smaug_series_str_t *gs = smaug_str_create(2);
+        smaug_str_set(gs, 0, "AB", 2);
+        smaug_str_set(gs, 1, "CD", 2);
+        size_t  glen = 0;
+        uint8_t gmask[1] = { 1 };
+        size_t  gidx[1]  = { 0 };
+
+        OK(smaug_str_clone(NULL) == NULL,            "str clone(NULL) -> NULL");
+        OK(smaug_str_get(NULL, 0, &glen) == NULL,    "str get(serie NULL) -> NULL");
+        OK(smaug_str_get(gs, 9, &glen) == NULL,      "str get(OOB) -> NULL");
+        OK(smaug_str_is_null(NULL, 0) == true,       "str is_null(serie NULL) -> true");
+        OK(smaug_str_is_null(gs, 9) == true,         "str is_null(OOB) -> true");
+        OK(smaug_str_append(NULL, "x", 1) == -1,     "str append(serie NULL) -> -1");
+        OK(smaug_str_append(gs, NULL, 5) == -1,      "str append(str NULL, len>0) -> -1");
+        OK(smaug_str_append_null(NULL) == -1,        "str append_null(NULL) -> -1");
+        OK(smaug_str_count_nonnull(NULL) == 0,       "str count_nonnull(NULL) -> 0");
+
+        OK(smaug_str_eq(NULL, "x", 1, NULL) == NULL, "str eq(serie NULL) -> NULL");
+        OK(smaug_str_eq(gs, NULL, 5, NULL) == NULL,  "str eq(target NULL, len>0) -> NULL");
+        OK(smaug_str_lt(NULL, "x", 1, NULL) == NULL, "str lt(serie NULL) -> NULL");
+        OK(smaug_str_gt(NULL, "x", 1, NULL) == NULL, "str gt(serie NULL) -> NULL");
+
+        OK(smaug_str_filter(NULL, gmask) == NULL,    "str filter(serie NULL) -> NULL");
+        OK(smaug_str_filter(gs, NULL) == NULL,       "str filter(mask NULL) -> NULL");
+        OK(smaug_str_take(NULL, gidx, 1) == NULL,    "str take(serie NULL) -> NULL");
+        OK(smaug_str_take(gs, NULL, 1) == NULL,      "str take(idx NULL, len>0) -> NULL");
+
+        OK(smaug_str_argsort(NULL, true) == NULL,    "str argsort(serie NULL) -> NULL");
+        OK(smaug_str_sort(NULL, true) == NULL,       "str sort(serie NULL) -> NULL");
+
+        smaug_str_free(gs);
+    }
+
     printf("PASS: string lifecycle (%d checks)\n", n_checks);
+
     return 0;
 }

@@ -522,9 +522,98 @@ static void i64_arith_null_prop(void) {
     smaug_i64_free(a); smaug_i64_free(b);
 }
 
+/* ======================================================================
+   FASE 8 / frente A1 — varredura de input inválido nas ops numéricas.
+   Verifica o contrato "o engine não confia no caller": toda fronteira pública
+   recusa ponteiro NULL / tamanho incompatível com falha limpa. Cobre só o que
+   o f64_binop_guards/scalar_edge ainda NÃO pegam (sub/mul/div NULL, i64 tam-dif,
+   sub/mul_scalar, lt/eq, take/filter NULL, reduções com ponteiro NULL, e os
+   getters com status=NULL no caminho de erro -> exercita o `if(status)` falso).
+   Retornos-em-NULL conferidos contra o código (diferem por função).
+   ====================================================================== */
+static void numeric_guard_sweep(void) {
+    smaug_series_f64_t *fa = smaug_f64_create(3);
+    smaug_f64_set(fa, 0, 1); smaug_f64_set(fa, 1, 2); smaug_f64_set(fa, 2, 3);
+    smaug_series_i64_t *ia = smaug_i64_create(3);
+    smaug_i64_set(ia, 0, 1); smaug_i64_set(ia, 1, 2); smaug_i64_set(ia, 2, 3);
+    smaug_series_i64_t *ib2 = smaug_i64_create(2);   /* tamanho diferente */
+
+    /* binops: NULL em qualquer operando -> NULL (cobre as 2 sub-condições do ||) */
+    OK(smaug_f64_sub(NULL, fa) == NULL && smaug_f64_sub(fa, NULL) == NULL, "f64 sub NULL -> NULL");
+    OK(smaug_f64_mul(NULL, fa) == NULL && smaug_f64_mul(fa, NULL) == NULL, "f64 mul NULL -> NULL");
+    OK(smaug_f64_div(NULL, fa) == NULL && smaug_f64_div(fa, NULL) == NULL, "f64 div NULL -> NULL");
+    OK(smaug_i64_sub(NULL, ia) == NULL && smaug_i64_sub(ia, NULL) == NULL, "i64 sub NULL -> NULL");
+    OK(smaug_i64_mul(NULL, ia) == NULL && smaug_i64_mul(ia, NULL) == NULL, "i64 mul NULL -> NULL");
+    OK(smaug_i64_div(NULL, ia) == NULL && smaug_i64_div(ia, NULL) == NULL, "i64 div NULL -> NULL");
+
+    /* binops i64: tamanho incompatível (add já coberto pelo i64_binop) */
+    OK(smaug_i64_sub(ia, ib2) == NULL, "i64 sub tam-dif -> NULL");
+    OK(smaug_i64_mul(ia, ib2) == NULL, "i64 mul tam-dif -> NULL");
+    OK(smaug_i64_div(ia, ib2) == NULL, "i64 div tam-dif -> NULL");
+
+    /* escalares: série NULL -> NULL (add/div já cobertos) */
+    OK(smaug_f64_sub_scalar(NULL, 1) == NULL, "f64 sub_scalar NULL -> NULL");
+    OK(smaug_f64_mul_scalar(NULL, 1) == NULL, "f64 mul_scalar NULL -> NULL");
+    OK(smaug_i64_sub_scalar(NULL, 1) == NULL, "i64 sub_scalar NULL -> NULL");
+    OK(smaug_i64_mul_scalar(NULL, 1) == NULL, "i64 mul_scalar NULL -> NULL");
+    OK(smaug_i64_div_scalar(NULL, 1) == NULL, "i64 div_scalar NULL -> NULL");
+
+    /* comparações: série NULL -> NULL (gt já coberto) */
+    OK(smaug_f64_lt(NULL, 0, NULL) == NULL, "f64 lt NULL -> NULL");
+    OK(smaug_f64_eq(NULL, 0, NULL) == NULL, "f64 eq NULL -> NULL");
+    OK(smaug_i64_lt(NULL, 0, NULL) == NULL, "i64 lt NULL -> NULL");
+    OK(smaug_i64_eq(NULL, 0, NULL) == NULL, "i64 eq NULL -> NULL");
+
+    /* take/filter: cobre as sub-condições !s e !idx/!mask */
+    {
+        size_t  idx[1]  = { 0 };
+        uint8_t mask[1] = { 1 };
+        OK(smaug_f64_take(NULL, idx, 1) == NULL, "f64 take serie NULL -> NULL");
+        OK(smaug_f64_take(fa, NULL, 1)  == NULL, "f64 take idx NULL -> NULL");
+        OK(smaug_f64_filter(NULL, mask) == NULL, "f64 filter serie NULL -> NULL");
+        OK(smaug_f64_filter(fa, NULL)   == NULL, "f64 filter mask NULL -> NULL");
+        OK(smaug_i64_take(NULL, idx, 1) == NULL, "i64 take serie NULL -> NULL");
+        OK(smaug_i64_take(ia, NULL, 1)  == NULL, "i64 take idx NULL -> NULL");
+        OK(smaug_i64_filter(NULL, mask) == NULL, "i64 filter serie NULL -> NULL");
+        OK(smaug_i64_filter(ia, NULL)   == NULL, "i64 filter mask NULL -> NULL");
+    }
+
+    /* reduções: PONTEIRO NULL (distinto de série toda-nula) */
+    OK(isnan(smaug_f64_sum(NULL, true)),       "f64 sum NULL -> NaN");
+    OK(isnan(smaug_f64_mean(NULL, true)),      "f64 mean NULL -> NaN");
+    OK(isnan(smaug_f64_min(NULL, true)),       "f64 min NULL -> NaN");
+    OK(isnan(smaug_f64_max(NULL, true)),       "f64 max NULL -> NaN");
+    OK(isnan(smaug_f64_var(NULL, true)),       "f64 var NULL -> NaN");
+    OK(isnan(smaug_f64_std(NULL, true)),       "f64 std NULL -> NaN");
+    OK(smaug_f64_count_nonnull(NULL) == 0,     "f64 count_nonnull NULL -> 0");
+    OK(smaug_i64_sum(NULL, true) == 0,         "i64 sum NULL -> 0");
+    OK(smaug_i64_min(NULL, true) == INT64_MIN, "i64 min NULL -> INT64_MIN");
+    OK(smaug_i64_max(NULL, true) == INT64_MIN, "i64 max NULL -> INT64_MIN");
+    OK(isnan(smaug_i64_mean(NULL, true)),      "i64 mean NULL -> NaN");
+    OK(isnan(smaug_i64_var(NULL, true)),       "i64 var NULL -> NaN");
+    OK(isnan(smaug_i64_std(NULL, true)),       "i64 std NULL -> NaN");
+    OK(smaug_i64_count_nonnull(NULL) == 0,     "i64 count_nonnull NULL -> 0");
+
+    /* getters: status=NULL no caminho de ERRO -> if(status) falso, sem crash */
+    smaug_series_f64_t *fn = smaug_f64_create(2);
+    smaug_f64_set(fn, 0, 1); smaug_f64_set_null(fn, 1);
+    OK(isnan(smaug_f64_get(NULL, 0, NULL)), "f64 get(serie NULL, status=NULL) -> NaN");
+    OK(isnan(smaug_f64_get(fn, 9, NULL)),   "f64 get(OOB, status=NULL) -> NaN");
+    OK(isnan(smaug_f64_get(fn, 1, NULL)),   "f64 get(pos NULL, status=NULL) -> NaN");
+    smaug_series_i64_t *in = smaug_i64_create(2);
+    smaug_i64_set(in, 0, 7); smaug_i64_set_null(in, 1);
+    OK(smaug_i64_get(NULL, 0, NULL) == 0,   "i64 get(serie NULL, status=NULL) -> 0");
+    OK(smaug_i64_get(in, 9, NULL)   == 0,   "i64 get(OOB, status=NULL) -> 0");
+    OK(smaug_i64_get(in, 1, NULL)   == 0,   "i64 get(pos NULL, status=NULL) -> 0");
+
+    smaug_f64_free(fa); smaug_f64_free(fn);
+    smaug_i64_free(ia); smaug_i64_free(ib2); smaug_i64_free(in);
+}
+
 int main(void) {
     f64_arith_null_prop();
     i64_arith_null_prop();
+    numeric_guard_sweep();
     f64_reduce_na_false();
     f64_reduce_empty();
     f64_reduce_all_null();
