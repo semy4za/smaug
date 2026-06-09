@@ -5,3 +5,4 @@ cov/
 *.gcda
 *.gcno
 *.gcov
+.vscode

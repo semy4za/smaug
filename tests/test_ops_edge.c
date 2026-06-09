@@ -471,7 +471,60 @@ static void i64_overflow_behavior(void) {
     smaug_i64_free(b);
 }
 
+/* ======================================================================
+   FASE 8 / categoria C — propagação de NULL nas aritméticas binárias.
+   O ramo descoberto é a 2a condição do `VALID(a,i) && VALID(b,i)`: "b NULL
+   com a VÁLIDO" (os testes de div só faziam "a NULL", que curto-circuita em
+   VALID(a) e nunca avalia VALID(b)). Padrão [ambos válidos | a-val/b-null |
+   a-null/b-val] exercita as 4 branches do &&.
+   ====================================================================== */
+static void f64_arith_null_prop(void) {
+    smaug_series_f64_t *a = smaug_f64_create(3);
+    smaug_series_f64_t *b = smaug_f64_create(3);
+    smaug_f64_set(a, 0, 1);  smaug_f64_set(a, 1, 2);  smaug_f64_set_null(a, 2);
+    smaug_f64_set(b, 0, 10); smaug_f64_set_null(b, 1); smaug_f64_set(b, 2, 30);
+
+    smaug_series_f64_t *r;
+    #define CHECK_PROP(op, name) \
+        r = smaug_f64_##op(a, b); \
+        OK(!smaug_f64_is_null(r, 0), name " pos0 (ambos validos) -> valido"); \
+        OK(smaug_f64_is_null(r, 1),  name " pos1 (b NULL, a valido) -> NULL"); \
+        OK(smaug_f64_is_null(r, 2),  name " pos2 (a NULL) -> NULL"); \
+        smaug_f64_free(r)
+    CHECK_PROP(add, "f64 add");
+    CHECK_PROP(sub, "f64 sub");
+    CHECK_PROP(mul, "f64 mul");
+    CHECK_PROP(div, "f64 div");
+    #undef CHECK_PROP
+
+    smaug_f64_free(a); smaug_f64_free(b);
+}
+
+static void i64_arith_null_prop(void) {
+    smaug_series_i64_t *a = smaug_i64_create(3);
+    smaug_series_i64_t *b = smaug_i64_create(3);
+    smaug_i64_set(a, 0, 6);  smaug_i64_set(a, 1, 8);  smaug_i64_set_null(a, 2);
+    smaug_i64_set(b, 0, 2);  smaug_i64_set_null(b, 1); smaug_i64_set(b, 2, 4);
+
+    smaug_series_i64_t *r;
+    #define CHECK_PROP(op, name) \
+        r = smaug_i64_##op(a, b); \
+        OK(!smaug_i64_is_null(r, 0), name " pos0 (ambos validos) -> valido"); \
+        OK(smaug_i64_is_null(r, 1),  name " pos1 (b NULL, a valido) -> NULL"); \
+        OK(smaug_i64_is_null(r, 2),  name " pos2 (a NULL) -> NULL"); \
+        smaug_i64_free(r)
+    CHECK_PROP(add, "i64 add");
+    CHECK_PROP(sub, "i64 sub");
+    CHECK_PROP(mul, "i64 mul");
+    CHECK_PROP(div, "i64 div");
+    #undef CHECK_PROP
+
+    smaug_i64_free(a); smaug_i64_free(b);
+}
+
 int main(void) {
+    f64_arith_null_prop();
+    i64_arith_null_prop();
     f64_reduce_na_false();
     f64_reduce_empty();
     f64_reduce_all_null();
