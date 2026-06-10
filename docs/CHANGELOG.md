@@ -4,7 +4,64 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
-### Contrato defensivo do C — peça 2/N: leituras comunicam status (`get` Shape 1) `[In progress]`
+### Endurecimento — frente B (OOM nas ops): B1 numérico + B2 bool `[In progress]`
+- **B1 — `test_allocfail` força OOM nas ops aritméticas restantes:** f64
+  `sub`/`mul`/`div` + `sub`/`mul`/`div_scalar` + compares `lt`/`eq`; i64
+  `sub`/`mul`/`div` + os três scalars. Antes só `add`/`add_scalar`/`gt` eram
+  alloc-falhados.
+- **B2 — seção bool nova no allocfail:** `and`/`or`/`xor`/`not` dirigidos com
+  `out_mask`, cobrindo os dois `malloc` do `alloc_pair` e os guards `!r`. Bool
+  estava fora do allocfail por completo.
+- `test_allocfail` 579 → 747 verificações. `gcov` direcionado confirma as duas
+  direções tomadas nos guards (`!r`/`!vals`/`!m`). Validado no Windows (MSYS2);
+  cobertura autoritativa e Valgrind pendentes do passe Fedora. **B3** (string/
+  `ops_str` + resíduo reachable) aguarda o mapa pós-B1+B2.
+
+### Endurecimento — frente A: guards de input + A2 (exclusão de cobertura) `[Done]`
+- **A1 — varredura de input inválido** em todas as ops públicas (ponteiro NULL,
+  tamanhos incompatíveis, `status=NULL` no caminho de erro), verificando o
+  contrato *o engine não confia no caller*. `test_ops_edge` (190 checks),
+  `test_bool`, `test_string` (114) e `test_alloc` (core) exercitam os guards.
+- **A2 — mecanismo de exclusão de cobertura:** tag `COV-EXCL-BR: <justificativa>`
+  no fonte + `scripts/make_coverage.sh` reconhecendo-a, separando **branch-alvo**
+  (exclui guards defensivos/inalcançáveis marcados) de **branch-bruto**, com
+  seção auditável de excluídos. 13 ramos marcados (overflow/capacity, realloc de
+  shrink, `bool:48` morto, `str:290` impossível). `assert` reservado a invariante
+  interna; overflow/capacity são guards documentados, nunca `assert`.
+- **Resíduo achado pela frente A:** `sub`/`mul_scalar` (f64) e os três scalars do
+  i64 só rodavam o guard NULL. `test_scalar_compute` (em `test_ops`) fecha conta
+  + propagação de null + contrato `i64 div_scalar(0) → tudo-null`.
+
+### Endurecimento — frente C: semântica fechada (null-propagation + Kleene) `[Done]`
+- **C1 — propagação estrita de null** nas aritméticas (qualquer operando null →
+  resultado null, sem elemento absorvente: `0 × null = null`), alinhada a
+  pandas/numpy; e a divergência de divisão por zero (i64 → null; f64 → IEEE 754,
+  ±Inf/NaN válido). Pinado em `test_ops_edge`.
+- **C2 — tabela-verdade Kleene completa** do booleano (`and`/`or`/`xor`/`not`),
+  incluindo os assimétricos (`F·NA = F`, `T·NA = T`). Pinado em `test_bool`.
+
+### Adicionado — testes de stress (`test_stress.c`) `[Done]`
+- Alvo `make test-stress`: N=1M f64/i64 linear, N=50k sort/argsort, N=50k append,
+  N=10k encadeado (filter→sort→take), COW com 200 views sobre série de 1k,
+  string N=1k, e 10k ciclos create/clone/view+COW/free. Valgrind-clean (90k+
+  allocs). Confiança em datasets grandes e crescimento de memória.
+
+### Adicionado — Copy-on-Write em views (f64/i64) `[Done]`
+- Views compartilham o buffer da pai **zero-copy** até a primeira escrita. Toda
+  mutação (`set`/`set_null`/`append`/`append_null`) materializa um buffer privado
+  (`make_private` em C, copiando **só o slice visto**) antes de escrever; a pai
+  nunca é tocada. Falha de materialização → `SMG_ERR_NOMEM` (`set`) / `-1`
+  (`append`), com série e pai intactos (falha segura). Ver `docs/COW.md`. Coberto
+  por `test_cow`.
+
+### Alterado — `str_set` migrado de `int` para `smaug_status_t` `[Done]`
+- `str_set` agora devolve `smaug_status_t` (`OK`/`OOB`/`ARGUMENT`/`NOMEM`) em toda
+  a stack (impl, header, cdef FFI), consistente com `f64_set`/`i64_set`. Como a
+  string **não tem views/COW**, o `SMG_ERR_NOMEM` vem da realocação do buffer de
+  bytes, não de detach. `str_set_null` chama `str_set` por dentro e propaga o
+  mesmo enum. Docs alinhados (`CONTRACT.md`, `API_INDEX.md`, `API_Reference.md`).
+
+### Contrato defensivo do C — peça 2/N: leituras comunicam status (`get` Shape 1) `[Done]`
 - **`f64_get`/`i64_get` migrados para Shape 1:** `T get(const S *s, size_t idx,
   smaug_status_t *status)`. Devolvem o valor; escrevem `*status` se `status !=
   NULL` (`SMG_OK`/`SMG_NULL_VALUE`/`SMG_ERR_OOB`/`SMG_ERR_ARGUMENT`). Em erro/null
@@ -26,7 +83,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
   frente: convergir `append`/`str_set` (0/-1) para o enum, e a **CoW** das views
   (peça grande, 3 forks em aberto + `SMG_ERR_NOMEM`).
 
-### Contrato defensivo do C — peça 1/N: mutações comunicam status `[In progress]`
+### Contrato defensivo do C — peça 1/N: mutações comunicam status `[Done]`
 - **Princípio adotado:** *o engine não confia no caller*. Toda fronteira pública
   valida (ponteiro/argumento/índice) e **comunica** o resultado; nunca falha em
   silêncio. Substitui a antiga nota "o caller garante a validade" em

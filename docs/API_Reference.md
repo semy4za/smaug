@@ -6,7 +6,8 @@ semântica análogas. As diferenças de int64 estão na seção final.
 
 **Status:** todas as funções abaixo estão **implementadas** para f64 e i64
 (`smaug_core.c` + `smaug_ops_f64.c` + `smaug_ops_i64.c`), mais as operações
-booleanas (`smaug_ops_bool.c`).
+booleanas (`smaug_ops_bool.c`) e o tipo `string` Tier 1
+(`smaug_str.c` + `smaug_ops_str.c`).
 
 ## Mapa de headers (qual `#include` usar)
 
@@ -20,6 +21,7 @@ cobre o que você usa, ou o umbrella `smaug.h` para tudo:
 | `smaug_core.h` | Lifecycle (create/free/clone/view), get/set, append, `smaug_free`. | `smaug_types.h` |
 | `smaug_numeric.h` | Aritmética, reduções, comparações, ordenação, take/filter/count (f64+i64). | `smaug_core.h` |
 | `smaug_bool.h` | Operações booleanas Kleene. | `smaug_types.h` |
+| `smaug_string.h` | Tipo `string`: lifecycle, acesso, comparações, filter/take/sort. | `smaug_types.h` |
 | `smaug.h` | **Umbrella** — inclui os de operação. | todos acima |
 
 > O antigo `smaug_math.h` foi **removido** (o nome "math" não refletia o
@@ -303,6 +305,77 @@ No frontend, a classe `BoolSeries` (`lua/smaug/core/boolseries.lua`) possui
 esses arrays via `ffi.gc(ptr, free)` e expõe `:land/:lor/:lxor/:lnot`,
 `:count_true/:any/:all`, e os operadores `*` (and), `+` (or), `-` (xor).
 `Series:filter(bool_series)` usa os valores como máscara de `smaug_*_filter`.
+
+---
+
+## Strings (`smaug_str_*`)
+
+Tipo Tier 1 completo. Representação **offset-based** (estilo Arrow): um buffer de
+bytes concatenados + um array de offsets. Trata **bytes crus** — não há
+normalização nem validação UTF-8 (dívida futura). Comparações e ordenação são
+**lexicográficas por byte**, não Unicode-aware. A string vazia `""` é um valor
+**válido e distinto de NULL**.
+
+> **String não tem views nem Copy-on-Write** (diferente de f64/i64). Toda série
+> string é dona do próprio buffer; não há detach.
+
+### Lifecycle
+
+| Função | Retorno | Notas |
+|--------|---------|-------|
+| `create(size)` | série / NULL | todos os elementos nascem NULL |
+| `create_with_capacity(size, buffer_capacity)` | série / NULL | pré-aloca o buffer de bytes para `set`/`append` |
+| `create_from_array(array, len)` | série / NULL | `array` é `const char *const *`; entrada `NULL` no array → posição NULL |
+| `free(s)` | void | idempotente (`NULL` seguro); respeita `external_alloc` |
+| `clone(s)` | série / NULL | deep copy independente |
+
+### Acesso e mutação
+
+| Função | Retorno | Comportamento |
+|--------|---------|---------------|
+| `get(s, idx, out_len)` | `const char*` / NULL | ponteiro para os bytes (**não** terminado em `\0`); escreve o comprimento em `*out_len`. NULL se `idx` inválido ou posição NULL |
+| `set(s, idx, str, len)` | `smaug_status_t` | grava `len` bytes; pode realocar o buffer. `SMG_OK`/`SMG_ERR_OOB`/`SMG_ERR_ARGUMENT`/`SMG_ERR_NOMEM` |
+| `set_null(s, idx)` | `smaug_status_t` | marca a posição como NULL |
+| `is_null(s, idx)` | `bool` | `true` se NULL ou fora dos limites |
+| `append(s, str, len)` | `0` ok / `-1` erro | adiciona ao fim |
+| `append_null(s)` | `0` ok / `-1` erro | adiciona posição nula ao fim |
+| `count_nonnull(s)` | `size_t` | número de elementos válidos |
+
+> **`get` não usa `smaug_status_t`** — já distingue erro/NULL de valor pelo
+> retorno `NULL` + `out_len`, sem colisão. O ponteiro aponta para dentro do
+> buffer interno: **não liberar**, e tratar como inválido após qualquer mutação
+> que possa realocar o buffer (`set`/`append`).
+>
+> **`set` retorna `smaug_status_t`** (migrado do antigo `int`), consistente com
+> `f64_set`/`i64_set`. Como string não tem views, o `SMG_ERR_NOMEM` vem da
+> realocação do buffer de bytes, não de detach COW.
+
+### Comparações
+
+```c
+uint8_t* smaug_str_eq(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
+uint8_t* smaug_str_lt(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
+uint8_t* smaug_str_gt(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
+```
+
+- Comparação **byte-lexicográfica** contra `target` (`target_len` bytes). Mesma
+  convenção dos numéricos: devolvem array `uint8_t*` (`1`/`0`) e, via `out_mask`
+  não-NULL, a máscara do resultado. **O caller libera ambos** com `smaug_free`.
+- NA de entrada → resultado `0` e mask `0x00` naquela posição.
+
+### Filtro e ordenação
+
+| Função | Retorno | Notas |
+|--------|---------|-------|
+| `filter(s, mask)` | série / NULL | nova série só com posições onde `mask[i] != 0` (preserva NULL) |
+| `take(s, idx, len)` | série / NULL | copia os índices `idx[0..len-1]` (preserva NULL); NULL se algum índice fora dos limites |
+| `argsort(s, ascending)` | `size_t*` / NULL | índices que ordenam; **NULL se a série tem qualquer nulo**; libera com `smaug_free` |
+| `sort(s, ascending)` | série / NULL | nova série ordenada (= `argsort` + `take`); NULL se há nulos |
+
+> Memória: séries (`create`/`clone`/`filter`/`take`/`sort`) liberam com
+> `smaug_str_free`; buffers crus de comparação/`argsort` (`uint8_t*`, `size_t*`,
+> `out_mask`) liberam com `smaug_free`. No frontend Lua, `ffi.gc` cuida dos
+> structs de série.
 
 ---
 

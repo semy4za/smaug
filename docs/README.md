@@ -222,6 +222,7 @@ Ferramentas auxiliares de build e cobertura.
 * CODE_REVIEW.md
 * CONTRACT.md
 * COVERAGE.md
+* COW.md
 * Roadmap.md
 
 ---
