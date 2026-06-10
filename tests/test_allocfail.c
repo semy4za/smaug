@@ -150,6 +150,110 @@ static void af_f64_compare(void) {
     smaug_f64_free(x);
 }
 
+/* --- B1: ops aritméticas restantes (sub/mul/div série) --- */
+static void af_f64_sub(void) {
+    double a[3] = {4, 5, 6}, b[3] = {1, 2, 3};
+    smaug_series_f64_t *x = smaug_f64_create_from_array(a, 3);
+    smaug_series_f64_t *y = smaug_f64_create_from_array(b, 3);
+    assert(x && y);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_f64_t *r = smaug_f64_sub(x, y);
+        if (r) { OK(r->size == 3, "f64 sub size"); smaug_f64_free(r); }
+    }
+    smaug_f64_free(x); smaug_f64_free(y);
+}
+
+static void af_f64_mul(void) {
+    double a[3] = {4, 5, 6}, b[3] = {1, 2, 3};
+    smaug_series_f64_t *x = smaug_f64_create_from_array(a, 3);
+    smaug_series_f64_t *y = smaug_f64_create_from_array(b, 3);
+    assert(x && y);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_f64_t *r = smaug_f64_mul(x, y);
+        if (r) { OK(r->size == 3, "f64 mul size"); smaug_f64_free(r); }
+    }
+    smaug_f64_free(x); smaug_f64_free(y);
+}
+
+static void af_f64_div(void) {
+    double a[3] = {4, 5, 6}, b[3] = {1, 2, 3};   /* divisor não-nulo */
+    smaug_series_f64_t *x = smaug_f64_create_from_array(a, 3);
+    smaug_series_f64_t *y = smaug_f64_create_from_array(b, 3);
+    assert(x && y);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_f64_t *r = smaug_f64_div(x, y);
+        if (r) { OK(r->size == 3, "f64 div size"); smaug_f64_free(r); }
+    }
+    smaug_f64_free(x); smaug_f64_free(y);
+}
+
+/* --- B1: scalars restantes (sub/mul/div) --- */
+static void af_f64_sub_scalar(void) {
+    double arr[3] = {1, 2, 3};
+    smaug_series_f64_t *x = smaug_f64_create_from_array(arr, 3);
+    assert(x);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_f64_t *r = smaug_f64_sub_scalar(x, 1.0);
+        if (r) { OK(r->size == 3, "f64 sub_scalar size"); smaug_f64_free(r); }
+    }
+    smaug_f64_free(x);
+}
+
+static void af_f64_mul_scalar(void) {
+    double arr[3] = {1, 2, 3};
+    smaug_series_f64_t *x = smaug_f64_create_from_array(arr, 3);
+    assert(x);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_f64_t *r = smaug_f64_mul_scalar(x, 2.0);
+        if (r) { OK(r->size == 3, "f64 mul_scalar size"); smaug_f64_free(r); }
+    }
+    smaug_f64_free(x);
+}
+
+static void af_f64_div_scalar(void) {
+    double arr[3] = {1, 2, 3};
+    smaug_series_f64_t *x = smaug_f64_create_from_array(arr, 3);
+    assert(x);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_f64_t *r = smaug_f64_div_scalar(x, 2.0);   /* scalar não-nulo */
+        if (r) { OK(r->size == 3, "f64 div_scalar size"); smaug_f64_free(r); }
+    }
+    smaug_f64_free(x);
+}
+
+/* --- B1: compares restantes (lt/eq); gt já coberto em af_f64_compare --- */
+static void af_f64_lt(void) {
+    double arr[3] = {1, 2, 3};
+    smaug_series_f64_t *x = smaug_f64_create_from_array(arr, 3);
+    assert(x);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *mask = NULL;
+        uint8_t *res = smaug_f64_lt(x, 1.5, &mask);
+        if (res) { OK(mask != NULL, "f64 lt mask junto"); free(res); free(mask); }
+    }
+    smaug_f64_free(x);
+}
+
+static void af_f64_eq(void) {
+    double arr[3] = {1, 2, 3};
+    smaug_series_f64_t *x = smaug_f64_create_from_array(arr, 3);
+    assert(x);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *mask = NULL;
+        uint8_t *res = smaug_f64_eq(x, 2.0, &mask);
+        if (res) { OK(mask != NULL, "f64 eq mask junto"); free(res); free(mask); }
+    }
+    smaug_f64_free(x);
+}
+
 static void af_f64_argsort(void) {
     double arr[3] = {3, 1, 2};
     smaug_series_f64_t *x = smaug_f64_create_from_array(arr, 3);
@@ -264,6 +368,83 @@ static void af_i64_compare(void) {
         smaug_mask_t *mask = NULL;
         uint8_t *res = smaug_i64_gt(x, 1, &mask);
         if (res) { OK(mask != NULL, "i64 gt mask junto"); free(res); free(mask); }
+    }
+    smaug_i64_free(x);
+}
+
+/* --- B1: i64 ops aritméticas restantes (sub/mul/div série) --- */
+static void af_i64_sub(void) {
+    int64_t a[3] = {4, 5, 6}, b[3] = {1, 2, 3};
+    smaug_series_i64_t *x = smaug_i64_create_from_array(a, 3);
+    smaug_series_i64_t *y = smaug_i64_create_from_array(b, 3);
+    assert(x && y);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_i64_t *r = smaug_i64_sub(x, y);
+        if (r) { OK(r->size == 3, "i64 sub size"); smaug_i64_free(r); }
+    }
+    smaug_i64_free(x); smaug_i64_free(y);
+}
+
+static void af_i64_mul(void) {
+    int64_t a[3] = {4, 5, 6}, b[3] = {1, 2, 3};
+    smaug_series_i64_t *x = smaug_i64_create_from_array(a, 3);
+    smaug_series_i64_t *y = smaug_i64_create_from_array(b, 3);
+    assert(x && y);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_i64_t *r = smaug_i64_mul(x, y);
+        if (r) { OK(r->size == 3, "i64 mul size"); smaug_i64_free(r); }
+    }
+    smaug_i64_free(x); smaug_i64_free(y);
+}
+
+static void af_i64_div(void) {
+    int64_t a[3] = {4, 5, 6}, b[3] = {1, 2, 3};   /* divisor não-nulo */
+    smaug_series_i64_t *x = smaug_i64_create_from_array(a, 3);
+    smaug_series_i64_t *y = smaug_i64_create_from_array(b, 3);
+    assert(x && y);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_i64_t *r = smaug_i64_div(x, y);
+        if (r) { OK(r->size == 3, "i64 div size"); smaug_i64_free(r); }
+    }
+    smaug_i64_free(x); smaug_i64_free(y);
+}
+
+/* --- B1: i64 scalars restantes (sub/mul/div) --- */
+static void af_i64_sub_scalar(void) {
+    int64_t arr[3] = {1, 2, 3};
+    smaug_series_i64_t *x = smaug_i64_create_from_array(arr, 3);
+    assert(x);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_i64_t *r = smaug_i64_sub_scalar(x, 1);
+        if (r) { OK(r->size == 3, "i64 sub_scalar size"); smaug_i64_free(r); }
+    }
+    smaug_i64_free(x);
+}
+
+static void af_i64_mul_scalar(void) {
+    int64_t arr[3] = {1, 2, 3};
+    smaug_series_i64_t *x = smaug_i64_create_from_array(arr, 3);
+    assert(x);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_i64_t *r = smaug_i64_mul_scalar(x, 3);
+        if (r) { OK(r->size == 3, "i64 mul_scalar size"); smaug_i64_free(r); }
+    }
+    smaug_i64_free(x);
+}
+
+static void af_i64_div_scalar(void) {
+    int64_t arr[3] = {2, 4, 6};
+    smaug_series_i64_t *x = smaug_i64_create_from_array(arr, 3);
+    assert(x);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_i64_t *r = smaug_i64_div_scalar(x, 2);   /* scalar não-nulo */
+        if (r) { OK(r->size == 3, "i64 div_scalar size"); smaug_i64_free(r); }
     }
     smaug_i64_free(x);
 }
@@ -741,8 +922,16 @@ int main(void) {
     af_f64_view();
     af_f64_append_grow();
     af_f64_add();
+    af_f64_sub();
+    af_f64_mul();
+    af_f64_div();
     af_f64_add_scalar();
+    af_f64_sub_scalar();
+    af_f64_mul_scalar();
+    af_f64_div_scalar();
     af_f64_compare();
+    af_f64_lt();
+    af_f64_eq();
     af_f64_argsort();
     af_f64_sort();
     af_f64_take();
@@ -754,7 +943,13 @@ int main(void) {
     af_i64_view();
     af_i64_append_grow();
     af_i64_add();
+    af_i64_sub();
+    af_i64_mul();
+    af_i64_div();
     af_i64_add_scalar();
+    af_i64_sub_scalar();
+    af_i64_mul_scalar();
+    af_i64_div_scalar();
     af_i64_compare();
     af_i64_argsort();
     af_i64_sort();
