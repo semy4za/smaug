@@ -203,6 +203,63 @@ static void test_i64_lifecycle(void) {
     smaug_i64_free(s);
 }
 
+/* ======================================================================
+   FASE 8 / frente A1 (core) — varredura de input inválido no lifecycle.
+   Cobre o que os testes de create, clone, view e append ainda nao pegavam: as 3
+   sub-condições do guard de view (!s, start>size, len>size-start), append/
+   append_null com serie NULL, clone/from_array NULL do i64, is_null(NULL/OOB)
+   f64+i64, e clone de serie VAZIA (ramo size>0 falso). create_from_array(NULL)
+   e clone(NULL) do f64, e create_with_capacity(size>cap), ja cobertos.
+   ====================================================================== */
+static void test_core_input_guards(void) {
+    smaug_series_f64_t *s  = smaug_f64_create(5);
+    smaug_series_i64_t *si = smaug_i64_create(5);
+
+    /* view: as 3 sub-condicoes do guard (short-circuit evita underflow em start>size) */
+    assert(smaug_f64_view(NULL, 0, 0) == NULL);
+    assert(smaug_f64_view(s, 99, 0)   == NULL);   /* start > size */
+    assert(smaug_f64_view(s, 0, 99)   == NULL);   /* len > size-start */
+    assert(smaug_i64_view(NULL, 0, 0) == NULL);
+    assert(smaug_i64_view(si, 99, 0)  == NULL);
+    assert(smaug_i64_view(si, 0, 99)  == NULL);
+
+    /* append / append_null: serie NULL -> -1 */
+    assert(smaug_f64_append(NULL, 1.0) == -1);
+    assert(smaug_f64_append_null(NULL) == -1);
+    assert(smaug_i64_append(NULL, 1)   == -1);
+    assert(smaug_i64_append_null(NULL) == -1);
+
+    /* clone / from_array NULL (i64; f64 ja coberto) */
+    assert(smaug_i64_clone(NULL) == NULL);
+    assert(smaug_i64_create_from_array(NULL, 4) == NULL);
+
+    /* is_null: serie NULL e OOB -> true */
+    assert(smaug_f64_is_null(NULL, 0) == true);
+    assert(smaug_f64_is_null(s, 99)   == true);
+    assert(smaug_i64_is_null(NULL, 0) == true);
+    assert(smaug_i64_is_null(si, 99)  == true);
+
+    /* clone de serie VAZIA -> exercita o ramo (size>0) falso */
+    smaug_series_f64_t *empty = smaug_f64_create_with_capacity(0, 0);
+    smaug_series_f64_t *ec    = smaug_f64_clone(empty);
+    assert(ec != NULL && ec->size == 0);
+    smaug_f64_free(empty); smaug_f64_free(ec);
+
+    /* simetria i64: create_with_capacity(size>cap), clone de vazia, append_null com crescimento */
+    assert(smaug_i64_create_with_capacity(9, 4) == NULL);   /* size > capacity */
+    smaug_series_i64_t *iempty = smaug_i64_create_with_capacity(0, 0);
+    smaug_series_i64_t *iec    = smaug_i64_clone(iempty);   /* clone vazia: ramo size>0 falso */
+    assert(iec != NULL && iec->size == 0);
+    smaug_i64_free(iempty); smaug_i64_free(iec);
+
+    smaug_series_i64_t *ig = smaug_i64_create(2);           /* size == capacity == 2 */
+    assert(smaug_i64_append_null(ig) == 0);                 /* size>=capacity -> cresce */
+    assert(ig->size == 3 && smaug_i64_is_null(ig, 2));
+    smaug_i64_free(ig);
+
+    smaug_f64_free(s); smaug_i64_free(si);
+}
+
 int main(void) {
     test_create_defaults();
     test_create_with_capacity();
@@ -212,6 +269,7 @@ int main(void) {
     test_view_aliasing();
     test_append_grow();
     test_i64_lifecycle();
+    test_core_input_guards();
 
     printf("PASS\n");
     return 0;
