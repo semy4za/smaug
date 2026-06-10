@@ -905,6 +905,57 @@ static void af_i64_filter(void) {
 }
 
 /* ======================================================================
+   B2: bool (Kleene) — and/or/xor/not via alloc-fail.
+   As ops bool não têm struct de série: operam em arrays crus (valores +
+   máscara + n). A única alocação durante a op é o alloc_pair (vals + mask),
+   então out_mask é sempre fornecido para forçar os DOIS mallocs (linhas
+   15/18) e o guard !r de cada op.
+   ====================================================================== */
+static void af_bool_and(void) {
+    uint8_t a[3] = {1, 0, 1}, b[3] = {1, 1, 0};
+    smaug_mask_t am[3] = {0xFF, 0xFF, 0xFF}, bm[3] = {0xFF, 0xFF, 0xFF};
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *om = NULL;
+        uint8_t *r = smaug_bool_and(a, am, b, bm, 3, &om);
+        if (r) { OK(om != NULL, "bool and mask junto"); free(r); free(om); }
+    }
+}
+
+static void af_bool_or(void) {
+    uint8_t a[3] = {1, 0, 1}, b[3] = {1, 1, 0};
+    smaug_mask_t am[3] = {0xFF, 0xFF, 0xFF}, bm[3] = {0xFF, 0xFF, 0xFF};
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *om = NULL;
+        uint8_t *r = smaug_bool_or(a, am, b, bm, 3, &om);
+        if (r) { OK(om != NULL, "bool or mask junto"); free(r); free(om); }
+    }
+}
+
+static void af_bool_xor(void) {
+    uint8_t a[3] = {1, 0, 1}, b[3] = {1, 1, 0};
+    smaug_mask_t am[3] = {0xFF, 0xFF, 0xFF}, bm[3] = {0xFF, 0xFF, 0xFF};
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *om = NULL;
+        uint8_t *r = smaug_bool_xor(a, am, b, bm, 3, &om);
+        if (r) { OK(om != NULL, "bool xor mask junto"); free(r); free(om); }
+    }
+}
+
+static void af_bool_not(void) {
+    uint8_t a[3] = {1, 0, 1};
+    smaug_mask_t am[3] = {0xFF, 0xFF, 0xFF};
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *om = NULL;
+        uint8_t *r = smaug_bool_not(a, am, 3, &om);
+        if (r) { OK(om != NULL, "bool not mask junto"); free(r); free(om); }
+    }
+}
+
+/* ======================================================================
    sanidade: sem falha injetada, tudo funciona (garante que o teste não
    está sabotando além da conta)
    ====================================================================== */
@@ -975,6 +1026,11 @@ int main(void) {
     af_f64_cow_append_null();
     af_i64_cow_append();
     af_i64_cow_append_null();
+
+    af_bool_and();
+    af_bool_or();
+    af_bool_xor();
+    af_bool_not();
 
     sanity_no_fail();
 
