@@ -121,7 +121,7 @@ smaug_series_str_t *smaug_str_create_from_array(const char *const *array, size_t
         if (array[i]) {
             size_t l = strlen(array[i]);
             /* proteção de overflow: o total não pode estourar size_t */
-            if (l > (size_t)-1 - total) return NULL;
+            if (l > (size_t)-1 - total) return NULL;  /* COV-EXCL-BR: total ~ SIZE_MAX; inalcancavel */
             total += l;
         }
     }
@@ -182,12 +182,12 @@ static int str_buffer_reserve(smaug_series_str_t *s, size_t extra) {
 
     size_t need = s->buffer_len + extra;
     /* overflow guard na soma acima */
-    if (need < s->buffer_len) return -1;
+    if (need < s->buffer_len) return -1;  /* COV-EXCL-BR: overflow na soma buffer_len+extra; so com buffer_len ~ SIZE_MAX */
 
     size_t new_cap = s->buffer_capacity ? s->buffer_capacity : SMAUG_STR_BUFFER_INIT;
     while (new_cap < need) {
         size_t grown = new_cap + (new_cap >> 1);      /* *1.5 */
-        if (grown <= new_cap) { new_cap = need; break; }  /* overflow → usa need */
+        if (grown <= new_cap) { new_cap = need; break; }  /* overflow → usa need; COV-EXCL-BR: overflow no crescimento *1.5; so com new_cap ~ SIZE_MAX */
         new_cap = grown;
     }
     char *nb = realloc(s->buffer, new_cap);
@@ -202,7 +202,7 @@ static int str_slots_reserve_one(smaug_series_str_t *s) {
     if (s->size < s->capacity) return 0;               /* já cabe */
 
     size_t new_cap = s->capacity ? (s->capacity + (s->capacity >> 1)) : 4;
-    if (new_cap <= s->capacity) new_cap = s->capacity + 1;
+    if (new_cap <= s->capacity) new_cap = s->capacity + 1;  /* COV-EXCL-BR: overflow ao dobrar capacity; so com capacity ~ SIZE_MAX */
 
     /* offsets tem (capacity + 1) elementos */
     size_t *no = realloc(s->offsets, (new_cap + 1) * sizeof(size_t));
@@ -215,7 +215,7 @@ static int str_slots_reserve_one(smaug_series_str_t *s) {
            numérico: realloc(p,0) liberaria p e deixaria dangling). */
         if (s->capacity > 0) {
             size_t *back = realloc(s->offsets, (s->capacity + 1) * sizeof(size_t));
-            if (back) s->offsets = back;
+            if (back) s->offsets = back;  /* COV-EXCL-BR: realloc de shrink falhando; defensivo */
         }
         return -1;
     }
@@ -287,7 +287,7 @@ smaug_status_t smaug_str_set_null(smaug_series_str_t *s, size_t idx) {
        logo não aloca; mas propagamos o status em vez de descartá-lo (o str_set
        legado devolve -1 só em !s/idx inválido/OOM, todos impossíveis aqui). */
     smaug_status_t rc = smaug_str_set(s, idx, "", 0);
-    if (rc != SMG_OK) return rc;   /* propaga (na prática impossível após validação acima) */
+    if (rc != SMG_OK) return rc;   /* propaga (na prática impossível após validação acima); COV-EXCL-BR: rc sempre SMG_OK neste ponto (validacao acima ja garante) */
     s->null_mask[idx] = 0x00;       /* e marca NULL (set deixou 0xFF) */
     return SMG_OK;
 }

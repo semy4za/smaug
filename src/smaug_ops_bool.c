@@ -45,7 +45,7 @@ uint8_t *smaug_bool_and(const uint8_t *a, const smaug_mask_t *am,
         if ((av && !a[i]) || (bv && !b[i])) {
             put(r, m, i, 0, 1);                 /* algum false -> false */
         } else if (av && bv) {
-            put(r, m, i, at && bt, 1);          /* ambos válidos */
+            put(r, m, i, at && bt, 1);          /* ambos válidos; COV-EXCL-BR: at&&bt sempre true aqui (linhas 45/47 ja garantiram ambos validos-nao-false) */
         } else {
             put(r, m, i, 0, 0);                 /* NA */
         }

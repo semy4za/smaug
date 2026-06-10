@@ -19,7 +19,7 @@ void smaug_free(void *ptr) {
    Retorna 0 se ok, -1 se malloc falhou (série fica válida com old capacity). */
 static int f64_grow(smaug_series_f64_t *s) {
     size_t new_cap = s->capacity ? (s->capacity + (s->capacity >> 1)) : 4;
-    if (new_cap <= s->capacity) new_cap = s->capacity + 1; /* overflow guard */
+    if (new_cap <= s->capacity) new_cap = s->capacity + 1; /* overflow guard; COV-EXCL-BR: overflow ao dobrar capacity; so com capacity ~ SIZE_MAX */
 
     double *nd = realloc(s->data, new_cap * sizeof(double));
     if (!nd) return -1;            /* data intacto; nada mudou, série consistente */
@@ -36,7 +36,7 @@ static int f64_grow(smaug_series_f64_t *s) {
            memória até o próximo grow). capacity fica inalterado em ambos os casos. */
         if (s->capacity > 0) {
             double *back = realloc(s->data, s->capacity * sizeof(double));
-            if (back) s->data = back;
+            if (back) s->data = back;  /* COV-EXCL-BR: realloc de shrink falhando; defensivo, mantem buffer maior (seguro) */
         }
         return -1;
     }
@@ -47,7 +47,7 @@ static int f64_grow(smaug_series_f64_t *s) {
 
 static int i64_grow(smaug_series_i64_t *s) {
     size_t new_cap = s->capacity ? (s->capacity + (s->capacity >> 1)) : 4;
-    if (new_cap <= s->capacity) new_cap = s->capacity + 1;
+    if (new_cap <= s->capacity) new_cap = s->capacity + 1;  /* COV-EXCL-BR: overflow ao dobrar capacity; so com capacity ~ SIZE_MAX */
 
     int64_t *nd = realloc(s->data, new_cap * sizeof(int64_t));
     if (!nd) return -1;            /* data intacto; série consistente */
@@ -59,7 +59,7 @@ static int i64_grow(smaug_series_i64_t *s) {
            liberaria o buffer e deixaria s->data pendente → double-free). */
         if (s->capacity > 0) {
             int64_t *back = realloc(s->data, s->capacity * sizeof(int64_t));
-            if (back) s->data = back;
+            if (back) s->data = back;  /* COV-EXCL-BR: realloc de shrink falhando; defensivo, mantem buffer maior (seguro) */
         }
         return -1;
     }
