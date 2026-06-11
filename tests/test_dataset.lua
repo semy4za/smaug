@@ -211,4 +211,119 @@ check(dn_clean:nrows() == 2, "dropna independência: sobram 2 linhas")
 dn_clean:col("v"):set(1, 999.0)                 -- muta o derivado
 check(dn_indep:col("v"):get(1) == 10.0, "dropna: derivado independente do original")
 
+-- ---- dropna(): resultado independente do original ----
+local dn_indep = smaug.dataset({
+    {"v", Series.from_table({10, 20, 30}, "float64")},
+}, "dn_indep")
+dn_indep:col("v"):set_null(2)                   -- linha 2 vira null
+local dn_clean = dn_indep:dropna()              -- sobram linhas 1 e 3
+check(dn_clean:nrows() == 2, "dropna independência: sobram 2 linhas")
+dn_clean:col("v"):set(1, 999.0)                 -- muta o derivado
+check(dn_indep:col("v"):get(1) == 10.0, "dropna: derivado independente do original")
+
+-- =====================================================================
+-- API pública: smaug.DataSet({...}) com inferência de dtype
+-- =====================================================================
+local df_pub = smaug.DataSet({
+    {"venda", {10, 20, 30}},
+    {"custo", {3,  7,  2}},
+})
+check(df_pub:ncols() == 2,              "smaug.DataSet: 2 colunas")
+check(df_pub:nrows() == 3,              "smaug.DataSet: 3 linhas")
+check(df_pub:col("venda"):get(1) == 10, "smaug.DataSet: valor coluna")
+check(df_pub:col("venda")._dtype == "int64",   "smaug.DataSet: dtype inferido int64")
+check(df_pub:col("custo")._dtype == "int64",   "smaug.DataSet: dtype inferido int64 2")
+
+-- fracionário → float64
+local df_frac = smaug.DataSet({{"preco", {1.5, 2.0, 3.7}}})
+check(df_frac:col("preco")._dtype == "float64", "smaug.DataSet: dtype inferido float64")
+
+-- string → string
+local df_str = smaug.DataSet({{"uf", {"SP","RJ","MG"}}})
+check(df_str:col("uf")._dtype == "string", "smaug.DataSet: dtype inferido string")
+
+-- dtype explícito sobrepõe inferência
+local df_exp = smaug.DataSet({{"val", {1, 2, 3}, "float64"}})
+check(df_exp:col("val")._dtype == "float64", "smaug.DataSet: dtype explícito respeitado")
+
+-- =====================================================================
+-- df["col"] = series via __newindex (add + update)
+-- =====================================================================
+local df_ni = smaug.DataSet({
+    {"venda", {10.0, 20.0, 30.0}, "float64"},
+    {"custo", {3.0,  7.0,  2.0},  "float64"},
+})
+
+-- criar coluna derivada
+df_ni["lucro"] = df_ni["venda"] - df_ni["custo"]
+check(df_ni:has_column("lucro"),               "newindex: coluna criada")
+check(df_ni:col("lucro"):get(1) == 7.0,        "newindex: valor correto (10-3)")
+check(df_ni:col("lucro"):get(2) == 13.0,       "newindex: valor correto (20-7)")
+
+-- atualizar coluna existente
+df_ni["venda"] = df_ni["venda"] * 1.1
+check(math.abs(df_ni:col("venda"):get(1) - 11.0) < 1e-9, "newindex: update in-place")
+
+-- encadeamento
+df_ni["margem"] = df_ni["lucro"] / df_ni["venda"]
+check(df_ni:has_column("margem"),              "newindex: encadeamento ok")
+
+-- tamanho diferente deve falhar
+check(not pcall(function()
+    df_ni["ruim"] = Series.from_table({1, 2}, "int64")
+end), "newindex: rejeita série com tamanho diferente")
+
+-- =====================================================================
+-- Broadcast de escalares via __newindex
+-- =====================================================================
+local df_bc = smaug.DataSet({{"val", {1.0, 2.0, 3.0}, "float64"}})
+
+-- string
+df_bc["pais"] = "BR"
+check(df_bc:has_column("pais"),          "broadcast string: coluna criada")
+check(df_bc:col("pais"):get(1) == "BR",  "broadcast string: valor")
+check(df_bc:col("pais"):get(3) == "BR",  "broadcast string: todas as linhas")
+
+-- inteiro → int64
+df_bc["ano"] = 2024
+check(df_bc:col("ano"):get(1) == 2024,   "broadcast int: valor")
+check(df_bc:col("ano")._dtype == "int64","broadcast int: dtype int64")
+
+-- fracionário → float64
+df_bc["taxa"] = 0.15
+check(df_bc:col("taxa"):get(1) == 0.15,     "broadcast float: valor")
+check(df_bc:col("taxa")._dtype == "float64","broadcast float: dtype float64")
+
+-- boolean → int64 (1/0)
+df_bc["ativo"] = true
+check(df_bc:col("ativo"):get(1) == 1,    "broadcast bool true → 1")
+df_bc["inativo"] = false
+check(df_bc:col("inativo"):get(2) == 0,  "broadcast bool false → 0")
+
+-- DataSet vazio rejeita broadcast
+check(not pcall(function()
+    local empty = smaug.DataSet.new("vazio")
+    empty["x"] = "BR"
+end), "broadcast em DataSet vazio: erro")
+
+-- =====================================================================
+-- Series.full
+-- =====================================================================
+local sf = Series.full(4, "ok", nil, "t")
+check(sf:len() == 4,          "Series.full: tamanho")
+check(sf:get(1) == "ok",      "Series.full: valor")
+check(sf:get(4) == "ok",      "Series.full: último valor")
+check(sf._dtype == "string",  "Series.full: dtype string")
+
+local sf2 = Series.full(3, 42)
+check(sf2._dtype == "int64",  "Series.full: dtype inferido int64")
+check(sf2:get(2) == 42,       "Series.full: valor int")
+
+local sf3 = Series.full(2, 1.5)
+check(sf3._dtype == "float64","Series.full: dtype inferido float64")
+
+local sf4 = Series.full(3, true)
+check(sf4:get(1) == 1,        "Series.full: bool true → 1")
+check(sf4._dtype == "int64",  "Series.full: bool dtype int64")
+
 print(string.format("OK — %d checks passaram (DataSet)", n_ok))

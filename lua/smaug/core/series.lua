@@ -227,6 +227,29 @@ function Series.float64(size, name) return Series.new("float64", size, name) end
 function Series.int64(size, name)   return Series.new("int64",   size, name) end
 function Series.string(size, name)  return Series.new("string",  size, name) end
 
+-- Series.full(n, val, dtype): série de n elementos todos iguais a val.
+-- dtype inferido quando omitido: string→"string", boolean→"int64" (1/0),
+-- número inteiro→"int64", fracionário→"float64".
+-- Usado por DataSet.__newindex para broadcast de escalares.
+function Series.full(n, val, dtype, name)
+    if val == nil then
+        error("smaug: Series.full requer um valor não-nulo", 2)
+    end
+    if not dtype then
+        local t = type(val)
+        if     t == "string"  then dtype = "string"
+        elseif t == "boolean" then dtype = "int64"; val = val and 1 or 0
+        elseif t == "number"  then
+            dtype = (val % 1 == 0) and "int64" or "float64"
+        else
+            error("smaug: Series.full: tipo não suportado: " .. t, 2)
+        end
+    end
+    local s = Series.new(dtype, n, name)
+    for i = 1, n do s:set(i, val) end
+    return s
+end
+
 -- Cria a partir de uma tabela Lua. `nil` na tabela vira null.
 function Series.from_table(arr, dtype, name)
     dtype = dtype or "float64"

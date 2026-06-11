@@ -2,27 +2,35 @@
 --
 -- Entry point do Smaug. Expõe a API pública de alto nível.
 --   local smaug = require("smaug")
---   local s = smaug.Series.float64(3)
+--   local df = smaug.DataSet({{"venda",{10,20,30}},{"custo",{3,7,2}}})
+--   local df = smaug.DataSet.from_columns(...)    -- infraestrutura, ainda funciona
 --
--- À medida que as fases avançam, DataSet e os leitores de I/O (read_csv,
--- read_json, read_xml, read_sql) serão expostos aqui também.
+-- API pública:    smaug.DataSet(...)   smaug.read_csv(...)  (ring 2, futuro)
+-- Infraestrutura: DataSet.new/from_columns, Series.new/from_table (uso interno)
 
 local Series     = require("smaug.core.series")
 local BoolSeries = require("smaug.core.boolseries")
 local DataSet    = require("smaug.core.dataset")
 
 local smaug = {
-    _VERSION = "0.3.0-dev",   -- Fase 3 em andamento
+    _VERSION   = "1.0.0-dev",
     Series     = Series,
     BoolSeries = BoolSeries,
-    DataSet    = DataSet,
+    DataSet    = DataSet,   -- classe com __call: smaug.DataSet({...}) e .from_columns(...)
 }
 
--- Açúcar: smaug.float64(...) == smaug.Series.float64(...)
+-- API pública
+smaug.NA      = Series.NA
+smaug.dataset = DataSet     -- alias legado (smaug.dataset({...}))
+
+-- I/O (Ring 2 — futuro)
+-- smaug.read_csv     = require("smaug.io.csv").read
+-- smaug.read_json    = require("smaug.io.json").read
+-- smaug.read_parquet = require("smaug.io.parquet").read
+
+-- Açúcar para Series (uso avançado / interoperabilidade)
 smaug.float64    = Series.float64
 smaug.int64      = Series.int64
 smaug.from_table = Series.from_table
-smaug.NA = Series.NA
-smaug.dataset = DataSet.from_columns   -- smaug.dataset({{"a", {1,2}}, {"b", {3,4}}})
 
 return smaug

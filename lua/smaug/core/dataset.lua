@@ -63,9 +63,11 @@ end
 -- =====================================================================
 function methods.add_column(self, name, series)
     if type(name) ~= "string" then error("smaug: nome de coluna deve ser string", 2) end
-    if not is_series(series) then error("smaug: add_column espera uma Series", 2) end
+    if not (is_series(series) or is_boolseries(series)) then
+        error("smaug: add_column espera uma Series ou BoolSeries", 2)
+    end
     if self._columns[name] ~= nil then
-        error("smaug: coluna '"..name.."' já existe", 2)
+        error("smaug: coluna '"..name.."' já existe; use df[\""..name.."\"] = s para atualizar", 2)
     end
     local n = series:len()
     if self._length == nil then
@@ -76,6 +78,25 @@ function methods.add_column(self, name, series)
     end
     self._columns[name] = series
     self._col_names[#self._col_names + 1] = name
+    return self
+end
+
+-- update_column: substitui uma coluna existente, preservando a posição.
+-- Valida o número de linhas. Não pode ser usada para criar colunas novas.
+function methods.update_column(self, name, series)
+    if type(name) ~= "string" then error("smaug: nome de coluna deve ser string", 2) end
+    if not (is_series(series) or is_boolseries(series)) then
+        error("smaug: update_column espera uma Series ou BoolSeries", 2)
+    end
+    if self._columns[name] == nil then
+        error("smaug: coluna '"..name.."' não existe; use df[\""..name.."\"] = s para criar", 2)
+    end
+    local n = series:len()
+    if n ~= self._length then
+        error("smaug: coluna '"..name.."' tem "..n.." linhas; esperado "..
+              self._length, 2)
+    end
+    self._columns[name] = series
     return self
 end
 
@@ -374,6 +395,79 @@ DataSet.__index = function(self, k)
     return nil
 end
 
+-- __newindex: df["coluna"] = serie_ou_escalar
+-- Semântica: muta o DataSet in-place (consistente com add_column/update_column).
+--   - Series ou BoolSeries: passada diretamente.
+--   - Escalar (string, number, boolean): broadcast para Series.full(nrows, val).
+-- Invariante preservada: todas as colunas mantêm o mesmo número de linhas.
+-- Coluna existente → update_column (substitui, preserva posição).
+-- Coluna nova      → add_column (acrescenta ao fim).
+DataSet.__newindex = function(self, k, v)
+    -- atributos internos (_columns, _col_names, etc.) passam direto
+    if type(k) ~= "string" or k:sub(1,1) == "_" then
+        rawset(self, k, v)
+        return
+    end
+    -- converte escalar em Series via broadcast
+    if not (is_series(v) or is_boolseries(v)) then
+        local nrows = rawget(self, "_length")
+        if nrows == nil then
+            error("smaug: df[\""..k.."\"] = escalar requer DataSet não-vazio", 2)
+        end
+        v = Series.full(nrows, v, nil, k)
+    end
+    -- add ou update dependendo se a coluna já existe
+    local cols = rawget(self, "_columns")
+    if cols[k] ~= nil then
+        self:update_column(k, v)
+    else
+        self:add_column(k, v)
+    end
+end
+
 DataSet.__len = function(self) return self:nrows() end
+
+-- __call: smaug.DataSet({{"col", dados}, ...}, name?)
+-- Permite usar a classe como construtor público: DataSet({...})
+-- Preserva acesso a DataSet.from_columns, DataSet.new etc. via a classe.
+-- Lógica de inferência de dtype: string→"string", inteiro→"int64",
+-- fracionário→"float64". Series/BoolSeries passadas diretamente.
+local function infer_dtype(arr)
+    for _, v in ipairs(arr) do
+        if type(v) == "string" then return "string" end
+    end
+    for _, v in ipairs(arr) do
+        if type(v) == "number" and v % 1 ~= 0 then return "float64" end
+    end
+    return "int64"
+end
+
+setmetatable(DataSet, {
+    __call = function(_, pairs_list, name)
+        if type(pairs_list) ~= "table" then
+            error("smaug: DataSet espera uma lista de pares {{\"col\", dados}, ...}", 2)
+        end
+        local df = DataSet.new(name)
+        for _, pair in ipairs(pairs_list) do
+            local cname, data, dtype = pair[1], pair[2], pair[3]
+            if type(cname) ~= "string" then
+                error("smaug: nome de coluna deve ser string", 2)
+            end
+            local col
+            if getmetatable(data) == DataSet then
+                error("smaug: coluna '"..cname.."': esperado Series, não DataSet", 2)
+            elseif is_series(data) or is_boolseries(data) then
+                col = data
+            elseif type(data) == "table" then
+                dtype = dtype or infer_dtype(data)
+                col = Series.from_table(data, dtype, cname)
+            else
+                error("smaug: coluna '"..cname.."': dados devem ser tabela ou Series", 2)
+            end
+            df:add_column(cname, col)
+        end
+        return df
+    end
+})
 
 return DataSet
