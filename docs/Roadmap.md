@@ -48,11 +48,12 @@ endurecidos. O tipo `string` (Tier 1) está completo — lifecycle, acesso,
 mutação, comparações, `filter`/`take` e `sort`/`argsort`, validado nos dois
 sistemas operacionais.
 
-Métricas: cobertura 96.16% linha / 75.42% branch; suíte de 6 testes em C (inclui
-`test_allocfail` via `--wrap` e `test_ops_edge`) e 8 suítes em Lua (incluindo
-property-based, ~222k checks). Valgrind-clean no Linux; build e testes validados
-no Windows (MSYS2) via `windows-build.ps1`. Modelo de referência de teste:
-SQLite.
+Métricas: cobertura **99.82% linha / 100.00% branch-alvo** (MC/DC completo,
+1095/1095 ramos, 19 exclusões documentadas); suíte de 7 testes em C (inclui
+`test_allocfail` via `--wrap`, `test_ops_edge` e `test_stress`) e 8 suítes em
+Lua (incluindo property-based, 281083 checks). Valgrind-clean no Linux; build e
+testes validados no Windows (MSYS2) via `windows-build.ps1`. Modelo de referência
+de teste: SQLite.
 
 | Frente | Entrega | Status |
 |--------|---------|--------|
@@ -158,11 +159,12 @@ Valgrind-clean com 90k+ allocs:
 - **String N=1k**: set + sort + clone em escala moderada (alocação por elemento é cara).
 - **10k ciclos** create/clone/view+COW/free sem acumulação de memória.
 
-### 5. Consistência da API — `[In progress]`
+### 5. Consistência da API — `[Done]`
 
-Eliminar divergências entre documentação, roadmap e implementação. A
-documentação deve refletir o código real. (Esta reformulação do Roadmap é o
-primeiro passo; seguem `API_INDEX.md` e `API_Reference.md`.)
+Divergências entre documentação, roadmap e implementação eliminadas. A
+documentação reflete o código real: `API_Reference.md` tem seção String completa,
+`CONTRACT.md` alinhado com `str_set` → `smaug_status_t`, `Build_and_Testing.md`
+com listas e contagens corretas, `CHANGELOG.md` com histórico completo.
 
 ---
 

@@ -244,7 +244,7 @@ double smaug_i64_var(const smaug_series_i64_t *s, bool ignore_na) {
             count++;
         }
     }
-    return count ? sum_sq / (double)count : NAN;
+    return count ? sum_sq / (double)count : NAN;  /* COV-EXCL-BR: count==0 inalcancavel: mean nao-NaN implica count>0 */
 }
 
 double smaug_i64_std(const smaug_series_i64_t *s, bool ignore_na) {

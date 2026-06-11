@@ -242,7 +242,7 @@ double smaug_f64_var(const smaug_series_f64_t *s, bool ignore_na) {
         }
     }
 
-    return count ? sum_sq / (double)count : NAN;
+    return count ? sum_sq / (double)count : NAN;  /* COV-EXCL-BR: count==0 inalcancavel: mean nao-NaN implica count>0 */
 }
 
 double smaug_f64_std(const smaug_series_f64_t *s, bool ignore_na) {

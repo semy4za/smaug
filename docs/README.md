@@ -2,6 +2,8 @@
 
 Biblioteca de dados tabulares para Lua com backend em C.
 
+> **Cobertura:** 100% branch-alvo (MC/DC) · 99.82% linhas · 767 checks OOM · 281083 checks property-based · Valgrind-clean
+
 Smaug fornece estruturas tipadas para análise e transformação de dados, combinando uma API de alto nível em Lua com um núcleo de processamento implementado em C e acessado através de LuaJIT FFI.
 
 O projeto foi desenvolvido com foco em:

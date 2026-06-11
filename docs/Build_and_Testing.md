@@ -325,9 +325,10 @@ tests/
 ├── test_edge.lua   # ✅ casos degenerados (vazia/1-elem/toda-nula/toda-igual) + propagação NA
 ├── test_special.lua# ✅ valores especiais f64 (Inf, NaN distinto de null, -0.0)
 ├── test_fillna.lua # ✅ fillna (Series + DataSet), preservação de NaN, sem coerção
-├── test_props.lua  # ✅ property-based: 10 invariantes × 3 seeds × 400 casos (~222k checks)
+├── test_props.lua  # ✅ property-based: 15 invariantes × 3 seeds × 400 casos (281083 checks)
 ├── test_i64.lua    # ✅ int64 dedicado (aritmética, reduções, sort, take/filter, lifecycle)
-└── test_allocfail.c # ✅ falha de alocação (--wrap malloc/realloc): varre cada ponto, f64+i64
+└── test_allocfail.c # ✅ falha de alocação (--wrap malloc/realloc): 767 verificações,
+                     #    cobre f64+i64+bool+string em toda op pública alocante
 ```
 
 Rode os C com `make test` (ou `make valgrind` para checar leaks) e o frontend

@@ -188,7 +188,7 @@ static int sort_cmp(const void *pa, const void *pb) {
     }
     /* desempate estável por índice (qsort não é estável; isto torna
        determinístico para elementos iguais) */
-    if (c == 0) c = (ia < ib) ? -1 : (ia > ib) ? 1 : 0;
+    if (c == 0) c = (ia < ib) ? -1 : (ia > ib) ? 1 : 0;  /* COV-EXCL-BR: ia==ib inalcancavel (indices sempre unicos no argsort) */
     return g_sort_ascending ? c : -c;
 }
 

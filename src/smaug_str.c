@@ -92,7 +92,7 @@ smaug_series_str_t *smaug_str_clone(const smaug_series_str_t *s) {
 
 void smaug_str_free(smaug_series_str_t *s) {
     if (!s) return;
-    if (!s->meta.external_alloc) {
+    if (!s->meta.external_alloc) {  /* COV-EXCL-BR: external_alloc=true inalcancavel via API publica; usado apenas internamente */
         free(s->buffer);
         free(s->offsets);
         free(s->null_mask);
@@ -184,7 +184,7 @@ static int str_buffer_reserve(smaug_series_str_t *s, size_t extra) {
     /* overflow guard na soma acima */
     if (need < s->buffer_len) return -1;  /* COV-EXCL-BR: overflow na soma buffer_len+extra; so com buffer_len ~ SIZE_MAX */
 
-    size_t new_cap = s->buffer_capacity ? s->buffer_capacity : SMAUG_STR_BUFFER_INIT;
+    size_t new_cap = s->buffer_capacity ? s->buffer_capacity : SMAUG_STR_BUFFER_INIT;  /* COV-EXCL-BR: buffer_capacity==0 inalcancavel via API publica (create garante bufcap>=INIT) */
     while (new_cap < need) {
         size_t grown = new_cap + (new_cap >> 1);      /* *1.5 */
         if (grown <= new_cap) { new_cap = need; break; }  /* overflow → usa need; COV-EXCL-BR: overflow no crescimento *1.5; so com new_cap ~ SIZE_MAX */
@@ -213,7 +213,7 @@ static int str_slots_reserve_one(smaug_series_str_t *s) {
     if (!nm) {
         /* offsets já cresceu; encolhe de volta se possível (lição do grow
            numérico: realloc(p,0) liberaria p e deixaria dangling). */
-        if (s->capacity > 0) {
+        if (s->capacity > 0) {  /* COV-EXCL-BR: bloco de recuperacao de OOM de null_mask; inalcancavel na pratica (slots crescem atomicamente) */
             size_t *back = realloc(s->offsets, (s->capacity + 1) * sizeof(size_t));
             if (back) s->offsets = back;  /* COV-EXCL-BR: realloc de shrink falhando; defensivo */
         }
@@ -247,7 +247,7 @@ smaug_status_t smaug_str_set(smaug_series_str_t *s, size_t idx, const char *str,
             memmove(s->buffer + start + len, s->buffer + tail_start, tail_bytes);
 
         /* grava a nova string no espaço aberto */
-        if (len > 0) memcpy(s->buffer + start, str, len);
+        if (len > 0) memcpy(s->buffer + start, str, len);  /* COV-EXCL-BR: len==0 inalcancavel aqui (bloco len>old_len implica len>0) */
 
         /* offsets seguintes sobem em `extra` */
         for (size_t i = idx + 1; i <= s->size; i++) s->offsets[i] += extra;

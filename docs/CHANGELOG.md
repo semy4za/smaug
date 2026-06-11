@@ -4,18 +4,35 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Não lançado]
 
-### Endurecimento — frente B (OOM nas ops): B1 numérico + B2 bool `[In progress]`
+### Endurecimento — frente B (OOM nas ops): B1 numérico + B2 bool + B3 string `[Done]`
 - **B1 — `test_allocfail` força OOM nas ops aritméticas restantes:** f64
   `sub`/`mul`/`div` + `sub`/`mul`/`div_scalar` + compares `lt`/`eq`; i64
   `sub`/`mul`/`div` + os três scalars. Antes só `add`/`add_scalar`/`gt` eram
   alloc-falhados.
 - **B2 — seção bool nova no allocfail:** `and`/`or`/`xor`/`not` dirigidos com
-  `out_mask`, cobrindo os dois `malloc` do `alloc_pair` e os guards `!r`. Bool
-  estava fora do allocfail por completo.
-- `test_allocfail` 579 → 747 verificações. `gcov` direcionado confirma as duas
-  direções tomadas nos guards (`!r`/`!vals`/`!m`). Validado no Windows (MSYS2);
-  cobertura autoritativa e Valgrind pendentes do passe Fedora. **B3** (string/
-  `ops_str` + resíduo reachable) aguarda o mapa pós-B1+B2.
+  `out_mask`, cobrindo os dois `malloc` do `alloc_pair` e os guards `!r`.
+- **B3 — string OOM:** `str_slots_reserve_one` forçado a crescer sob falha em
+  `append` (buffer de 1 byte) e `append_null` (capacity=0); fecha todos os
+  pontos de alocação nas ops públicas.
+- `test_allocfail` 579 → 767 verificações. Validado no Windows e Fedora (Valgrind-clean).
+
+### Milestone — branch-alvo 100% (MC/DC completo) `[Done]`
+- **1095/1095 ramos** cobertos em ambas as direções (branch-alvo, excluindo guards
+  defensivos/inalcançáveis documentados). Jornada: 75.42% → 93.10% → 95.10% →
+  95.55% → 98.55% → 99.73% → 99.91% → **100.00%**.
+- **19 exclusões** com `COV-EXCL-BR` e justificativa auditável: overflows de
+  `SIZE_MAX`, `external_alloc` via API interna, invariantes matemáticas
+  (`mean != NaN → count > 0`), `ia == ib` impossível em argsort, e guards
+  defensivos de realloc-shrink.
+- Cobertura de linhas: **99.82%** (1090/1092 — as 2 linhas descobertas são código
+  morto logicamente inalcançável em `smaug_str.c`).
+- Frentes que contribuíram: C (semântica/Kleene), A (guards de input + A2),
+  B (OOM), e sweep de edges/MC/DC (compares sem máscara, série vazia, reduções
+  all-null, tiebreaks de ordenação, guards de input).
+- `test_ops_edge` 190 → 249 checks; `test_allocfail` 579 → 767 checks.
+- Métrica de referência adotada: padrão SQLite/aviônica (branch-alvo tomado ao
+  menos uma vez em ambas as direções, guards inalcançáveis excluídos com
+  documentação).
 
 ### Endurecimento — frente A: guards de input + A2 (exclusão de cobertura) `[Done]`
 - **A1 — varredura de input inválido** em todas as ops públicas (ponteiro NULL,

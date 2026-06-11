@@ -372,6 +372,33 @@ static void af_i64_compare(void) {
     smaug_i64_free(x);
 }
 
+/* --- B3: i64 compares restantes (lt/eq); gt já coberto em af_i64_compare --- */
+static void af_i64_lt(void) {
+    int64_t arr[3] = {1, 2, 3};
+    smaug_series_i64_t *x = smaug_i64_create_from_array(arr, 3);
+    assert(x);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *mask = NULL;
+        uint8_t *res = smaug_i64_lt(x, 2, &mask);
+        if (res) { OK(mask != NULL, "i64 lt mask junto"); free(res); free(mask); }
+    }
+    smaug_i64_free(x);
+}
+
+static void af_i64_eq(void) {
+    int64_t arr[3] = {1, 2, 3};
+    smaug_series_i64_t *x = smaug_i64_create_from_array(arr, 3);
+    assert(x);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *mask = NULL;
+        uint8_t *res = smaug_i64_eq(x, 2, &mask);
+        if (res) { OK(mask != NULL, "i64 eq mask junto"); free(res); free(mask); }
+    }
+    smaug_i64_free(x);
+}
+
 /* --- B1: i64 ops aritméticas restantes (sub/mul/div série) --- */
 static void af_i64_sub(void) {
     int64_t a[3] = {4, 5, 6}, b[3] = {1, 2, 3};
@@ -522,18 +549,42 @@ static void af_str_set_grow(void) {
         smaug_str_free(s);
     }
 }
+/* --- B3: str append forçando crescimento de buffer sob falha ---
+   SMAUG_STR_BUFFER_INIT = 16 bytes. Criamos com capacidade 1 (força reserve
+   logo no 1º append) e plantamos strings que somam >16 bytes pra garantir
+   que str_buffer_reserve chame realloc e tenha chance de falhar.
+   str_slots_reserve_one também entra quando capacity==0 (slots crescem). */
 static void af_str_append_grow(void) {
     for (long k = 0; k < MAX_ALLOCS; k++) {
         reset(-1);
-        smaug_series_str_t *s = smaug_str_create(0);
+        /* capacidade inicial 1 byte → qualquer string >1 byte força crescimento */
+        smaug_series_str_t *s = smaug_str_create_with_capacity(0, 1);
         assert(s);
         reset(k);
-        smaug_str_append(s, "alpha", 5);
-        smaug_str_append(s, "beta", 4);
+        /* 20 bytes: garante crescimento do buffer (>BUFFER_INIT=16) */
+        smaug_str_append(s, "abcdefghijklmnopqrst", 20);
+        smaug_str_append(s, "uvwxyz", 6);
         smaug_str_append_null(s);
         smaug_str_free(s);
     }
 }
+/* --- B3-final: append_null força crescimento de slots sob falha (str:316) ---
+   str_slots_reserve_one cresce quando size==capacity. create(0) → capacity=0,
+   então o 1º append_null já precisa crescer. O bloco anterior (af_str_append_grow)
+   chama append_null depois de dois appends regulares que já cresceram os slots —
+   portanto str:316 nunca falhou lá. Aqui append_null é a primeira op. */
+static void af_str_append_null_grow(void) {
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_str_t *s = smaug_str_create(0);   /* capacity=0 */
+        assert(s);
+        reset(k);
+        smaug_str_append_null(s);   /* 1ª op: slots crescem aqui → str:316 */
+        smaug_str_append_null(s);
+        smaug_str_free(s);
+    }
+}
+
 static void af_str_compare(void) {
     const char *arr[] = {"SP", "RJ", "MG"};
     reset(-1);
@@ -1002,6 +1053,8 @@ int main(void) {
     af_i64_mul_scalar();
     af_i64_div_scalar();
     af_i64_compare();
+    af_i64_lt();
+    af_i64_eq();
     af_i64_argsort();
     af_i64_sort();
     af_i64_take();
@@ -1012,6 +1065,7 @@ int main(void) {
     af_str_clone();
     af_str_set_grow();
     af_str_append_grow();
+    af_str_append_null_grow();
     af_str_compare();
     af_str_filter();
     af_str_take();

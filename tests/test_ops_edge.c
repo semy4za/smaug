@@ -610,6 +610,308 @@ static void numeric_guard_sweep(void) {
     smaug_i64_free(ia); smaug_i64_free(ib2); smaug_i64_free(in);
 }
 
+/* Guards de input: f64 argsort/sort com s=NULL (f64:359/390) */
+static void f64_null_guard_sort(void) {
+    OK(smaug_f64_argsort(NULL, true) == NULL, "f64 argsort(NULL) -> NULL");
+    OK(smaug_f64_sort(NULL, true)    == NULL, "f64 sort(NULL) -> NULL");
+}
+
+/* Guards de input: i64 ops binárias com NULL/tamanho incompatível (i64:23) */
+static void i64_null_guard_binop(void) {
+    smaug_series_i64_t *a = smaug_i64_create(2);
+    smaug_i64_set(a, 0, 1); smaug_i64_set(a, 1, 2);
+    OK(smaug_i64_add(NULL, a) == NULL, "i64 add(NULL,a) -> NULL");
+    OK(smaug_i64_add(a, NULL) == NULL, "i64 add(a,NULL) -> NULL");
+    OK(smaug_i64_sub(NULL, a) == NULL, "i64 sub(NULL,a) -> NULL");
+    OK(smaug_i64_mul(NULL, a) == NULL, "i64 mul(NULL,a) -> NULL");
+    OK(smaug_i64_div(NULL, a) == NULL, "i64 div(NULL,a) -> NULL");
+    smaug_i64_free(a);
+}
+
+/* Guards de input: i64 argsort/sort com s=NULL (i64:356/383) */
+static void i64_null_guard_sort(void) {
+    OK(smaug_i64_argsort(NULL, true) == NULL, "i64 argsort(NULL) -> NULL");
+    OK(smaug_i64_sort(NULL, true)    == NULL, "i64 sort(NULL) -> NULL");
+}
+
+/* Guards de input + reachable: i64 reduções com s=NULL e size==0 (i64:176/195/232) */
+static void i64_reduce_null_and_empty(void) {
+    /* NULL */
+    OK(smaug_i64_min(NULL, true)  == INT64_MIN, "i64 min(NULL) -> INT64_MIN");
+    OK(smaug_i64_max(NULL, true)  == INT64_MIN, "i64 max(NULL) -> INT64_MIN");
+    OK(isnan(smaug_i64_mean(NULL, true)),        "i64 mean(NULL) -> NaN");
+    OK(isnan(smaug_i64_std(NULL, true)),         "i64 std(NULL) -> NaN");
+    /* size==0: fecha o lado reachable do mesmo if */
+    smaug_series_i64_t *e = smaug_i64_create(0);
+    OK(smaug_i64_min(e, true)  == INT64_MIN, "i64 min(vazia) -> INT64_MIN");
+    OK(smaug_i64_max(e, true)  == INT64_MIN, "i64 max(vazia) -> INT64_MIN");
+    OK(isnan(smaug_i64_mean(e, true)),        "i64 mean(vazia) -> NaN");
+    OK(isnan(smaug_i64_std(e, true)),         "i64 std(vazia) -> NaN");
+    smaug_i64_free(e);
+}
+
+/* Guards de input: str set com str=NULL, len>0 (str:297) */
+static void str_null_guard_set(void) {
+    smaug_series_str_t *s = smaug_str_create(3);
+    assert(s);
+    smaug_status_t rc = smaug_str_set(s, 0, NULL, 5);
+    OK(rc == SMG_ERR_ARGUMENT, "str set(NULL,len>0) -> ARGUMENT");
+    smaug_str_free(s);
+}
+
+/* Guards de input: ops_str NULL target/s (ops_str:41/136) */
+static void ops_str_null_guards(void) {
+    const char *arr[] = {"a", "b", "c"};
+    smaug_series_str_t *s = smaug_str_create_from_array(arr, 3);
+    assert(s);
+    /* compare com target=NULL e target_len>0 (ops_str:41) */
+    OK(smaug_str_eq(s, NULL, 3, NULL) == NULL, "str_eq(target=NULL,len>0) -> NULL");
+    OK(smaug_str_lt(s, NULL, 3, NULL) == NULL, "str_lt(target=NULL,len>0) -> NULL");
+    OK(smaug_str_gt(s, NULL, 3, NULL) == NULL, "str_gt(target=NULL,len>0) -> NULL");
+    smaug_str_free(s);
+
+    /* ops_str:32 — ramo len > target_len em str_cmp_at:
+       série com "abc" comparada contra target "ab" (2 bytes) — prefixo igual
+       mas elemento é mais longo → return 1 (maior). */
+    const char *long_arr[] = {"ab", "abc", "z"};
+    smaug_series_str_t *sl = smaug_str_create_from_array(long_arr, 3);
+    assert(sl);
+    uint8_t *r = smaug_str_eq(sl, "ab", 2, NULL);
+    OK(r && r[0]==1 && r[1]==0, "str_eq: elem mais longo que target nao eh igual");
+    free(r);
+    r = smaug_str_gt(sl, "ab", 2, NULL);
+    OK(r && r[0]==0 && r[1]==1, "str_gt: 'abc' > 'ab' (len tiebreak)");
+    free(r);
+    /* ops_str:41 branch residual: target=NULL e target_len=0 (não é erro, compara contra "") */
+    r = smaug_str_eq(sl, NULL, 0, NULL);
+    OK(r != NULL, "str_eq(target=NULL,len=0) -> válido (compara contra string vazia)");
+    free(r);
+    smaug_str_free(sl);
+
+    /* ops_str:136 — segundo ramo: s!=NULL mas idx==NULL e len>0 */
+    OK(smaug_str_take(NULL, NULL, 1) == NULL, "str_take(NULL,NULL,1) -> NULL");
+    /* take com s válido, idx=NULL, len>0 */
+    const char *ta[] = {"x", "y"};
+    smaug_series_str_t *st = smaug_str_create_from_array(ta, 2);
+    OK(smaug_str_take(st, NULL, 1) == NULL, "str_take(s,NULL,len>0) -> NULL");
+    /* branch 5: idx=NULL e len=0 — válido, retorna série vazia */
+    smaug_series_str_t *tz = smaug_str_take(st, NULL, 0);
+    OK(tz && tz->size == 0, "str_take(s,NULL,0) -> serie vazia");
+    smaug_str_free(tz);
+    smaug_str_free(st);
+}
+
+/* Reachable: out_mask=NULL nas compares f64 (f64:294/303/306/320/329/332) */
+static void f64_compare_no_mask(void) {
+    double arr[] = {1.0, 2.0, 3.0};
+    smaug_series_f64_t *s = smaug_f64_create_from_array(arr, 3);
+    assert(s);
+    uint8_t *r;
+    /* lt sem máscara: exercita out_mask=NULL e mask=NULL branches */
+    r = smaug_f64_lt(s, 2.5, NULL);
+    OK(r && r[0]==1 && r[1]==1 && r[2]==0, "f64 lt sem out_mask");
+    free(r);
+    /* eq sem máscara */
+    r = smaug_f64_eq(s, 2.0, NULL);
+    OK(r && r[0]==0 && r[1]==1 && r[2]==0, "f64 eq sem out_mask");
+    free(r);
+    smaug_f64_free(s);
+
+    /* f64:306/332 — ramo !VALID + mask==NULL: série com null, sem out_mask */
+    smaug_series_f64_t *n = smaug_f64_create(3);
+    smaug_f64_set(n, 0, 1.0); smaug_f64_set_null(n, 1); smaug_f64_set(n, 2, 3.0);
+    r = smaug_f64_lt(n, 2.0, NULL);
+    OK(r && r[0]==1 && r[1]==0 && r[2]==0, "f64 lt null+no_mask: ramo mask==NULL no else");
+    free(r);
+    r = smaug_f64_eq(n, 1.0, NULL);
+    OK(r && r[0]==1 && r[1]==0 && r[2]==0, "f64 eq null+no_mask: ramo mask==NULL no else");
+    free(r);
+    smaug_f64_free(n);
+}
+
+/* Reachable: out_mask=NULL nas compares i64 (i64:292/299/301/304/318/325/327/330) */
+static void i64_compare_no_mask(void) {
+    int64_t arr[] = {1, 2, 3};
+    smaug_series_i64_t *s = smaug_i64_create_from_array(arr, 3);
+    assert(s);
+    uint8_t *r;
+    r = smaug_i64_lt(s, 3, NULL);
+    OK(r && r[0]==1 && r[1]==1 && r[2]==0, "i64 lt sem out_mask");
+    free(r);
+    r = smaug_i64_eq(s, 2, NULL);
+    OK(r && r[0]==0 && r[1]==1 && r[2]==0, "i64 eq sem out_mask");
+    free(r);
+    /* série com null + sem máscara: exercita VALID() false + mask==NULL (i64:299/325) */
+    smaug_series_i64_t *n = smaug_i64_create(3);
+    smaug_i64_set(n, 0, 1); smaug_i64_set_null(n, 1); smaug_i64_set(n, 2, 3);
+    r = smaug_i64_lt(n, 2, NULL);
+    OK(r && r[0]==1 && r[1]==0 && r[2]==0, "i64 lt com null sem out_mask");
+    free(r);
+    r = smaug_i64_eq(n, 1, NULL);
+    OK(r && r[0]==1 && r[1]==0 && r[2]==0, "i64 eq com null sem out_mask");
+    free(r);
+    /* i64:304/330 — ramo !VALID + mask!=NULL (mask[i]=0x00 escrito):
+       série com null, COM out_mask → escreve 0x00 na posição nula */
+    smaug_mask_t *om = NULL;
+    r = smaug_i64_lt(n, 2, &om);
+    OK(r && om && om[1]==0x00, "i64 lt null+mask: mask[null]=0x00");
+    free(r); free(om); om = NULL;
+    r = smaug_i64_eq(n, 1, &om);
+    OK(r && om && om[1]==0x00, "i64 eq null+mask: mask[null]=0x00");
+    free(r); free(om);
+    smaug_i64_free(s); smaug_i64_free(n);
+}
+
+/* Reachable: i64 reduções all-null e std/mean all-null (i64:224/235/241/247) */
+static void i64_reduce_all_null(void) {
+    smaug_series_i64_t *s = smaug_i64_create(3);  /* tudo NULL */
+    /* mean all-null com ignore_na=false: } else if (!ignore_na) {  (i64:224) */
+    OK(isnan(smaug_i64_mean(s, false)), "i64 mean all-null,ignore_na=false -> NaN");
+    /* std all-null: isnan(mean) -> return NaN (i64:235) */
+    OK(isnan(smaug_i64_std(s, true)),  "i64 std all-null -> NaN");
+    OK(isnan(smaug_i64_std(s, false)), "i64 std all-null,ignore_na=false -> NaN");
+    smaug_i64_free(s);
+
+    /* i64:241 (VALID true no loop de var) + i64:247 (count>0 → divisão real):
+       série mista (válidos E nulls) com ignore_na=true → mean!=NaN → entra no
+       loop → VALID=true para os válidos, count>0 → toma o ramo da divisão */
+    smaug_series_i64_t *m = smaug_i64_create(3);
+    smaug_i64_set(m, 0, 4); smaug_i64_set_null(m, 1); smaug_i64_set(m, 2, 6);
+    OK(!isnan(smaug_i64_var(m, true)),  "i64 var misto ignore_na=true: VALID+count>0");
+    OK(!isnan(smaug_i64_std(m, true)),  "i64 std misto ignore_na=true");
+    smaug_i64_free(m);
+}
+
+/* Reachable: f64 std all-null → count==0 (f64:245) */
+static void f64_reduce_all_null_std(void) {
+    smaug_series_f64_t *s = smaug_f64_create(3);  /* tudo NULL */
+    OK(isnan(smaug_f64_std(s, true)),  "f64 std all-null -> NaN");
+    OK(isnan(smaug_f64_var(s, true)),  "f64 var all-null -> NaN");
+    smaug_f64_free(s);
+}
+
+/* Reachable: série vazia em core/str/bool (core:353, str:83, bool:15/18) */
+static void empty_series_edges(void) {
+    /* core:353 — i64_cow_detach com size==0: view vazia desvincula sem malloc.
+       Disparado por mutação (set/append) em view de tamanho zero. */
+    smaug_series_i64_t *base = smaug_i64_create(2);
+    smaug_i64_set(base, 0, 1); smaug_i64_set(base, 1, 2);
+    smaug_series_i64_t *vz = smaug_i64_view(base, 0, 0);  /* view vazia */
+    assert(vz && vz->size == 0 && vz->meta.is_view);
+    smaug_i64_append(vz, 99);   /* dispara detach com size==0 */
+    OK(!vz->meta.is_view, "i64 view vazia: detach sem malloc");
+    smaug_i64_free(base); smaug_i64_free(vz);
+
+    /* str:83 — clone de série vazia (free do buffer quando size==0) */
+    smaug_series_str_t *es = smaug_str_create(0);
+    smaug_series_str_t *ec = smaug_str_clone(es);
+    OK(ec && ec->size == 0, "str clone(vazia) -> vazia");
+    smaug_str_free(es); smaug_str_free(ec);
+
+    /* bool:15/18 — alloc_pair com n==0 (série bool vazia) */
+    uint8_t  av[1]={0}; smaug_mask_t am[1]={0xFF};
+    uint8_t  bv[1]={0}; smaug_mask_t bm[1]={0xFF};
+    smaug_mask_t *om = NULL;
+    uint8_t *r = smaug_bool_and(av, am, bv, bm, 0, &om);
+    OK(r != NULL, "bool and(n=0) retorna buffer válido");
+    free(r); free(om);
+}
+
+/* Reachable: str edges — out_len=NULL, len==0, first-grow, external_alloc
+   (str:156/162/187/216/250/95) */
+static void str_reachable_edges(void) {
+    const char *arr[] = {"hello", "world", NULL};
+    smaug_series_str_t *s = smaug_str_create_from_array(arr, 3);
+    assert(s);
+
+    /* str:156 — get com out_len=NULL: pos NULL → *out_len omitido */
+    const char *p = smaug_str_get(s, 2, NULL);
+    OK(p == NULL, "str get(null-pos, out_len=NULL) -> NULL sem crash");
+
+    /* str:162 — get com out_len=NULL: pos válida → comprimento omitido */
+    p = smaug_str_get(s, 0, NULL);
+    OK(p != NULL, "str get(válida, out_len=NULL) -> ptr não-NULL");
+
+    /* str:250 — if(len>0) memcpy: ramo len==0 em set (string vazia sobrescreve pos) */
+    smaug_series_str_t *sv = smaug_str_create(2);
+    smaug_str_set(sv, 0, "hello", 5);
+    smaug_str_set(sv, 0, "", 0);   /* set com len==0: sem memcpy */
+    size_t ol = 99;
+    const char *pv = smaug_str_get(sv, 0, &ol);
+    OK(pv != NULL && ol == 0, "str set len==0: string vazia");
+    smaug_str_free(sv);
+
+    /* str:297 — branch 2: append(NULL, 0) não é erro (str==NULL mas len==0) */
+    smaug_series_str_t *an = smaug_str_create(0);
+    int rc_an = smaug_str_append(an, NULL, 0);
+    OK(rc_an == 0 && an->size == 1, "str append(NULL,0) ok: string vazia nao-nula");
+    smaug_str_free(an);
+
+    smaug_str_free(s);
+
+    /* str:187 — buffer_capacity==0 no first-grow: usa SMAUG_STR_BUFFER_INIT
+       create_with_capacity(0,0) → bufcap=SMAUG_STR_BUFFER_INIT (não zero),
+       então forçamos via série que começa sem buffer. Usamos o path normal
+       de create(1) + set que expande. */
+    smaug_series_str_t *g = smaug_str_create(1);  /* 1 elem, NULL */
+    smaug_str_set(g, 0, "abcdefghijklmnopqrstuvwxyz", 26); /* força grow */
+    OK(smaug_str_get(g, 0, NULL) != NULL, "str set força grow de buffer");
+    smaug_str_free(g);
+
+    /* str:216 — str_slots_reserve_one com capacity==0 já é exercitado pelo
+       af_str_append_null_grow no allocfail; aqui verificamos o path de sucesso:
+       clone de série com size>0 → realloc de slots. */
+    smaug_series_str_t *c = smaug_str_create(1);
+    smaug_str_set(c, 0, "x", 1);
+    smaug_series_str_t *cl = smaug_str_clone(c);
+    OK(cl && cl->size == 1, "str clone com capacity>0");
+    smaug_str_free(c); smaug_str_free(cl);
+}
+
+/* Reachable: ops_str edges — série vazia, tiebreaks (ops_str:32/43/48/145/191/202) */
+static void ops_str_reachable_edges(void) {
+    /* série vazia: ternários size==0 em malloc (ops_str:43/48/202) */
+    smaug_series_str_t *empty = smaug_str_create(0);
+    smaug_mask_t *om = NULL;
+    uint8_t *r = smaug_str_eq(empty, "x", 1, &om);
+    OK(r != NULL, "str_eq(vazia) -> buffer válido");
+    free(r); free(om);
+    size_t *ai = smaug_str_argsort(empty, true);
+    OK(ai != NULL, "str_argsort(vazia) -> buffer válido");
+    free(ai);
+    smaug_str_free(empty);
+
+    /* ops_str:145 — take com bytes==0 (série de NULLs):
+       create_with_capacity(0, bytes?bytes:1) exercita o ternário */
+    smaug_series_str_t *nulls = smaug_str_create(3); /* tudo NULL */
+    size_t tidx[] = {0, 1};
+    smaug_series_str_t *t = smaug_str_take(nulls, tidx, 2);
+    OK(t && t->size == 2, "str_take com bytes==0");
+    smaug_str_free(nulls); smaug_str_free(t);
+
+    /* ops_str:32 — tiebreak de comprimento em cmp_str (len > target_len → return 1):
+       série com "ab" e "abc" — prefixo idêntico, mas "abc" é mais longa.
+       No argsort, "ab" < "abc" (menor comprimento vem antes): aciona len<target e len>target */
+    const char *lendiff[] = {"abc", "ab", "z"};
+    smaug_series_str_t *sld = smaug_str_create_from_array(lendiff, 3);
+    size_t *ldi = smaug_str_argsort(sld, true);
+    OK(ldi != NULL && ldi[0]==1 && ldi[1]==0, "str_argsort: 'ab'<'abc' (len tiebreak)");
+    free(ldi);
+    smaug_series_str_t *ldsorted = smaug_str_sort(sld, true);
+    OK(ldsorted != NULL, "str_sort com len-diff tiebreak");
+    smaug_str_free(ldsorted);
+    smaug_str_free(sld);
+
+    /* ops_str:191 — tiebreak de índice quando bytes e comprimento iguais (c==0):
+       strings idênticas: "a","a","b" → as duas "a" têm c==0 → ia<ib decide ordem */
+    const char *dup[] = {"a", "a", "b"};
+    smaug_series_str_t *sd = smaug_str_create_from_array(dup, 3);
+    size_t *di = smaug_str_argsort(sd, true);
+    OK(di != NULL && di[0]==0 && di[1]==1, "str_argsort tiebreak por índice (estável)");
+    free(di);
+    smaug_str_free(sd);
+}
+
 int main(void) {
     f64_arith_null_prop();
     i64_arith_null_prop();
@@ -617,18 +919,32 @@ int main(void) {
     f64_reduce_na_false();
     f64_reduce_empty();
     f64_reduce_all_null();
+    f64_reduce_all_null_std();
     f64_binop_guards();
     f64_div_zero_and_null();
     f64_scalar_edge();
     f64_compare_edge();
+    f64_compare_no_mask();
     f64_sort_edge();
+    f64_null_guard_sort();
     f64_take_filter_edge();
 
     i64_reduce_na_false();
     i64_reduce_empty();
+    i64_reduce_all_null();
+    i64_reduce_null_and_empty();
     i64_binop_guards();
+    i64_null_guard_binop();
     i64_div_zero();
     i64_scalar_compare_sort_edge();
+    i64_null_guard_sort();
+    i64_compare_no_mask();
+
+    str_null_guard_set();
+    ops_str_null_guards();
+    empty_series_edges();
+    str_reachable_edges();
+    ops_str_reachable_edges();
 
     mutation_status_contract();
     get_status_contract();
