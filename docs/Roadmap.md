@@ -52,7 +52,7 @@ Métricas: cobertura **99.82% linha / 100.00% branch-alvo** (MC/DC completo,
 1095/1095 ramos, 19 exclusões documentadas); suíte de 7 testes em C (inclui
 `test_allocfail` via `--wrap`, `test_ops_edge` e `test_stress`) e 8 suítes em
 Lua (incluindo property-based, 281083 checks). Valgrind-clean no Linux; build e
-testes validados no Windows (MSYS2) via `windows-build.ps1`. Modelo de referência
+testes validados no Windows (MSYS2) via `windows_build.ps1`. Modelo de referência
 de teste: SQLite.
 
 | Frente | Entrega | Status |
@@ -316,7 +316,7 @@ mapeamento NumPy/pandas → Smaug documentado.
 Itens conscientemente adiados, reagendados em fase dedicada. Os já pagos saíram
 desta lista (ver `CHANGELOG.md`): allocfail estendido à string, cobertura de
 branch dos numéricos, `Series:dropna`, correção do `set` i64 (CODE_REVIEW A7),
-`windows-build.ps1` (auto-descoberta de fontes + todos os testes).
+`windows_build.ps1` (auto-descoberta de fontes + todos os testes).
 
 **Estatísticas/utilitárias:** `median`/`quantile` nativos; `abs`/`round`/`clip`;
 `cumsum`/`cumprod`; `diff`/`shift`; `unique`/`value_counts`/`mode`; `fillna` por

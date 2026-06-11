@@ -1,4 +1,4 @@
-# scripts\windows-build.ps1
+# scripts\windows_build.ps1
 #
 # Setup + build + testes do Smaug no Windows (sem make, sem Valgrind).
 #
@@ -11,10 +11,11 @@
 #      e test_stress com N grande).
 #   4. Roda as 8 suites Lua com luajit (series, dataset, edge, special, fillna,
 #      props, i64, string).
+#   5. Regenera o MANIFEST.txt (make manifest equivalente).
 #
 # Uso (a partir da raiz do projeto):
-#   powershell -ExecutionPolicy Bypass -File .\scripts\windows-build.ps1
-#   powershell -ExecutionPolicy Bypass -File .\scripts\windows-build.ps1 -Setup
+#   powershell -ExecutionPolicy Bypass -File .\scripts\windows_build.ps1
+#   powershell -ExecutionPolicy Bypass -File .\scripts\windows_build.ps1 -Setup
 #
 # Observacoes:
 #   * Valgrind nao existe no Windows; a checagem de leaks fica so no Linux.
@@ -27,7 +28,8 @@
 [CmdletBinding()]
 param(
     [switch]$Setup,
-    [switch]$SkipLua
+    [switch]$SkipLua,
+    [switch]$SkipManifest
 )
 
 $ErrorActionPreference = "Stop"
@@ -101,8 +103,7 @@ if ($luajit) {
 New-Item -ItemType Directory -Force -Path "build" | Out-Null
 
 # Fontes do backend: descobre TODOS os src\*.c automaticamente, para nunca
-# dessincronizar quando um novo .c entra (foi o que aconteceu com a fase string:
-# a lista fixa tinha so os 4 numericos e os testes de string nao linkavam).
+# dessincronizar quando um novo .c entra.
 $sources = @(Get-ChildItem -Path "src" -Filter "*.c" | ForEach-Object { "src\$($_.Name)" })
 if ($sources.Count -eq 0) { throw "Nenhum fonte encontrado em src\*.c" }
 Write-Host ("Fontes ({0}): {1}" -f $sources.Count, ($sources -join ", ")) -ForegroundColor DarkGray
@@ -113,8 +114,9 @@ Write-Host "== Compilando build\smaug.dll ==" -ForegroundColor Cyan
 if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar a DLL." }
 Write-Host "OK -> build\smaug.dll" -ForegroundColor Green
 
-$cTests = @("test_alloc", "test_ops", "test_ops_edge", "test_bool", "test_string", "test_cow")
-$cTestsWrap = @("test_allocfail")
+$cTests      = @("test_alloc", "test_ops", "test_ops_edge", "test_bool", "test_string", "test_cow")
+$cTestsWrap  = @("test_allocfail")
+$cTestsStress = @("test_stress")
 $allPass = $true
 
 Write-Host ""
@@ -129,10 +131,7 @@ foreach ($t in $cTests) {
     Write-Host ("{0,-14} -> {1}" -f $t, $out)
     if ($out -notlike "PASS*") { $allPass = $false }
 }
-# Testes com -Wl,--wrap (falha de alocacao injetada). Saida "PASS: ...".
-# Os args -Wl,... comecam com hifen; o PowerShell tentaria interpreta-los como
-# parametros proprios. Montamos a lista como array e usamos splatting (@cargs),
-# que passa cada item literalmente ao gcc.
+
 foreach ($t in $cTestsWrap) {
     $exe = "build\$t.exe"
     $cargs = @(
@@ -149,8 +148,6 @@ foreach ($t in $cTestsWrap) {
     if ($out -notlike "PASS*") { $allPass = $false }
 }
 
-# Testes de stress (N grande; roda rapido no Windows sem Valgrind).
-$cTestsStress = @("test_stress")
 Write-Host ""
 Write-Host "== Testes de Stress ==" -ForegroundColor Cyan
 foreach ($t in $cTestsStress) {
@@ -160,7 +157,6 @@ foreach ($t in $cTestsStress) {
 
     $out = (& ".\$exe") | Out-String
     $out = $out.Trim()
-    # Mostra apenas a ultima linha (o PASS: stress ... das impressoes de progresso)
     $lastLine = ($out -split "`n")[-1].Trim()
     Write-Host ("{0,-14} -> {1}" -f $t, $lastLine)
     if ($lastLine -notlike "PASS*") { $allPass = $false }
@@ -172,14 +168,49 @@ if ($luajit -and -not $SkipLua) {
     $luaTests = @("test_series", "test_dataset", "test_edge", "test_special",
                   "test_fillna", "test_props", "test_i64", "test_string")
     foreach ($lt in $luaTests) {
-        $out = (& $luajit "tests\$lt.lua") | Out-String
-        $out = $out.Trim()
-        Write-Host $out
-        if ($out -notlike "OK*") { $allPass = $false }
+        # Captura stdout e stderr separados para distinguir output normal de erros
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $luajit
+        $psi.Arguments = "tests\$lt.lua"
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError  = $true
+        $psi.UseShellExecute = $false
+        $psi.WorkingDirectory = $Root
+
+        $proc = New-Object System.Diagnostics.Process
+        $proc.StartInfo = $psi
+        $proc.Start() | Out-Null
+        $stdout = $proc.StandardOutput.ReadToEnd().Trim()
+        $stderr = $proc.StandardError.ReadToEnd().Trim()
+        $proc.WaitForExit()
+        $rc = $proc.ExitCode
+
+        if ($rc -ne 0 -or $stdout -notlike "OK*") {
+            # Falha real: mostra tudo, incluindo stack trace
+            Write-Host "FALHOU: $lt" -ForegroundColor Red
+            if ($stdout) { Write-Host $stdout }
+            if ($stderr) { Write-Host $stderr -ForegroundColor Red }
+            $allPass = $false
+        } else {
+            Write-Host $stdout
+        }
     }
 } elseif (-not $luajit) {
     Write-Host ""
     Write-Host "(Lua pulado: luajit nao encontrado. Rode com -Setup.)" -ForegroundColor Yellow
+}
+
+# Regenera o MANIFEST.txt para refletir o estado atual do repo.
+if (-not $SkipManifest) {
+    Write-Host ""
+    $manifestScript = "scripts\make_manifest.ps1"
+    if (Test-Path $manifestScript) {
+        Write-Host "== Manifest ==" -ForegroundColor Cyan
+        & powershell -ExecutionPolicy Bypass -File $manifestScript
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Aviso: make_manifest.ps1 retornou erro (nao bloqueia o build)." -ForegroundColor Yellow
+        }
+    }
 }
 
 Write-Host ""

@@ -70,7 +70,7 @@ gcc -std=c11 -fPIC -Wall -Wextra -O2 -I./include -shared \
 
 > **⚠️ Bloco desatualizado / decisão pendente.** Este CMake é um rascunho antigo
 > e **não** está em uso (o desenvolvimento usa o Makefile no Linux e
-> `scripts/windows-build.ps1` no Windows). Problemas conhecidos: usa o nome
+> `scripts/windows_build.ps1` no Windows). Problemas conhecidos: usa o nome
 > antigo `smaug_math` (geraria `libsmaug_math`, que o `ffi_loader` não procura
 > mais — hoje é `libsmaug`/`smaug.dll`); e usa `-ffast-math`, **incompatível com
 > o contrato de NaN** (permite ao compilador assumir que NaN não ocorre).
@@ -141,7 +141,7 @@ nm -D build/libsmaug.so | grep smaug | head
 ## Windows (PowerShell)
 
 No Windows não há `make` nem Valgrind por padrão. Use o script
-`scripts\windows-build.ps1`, que compila o backend em `build\smaug.dll`
+`scripts\windows_build.ps1`, que compila o backend em `build\smaug.dll`
 (nome que o `ffi_loader.lua` procura no Windows) chamando o `gcc` diretamente, e
 roda os testes C e Lua.
 
@@ -150,8 +150,8 @@ instala tudo com a flag `-Setup`:
 
 ```powershell
 # da raiz do projeto:
-powershell -ExecutionPolicy Bypass -File .\scripts\windows-build.ps1 -Setup   # 1ª vez
-powershell -ExecutionPolicy Bypass -File .\scripts\windows-build.ps1          # depois
+powershell -ExecutionPolicy Bypass -File .\scripts\windows_build.ps1 -Setup   # 1ª vez
+powershell -ExecutionPolicy Bypass -File .\scripts\windows_build.ps1          # depois
 ```
 
 O `-Setup` instala o MSYS2 (via `winget`, se ausente) e os pacotes

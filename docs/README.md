@@ -173,7 +173,7 @@ make coverage
 Windows:
 
 ```powershell
-scripts/windows-build.ps1
+scripts/windows_build.ps1
 ```
 
 ---

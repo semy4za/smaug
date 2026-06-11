@@ -326,4 +326,72 @@ local sf4 = Series.full(3, true)
 check(sf4:get(1) == 1,        "Series.full: bool true → 1")
 check(sf4._dtype == "int64",  "Series.full: bool dtype int64")
 
+local sf4 = Series.full(3, true)
+check(sf4:get(1) == 1,        "Series.full: bool true → 1")
+check(sf4._dtype == "int64",  "Series.full: bool dtype int64")
+
+-- =====================================================================
+-- BoolSeries como coluna de primeira classe no DataSet
+-- =====================================================================
+local BoolSeries = smaug.BoolSeries
+local df_bool = smaug.DataSet({
+    {"preco",  {10.0, 20.0, 30.0, 40.0}, "float64"},
+    {"cidade", {"SP", "RJ", "SP", "MG"}, "string"},
+})
+
+-- broadcast de boolean cria coluna int64 (1/0), não BoolSeries
+df_bool["flag"] = true
+check(df_bool:col("flag")._dtype == "int64", "broadcast bool -> int64")
+check(df_bool:col("flag"):get(1) == 1,       "broadcast bool valor")
+
+-- adicionar coluna BoolSeries explícita via __newindex
+local mask_sp = df_bool:col("cidade"):eq("SP")
+df_bool["eh_sp"] = mask_sp
+check(getmetatable(df_bool:col("eh_sp")) == BoolSeries, "BoolSeries como coluna")
+check(df_bool:col("eh_sp"):get(1) == true,  "BoolSeries coluna: pos 1 = true")
+check(df_bool:col("eh_sp"):get(2) == false, "BoolSeries coluna: pos 2 = false")
+
+-- head/tail sobre DataSet com coluna BoolSeries
+local h = df_bool:head(2)
+check(h:nrows() == 2,                              "head com BoolSeries coluna")
+check(getmetatable(h:col("eh_sp")) == BoolSeries,  "head preserva BoolSeries")
+check(h:col("eh_sp"):get(1) == true,               "head BoolSeries valor correto")
+
+local tl = df_bool:tail(2)
+check(tl:nrows() == 2,                             "tail com BoolSeries coluna")
+check(tl:col("eh_sp"):get(1) == true,              "tail BoolSeries: pos 1 = SP (true)")
+check(tl:col("eh_sp"):get(2) == false,             "tail BoolSeries: pos 2 = MG (false)")
+
+-- filter sobre DataSet com coluna BoolSeries
+local sp_df = df_bool:filter(df_bool:col("cidade"):eq("SP"))
+check(sp_df:nrows() == 2,                                    "filter com BoolSeries coluna")
+check(getmetatable(sp_df:col("eh_sp")) == BoolSeries,        "filter preserva BoolSeries")
+
+-- to_table sobre DataSet com coluna BoolSeries
+local tt = df_bool:to_table()
+check(type(tt.eh_sp) == "table",   "to_table: BoolSeries vira tabela")
+check(tt.eh_sp[1] == true,         "to_table: BoolSeries valor 1")
+check(tt.eh_sp[2] == false,        "to_table: BoolSeries valor 2")
+
+-- describe sobre DataSet com coluna BoolSeries
+local desc = df_bool:describe()
+check(type(desc.eh_sp) == "table",  "describe: BoolSeries tem entrada")
+check(desc.eh_sp.count == 4,        "describe BoolSeries: count")
+check(desc.eh_sp.true_ == 2,        "describe BoolSeries: true_")
+check(desc.eh_sp.false_ == 2,       "describe BoolSeries: false_")
+
+-- sort_by com coluna BoolSeries (false < true)
+local sorted_b = df_bool:sort_by("eh_sp", true)
+check(sorted_b:nrows() == 4,                         "sort_by BoolSeries")
+check(sorted_b:col("eh_sp"):get(1) == false,         "sort_by BoolSeries: falses primeiro")
+check(sorted_b:col("eh_sp"):get(3) == true,          "sort_by BoolSeries: trues depois")
+
+-- dropna com coluna BoolSeries (sem NAs aqui — deve retornar tudo)
+local dn = df_bool:dropna()
+check(dn:nrows() == 4, "dropna com BoolSeries sem NAs")
+
+-- fillna sobre BoolSeries diretamente (sem NAs: fillna é no-op semântico)
+local bs_fn = df_bool:col("eh_sp"):fillna(false)
+check(getmetatable(bs_fn) == BoolSeries, "fillna DataSet: BoolSeries preservada")
+
 print(string.format("OK — %d checks passaram (DataSet)", n_ok))

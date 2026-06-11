@@ -138,4 +138,161 @@ end
 -- Construtor interno usado por Series:gt/:lt/:eq (que já têm os ponteiros).
 BoolSeries._own = own
 
+-- Constrói BoolSeries a partir de arrays Lua puros (sem posse de C).
+-- Usado pelos métodos de coluna que produzem novos buffers em Lua.
+local function from_lua_arrays(vals_arr, nulls_arr, n, name)
+    local sz  = n == 0 and 1 or n
+    local vptr = ffi.new("uint8_t[?]", sz)
+    local nptr = nulls_arr and ffi.new("uint8_t[?]", sz) or nil
+    for i = 0, n - 1 do
+        vptr[i] = vals_arr[i + 1] or 0
+        if nptr then nptr[i] = nulls_arr[i + 1] or 0x00 end
+    end
+    -- cast para uint8_t* para que get()/is_null() usem indexação de ponteiro,
+    -- consistente com os buffers criados via own/ffi.gc (que são uint8_t*).
+    -- O array ffi.new mantém a memória viva enquanto o cdata existir.
+    return setmetatable({
+        _vals  = ffi.cast("uint8_t*", vptr),
+        _nulls = nptr and ffi.cast("uint8_t*", nptr) or nil,
+        _n     = n,
+        _name  = name or "mask",
+        _base  = vptr,   -- ancora o ffi.new para que o GC não colete a memória
+        _nbase = nptr,   -- idem para nulls
+    }, BoolSeries)
+end
+
+-- =====================================================================
+-- API de coluna: métodos necessários para BoolSeries ser cidadão
+-- completo do DataSet (toda coluna deve implementar este contrato).
+-- =====================================================================
+
+-- take(idx): nova BoolSeries com os elementos nos índices dados (1-based).
+function methods.take(self, idx)
+    local n      = #idx
+    local vals   = {}
+    local nulls  = nil
+    local has_na = false
+    for k, i in ipairs(idx) do
+        if i < 1 or i > self:len() then
+            error("smaug: take: índice " .. i .. " fora dos limites", 2)
+        end
+        local v = self:get(i)
+        vals[k] = (v == true) and 1 or 0
+        if v == nil then has_na = true end
+    end
+    if has_na then
+        nulls = {}
+        for k, i in ipairs(idx) do
+            nulls[k] = self:is_null(i) and 0x00 or 0xFF
+        end
+    end
+    return from_lua_arrays(vals, nulls, n, self._name)
+end
+
+-- head/tail: primeiros/últimos n elementos.
+function methods.head(self, n)
+    n = math.min(n or 5, self:len())
+    local idx = {}
+    for i = 1, n do idx[i] = i end
+    return self:take(idx)
+end
+
+function methods.tail(self, n)
+    local total = self:len()
+    n = math.min(n or 5, total)
+    local idx = {}
+    for i = total - n + 1, total do idx[#idx + 1] = i end
+    return self:take(idx)
+end
+
+-- filter(mask): nova BoolSeries com as posições onde mask é true.
+function methods.filter(self, mask)
+    local idx = {}
+    for i = 1, mask:len() do
+        if mask:get(i) == true then idx[#idx + 1] = i end
+    end
+    return self:take(idx)
+end
+
+-- dropna: nova BoolSeries sem posições NA.
+function methods.dropna(self)
+    local idx = {}
+    for i = 1, self:len() do
+        if not self:is_null(i) then idx[#idx + 1] = i end
+    end
+    return self:take(idx)
+end
+
+-- fillna(value): substitui NA por value (deve ser boolean).
+function methods.fillna(self, value)
+    if value == nil then
+        error("smaug: fillna requer um valor de preenchimento", 2)
+    end
+    if type(value) ~= "boolean" then
+        error("smaug: fillna em BoolSeries espera boolean; recebido "
+              .. type(value), 2)
+    end
+    local n    = self:len()
+    local fill = value and 1 or 0
+    local vals = {}
+    for i = 1, n do
+        local v = self:get(i)
+        vals[i] = (v == nil) and fill or (v and 1 or 0)
+    end
+    return from_lua_arrays(vals, nil, n, self._name)  -- nil = sem NAs
+end
+
+-- describe: estatísticas de uma coluna booleana.
+function methods.describe(self)
+    local n     = self:len()
+    local nulls = 0
+    local trues = 0
+    for i = 1, n do
+        local v = self:get(i)
+        if v == nil   then nulls = nulls + 1
+        elseif v      then trues = trues + 1 end
+    end
+    local count = n - nulls
+    return {
+        count  = count,
+        nulls  = nulls,
+        true_  = trues,
+        false_ = count - trues,
+        freq   = count > 0 and (trues / count) or nil,
+    }
+end
+
+-- argsort: false < true, NAs retornam nil (consistente com Series).
+function methods.argsort(self, ascending)
+    if ascending == nil then ascending = true end
+    for i = 1, self:len() do
+        if self:is_null(i) then return nil end
+    end
+    local idx = {}
+    for i = 1, self:len() do idx[i] = i end
+    table.sort(idx, function(a, b)
+        local va = self._vals[a - 1] ~= 0
+        local vb = self._vals[b - 1] ~= 0
+        if va == vb then return a < b end   -- empate: estável por índice
+        -- ascending: false(0) < true(1); descending: true(1) < false(0)
+        if ascending then
+            return (not va) and vb  -- va=false, vb=true → a vem antes
+        else
+            return va and (not vb)  -- va=true, vb=false → a vem antes
+        end
+    end)
+    return idx
+end
+
+-- count_nonnull: alias para compatibilidade com Series na API do DataSet.
+function methods.count_nonnull(self)
+    local n = self:len()
+    if self._nulls == nil then return n end
+    local c = 0
+    for i = 0, n - 1 do
+        if self._nulls[i] == 0xFF then c = c + 1 end
+    end
+    return c
+end
+
 return BoolSeries

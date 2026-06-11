@@ -230,7 +230,7 @@ projeto: I/O (CSV/JSON) para carregar dados reais.
   editar 4 lugares, e esquecer um quebrava o build (foi o que aconteceu). Agora
   há **fonte única**: `C_TESTS_PLAIN`, `C_TEST_WRAP`, `LUA_TESTS`; os alvos
   iteram sobre elas. Adicionar teste = editar uma linha.
-- **`windows-build.ps1` atualizado** (estava bem defasado): rodava só 3 testes C
+- **`windows_build.ps1` atualizado** (estava bem defasado): rodava só 3 testes C
   (faltavam `test_string`, `test_allocfail`) e 2 suítes Lua (faltavam 6). Agora
   cobre os 5 testes C (incl. `test_allocfail` com `--wrap`) e as 8 suítes Lua,
   alinhado ao Makefile. Mantido ASCII puro. Checagem de saída corrigida para
@@ -447,7 +447,7 @@ projeto: I/O (CSV/JSON) para carregar dados reais.
 ### Alterado (infra)
 - **Biblioteca renomeada** `libsmaug_math` → `libsmaug` (`.so`/`.dll`/`.dylib`),
   coordenado em 3 lugares: `Makefile` (TARGET), `ffi_loader.lua` (nomes do
-  `ffi.load`) e `windows-build.ps1`. O nome "math" não refletia mais o conteúdo
+  `ffi.load`) e `windows_build.ps1`. O nome "math" não refletia mais o conteúdo
   (a lib é o Smaug inteiro). Validado: Lua carrega e passa os 99 checks nas duas
   plataformas. Docs de comandos/exemplos atualizadas.
 - `.gitattributes`: força `eol=lf` em todo arquivo de texto. Resolve a conversão
@@ -517,7 +517,7 @@ projeto: I/O (CSV/JSON) para carregar dados reais.
   Valgrind-clean no Linux e funcionando no Windows.
 
 ### Adicionado (ferramentas)
-- `scripts\windows-build.ps1`: setup + build + testes no Windows via PowerShell.
+- `scripts\windows_build.ps1`: setup + build + testes no Windows via PowerShell.
   Compila `build\smaug_math.dll` com gcc (sem make), roda os testes C e Lua.
   Flag `-Setup` instala MSYS2 + gcc + luajit. Seção "Windows (PowerShell)" no
   `Build_and_Testing.md`. (Valgrind permanece exclusivo do Linux.) Script em
