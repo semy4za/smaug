@@ -444,27 +444,54 @@ local function trunc_to_int(x)
     return x >= 0 and math.floor(x) or math.ceil(x)
 end
 
+-- astype(dtype): converte a série para outro dtype, devolvendo uma NOVA série.
+-- Contrato de conversão: tolerante a falha por elemento.
+--   Elementos inconversíveis tornam-se null — a série inteira nunca é descartada.
+--   "abc"→float64 = null | "abc"→int64 = null | NaN→int64 = null | Inf→int64 = null
+--   null→qualquer = null (ausência se propaga).
+-- Sem coerção implícita: i64 só aceita inteiro (1.5 em i64 vira null, não trunca
+-- silenciosamente — exceto na conversão f64→i64, que trunca em direção a zero por
+-- ser operação numérica explícita entre tipos de mesma família).
 function methods.astype(self, dtype, name)
     if not DTYPES[dtype] then
-        error("smaug: dtype desconhecido '"..tostring(dtype).."'", 2)
+        error("smaug: dtype desconhecido '" .. tostring(dtype) .. "'", 2)
     end
-    local n = self:len()
-    local out = Series.new(dtype, n, name or self._name)
-    local to_int = (dtype == "int64")
+    local src  = self._dtype
+    local n    = self:len()
+    local out  = Series.new(dtype, n, name or self._name)
+
     for i = 1, n do
         local v = self:get(i)
         if v == nil then
             out:set_null(i)
-        elseif to_int then
-            -- f64 -> i64: NaN não tem representação em inteiro → vira null
-            -- (coerente: NaN = indefinido; em i64, indefinido = ausente).
-            -- Inf idem (não cabe em int64). Demais: truncagem em direção a zero.
+        elseif src == "string" and dtype ~= "string" then
+            -- string → numérico: tonumber; falha de parse → null
+            local num = tonumber(v)
+            if num == nil then
+                out:set_null(i)
+            elseif dtype == "int64" then
+                -- mesmo contrato do f64→i64: NaN/Inf → null, resto trunca
+                if num ~= num or num == math.huge or num == -math.huge then
+                    out:set_null(i)
+                else
+                    out:set(i, trunc_to_int(num))
+                end
+            else
+                out:set(i, num)
+            end
+        elseif dtype == "string" and src ~= "string" then
+            -- numérico → string: tostring; NaN/Inf viram suas representações
+            -- (NaN é valor presente no Smaug — não vira null na conversão)
+            out:set(i, tostring(v))
+        elseif dtype == "int64" and src ~= "int64" then
+            -- f64 → i64: NaN/Inf → null, resto trunca em direção a zero
             if v ~= v or v == math.huge or v == -math.huge then
                 out:set_null(i)
             else
                 out:set(i, trunc_to_int(v))
             end
         else
+            -- mesmo dtype ou f64→f64, i64→i64: cópia direta
             out:set(i, v)
         end
     end
@@ -476,25 +503,34 @@ end
 -- preenche NULL (ausência), NÃO NaN (NaN é valor presente — fica intacto).
 -- Posições não-nulas inalteradas. Não altera o dtype.
 function methods.fillna(self, value)
-    -- sem valor seguro de preenchimento (fwd/bwd-fill é dívida técnica)
     if value == nil or value == NA then
         error("smaug: fillna requer um valor de preenchimento", 2)
     end
-    if type(value) ~= "number" then
-        error("smaug: fillna requer um número compatível com o dtype", 2)
-    end
-    -- sem coerção: i64 só aceita inteiro (1.5 em i64 é erro, não trunca)
-    if self._dtype == "int64" and value % 1 ~= 0 then
-        error("smaug: fillna em int64 requer valor inteiro (sem coerção); "
-              .. "recebido " .. tostring(value), 2)
+    local dt = self._dtype
+    -- validação dtype-aware: sem coerção, o valor deve casar com o tipo da série
+    if dt == "string" then
+        if type(value) ~= "string" then
+            error("smaug: fillna em série string espera uma string Lua; "
+                  .. "recebido " .. type(value), 2)
+        end
+    else
+        if type(value) ~= "number" then
+            error("smaug: fillna em série " .. dt .. " espera um número; "
+                  .. "recebido " .. type(value), 2)
+        end
+        -- sem coerção: i64 só aceita inteiro (1.5 em i64 é erro, não trunca)
+        if dt == "int64" and value % 1 ~= 0 then
+            error("smaug: fillna em int64 requer valor inteiro (sem coerção); "
+                  .. "recebido " .. tostring(value), 2)
+        end
     end
     local n = self:len()
-    local out = Series.new(self._dtype, n, self._name)
+    local out = Series.new(dt, n, self._name)
     for i = 1, n do
         if self:is_null(i) then
-            out:set(i, value)                 -- preenche o null
+            out:set(i, value)           -- preenche o null
         else
-            out:set(i, self:get(i))           -- copia o valor (NaN incluso)
+            out:set(i, self:get(i))     -- copia o valor (NaN incluso)
         end
     end
     return out
@@ -503,8 +539,34 @@ end
 -- describe: resumo estatístico (tabela Lua). Percentis calculados a partir dos
 -- valores não-nulos ordenados em Lua (não exige dropna no C).
 function methods.describe(self)
+    local n = self:len()
+    local nulls = n - self:count_nonnull()
+    -- string: estatísticas categóricas (sem média/std/percentis)
+    if self._dtype == "string" then
+        local freq = {}
+        local top, top_freq = nil, 0
+        for i = 1, n do
+            local v = self:get(i)
+            if v ~= nil then
+                freq[v] = (freq[v] or 0) + 1
+                if freq[v] > top_freq then top, top_freq = v, freq[v] end
+            end
+        end
+        return {
+            count  = n - nulls,
+            nulls  = nulls,
+            unique = (function()
+                local u = 0
+                for _ in pairs(freq) do u = u + 1 end
+                return u
+            end)(),
+            top    = top,
+            freq   = top_freq > 0 and top_freq or nil,
+        }
+    end
+    -- numérico: estatísticas contínuas
     local vals = {}
-    for i = 1, self:len() do
+    for i = 1, n do
         local v = self:get(i)
         if v ~= nil then vals[#vals + 1] = v end
     end
@@ -513,20 +575,20 @@ function methods.describe(self)
     local function pct(p)
         if m == 0 then return nil end
         if m == 1 then return vals[1] end
-        local rank = p * (m - 1) + 1           -- interpolação linear (tipo numpy)
+        local rank = p * (m - 1) + 1
         local lo = math.floor(rank)
         local frac = rank - lo
         if lo >= m then return vals[m] end
         return vals[lo] + frac * (vals[lo + 1] - vals[lo])
     end
     return {
-        count   = m,                            -- não-nulos
-        nulls   = self:len() - m,
+        count   = m,
+        nulls   = nulls,
         mean    = self:mean(),
         std     = self:std(),
         min     = self:min(),
         ["25%"] = pct(0.25),
-        ["50%"] = pct(0.50),                    -- mediana
+        ["50%"] = pct(0.50),
         ["75%"] = pct(0.75),
         max     = self:max(),
     }

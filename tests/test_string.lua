@@ -215,4 +215,69 @@ do
     check(sorted:len() == 5, "sort preserva tamanho")
 end
 
+-- =====================================================================
+-- fillna / describe / astype para string
+-- =====================================================================
+local function test_string_ux()
+    -- fillna: preenche NULL com string; mantém não-nulos intactos
+    local s = S.from_table({"SP", smaug.NA, "RJ", smaug.NA}, "string", "uf")
+    local f = s:fillna("?")
+    check(f:get(1) == "SP", "fillna string: não-nulo preservado")
+    check(f:get(2) == "?",  "fillna string: null preenchido")
+    check(f:get(3) == "RJ", "fillna string: não-nulo preservado 2")
+    check(f:get(4) == "?",  "fillna string: null preenchido 2")
+    check(s:is_null(2),     "fillna string: original imutável")
+
+    -- fillna com tipo errado dá erro descritivo
+    check(rejects(function() s:fillna(0)   end), "fillna str+num -> erro")
+    check(rejects(function() s:fillna(nil) end), "fillna nil -> erro")
+
+    -- describe: retorna count/nulls/unique/top/freq
+    local d = s:describe()
+    check(d.count  == 2,    "describe str: count não-nulos")
+    check(d.nulls  == 2,    "describe str: nulls")
+    check(d.unique == 2,    "describe str: unique")
+    check(d.top ~= nil,     "describe str: top existe")
+    check(d.freq   >= 1,    "describe str: freq >= 1")
+
+    -- describe: série com valor mais frequente
+    local s2 = S.from_table({"a","b","a","a","b"}, "string")
+    local d2 = s2:describe()
+    check(d2.top == "a" and d2.freq == 3, "describe str: top/freq corretos")
+    check(d2.unique == 2,                 "describe str: unique 2 valores")
+
+    -- describe: série toda NULL
+    local sn = S.from_table({smaug.NA, smaug.NA}, "string")
+    local dn = sn:describe()
+    check(dn.count == 0 and dn.nulls == 2, "describe str: toda-null")
+    check(dn.top == nil and dn.freq == nil, "describe str: top nil em toda-null")
+
+    -- astype string → float64: parse numérico
+    local nums = S.from_table({"1.5", "2.0", "abc", smaug.NA}, "string")
+    local f64  = nums:astype("float64")
+    check(f64._dtype == "float64",       "astype str->f64: dtype")
+    check(f64:get(1) == 1.5,             "astype str->f64: valor")
+    check(f64:get(2) == 2.0,             "astype str->f64: valor 2")
+    check(f64:is_null(3),                "astype str->f64: parse inválido -> null")
+    check(f64:is_null(4),                "astype str->f64: null preservado")
+
+    -- astype string → int64
+    local ints = S.from_table({"3", "7", "x"}, "string"):astype("int64")
+    check(ints:get(1) == 3,  "astype str->i64: valor")
+    check(ints:get(2) == 7,  "astype str->i64: valor 2")
+    check(ints:is_null(3),   "astype str->i64: parse inválido -> null")
+
+    -- astype float64 → string
+    local strs = S.from_table({1.5, 0.0/0.0, smaug.NA}, "float64"):astype("string")
+    check(strs._dtype == "string",       "astype f64->str: dtype")
+    check(strs:get(1) == "1.5",          "astype f64->str: valor")
+    check(strs:get(2) ~= nil,            "astype f64->str: NaN vira string (nao null)")
+    check(strs:is_null(3),               "astype f64->str: null preservado")
+
+    -- astype int64 → string
+    local si = S.from_table({10, 20, smaug.NA}, "int64"):astype("string")
+    check(si:get(1) == "10" and si:get(2) == "20", "astype i64->str: valores")
+    check(si:is_null(3),                            "astype i64->str: null preservado")
+end
+
 print(string.format("OK — %d checks passaram (string frontend)", n_ok))

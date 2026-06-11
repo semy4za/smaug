@@ -77,6 +77,21 @@ de teste: SQLite.
 4. **`sum` com `min_count`**: default `0` (compatível com pandas); `min_count=1`
    dá `null` se não houver valor válido. *(min_count ainda a implementar — ver
    dívida técnica.)*
+5. **Conversões por elemento são tolerantes a falha.** `astype` nunca lança erro
+   por causa de um elemento individual — elementos inconversíveis tornam-se
+   `null`. A série inteira não é descartada por um dado ruim.
+
+   ```
+   "abc"  → float64  =>  null   (parse falhou)
+   "abc"  → int64    =>  null   (parse falhou)
+   NaN    → int64    =>  null   (sem representação inteira)
+   Inf    → int64    =>  null   (sem representação inteira)
+   null   → qualquer =>  null   (ausência se propaga)
+   ```
+
+   Isso define o comportamento vetorial: operações em lote são tolerantes a
+   dados imperfeitos. A `null_mask` absorve o erro por elemento sem interromper
+   o processamento da série.
 
 ---
 
@@ -198,6 +213,29 @@ abstração prematura com um banco só. Disciplina barata no lugar: concentrar t
 a interação SQL num único módulo de fronteira (como o `ffi_loader` faz para o C),
 para que adicionar dialetos no futuro seja mexer num módulo, não caçar SQL
 espalhado.
+
+### Indexação expressiva — `[Planned]`
+
+O padrão pandas `df[df.cidade == "SP"]` é um objetivo explícito de UX do Smaug.
+A ergonomia não pode ser ignorada: uma pessoa que vem do pandas vai tentar isso
+antes de qualquer outra coisa.
+
+A forma Lua natural para isso é via `__index` e `__newindex` no DataSet, e via
+`__eq` / `__lt` / `__le` no BoolSeries. O design precisa resolver três tensões:
+
+1. `__eq` em Lua é usado para igualdade de tabelas — sobrescrever tem consequências
+   sobre `==` em geral. A solução provável é um operador dedicado (ex. `s:is(v)`)
+   ou aceitar o override com documentação clara do comportamento.
+2. `df[mask]` exige que `__index` do DataSet distinga entre `mask` (BoolSeries) e
+   `"coluna"` (string) — factível, a distinção é por tipo.
+3. `df[df.cidade == "SP"]` encadeado exige que `df.cidade` retorne a Series
+   (já funciona via `__index`) e que `series == valor` retorne uma BoolSeries
+   (override de `__eq`).
+
+Isso é Ring 1 puro — zero impacto no C. Entra depois do I/O básico (Ring 2),
+quando o loop completo `lê → transforma → filtra` estiver disponível e a API
+puder ser validada com dados reais. A implementação sem I/O seria açúcar
+sintático sem contexto de uso real para validar as decisões de design.
 
 ### Analytics — GroupBy, Join, Window — `[Concept]`
 
