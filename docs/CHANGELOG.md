@@ -7,6 +7,73 @@ novo vale ser visto, não só descrito.
 
 ---
 
+## 2026-06-12 · Ring 1 completo
+
+### Adicionado — `df[mask]` indexação por BoolSeries
+`DataSet.__index` passa a despachar para `filter` quando a chave é uma
+`BoolSeries`. Açúcar sobre `:filter()` — sem semântica nova.
+
+```lua
+local payload = {
+    {"idade", {17, 32, 25}, "int64"},
+    {"nome",  {"Ana", "Bruno", "Carol"}, "string"},
+}
+local ds = smaug.DataSet(payload)
+local adultos = ds[ds.idade:gt(18)]
+```
+
+### Adicionado — `.str` Tier A completo
+Accessor `.str` em `Series` do tipo string. Proxy retornado por `s.str`;
+7 métodos + `replace`. Null propaga; erro claro em dtype errado.
+
+```lua
+local payload = {{"cidade", {"  São Paulo  ", "rio", "MINAS"}, "string"}}
+local ds = smaug.DataSet(payload)
+local normalizado = ds.cidade.str:strip():lower()
+```
+
+Métodos: `len` (→ int64), `lower`, `upper`, `strip`, `replace` (→ string),
+`contains`, `startswith`, `endswith` (→ BoolSeries).
+
+### Adicionado — comparações `ge`/`le`/`ne`
+Para f64, i64 e string — backend C + wrappers Lua. Completam o conjunto
+`gt`/`lt`/`eq`/`ge`/`le`/`ne` nos três tipos.
+
+```lua
+local payload = {{"vendas", {10, 20, 30, 40}, "float64"}}
+local ds = smaug.DataSet(payload)
+local validos = ds[ds.vendas:ge(20) * ds.vendas:le(35)]  -- [20, 30]
+```
+
+### Adicionado — `Series:map(fn, dtype?)`
+Aplica função Lua elemento a elemento. `nil` retornado → null. Dtype
+inferido do primeiro retorno não-null; tipos mistos → erro com índice.
+Dtype explícito prevalece.
+
+```lua
+local payload = {{"preco", {10, 20, nil, 40}, "float64"}}
+local ds = smaug.DataSet(payload)
+local com_taxa = ds.preco:map(function(v) if v then return v * 1.1 end end)
+```
+
+### Corrigido — `f64` div/0 → null (uniforme com i64)
+`smaug_f64_div` e `smaug_f64_div_scalar` passam a produzir `null` quando
+o divisor é zero, eliminando `±Inf`/`NaN` silenciosos. Comportamento
+agora uniforme entre f64 e i64 — div/0 não passa.
+
+```lua
+local payload = {{"vendas", {100.0, 250.0, 0.0}, "float64"}}
+local ds = smaug.DataSet(payload)
+local r = ds.vendas / 0   -- [null, null, null] — não [Inf, Inf, NaN]
+```
+
+### Decisão — Broadcasting rejeitado para Ring 1
+Broadcasting de `Series(length=1)` não desbloqueia capacidades novas além
+do escalar direto (já existente). Broadcasting real pertence ao `Tensor2D`/ML.
+Removido da dívida técnica; registrado como decisão explícita no Roadmap.
+
+---
+
 ## 2026-06-11 · 9807b46
 
 ### Corrigido — `test_string_ux()` órfã

@@ -2,7 +2,8 @@
 
 O histórico detalhado de mudanças fica no `CHANGELOG.md`. Detalhes de API ficam
 no `API_INDEX.md` e no `API_Reference.md`. Contratos defensivos do backend C
-ficam no `CONTRACT.md`.
+ficam no `CONTRACT.md`. A estrutura conceitual e o modelo de crescimento em
+anéis ficam no `ARCHITECTURE.md`.
 
 Marcadores de status: `[Done]`, `[In progress]`, `[Planned]`, `[Concept]`.
 
@@ -27,21 +28,8 @@ deve ser natural de ler e conciso de compor.
 ## Arquitetura em anéis
 
 O projeto cresce de dentro pra fora. Um anel só expande quando o interior está
-sólido — não o contrário.
-
-```
-┌─────────────────────────────────────────┐
-│  Ring 2+  I/O, persistência, analytics  │
-│  ┌───────────────────────────────────┐  │
-│  │  Ring 1  Series, BoolSeries,      │  │
-│  │          DataSet, UX Lua          │  │
-│  │  ┌─────────────────────────────┐  │  │
-│  │  │  Ring 0  C puro: memória,   │  │  │
-│  │  │  tipos, ops primitivas      │  │  │
-│  │  └─────────────────────────────┘  │  │
-│  └───────────────────────────────────┘  │
-└─────────────────────────────────────────┘
-```
+sólido — não o contrário. Ver `ARCHITECTURE.md` para o modelo completo (7 anéis),
+princípios, regra de decisão e avaliação de robustez do núcleo.
 
 ---
 
@@ -83,6 +71,10 @@ ramos, 19 exclusões `COV-EXCL-BR` documentadas). Valgrind-clean. Zero warnings
    não `null`.
 6. **Conversões por elemento são tolerantes a falha.** `astype` nunca lança
    erro por elemento — inconversíveis tornam-se `null`.
+7. **`div/0 → null` em ambos os tipos.** `f64` e `i64` produzem `null` quando
+   o divisor é zero — comportamento uniforme, previsível, sem `±Inf`/`NaN`
+   silenciosos. `NaN` continua existindo como valor literal e em operações
+   como `0/0` só quando intencionalmente construído.
 
    ```
    "abc" → float64  =>  null   (parse falhou)
@@ -105,7 +97,7 @@ explícita via `astype`.
 
 ---
 
-## Ring 1 — Frontend Lua `[In progress]`
+## Ring 1 — Frontend Lua `[Done]`
 
 Series, BoolSeries, DataSet, ergonomia. A API Lua é a linguagem principal do
 Smaug. Ring 1 está fechado quando Series/BoolSeries/DataSet têm contratos
@@ -116,33 +108,36 @@ features possíveis existem.
 
 | Componente | Status |
 |---|---|
-| `Series` (29 métodos, despacho por dtype, ffi.gc) | `[Done]` |
+| `Series` (32 métodos — incluindo `ge`/`le`/`ne`, `map`) | `[Done]` |
 | `BoolSeries` (20 métodos, Kleene, coluna de primeira classe) | `[Done]` |
 | `DataSet` (23 métodos, CRUD, filter, sort, select) | `[Done]` |
+| `df[mask]` — indexação por BoolSeries (`__index` dispatch) | `[Done]` |
+| `.str` Tier A: `len`, `lower`/`upper`, `strip`, `contains`, `startswith`/`endswith`, `replace` | `[Done]` |
+| Comparações `ge`/`le`/`ne` para f64, i64 e string | `[Done]` |
+| `Series:map(fn, dtype?)` com inferência e validação de tipo | `[Done]` |
+| `div/0 → null` para f64 (uniforme com i64) | `[Done]` |
 | `__newindex` (`df["col"] = series_ou_escalar`) | `[Done]` |
 | `Series.full(n, val)` (broadcast de escalar) | `[Done]` |
 | `smaug.DataSet({{"col", dados}, ...})` (açúcar de construção) | `[Done]` |
 | UX de string (fillna dtype-aware, describe, astype tolerante) | `[Done]` |
+| `DataSet:dropna(subset)` | `[Done]` |
 | Contrato formal Ring 1 (`CONTRACT.md` seção Lua) | `[Done]` |
 
-### Próximas frentes de Ring 1 `[Planned]`
+### Nota — limitação estrutural da linguagem
 
-**Indexação expressiva** — o padrão pandas `df[df.cidade == "SP"]` é objetivo
-explícito de UX. Requer `__index` do DataSet distinguindo BoolSeries de string,
-e decisão sobre `__eq` (override com consequências sobre `==` em Lua).
-Entra depois do I/O (Ring 2) para validar com dados reais.
+`df[df.idade > 18]` com operadores nativos Lua não é implementável: `__lt`/`__le`
+só disparam entre objetos do mesmo metatype; `__eq` entre tipos diferentes retorna
+`false` silenciosamente (Lua 5.1/LuaJIT). A sintaxe `:gt()`/`:lt()`/`:eq()` é o
+teto da linguagem, não uma escolha do Smaug.
 
 ```lua
--- objetivo de UX (ainda não implementado)
-local sp = df[df:col("uf"):eq("SP")]
+-- o que existe e funciona
+local payload = {
+    {"idade", {17, 32, 25}, "int64"},
+}
+local ds = smaug.DataSet(payload)
+local adultos = ds[ds.idade:gt(18)]   -- df[mask] funciona
 ```
-
-**Enriquecimento de métodos:**
-- `.str` Tier A: `len`, `lower`/`upper`, `strip`, `contains`,
-  `startswith`/`endswith`.
-- Numéricas: `value_counts`/`unique`, `median`/`quantile`, `abs`/`round`/`clip`.
-- `DataSet:dropna()` (a `Series` já tem — `sort_by` ainda menciona "use dropna
-  primeiro" no nível DataSet).
 
 ---
 
@@ -205,6 +200,26 @@ O ecossistema futuro (todos `[Concept]`, sem compromisso):
 
 ---
 
+## Pré-1.0 — Antes do tag
+
+Itens obrigatórios antes de `git tag v1.0.0`.
+
+Não representam dívida técnica de corretude ou arquitetura.
+A engine pode estar funcionalmente concluída antes que estes itens
+estejam finalizados, mas todos devem estar concluídos para uma
+release v1.0 pública e mantível.
+
+- [ ] Docstrings no source Lua — contrato, parâmetros e exemplo em cada
+      método público de `Series`, `BoolSeries` e `DataSet`. Estilo pandas:
+      quem lê o source ou usa um LSP encontra o comportamento sem precisar
+      dos docs externos.
+- [ ] `API_Reference.md` — seção String e atualização geral para Ring 1.
+- [ ] Linux: `make valgrind` + `make coverage` + commit `COVERAGE.md`.
+- [ ] CHANGELOG entry v1.0.0.
+- [ ] `git tag v1.0.0`.
+
+---
+
 ## Dívida técnica registrada
 
 Itens conscientemente adiados. Os já pagos saíram desta lista (ver `CHANGELOG.md`).
@@ -215,16 +230,17 @@ Itens conscientemente adiados. Os já pagos saíram desta lista (ver `CHANGELOG.
   operações) — fase dedicada, sem penalizar loops quentes.
 - Build: decidir futuro do bloco CMake (atrelado à decisão Lua 5.4).
 
-**Ring 1:**
-- `DataSet:dropna()` com `subset` de colunas.
-- `apply`/`map` (função Lua elemento a elemento).
-- Broadcasting (Series de tamanhos diferentes / Series × array).
-- Reconciliar assimetria de div/0: f64 (IEEE: ±Inf/NaN) vs i64 (→ null).
-- Contrato formal Ring 1 escrito em `CONTRACT.md`.
+**Ring 1:** dívida zerada.
 
-**String (`.str`, incremental por camadas):**
-- Tier A: `len`, `lower`/`upper`, `strip`, `contains`, `startswith`/`endswith`,
-  `replace` (literal).
+**Broadcasting — rejeitado:**
+Operações escalares (`serie * 2`) já cobrem o caso de uso.
+Broadcasting de `Series(length=1)` não desbloqueia capacidades novas
+e introduz semântica de shape sem base nos contratos atuais.
+Broadcasting real (axis-aware) pertence ao `Tensor2D`/ML, onde a
+semântica pode ser definida explicitamente.
+
+**Ring 1 — `.str` (incremental por camadas):**
+- Tier A: `[Done]` — `len`, `lower`/`upper`, `strip`, `contains`, `startswith`/`endswith`, `replace`.
 - Tier B: `split`, `cat`/join, `slice`, `pad`/`zfill`, `repeat`, `find`.
 - Tier C: regex (`extract`/`findall`/`match` — subprojeto), normalização UTF-8
   (hoje trata bytes crus; case-folding Unicode-aware exige tabelas de caso).

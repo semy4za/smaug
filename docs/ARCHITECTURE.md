@@ -1,0 +1,268 @@
+# Smaug — Arquitetura
+
+Documento de referência para a estrutura conceitual e o modelo de crescimento
+do ecossistema Smaug. Muda raramente — descreve teoria, não entregas.
+
+Para o estado atual de cada anel e as próximas entregas concretas, ver
+`Roadmap.md`. Para o histórico de mudanças, ver `CHANGELOG.md`.
+
+---
+
+## Princípios
+
+**P1 — Crescimento para fora.**
+A evolução ocorre pela adição de anéis externos. Novas funcionalidades não
+exigem expansão estrutural do núcleo.
+
+**P2 — Dependências fluem para dentro.**
+Um anel pode depender de anéis internos. O inverso é proibido.
+
+```
+Anel N → Anel N-1 → ... → Anel 0   ✓
+Anel 0 → Anel 1                     ✗
+```
+
+**P3 — Propriedade semântica isolada.**
+Cada responsabilidade pertence a exatamente um anel. Conceitos não são
+duplicados entre camadas.
+
+**P4 — Estabilidade cresce para dentro.**
+Quanto mais próximo do centro, mais conservadora é a evolução esperada.
+Camadas externas podem mudar rapidamente. O núcleo muda com cautela.
+
+---
+
+## Modelo de anéis
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Anel 6  Interação — TUI, Studio, Web, Notebooks     │
+│  ┌────────────────────────────────────────────────┐  │
+│  │  Anel 5  Ferramentas — Console, Debug, Profiling│  │
+│  │  ┌──────────────────────────────────────────┐  │  │
+│  │  │  Anel 4  ML e Analytics                  │  │  │
+│  │  │  ┌────────────────────────────────────┐  │  │  │
+│  │  │  │  Anel 3  Persistência — ORM, Schema│  │  │  │
+│  │  │  │  ┌──────────────────────────────┐  │  │  │  │
+│  │  │  │  │  Anel 2  Conectividade — I/O │  │  │  │  │
+│  │  │  │  │  ┌────────────────────────┐  │  │  │  │  │
+│  │  │  │  │  │  Anel 1  Abstrações   │  │  │  │  │  │
+│  │  │  │  │  │  ┌──────────────────┐ │  │  │  │  │  │
+│  │  │  │  │  │  │  Anel 0  Núcleo │ │  │  │  │  │  │
+│  │  │  │  │  │  └──────────────────┘ │  │  │  │  │  │
+│  │  │  │  │  └────────────────────┘  │  │  │  │  │  │
+│  │  │  │  └──────────────────────────┘  │  │  │  │  │
+│  │  │  └────────────────────────────────┘  │  │  │  │
+│  │  └──────────────────────────────────────┘  │  │  │
+│  └────────────────────────────────────────────┘  │  │
+└──────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────┘
+```
+
+---
+
+## Anel 0 — Núcleo Computacional
+
+**Status: `[Done]`**
+
+Mecanismos fundamentais de execução. Máxima estabilidade, mínimo conhecimento
+externo. Não conhece Series, DataSet, CSV, SQL, modelos nem interfaces.
+
+**Responsabilidades:**
+- Gerenciamento de memória (alloc, grow, free)
+- Estruturas de armazenamento colunar (f64, i64, bool, string offset-based)
+- Ownership, views, Copy-on-Write
+- Máscaras de nulidade (null bitmask uniforme)
+- Operações primitivas (aritmética, comparações, sort, filter, take)
+- Contratos defensivos — toda fronteira pública valida e comunica o resultado
+
+**Não conhece:** Series, DataSet, CSV, SQL, modelos, interfaces.
+
+---
+
+## Anel 1 — Abstrações de Dados
+
+**Status: `[Done]`**
+
+Transforma mecanismos do Anel 0 em estruturas semânticas. Define a forma
+como usuários interagem e raciocinam sobre dados.
+
+**Responsabilidades:**
+- `Series` — coluna tipada 1D com null handling
+- `BoolSeries` — máscara booleana com lógica Kleene
+- `DataSet` — coleção de Series alinhadas
+- Filtros, agregações, ordenação, operações relacionais
+- Ergonomia Lua: açúcar sintático, metamétodos, accessor `.str`
+
+**Dependência:** Anel 1 → Anel 0.
+
+---
+
+## Anel 2 — Conectividade
+
+**Status: `[Planned]`**
+
+Integra o ecossistema com sistemas externos. Transporta dados — não define
+semântica, não define persistência, não define regras de negócio.
+
+**Responsabilidades:**
+
+| Fonte → DataSet | DataSet → Destino |
+|---|---|
+| CSV / TSV | CSV / TSV |
+| JSON | JSON |
+| SQLite | SQLite |
+| PostgreSQL | PostgreSQL |
+| Arrow / Parquet | Arrow / Parquet |
+| REST | — |
+
+**Contrato funcional:**
+```
+Sistema Externo → Conectividade → DataSet   (entrada)
+DataSet → Conectividade → Sistema Externo   (saída)
+```
+
+**Dependência:** Anel 2 → Anel 1 → Anel 0.
+
+---
+
+## Anel 3 — Persistência
+
+**Status: `[Concept]`**
+
+Gerencia estruturas persistidas e sua evolução ao longo do tempo.
+
+**Responsabilidades:**
+- ORM e Query Builder
+- Registro de metadados e schema
+- Engine de migração (estilo Alembic)
+- Versionamento de schema
+
+**Distinção importante:**
+- Conectividade responde: *como os dados entram e saem?*
+- Persistência responde: *como estruturas persistidas são organizadas e evoluem?*
+
+**Dependência:** Anel 3 → Anel 2 → Anel 1 → Anel 0.
+
+---
+
+## Anel 4 — Analytics e Machine Learning
+
+**Status: `[Concept]`**
+
+Transforma dados em conhecimento, métricas ou modelos preditivos.
+
+**Responsabilidades:**
+- Análise exploratória, profiling, estatísticas descritivas
+- Engenharia de atributos
+- Pipelines de treinamento e inferência
+- Avaliação e serialização de modelos
+- Domínios: forecasting, classificação, regressão, clustering
+
+**Regra arquitetural:** ML consome DataSets. DataSets não conhecem ML.
+
+**Nota sobre broadcasting:** broadcasting axis-aware pertence a este anel,
+associado ao tipo `Tensor2D` (distinto do `DataSet` heterogêneo). Broadcasting
+de Series de tamanho 1 foi rejeitado no Anel 1 — operações escalares já cobrem
+o caso sem introduzir semântica de shape.
+
+**Dependência:** Anel 4 → Anel 3 → Anel 2 → Anel 1 → Anel 0.
+
+---
+
+## Anel 5 — Ferramentas
+
+**Status: `[Concept]`**
+
+Observabilidade e produtividade. Ferramentas observam — não definem semântica.
+
+**Responsabilidades:**
+- Rich console: `describe`, `explain`, inspeção de schema
+- Relatórios de profiling
+- Ferramentas de debug e exploração de dados
+
+**Dependência:** Anel 5 → anéis internos conforme necessário.
+
+---
+
+## Anel 6 — Interação
+
+**Status: `[Concept]`**
+
+Mecanismos de interação humana. Interfaces consomem serviços — não definem
+lógica de negócio nem semântica de dados.
+
+**Responsabilidades:**
+- TUI, Studio (Smaug|Vialactea Studio)
+- Dashboards, integrações com notebooks
+- Interfaces web, exploradores visuais
+
+**Dependência:** Anel 6 → anéis internos conforme necessário.
+
+---
+
+## Regra de decisão arquitetural
+
+Toda nova funcionalidade deve responder:
+
+> *Qual é o anel mais interno capaz de resolver este problema sem violar
+> a separação de responsabilidades?*
+
+A implementação ocorre nesse anel — nunca mais profundamente do que o necessário.
+
+---
+
+## Estado atual do núcleo
+
+Avaliação de robustez e confiabilidade dos Anéis 0 e 1.
+
+### Robustez arquitetural
+
+| Área | Estado |
+|---|---|
+| Tipos colunares (f64/i64/bool/string) | ✅ Forte |
+| Separação por tipo (core vs ops) | ✅ Forte |
+| Null bitmask uniforme | ✅ Forte |
+| Semântica null / NaN / ±Inf / div/0 | ✅ Forte — contratos explícitos e decididos |
+| Ordenação determinística | ✅ Forte |
+| Contratos defensivos | ✅ Forte — toda fronteira pública valida |
+| Tratamento de OOM | ✅ Forte — todos os pontos públicos cobertos |
+| Integridade de memória | ✅ Forte — Valgrind-clean |
+| Views e Copy-on-Write | ✅ Forte |
+| Isolamento após COW detach | ✅ Forte |
+| Álgebra booleana Kleene | ✅ Forte |
+| Filter / Take / Sort | ✅ Forte |
+| Consistência de API | ✅ Forte |
+| Dependências externas | ✅ Forte — núcleo independente |
+| Extensibilidade para novos tipos | ✅ Forte — demonstrada sem ruptura |
+| Extensibilidade para operações futuras | ✅ Forte |
+
+### Validação e evidências
+
+| Área | Estado |
+|---|---|
+| Stress tests (N=1M) | ✅ Forte |
+| Property-based testing (281k+ checks) | ✅ Forte |
+| AllocFail testing (767 verificações) | ✅ Forte |
+| Branch coverage / MC/DC | ✅ Forte — 100% branch-alvo (1095/1095) |
+| Cobertura de linhas | ✅ Forte — 99.82% |
+| Cross-platform (Windows/Linux) | ✅ Validado — MSYS2-UCRT64 + Fedora |
+| Strings (robustez) | ✅ Forte — lifecycle, comparações, sort, filter, take |
+| Fuzzing | ⚠️ Ausente — lacuna registrada na dívida técnica |
+
+### Capacidade analítica
+
+| Área | Estado |
+|---|---|
+| Aritmética vetorizada (f64/i64) | ✅ Forte |
+| Comparações vetorizadas (gt/lt/eq/ge/le/ne) | ✅ Forte |
+| Reduções (sum/min/max/mean/var/std) | ✅ Forte |
+| Lógica booleana (Kleene completo) | ✅ Forte |
+| Filtros e seleção | ✅ Forte |
+| Ordenação (sort/argsort) | ✅ Forte |
+| Transformações (map, astype, fillna) | ✅ Forte |
+| `.str` Tier A | ✅ Forte |
+| GroupBy | ⏳ Anel 2+ |
+| Join | ⏳ Anel 2+ |
+| Window functions | ⏳ Anel 2+ |
+| Agregações avançadas | ⏳ Anel 2+ |
