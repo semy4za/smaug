@@ -8,13 +8,13 @@ ed7d63f5177cc7d7fbfee9c7c18ebeb4d6fd7da02680ec7778cfe23be1d15b03      31  .gitat
 0be2e0399e8583198ce1e815c81e244fc3a97b02e572948ae842936edb7be239     184  .\docs\API_INDEX.md
 6e9da6dd6544f53f958153813c11db8e5a5c2acb65665888f6abd36d73fc6382     466  .\docs\API_Reference.md
 e0573823ec9aaa68c30b3542e33b48ce65c833559065b7ffbad8720e7f4ea6ec     433  .\docs\Build_and_Testing.md
-cc3cbdf095accd13faa32b30abddf9e374cd98d42864d8ad21f3ee8d5ccafd95     655  .\docs\CHANGELOG.md
+c048b32b7d46911ec754501350c02939dc83ebec6c2298d6446c7b339f7eb188     201  .\docs\CHANGELOG.md
 9a5745e0953b96ecc14c62e02951b104b7e2575938630a0bde0a5cecafee14ee      98  .\docs\CODE_REVIEW.md
-0622a8800fedbb7dcb44c580ac157239c881fc8d72816a294c005591a9f41a49     115  .\docs\CONTRACT.md
-d827b2a7949072549bb83501abf94d005ac20cb15e4b0da35c47b6b2186bcf6f      44  .\docs\COVERAGE.md
-256e0c7b49824267619e53f32ad66d1b3b76eec75943c7bb05d776477cf8be6f     138  .\docs\COW.md
-7c4ded9567d24882d69417aff9696e179eb929d6d1c81e885bfd04a4d6519fa6     257  .\docs\README.md
-443ffdfebc1e61264c48cc2eb59c9d9b3f1d65dd8b7910ae602af980be06a379     349  .\docs\Roadmap.md
+d725ddfecddc5c0ce7cae857ecb7bc57edc66202b40d66e723595709e2d14044     274  .\docs\CONTRACT.md
+e17b330ee167dc7261f469eca7788750b9a08c67baf19d5c31fa2c03c1afab66      46  .\docs\COVERAGE.md
+0b780addfb2929a2af46aa31af0849d30b479a51a35a730f9863843cf095e910     159  .\docs\COW.md
+933b663060a49dfc050323f43b0d0c4f69b348462702c6f440ceb5c732dbf0ed     185  .\docs\README.md
+0dbd93d06481bcf673be17d5a0d26c828787834e8e548d76403088c34af50954     235  .\docs\Roadmap.md
 ec1ae8442e32984127948c7e126da19f84f85193023143dc36ee82b8e352544d      29  .\include\smaug.h
 963e21a0d5b9b1857da7bbe7310a4a9340057fcf7560272f062e4e83727c5da3      40  .\include\smaug_bool.h
 31d4d936c265d46e39016d7e1861f01d2633cf476fed8f4798012bc385a009c3      78  .\include\smaug_core.h
@@ -27,7 +27,7 @@ ec1ae8442e32984127948c7e126da19f84f85193023143dc36ee82b8e352544d      29  .\incl
 5d4a0a530bdf4f66466e462dbcf6cade8baf56440717aced7dcdd733e4f20619     268  .\lua\smaug\ffi_loader.lua
 e707eb9e0f1e00d7f170eb4c3f5f2b87fc7f38203bab2765a033e5e56423e161      36  .\lua\smaug\init.lua
 868626d77f7027a3192db17174bda522572388c700c022dbd5b3f82ffe9b99a0      87  .\Makefile
-fe5ef792a2479a09683b67cfac61a08fbcf0c866e4b2be6f2ebcf613f9f6e0a0     217  .\scripts\make_coverage.sh
+9c5ea7cf7082229e22032d9b6c21f19ca523d529730090a089e546cadbb23e07     218  .\scripts\make_coverage.sh
 ab62e2b7e4e545059419f9847988cc2bbc8c171a3a7f84048c02251dc9200487      65  .\scripts\make_manifest.ps1
 69322d8cf4dde498b76b4e463d02f66f355e541878e74b5fdee95aae80204805      34  .\scripts\make_manifest.sh
 d428054e2c4e838e6f9eacfcac27b56f96b427c615634277e6aea76b85f2c7a4     223  .\scripts\windows_build.ps1
@@ -52,6 +52,6 @@ c3eaa9b8d9204fa3e00a24e74029820ba5b6befc2f7a96deb7a6624ad2299629     206  .\test
 95b96ff3b9f6eb462c664326f654abe94262db625000b21e4f20f12afbb8a448     151  .\tests\test_special.lua
 e656ea4300fba405ffbbf1da95d6a2b5e18e4efdbc589ab7e7d77432ea33a871     339  .\tests\test_stress.c
 c91543e30b7f518c0cd084ed39fe46fab4ba261f66d937bad8ef9bed89bf3557     388  .\tests\test_string.c
-18f49d8da38c11e3ec45356a095d7e35e9dcbceb1b56038b396f7436b86cfdf9     283  .\tests\test_string.lua
+8e65528b2dca87e925ee3ee71820bf46567fb18a12b066ad5f4db70ebee2ae26     285  .\tests\test_string.lua
 #
 # total de arquivos: 51
