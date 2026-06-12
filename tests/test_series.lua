@@ -251,4 +251,71 @@ check(ds[ds.v:ge(3)]:nrows() == 3,  "ge integração: >= 3 -> 3 linhas")
 check(ds[ds.v:le(2)]:nrows() == 2,  "le integração: <= 2 -> 2 linhas")
 check(ds[ds.v:ne(3)]:nrows() == 4,  "ne integração: != 3 -> 4 linhas")
 
+-- ===== map =====
+local function test_map()
+    -- básico: transformação inteira
+    local s = Series.from_table({1, 2, 3}, "int64")
+    local r = s:map(function(v) return v * 2 end)
+    check(r._dtype == "int64",      "map: dtype inferido int64")
+    check(r:get(1) == 2,            "map: valor 1")
+    check(r:get(3) == 6,            "map: valor 3")
+    check(r:len() == 3,             "map: comprimento preservado")
+
+    -- null na entrada -> null na saída
+    local sn = Series.from_table({1, smaug.NA, 3}, "int64")
+    local rn = sn:map(function(v) if v == nil then return nil end return v + 10 end)
+    check(rn:get(1) == 11,          "map: null in: valor 1 ok")
+    check(rn:is_null(2),            "map: null in -> null out")
+    check(rn:get(3) == 13,          "map: null in: valor 3 ok")
+
+    -- fn retorna nil condicionalmente -> null
+    local sc = Series.from_table({5, 15, 25}, "int64")
+    local rc = sc:map(function(v) if v > 10 then return v end return nil end)
+    check(rc:is_null(1),            "map: nil cond -> null")
+    check(rc:get(2) == 15,          "map: nil cond: valor 2 ok")
+    check(rc:get(3) == 25,          "map: nil cond: valor 3 ok")
+
+    -- dtype explícito prevalece
+    local rf = s:map(function(v) return v / 2 end, "float64")
+    check(rf._dtype == "float64",   "map: dtype explícito float64")
+    check(rf:get(1) == 0.5,         "map: valor com dtype explícito")
+
+    -- inferência: float64 quando retorno tem fração
+    local rf2 = s:map(function(v) return v + 0.5 end)
+    check(rf2._dtype == "float64",  "map: inferência float64 por fração")
+
+    -- inferência: string
+    local rs = s:map(function(v) return "v"..v end)
+    check(rs._dtype == "string",    "map: inferência string")
+    check(rs:get(1) == "v1",        "map: valor string")
+
+    -- índice disponível na fn
+    local ri = s:map(function(v, i) return v + i end)
+    check(ri:get(1) == 2,           "map: índice fn: 1+1=2")
+    check(ri:get(3) == 6,           "map: índice fn: 3+3=6")
+
+    -- tipo misto -> erro com índice
+    local ok1, err1 = pcall(function()
+        s:map(function(v) if v == 1 then return "x" end return v end)
+    end)
+    check(not ok1,                  "map: tipo misto -> erro")
+    check(err1:find("índice") ~= nil, "map: erro aponta índice")
+
+    -- toda-null sem dtype -> erro
+    local ok2 = pcall(function() s:map(function() return nil end) end)
+    check(not ok2,                  "map: toda-null sem dtype -> erro")
+
+    -- toda-null com dtype -> série null
+    local rz = s:map(function() return nil end, "int64")
+    check(rz:is_null(1) and rz:is_null(3), "map: toda-null com dtype -> série null")
+
+    -- fn não é função -> erro
+    local ok3 = pcall(function() s:map(42) end)
+    check(not ok3,                  "map: fn não-função -> erro")
+
+    -- imutabilidade: original intacto
+    check(s:get(1) == 1,            "map: original imutável")
+end
+test_map()
+
 print(string.format("OK — %d checks passaram (Series f64 + i64 + bool)", n_ok))

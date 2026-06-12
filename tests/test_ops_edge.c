@@ -101,8 +101,8 @@ static void f64_div_zero_and_null(void) {
 
     smaug_series_f64_t *r = smaug_f64_div(a, b);
     OK(r != NULL, "f64 div ok");
-    /* 10/0 = Inf (IEEE), 20/4 = 5, NULL/2 = NULL */
-    OK(isinf(smaug_f64_get(r, 0, NULL)), "f64 div por zero = Inf");
+    /* 10/0 = NULL (div/0 previsível), 20/4 = 5, NULL/2 = NULL */
+    OK(smaug_f64_is_null(r, 0), "f64 div por zero = NULL");
     OK(smaug_f64_get(r, 1, NULL) == 5.0, "f64 div normal");
     OK(smaug_f64_is_null(r, 2), "f64 div com NULL preserva NULL");
 
@@ -180,9 +180,9 @@ static void f64_scalar_edge(void) {
     OK(smaug_f64_is_null(r, 1), "f64 add_scalar preserva NULL");
     smaug_f64_free(r);
 
-    /* div_scalar por zero: 10/0 = Inf (IEEE) */
+    /* div_scalar por zero: tudo NULL (igual ao i64; div/0 não passa) */
     smaug_series_f64_t *dz = smaug_f64_div_scalar(a, 0);
-    OK(dz && isinf(smaug_f64_get(dz, 0, NULL)), "f64 div_scalar por zero = Inf");
+    OK(dz && smaug_f64_is_null(dz, 0), "f64 div_scalar por zero = NULL");
     smaug_f64_free(dz);
 
     smaug_f64_free(a);

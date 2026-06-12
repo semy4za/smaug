@@ -81,10 +81,11 @@ smaug_series_f64_t *smaug_f64_div(const smaug_series_f64_t *a,
     if (!r) return NULL;
 
     for (size_t i = 0; i < a->size; i++) {
-        if (VALID(a, i) && VALID(b, i)) {
-            r->data[i]      = a->data[i] / b->data[i];  /* div/0 → ±Inf/NaN (IEEE 754) */
+        if (VALID(a, i) && VALID(b, i) && b->data[i] != 0.0) {
+            r->data[i]      = a->data[i] / b->data[i];
             r->null_mask[i] = 0xFF;
         }
+        /* div/0 → NULL (previsível; evita ±Inf/NaN silenciosos) */
     }
     return r;
 }
@@ -141,13 +142,14 @@ smaug_series_f64_t *smaug_f64_mul_scalar(const smaug_series_f64_t *a, double sca
 
 smaug_series_f64_t *smaug_f64_div_scalar(const smaug_series_f64_t *a, double scalar) {
     if (!a) return NULL;
+    if (scalar == 0.0) return alloc_result(a->size);  /* tudo NULL — igual ao i64 */
 
     smaug_series_f64_t *r = alloc_result(a->size);
     if (!r) return NULL;
 
     for (size_t i = 0; i < a->size; i++) {
         if (VALID(a, i)) {
-            r->data[i]      = a->data[i] / scalar;   /* scalar==0 → ±Inf/NaN */
+            r->data[i]      = a->data[i] / scalar;
             r->null_mask[i] = 0xFF;
         }
     }

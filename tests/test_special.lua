@@ -96,15 +96,21 @@ do
 end
 
 -- ===================================================================
--- NaN gerado por operação (0/0) também é NaN real, não null
+-- div/0 → null (decisão explícita: div/0 não passa, é previsível)
+-- 0/0, n/0 e -n/0 todos produzem null; NaN via op foi removido.
+-- NaN ainda existe como valor literal (S.from_table({0/0})).
 -- ===================================================================
 do
-    local a = S.from_table({0.0, 1.0}, "float64")
-    local b = S.from_table({0.0, 0.0}, "float64")
-    local c = a / b            -- [0/0=NaN, 1/0=+Inf]
-    check(is_nan(c:get(1)), "op: 0/0 → NaN real")
-    check(c:is_null(1) == false, "op: 0/0 não é null")
-    check(c:get(2) == inf, "op: 1/0 → +Inf")
+    local a = S.from_table({0.0, 1.0, -1.0}, "float64")
+    local b = S.from_table({0.0, 0.0,  0.0}, "float64")
+    local c = a / b
+    check(c:is_null(1), "op: 0/0  → null")
+    check(c:is_null(2), "op: 1/0  → null")
+    check(c:is_null(3), "op: -1/0 → null")
+    -- escalar 0
+    local d = a / 0
+    check(d:is_null(1), "op: f64 / escalar 0 → null")
+    check(d:is_null(2), "op: f64 / escalar 0 → null (2)")
 end
 
 -- ===================================================================
@@ -115,11 +121,11 @@ do
     s:set(1, 3.0); s:set(2, nan); s:set(3, 1.0)
     check_err(function() return s:sort() end, "NaN: sort recusa NaN")
     check(s:argsort() == nil, "NaN: argsort retorna nil com NaN")
-    -- NaN vindo de operação também é recusado pelo sort
+    -- null vindo de div/0 também é recusado pelo sort
     local a = S.from_table({0.0, 1.0}, "float64")
     local b = S.from_table({0.0, 2.0}, "float64")
-    local c = a / b            -- contém NaN em [1]
-    check_err(function() return c:sort() end, "NaN: sort recusa NaN de operação")
+    local c = a / b            -- [1] = null (0/0 → null), [2] = 0.5
+    check_err(function() return c:sort() end, "div/0: sort recusa null resultante")
 end
 
 -- ===================================================================

@@ -570,6 +570,95 @@ function methods.fillna(self, value)
     return out
 end
 
+-- map(fn, dtype?): aplica fn a cada elemento, devolvendo nova Series.
+-- Contrato:
+--   nil retornado -> null na saída (semântica de ausência já estabelecida).
+--   dtype omitido -> inferido do primeiro retorno não-null.
+--   dtype explícito -> prevalece; retornos devem ser compatíveis.
+--   tipos mistos -> erro imediato (sem coerção silenciosa).
+--   série toda-null (ou fn retorna nil em todos) -> série null do dtype
+--     informado; sem dtype -> erro (impossível inferir).
+-- fn recebe o valor Lua (nil se null) e o índice 1-based.
+-- O índice permite: fn(v, i) -> construções dependentes de posição.
+local function infer_from_value(v)
+    local t = type(v)
+    if t == "string"  then return "string" end
+    if t == "number"  then
+        return (v % 1 == 0) and "int64" or "float64"
+    end
+    return nil   -- tipo não suportado
+end
+
+local function check_map_value(v, dtype, i)
+    if dtype == "int64" then
+        if type(v) ~= "number" or v % 1 ~= 0 then
+            error("smaug: map: tipo inconsistente no índice " .. i
+                  .. " (esperado int64, recebido " .. type(v) .. ")", 4)
+        end
+    elseif dtype == "string" then
+        if type(v) ~= "string" then
+            error("smaug: map: tipo inconsistente no índice " .. i
+                  .. " (esperado string, recebido " .. type(v) .. ")", 4)
+        end
+    else  -- float64
+        if type(v) ~= "number" then
+            error("smaug: map: tipo inconsistente no índice " .. i
+                  .. " (esperado float64, recebido " .. type(v) .. ")", 4)
+        end
+    end
+end
+
+function methods.map(self, fn, dtype, name)
+    if type(fn) ~= "function" then
+        error("smaug: map espera uma função como 1º argumento", 2)
+    end
+    if dtype ~= nil and not DTYPES[dtype] then
+        error("smaug: map: dtype desconhecido '" .. tostring(dtype) .. "'", 2)
+    end
+
+    local n       = self:len()
+    local results = {}      -- coleta todos os retornos antes de alocar
+    local inferred = dtype  -- nil = ainda não inferido
+
+    -- passo 1: aplica fn, infere dtype, valida consistência
+    for i = 1, n do
+        local v  = self:get(i)   -- nil se null
+        local r  = fn(v, i)
+        if r == nil or r == NA then
+            results[i] = nil     -- null na saída
+        else
+            local rt = infer_from_value(r)
+            if rt == nil then
+                error("smaug: map: retorno de tipo não suportado no índice "
+                      .. i .. " (" .. type(r) .. ")", 2)
+            end
+            if inferred == nil then
+                inferred = rt    -- primeiro não-null: fixa o dtype
+            else
+                -- valida consistência (sem coerção silenciosa)
+                check_map_value(r, inferred, i)
+            end
+            results[i] = r
+        end
+    end
+
+    -- passo 2: sem dtype e série toda-null -> erro (impossível inferir)
+    if inferred == nil then
+        error("smaug: map: todos os retornos são nil — informe dtype explicitamente", 2)
+    end
+
+    -- passo 3: monta a série de saída
+    local out = Series.new(inferred, n, name or self._name)
+    for i = 1, n do
+        if results[i] == nil then
+            out:set_null(i)
+        else
+            out:set(i, results[i])
+        end
+    end
+    return out
+end
+
 -- describe: resumo estatístico (tabela Lua). Percentis calculados a partir dos
 -- valores não-nulos ordenados em Lua (não exige dropna no C).
 function methods.describe(self)
