@@ -434,3 +434,205 @@ int smaug_i64_append_null(smaug_series_i64_t *s) {
     s->size++;
     return 0;
 }
+
+/* ===================================================================
+   BOOL — Lifecycle
+   Espelha i64 (storage de tamanho fixo), com data uint8_t (0/1). Mesmo
+   contrato de fronteira: valida e comunica; em erro nenhuma escrita ocorre.
+   COW idêntico ao dos numéricos.
+   =================================================================== */
+
+static int bool_grow(smaug_series_bool_t *s) {
+    size_t new_cap = s->capacity ? (s->capacity + (s->capacity >> 1)) : 4;
+    if (new_cap <= s->capacity) new_cap = s->capacity + 1;  /* COV-EXCL-BR: overflow ao dobrar capacity; so com capacity ~ SIZE_MAX */
+
+    uint8_t *nd = realloc(s->data, new_cap * sizeof(uint8_t));
+    if (!nd) return -1;            /* data intacto; série consistente */
+    s->data = nd;
+
+    smaug_mask_t *nm = realloc(s->null_mask, new_cap * sizeof(smaug_mask_t));
+    if (!nm) {
+        if (s->capacity > 0) {
+            uint8_t *back = realloc(s->data, s->capacity * sizeof(uint8_t));
+            if (back) s->data = back;  /* COV-EXCL-BR: realloc de shrink falhando; defensivo, mantem buffer maior (seguro) */
+        }
+        return -1;
+    }
+    s->null_mask = nm;
+    s->capacity  = new_cap;
+    return 0;
+}
+
+smaug_series_bool_t *smaug_bool_create_with_capacity(size_t size, size_t capacity) {
+    if (size > capacity) return NULL;
+
+    smaug_series_bool_t *s = malloc(sizeof(smaug_series_bool_t));
+    if (!s) return NULL;
+
+    if (capacity == 0) {
+        s->data      = NULL;
+        s->null_mask = NULL;
+    } else {
+        s->data = malloc(capacity * sizeof(uint8_t));
+        if (!s->data) { free(s); return NULL; }
+
+        s->null_mask = malloc(capacity * sizeof(smaug_mask_t));
+        if (!s->null_mask) { free(s->data); free(s); return NULL; }
+
+        memset(s->null_mask, 0x00, capacity);
+        memset(s->data,      0,    size * sizeof(uint8_t));
+    }
+
+    s->size                = size;
+    s->capacity            = capacity;
+    s->meta.name           = "unnamed";
+    s->meta.dtype          = "bool";
+    s->meta.is_view        = false;
+    s->meta.external_alloc = false;
+    return s;
+}
+
+smaug_series_bool_t *smaug_bool_create(size_t size) {
+    return smaug_bool_create_with_capacity(size, size);
+}
+
+smaug_series_bool_t *smaug_bool_create_from_array(const uint8_t *array, size_t len) {
+    if (!array) return NULL;
+
+    smaug_series_bool_t *s = smaug_bool_create_with_capacity(len, len);
+    if (!s) return NULL;
+
+    /* normaliza qualquer não-zero para 1 (data é booleano canônico) */
+    for (size_t i = 0; i < len; i++) s->data[i] = array[i] ? 1 : 0;
+    memset(s->null_mask, 0xFF, len);
+    return s;
+}
+
+void smaug_bool_free(smaug_series_bool_t *s) {
+    if (!s) return;
+    if (!s->meta.external_alloc) {
+        free(s->data);
+        free(s->null_mask);
+    }
+    free(s);
+}
+
+smaug_series_bool_t *smaug_bool_clone(const smaug_series_bool_t *s) {
+    if (!s) return NULL;
+
+    smaug_series_bool_t *c = smaug_bool_create_with_capacity(s->size, s->capacity);
+    if (!c) return NULL;
+
+    if (s->size > 0) {
+        memcpy(c->data,      s->data,      s->size * sizeof(uint8_t));
+        memcpy(c->null_mask, s->null_mask, s->size);
+    }
+
+    c->meta                = s->meta;
+    c->meta.is_view        = false;
+    c->meta.external_alloc = false;
+    return c;
+}
+
+smaug_series_bool_t *smaug_bool_view(smaug_series_bool_t *s, size_t start, size_t len) {
+    if (!s || start > s->size || len > s->size - start) return NULL;
+
+    smaug_series_bool_t *v = malloc(sizeof(smaug_series_bool_t));
+    if (!v) return NULL;
+
+    v->data                = s->data      + start;
+    v->null_mask           = s->null_mask + start;
+    v->size                = len;
+    v->capacity            = len;
+    v->meta                = s->meta;
+    v->meta.is_view        = true;
+    v->meta.external_alloc = true;
+    return v;
+}
+
+/* --- Copy-on-Write detach (bool) --- */
+static int bool_cow_detach(smaug_series_bool_t *s) {
+    if (!s->meta.is_view) return 0;
+    if (s->size == 0) {
+        s->data                = NULL;
+        s->null_mask           = NULL;
+        s->capacity            = 0;
+        s->meta.is_view        = false;
+        s->meta.external_alloc = false;
+        return 0;
+    }
+    uint8_t      *nd = malloc(s->size * sizeof *nd);
+    smaug_mask_t *nm = malloc(s->size * sizeof *nm);
+    if (!nd || !nm) { free(nd); free(nm); return -1; }
+    memcpy(nd, s->data,      s->size * sizeof *nd);
+    memcpy(nm, s->null_mask, s->size * sizeof *nm);
+    s->data                = nd;
+    s->null_mask           = nm;
+    s->capacity            = s->size;
+    s->meta.is_view        = false;
+    s->meta.external_alloc = false;
+    return 0;
+}
+
+/* --- Getters / Setters --- */
+
+uint8_t smaug_bool_get(const smaug_series_bool_t *s, size_t idx, smaug_status_t *status) {
+    if (!s)             { if (status) *status = SMG_ERR_ARGUMENT; return 0; }
+    if (idx >= s->size) { if (status) *status = SMG_ERR_OOB;      return 0; }
+    if (s->null_mask[idx] != 0xFF) { if (status) *status = SMG_NULL_VALUE; return 0; }
+    if (status) *status = SMG_OK;
+    return s->data[idx];
+}
+
+smaug_status_t smaug_bool_set(smaug_series_bool_t *s, size_t idx, uint8_t val) {
+    if (!s)             return SMG_ERR_ARGUMENT;
+    if (idx >= s->size) return SMG_ERR_OOB;
+    if (bool_cow_detach(s) != 0) return SMG_ERR_NOMEM;
+    s->data[idx]      = val ? 1 : 0;   /* normaliza para booleano canônico */
+    s->null_mask[idx] = 0xFF;
+    return SMG_OK;
+}
+
+smaug_status_t smaug_bool_set_null(smaug_series_bool_t *s, size_t idx) {
+    if (!s)             return SMG_ERR_ARGUMENT;
+    if (idx >= s->size) return SMG_ERR_OOB;
+    if (bool_cow_detach(s) != 0) return SMG_ERR_NOMEM;
+    s->null_mask[idx] = 0x00;
+    s->data[idx]      = 0;
+    return SMG_OK;
+}
+
+bool smaug_bool_is_null(smaug_series_bool_t *s, size_t idx) {
+    if (!s || idx >= s->size) return true;
+    return s->null_mask[idx] != 0xFF;
+}
+
+/* --- Append dinâmico --- */
+
+int smaug_bool_append(smaug_series_bool_t *s, uint8_t val) {
+    if (!s) return -1;
+    if (bool_cow_detach(s) != 0) return -1;
+
+    if (s->size >= s->capacity) {
+        if (bool_grow(s) != 0) return -1;
+    }
+
+    s->data[s->size]      = val ? 1 : 0;
+    s->null_mask[s->size] = 0xFF;
+    s->size++;
+    return 0;
+}
+
+int smaug_bool_append_null(smaug_series_bool_t *s) {
+    if (!s) return -1;
+    if (bool_cow_detach(s) != 0) return -1;
+
+    if (s->size >= s->capacity) {
+        if (bool_grow(s) != 0) return -1;
+    }
+
+    s->data[s->size]      = 0;
+    s->null_mask[s->size] = 0x00;
+    s->size++;
+    return 0;
+}

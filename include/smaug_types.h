@@ -59,6 +59,18 @@ typedef struct {
     smaug_metadata_t meta;
 } smaug_series_i64_t;
 
+/* Series Bool — armazenamento de coluna booleana (Anel 0).
+   Um byte por elemento (0 = false, 1 = true). Nulos via bitmask paralelo,
+   uniforme com os demais tipos. O dtype booleano de primeira classe vive aqui,
+   no mesmo padrão de f64/i64 — não como classe paralela no frontend. */
+typedef struct {
+    uint8_t      *data;        /* 0 = false, 1 = true     */
+    smaug_mask_t *null_mask;   /* paralelo a data         */
+    size_t        size;        /* elementos preenchidos   */
+    size_t        capacity;    /* elementos alocados      */
+    smaug_metadata_t meta;
+} smaug_series_bool_t;
+
 /* Series String (offset-based, estilo Apache Arrow).
    -------------------------------------------------------------------
    Em vez de um ponteiro por string (char**, muitas alocações), todas as

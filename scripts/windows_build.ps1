@@ -114,7 +114,7 @@ Write-Host "== Compilando build\smaug.dll ==" -ForegroundColor Cyan
 if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar a DLL." }
 Write-Host "OK -> build\smaug.dll" -ForegroundColor Green
 
-$cTests      = @("test_alloc", "test_ops", "test_ops_edge", "test_bool", "test_string", "test_cow")
+$cTests      = @("test_alloc", "test_ops", "test_ops_edge", "test_bool", "test_bool_lifecycle", "test_string", "test_cow")
 $cTestsWrap  = @("test_allocfail")
 $cTestsStress = @("test_stress")
 $allPass = $true

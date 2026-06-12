@@ -75,4 +75,25 @@ bool    smaug_i64_is_null(smaug_series_i64_t *s, size_t idx);
 int smaug_i64_append(smaug_series_i64_t *s, int64_t val);
 int smaug_i64_append_null(smaug_series_i64_t *s);
 
+/* ===================== BOOL — Lifecycle ===================== */
+/* Coluna booleana de primeira classe (dtype `bool`). Mesmo contrato de
+   fronteira de f64/i64: valida e comunica; em erro nenhuma escrita ocorre.
+   Sentinela de get em erro/null: 0 (false). */
+smaug_series_bool_t* smaug_bool_create(size_t size);
+smaug_series_bool_t* smaug_bool_create_with_capacity(size_t size, size_t capacity);
+smaug_series_bool_t* smaug_bool_create_from_array(const uint8_t *array, size_t len);
+void                 smaug_bool_free(smaug_series_bool_t *s);
+smaug_series_bool_t* smaug_bool_clone(const smaug_series_bool_t *s);
+smaug_series_bool_t* smaug_bool_view(smaug_series_bool_t *s, size_t start, size_t len);
+
+/* Getters / Setters. `val` é tratado como booleano: qualquer não-zero vira 1. */
+uint8_t smaug_bool_get(const smaug_series_bool_t *s, size_t idx, smaug_status_t *status);
+smaug_status_t smaug_bool_set(smaug_series_bool_t *s, size_t idx, uint8_t val);
+smaug_status_t smaug_bool_set_null(smaug_series_bool_t *s, size_t idx);
+bool    smaug_bool_is_null(smaug_series_bool_t *s, size_t idx);
+
+/* Append dinâmico */
+int smaug_bool_append(smaug_series_bool_t *s, uint8_t val);
+int smaug_bool_append_null(smaug_series_bool_t *s);
+
 #endif /* SMAUG_CORE_H */

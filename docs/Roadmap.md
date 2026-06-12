@@ -230,7 +230,20 @@ Itens conscientemente adiados. Os já pagos saíram desta lista (ver `CHANGELOG.
   operações) — fase dedicada, sem penalizar loops quentes.
 - Build: decidir futuro do bloco CMake (atrelado à decisão Lua 5.4).
 
-**Ring 1:** dívida zerada.
+**Ring 1 — `bool` não é dtype de primeira classe (dívida de contrato):**
+Hoje `bool` é uma classe Lua paralela (`BoolSeries`), não um dtype despachado
+por descritor como `f64`/`i64`/`string`. Isso viola o próprio contrato:
+- **P3 (propriedade semântica isolada):** "coluna booleana" existe em dois
+  lugares — `BoolSeries` e o mecanismo de dtype. Duplicação conceitual.
+- **Nomenclatura cruza anéis:** `smaug_bool.h` (Anel 0/C) usa o nome
+  "BoolSeries", um conceito do Anel 1/Lua. O núcleo não deveria conhecê-lo.
+- **Consistência de dtype:** `bool` não é criável via `from_table({...}, "bool")`
+  nem reportado por `dtypes()`; os exemplos da doc com `"bool"` não executam.
+
+Decisão: unificar `bool` no modelo de dtype antes do 1.0 (Caminho 1). Criar
+`smaug_series_bool_t` no Anel 0 (armazenamento), descritor `bool` no Anel 1,
+comparações passam a retornar `Series<bool>`, `BoolSeries` é aposentada.
+Não é melhoria opcional — é pagamento de dívida de contrato existente.
 
 **Broadcasting — rejeitado:**
 Operações escalares (`serie * 2`) já cobrem o caso de uso.

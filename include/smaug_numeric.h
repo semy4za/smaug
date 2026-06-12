@@ -89,4 +89,31 @@ size_t              smaug_i64_count_nonnull(const smaug_series_i64_t *s);
 smaug_series_i64_t* smaug_i64_take  (const smaug_series_i64_t *s, const size_t *idx, size_t len);
 smaug_series_i64_t* smaug_i64_filter(const smaug_series_i64_t *s, const uint8_t *mask);
 
+/* ===================== BOOL — seleção, agregação, lógica Kleene =====================
+   Operações struct-based sobre smaug_series_bool_t (dtype `bool` de primeira
+   classe). Distintas das funções raw de smaug_bool.h, que operam sobre arrays
+   (uint8_t*, máscara) e são o legado da BoolSeries — a ser aposentado. Estas
+   seguem o padrão dos demais dtypes: recebem/retornam a struct. */
+size_t               smaug_bool_count_nonnull(const smaug_series_bool_t *s);
+smaug_series_bool_t* smaug_bool_take  (const smaug_series_bool_t *s, const size_t *idx, size_t len);
+smaug_series_bool_t* smaug_bool_filter(const smaug_series_bool_t *s, const uint8_t *mask);
+
+/* Agregações (NA ignorado; all de série vazia = true). */
+size_t smaug_bool_series_count_true(const smaug_series_bool_t *s);
+bool   smaug_bool_series_any(const smaug_series_bool_t *s);
+bool   smaug_bool_series_all(const smaug_series_bool_t *s);
+
+/* Lógica Kleene struct→struct. Exigem mesmo tamanho; retornam NULL em
+   mismatch/OOM. NULL propaga conforme a tabela-verdade de três valores. */
+smaug_series_bool_t* smaug_bool_series_and(const smaug_series_bool_t *a, const smaug_series_bool_t *b);
+smaug_series_bool_t* smaug_bool_series_or (const smaug_series_bool_t *a, const smaug_series_bool_t *b);
+smaug_series_bool_t* smaug_bool_series_xor(const smaug_series_bool_t *a, const smaug_series_bool_t *b);
+smaug_series_bool_t* smaug_bool_series_not(const smaug_series_bool_t *a);
+
+/* Ordenação: false < true. Recusam série com qualquer NULL (retornam NULL),
+   como os demais dtypes — posição de NA é indefinida. ascending controla a
+   direção. Estável (preserva ordem relativa de iguais). */
+size_t*              smaug_bool_argsort(const smaug_series_bool_t *s, bool ascending);
+smaug_series_bool_t* smaug_bool_sort   (const smaug_series_bool_t *s, bool ascending);
+
 #endif /* SMAUG_NUMERIC_H */
