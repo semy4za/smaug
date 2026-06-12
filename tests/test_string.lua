@@ -280,4 +280,6 @@ local function test_string_ux()
     check(si:is_null(3),                            "astype i64->str: null preservado")
 end
 
+test_string_ux()
+
 print(string.format("OK — %d checks passaram (string frontend)", n_ok))

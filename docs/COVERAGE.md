@@ -3,7 +3,7 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `6c6ff96`  |  Data: 2026-06-10 22:21:00 -0300
+- Commit medido: `a966a52`  |  Data: 2026-06-11 21:29:19 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
 - **Branch-bruto** (todos os ramos): `1095/1114 = 98.29%` -- 19 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
@@ -32,12 +32,14 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_ops_f64.c:245` — count==0 inalcancavel: mean nao-NaN implica count>0
 - `smaug_ops_i64.c:247` — count==0 inalcancavel: mean nao-NaN implica count>0
 - `smaug_ops_bool.c:48` — at&&bt sempre true aqui (linhas 45/47 ja garantiram ambos validos-nao-false)
+- `smaug_ops_bool.c:48` — at&&bt sempre true aqui (linhas 45/47 ja garantiram ambos validos-nao-false)
 - `smaug_str.c:95` — external_alloc=true inalcancavel via API publica; usado apenas internamente
 - `smaug_str.c:124` — total ~ SIZE_MAX; inalcancavel
 - `smaug_str.c:185` — overflow na soma buffer_len+extra; so com buffer_len ~ SIZE_MAX
 - `smaug_str.c:187` — buffer_capacity==0 inalcancavel via API publica (create garante bufcap>=INIT)
 - `smaug_str.c:205` — overflow ao dobrar capacity; so com capacity ~ SIZE_MAX
 - `smaug_str.c:216` — bloco de recuperacao de OOM de null_mask; inalcancavel na pratica (slots crescem atomicamente)
+- `smaug_str.c:218` — realloc de shrink falhando; defensivo
 - `smaug_str.c:218` — realloc de shrink falhando; defensivo
 - `smaug_str.c:250` — len==0 inalcancavel aqui (bloco len>old_len implica len>0)
 - `smaug_str.c:290` — rc sempre SMG_OK neste ponto (validacao acima ja garante)

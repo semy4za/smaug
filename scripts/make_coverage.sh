@@ -148,19 +148,20 @@ for s in $SRCS; do
     fi
 
     # Lista dos ramos EXCLUIDOS, com a justificativa extraida do proprio comentario.
+    # Nota: uma linha pode ter 2 ramos excluidos (ex: && em curto-circuito, if simples)
+    # -- nesse caso ambos aparecem, por isso o total pode exceder o numero de marcacoes.
     exc=$(awk -v f="$s.c" '
         /^ *[^:]+: *[0-9]+:/ {
             i = index($0, ":"); r = substr($0, i+1)
             j = index(r, ":"); ln = substr(r, 1, j-1); gsub(/ /, "", ln)
-            cur = ln; csrc = substr(r, j+1); done = 0; next
+            cur = ln; csrc = substr(r, j+1); next
         }
         /^branch/ {
-            if (($0 ~ /taken 0%/ || $0 ~ /never executed/) && !done && csrc ~ /COV-EXCL-BR/) {
+            if (($0 ~ /taken 0%/ || $0 ~ /never executed/) && csrc ~ /COV-EXCL-BR/) {
                 m = index(csrc, "COV-EXCL-BR:")
                 why = substr(csrc, m + 12)
                 sub(/ *\*\/.*$/, "", why); sub(/^ +/, "", why)
                 printf "- `%s:%s` — %s\n", f, cur, why
-                done = 1
             }
         }
     ' "$g" || true)
