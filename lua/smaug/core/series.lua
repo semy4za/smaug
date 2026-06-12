@@ -717,9 +717,145 @@ Series.__tostring = function(self)
         self._name, self._dtype, n, table.concat(parts, "\n"))
 end
 
--- __index: índice numérico -> get(); senão, método.
+-- =====================================================================
+-- Accessor .str — operações sobre séries do tipo string.
+-- s.str devolve um proxy com os 7 métodos Tier A; erro claro se o dtype
+-- não for string. Todas as operações propagam null: elemento null na entrada
+-- -> null na saída. Sem C novo: tudo em Lua sobre smaug_str_get.
+-- Semântica de bytes (não Unicode): len = bytes, lower/upper = ASCII only.
+-- =====================================================================
+local StrProxy = {}
+StrProxy.__index = StrProxy
+
+-- Helpers internos para as operações mais usadas.
+-- new_str_series: aloca Series string de tamanho n e preenche via iterador.
+local function str_map(src, fn)
+    -- fn(v: string | nil) -> string | nil
+    local n   = src:len()
+    local out = Series.new("string", n, src._name)
+    for i = 1, n do
+        local v = src:get(i)
+        if v == nil then
+            out:set_null(i)
+        else
+            local r = fn(v)
+            if r == nil then out:set_null(i) else out:set(i, r) end
+        end
+    end
+    return out
+end
+
+-- bool_map: itera e devolve BoolSeries (null -> NA na máscara).
+local function bool_map(src, fn)
+    local n    = src:len()
+    local vals = {}
+    local has_na = false
+    for i = 1, n do
+        local v = src:get(i)
+        if v == nil then
+            vals[i] = false
+            has_na  = true
+        else
+            vals[i] = fn(v)
+        end
+    end
+    -- monta os arrays de uint8_t para BoolSeries._own via from_lua_arrays
+    local sz   = n == 0 and 1 or n
+    local vptr = ffi.new("uint8_t[?]", sz)
+    local nptr = has_na and ffi.new("uint8_t[?]", sz) or nil
+    for i = 0, n - 1 do
+        vptr[i] = vals[i + 1] and 1 or 0
+        if nptr then
+            nptr[i] = (src:get(i + 1) == nil) and 0x00 or 0xFF
+        end
+    end
+    -- BoolSeries._own assume posse (ffi.gc) dos ponteiros passados.
+    -- Aqui os arrays são ffi.new — o GC deles é o Lua, não smaug_free.
+    -- Contornamos criando uma BoolSeries a partir de uma tabela usando
+    -- o construtor interno _from_lua do boolseries.lua.
+    -- Como BoolSeries não expõe esse construtor publicamente, aproveitamos
+    -- o mesmo mecanismo que boolseries.lua usa internamente: construímos
+    -- com setmetatable direto, ancorando os arrays via _base/_nbase.
+    return setmetatable({
+        _vals  = ffi.cast("uint8_t*", vptr),
+        _nulls = nptr and ffi.cast("uint8_t*", nptr) or nil,
+        _n     = n,
+        _name  = src._name,
+        _base  = vptr,
+        _nbase = nptr,
+    }, BoolSeries)
+end
+
+-- len(): comprimento em bytes de cada elemento -> Series int64.
+-- Null -> null. String vazia "" -> 0.
+function StrProxy:len()
+    local n   = self._s:len()
+    local out = Series.new("int64", n, self._s._name)
+    for i = 1, n do
+        local v = self._s:get(i)
+        if v == nil then out:set_null(i) else out:set(i, #v) end
+    end
+    return out
+end
+
+-- lower() / upper(): conversão ASCII de caixa -> nova Series string.
+-- Null -> null. Apenas bytes ASCII 65-90 / 97-122 são alterados
+-- (semântica de bytes; sem Unicode).
+function StrProxy:lower()
+    return str_map(self._s, string.lower)
+end
+
+function StrProxy:upper()
+    return str_map(self._s, string.upper)
+end
+
+-- strip(): remove espaços e tabulações das extremidades -> nova Series string.
+-- Padrão Lua %s inclui: espaço, \t, \n, \r, \f, \v.
+function StrProxy:strip()
+    return str_map(self._s, function(v)
+        return (v:match("^%s*(.-)%s*$"))
+    end)
+end
+
+-- contains(sub): BoolSeries true onde a string contém a substring `sub`.
+-- Null -> NA. String vazia "" é substring de qualquer string.
+function StrProxy:contains(sub)
+    if type(sub) ~= "string" then
+        error("smaug: str:contains espera uma string; recebido " .. type(sub), 2)
+    end
+    return bool_map(self._s, function(v) return v:find(sub, 1, true) ~= nil end)
+end
+
+-- startswith(prefix): BoolSeries true onde a string começa com `prefix`.
+function StrProxy:startswith(prefix)
+    if type(prefix) ~= "string" then
+        error("smaug: str:startswith espera uma string; recebido " .. type(prefix), 2)
+    end
+    local n = #prefix
+    return bool_map(self._s, function(v) return v:sub(1, n) == prefix end)
+end
+
+-- endswith(suffix): BoolSeries true onde a string termina com `suffix`.
+function StrProxy:endswith(suffix)
+    if type(suffix) ~= "string" then
+        error("smaug: str:endswith espera uma string; recebido " .. type(suffix), 2)
+    end
+    local n = #suffix
+    return bool_map(self._s, function(v)
+        return n == 0 or v:sub(-n) == suffix
+    end)
+end
+
+-- __index: índice numérico -> get(); "str" em série string -> proxy; senão, método.
 Series.__index = function(self, k)
     if type(k) == "number" then return methods.get(self, k) end
+    if k == "str" then
+        if self._dtype ~= "string" then
+            error("smaug: accessor .str só se aplica a séries string; dtype é '"
+                  .. self._dtype .. "'", 2)
+        end
+        return setmetatable({ _s = self }, StrProxy)
+    end
     return methods[k]
 end
 

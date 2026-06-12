@@ -386,11 +386,14 @@ DataSet.__tostring = function(self)
         self._name, nrows, #names, table.concat(out, "\n"))
 end
 
--- __index: df["coluna"] OU df:metodo(). Métodos têm precedência; para uma
--- coluna cujo nome colide com um método, use df:column(nome).
+-- __index: df["coluna"] OU df:metodo() OU df[bool_series].
+-- Prioridades: método > BoolSeries (filtragem) > string (coluna).
+-- Para coluna cujo nome colide com um método, use df:column(nome).
+-- df[mask] é açúcar para df:filter(mask); semântica idêntica.
 DataSet.__index = function(self, k)
     local m = methods[k]
     if m ~= nil then return m end
+    if is_boolseries(k) then return self:filter(k) end
     if type(k) == "string" then return rawget(self, "_columns")[k] end
     return nil
 end

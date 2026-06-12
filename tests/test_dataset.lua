@@ -394,4 +394,29 @@ check(dn:nrows() == 4, "dropna com BoolSeries sem NAs")
 local bs_fn = df_bool:col("eh_sp"):fillna(false)
 check(getmetatable(bs_fn) == BoolSeries, "fillna DataSet: BoolSeries preservada")
 
+-- =====================================================================
+-- df[mask]: indexação por BoolSeries (__index dispatch)
+-- =====================================================================
+-- df[mask] é açúcar para df:filter(mask); testa o dispatch do __index.
+local mask_caros = df["preco"]:gt(25)          -- preco > 25 -> linhas 3,4,5
+local r_mask = df[mask_caros]
+check(r_mask:nrows() == 3,              "df[mask]: nrows correto")
+check(r_mask["id"]:get(1) == 3,        "df[mask]: primeira linha correta")
+check(r_mask["preco"]:get(3) == 50,    "df[mask]: última linha correta")
+
+-- resultado idêntico ao df:filter(mask) explícito
+local r_filter = df:filter(mask_caros)
+check(r_mask:nrows() == r_filter:nrows(),            "df[mask] == df:filter: nrows")
+check(r_mask["id"]:get(2) == r_filter["id"]:get(2), "df[mask] == df:filter: valores")
+
+-- expressão inline: df[df["col"]:op(val)]
+local r_inline = df[df["preco"]:lt(25)]        -- preco < 25 -> linhas 1,2
+check(r_inline:nrows() == 2,           "df[mask] inline: nrows")
+check(r_inline["id"]:get(1) == 1,     "df[mask] inline: primeira linha")
+
+-- máscara que seleciona zero linhas
+local r_empty = df[df["preco"]:gt(999)]
+check(r_empty:nrows() == 0,            "df[mask] zero linhas")
+check(r_empty:ncols() == df:ncols(),   "df[mask] zero linhas preserva colunas")
+
 print(string.format("OK — %d checks passaram (DataSet)", n_ok))

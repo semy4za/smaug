@@ -22,8 +22,8 @@ ec1ae8442e32984127948c7e126da19f84f85193023143dc36ee82b8e352544d      29  .\incl
 20b16d904f6a7395e37bdde4fa9bcd0a5177d0f1d9e28cc1258f3dcb1f233b0e     103  .\include\smaug_string.h
 9afb4a41fa4d3488b7a634b2d795e314707f8237eab34729656a89e1ef29f4e3      95  .\include\smaug_types.h
 4bc43a1508472d129c4d9e234bdbc5807cef6ab820084db8dbe90ae82c69fef7     298  .\lua\smaug\core\boolseries.lua
-48b0ae24a16531cd57acb5fa54bb9cb6063884e9fe4e8264c1ea22204411719f     473  .\lua\smaug\core\dataset.lua
-84bcb52b38004491c88519a921ebdb39776b381ba6b8fcfeb0038bd8411e844c     736  .\lua\smaug\core\series.lua
+fa88a2cfb2265a43a6bb0917d499dcfc4feada4184000709344c4c1c65e8314d     476  .\lua\smaug\core\dataset.lua
+1595dc3b3a0ce6349d689eaf9b8c937d903bc1109b85b329bd54424b2ac2f11a     872  .\lua\smaug\core\series.lua
 5d4a0a530bdf4f66466e462dbcf6cade8baf56440717aced7dcdd733e4f20619     268  .\lua\smaug\ffi_loader.lua
 e707eb9e0f1e00d7f170eb4c3f5f2b87fc7f38203bab2765a033e5e56423e161      36  .\lua\smaug\init.lua
 868626d77f7027a3192db17174bda522572388c700c022dbd5b3f82ffe9b99a0      87  .\Makefile
@@ -41,7 +41,7 @@ f1e554fd17de66cdae2f8f6841c26af821813186ed9766ebd7e3818ebb169e46     221  .\src\
 ec947e48835b0d7cc4bd84723f3d735232cb1da29a5e939276c383a72edb2cb1    1093  .\tests\test_allocfail.c
 0542967f3be7181bbab4110ba8b991c6cc4cc549c78912d9f95de2b2202dcd21     217  .\tests\test_bool.c
 0d87515dd11969c713c672793f5a23ae9ab82ad0f8065e19f6b864af85a81e37     428  .\tests\test_cow.c
-13c011297014e5472d9b300684e332a88a926349b141acca0c2277bf9404bb07     397  .\tests\test_dataset.lua
+804e7645df8f9b119fd5d99af7c42927066b7e68f5b0bfa685ea2b608c246996     422  .\tests\test_dataset.lua
 5d2b0ac1d55681b7d392744d7133aac357d5062a1e92a2ceec8cde895134f2a3     195  .\tests\test_edge.lua
 23950c376fb42b510f6b0fa1aad4a93610e91112260f3b13c9120d7d9b9b6a4b     113  .\tests\test_fillna.lua
 a83926f34671689c0bc95a07579aa587a318a8baf909c722e048546a74215531     228  .\tests\test_i64.lua
@@ -52,6 +52,6 @@ c3eaa9b8d9204fa3e00a24e74029820ba5b6befc2f7a96deb7a6624ad2299629     206  .\test
 95b96ff3b9f6eb462c664326f654abe94262db625000b21e4f20f12afbb8a448     151  .\tests\test_special.lua
 e656ea4300fba405ffbbf1da95d6a2b5e18e4efdbc589ab7e7d77432ea33a871     339  .\tests\test_stress.c
 c91543e30b7f518c0cd084ed39fe46fab4ba261f66d937bad8ef9bed89bf3557     388  .\tests\test_string.c
-8e65528b2dca87e925ee3ee71820bf46567fb18a12b066ad5f4db70ebee2ae26     285  .\tests\test_string.lua
+f5e6a72e8865ebd6e35892a10d98732f6b316fea7dc3648dd1cc52cdf0e3a06d     374  .\tests\test_string.lua
 #
 # total de arquivos: 51

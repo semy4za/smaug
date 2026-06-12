@@ -282,4 +282,93 @@ end
 
 test_string_ux()
 
+-- =====================================================================
+-- .str Tier A: len, lower, upper, strip, contains, startswith, endswith
+-- =====================================================================
+local function test_str_accessor()
+    local s = S.from_table({"  Sao Paulo  ", "rio", smaug.NA, "MINAS"}, "string")
+
+    -- len: comprimento em bytes; null -> null
+    local l = s.str:len()
+    check(l._dtype == "int64",  "str:len dtype int64")
+    check(l:get(1) == 13,       "str:len espaços inclusos")
+    check(l:get(2) == 3,        "str:len valor simples")
+    check(l:is_null(3),         "str:len null -> null")
+    check(l:get(4) == 5,        "str:len uppercase")
+
+    -- lower: ASCII; null -> null
+    local lo = s.str:lower()
+    check(lo._dtype == "string",          "str:lower dtype string")
+    check(lo:get(2) == "rio",             "str:lower já minúsculo")
+    check(lo:get(4) == "minas",           "str:lower uppercase -> lower")
+    check(lo:is_null(3),                  "str:lower null -> null")
+
+    -- upper: ASCII; null -> null
+    local up = s.str:upper()
+    check(up:get(2) == "RIO",             "str:upper lower -> upper")
+    check(up:get(4) == "MINAS",           "str:upper já maiúsculo")
+    check(up:is_null(3),                  "str:upper null -> null")
+
+    -- strip: remove espaços nas bordas; null -> null
+    local st = s.str:strip()
+    check(st:get(1) == "Sao Paulo",       "str:strip remove bordas")
+    check(st:get(2) == "rio",             "str:strip sem espaço: inalterado")
+    check(st:is_null(3),                  "str:strip null -> null")
+
+    -- strip: string de só espaços vira ""
+    local sp = S.from_table({"   "}, "string")
+    check(sp.str:strip():get(1) == "",    "str:strip só espaços -> ''")
+
+    -- contains: busca de substring; null -> NA
+    local c = s.str:contains("ao")
+    check(c:get(1) == true,               "str:contains match")
+    check(c:get(2) == false,              "str:contains no-match")
+    check(c:is_null(3),                   "str:contains null -> NA")
+
+    -- contains: string vazia sempre true
+    check(s.str:contains(""):get(2) == true, "str:contains '' sempre true")
+
+    -- startswith; null -> NA
+    local sw = s.str:startswith("  S")
+    check(sw:get(1) == true,              "str:startswith match")
+    check(sw:get(2) == false,             "str:startswith no-match")
+    check(sw:is_null(3),                  "str:startswith null -> NA")
+
+    -- startswith: prefixo vazio sempre true
+    check(s.str:startswith(""):get(2) == true, "str:startswith '' sempre true")
+
+    -- endswith; null -> NA
+    local ew = s.str:endswith("AS")
+    check(ew:get(4) == true,              "str:endswith match")
+    check(ew:get(2) == false,             "str:endswith no-match")
+    check(ew:is_null(3),                  "str:endswith null -> NA")
+
+    -- endswith: sufixo vazio sempre true
+    check(s.str:endswith(""):get(2) == true, "str:endswith '' sempre true")
+
+    -- dtype errado dá erro descritivo
+    local n = S.from_table({1.0, 2.0}, "float64")
+    check(rejects(function() return n.str:lower() end), "str em float64 -> erro")
+    local i = S.from_table({1, 2}, "int64")
+    check(rejects(function() return i.str:len() end),   "str em int64 -> erro")
+
+    -- argumento de tipo errado
+    check(rejects(function() s.str:contains(42)     end), "contains(num) -> erro")
+    check(rejects(function() s.str:startswith(false) end), "startswith(bool) -> erro")
+    check(rejects(function() s.str:endswith(nil)     end), "endswith(nil) -> erro")
+
+    -- integração: filter com .str:contains
+    -- "tos" só ocorre em "Santos"; NA na máscara conta como false (descartado)
+    local cidades = S.from_table({"São Paulo", "Rio de Janeiro", "Santos", smaug.NA}, "string")
+    local mask = cidades.str:contains("tos")
+    check(mask:get(1) == false,           "str:contains integração: SP false")
+    check(mask:get(3) == true,            "str:contains integração: Santos true")
+    check(mask:is_null(4),                "str:contains integração: null -> NA")
+    local filtrado = cidades:filter(mask)
+    check(filtrado:len() == 1,            "filter com str:contains: 1 resultado")
+    check(filtrado:get(1) == "Santos",    "filter com str:contains: valor correto")
+end
+
+test_str_accessor()
+
 print(string.format("OK — %d checks passaram (string frontend)", n_ok))
