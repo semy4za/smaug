@@ -33,8 +33,15 @@ static int str_cmp_at(const smaug_series_str_t *s, size_t idx,
     return 0;
 }
 
-/* Núcleo comum das três comparações: aplica `keep(cmp)` a cada elemento válido.
-   mode: 0 = eq, -1 = lt (cmp<0), +1 = gt (cmp>0). */
+/* Modos de comparação para str_compare. */
+#define STR_CMP_EQ  0   /* ==  */
+#define STR_CMP_LT (-1) /* <   */
+#define STR_CMP_GT  1   /* >   */
+#define STR_CMP_GE  2   /* >=  */
+#define STR_CMP_LE (-2) /* <=  */
+#define STR_CMP_NE  3   /* !=  */
+
+/* Núcleo comum das seis comparações. */
 static uint8_t *str_compare(const smaug_series_str_t *s, const char *target,
                             size_t target_len, smaug_mask_t **out_mask, int mode) {
     if (!s) return NULL;
@@ -57,20 +64,28 @@ static uint8_t *str_compare(const smaug_series_str_t *s, const char *target,
             continue;
         }
         int r;
-        if (mode == 0) {
-            /* eq: comprimento primeiro (O(1)); memcmp só se baterem */
+        if (mode == STR_CMP_EQ || mode == STR_CMP_NE) {
+            /* eq/ne: comprimento primeiro (O(1)); memcmp só se baterem */
             size_t len = s->offsets[i + 1] - s->offsets[i];
+            int eq;
             if (len != target_len) {
-                r = 0;                         /* comprimentos diferentes -> != */
+                eq = 0;
             } else {
-                r = (len == 0) ? 1
-                  : (memcmp(s->buffer + s->offsets[i], target, len) == 0);
+                eq = (len == 0) ? 1
+                   : (memcmp(s->buffer + s->offsets[i], target, len) == 0);
             }
-            result[i] = (uint8_t)r;
+            r = (mode == STR_CMP_EQ) ? eq : !eq;
         } else {
             int c = str_cmp_at(s, i, target, target_len);
-            result[i] = (uint8_t)((mode < 0) ? (c < 0) : (c > 0));
+            switch (mode) {
+                case STR_CMP_LT: r = (c <  0); break;
+                case STR_CMP_GT: r = (c >  0); break;
+                case STR_CMP_LE: r = (c <= 0); break;
+                case STR_CMP_GE: r = (c >= 0); break;
+                default:         r = 0;        break;
+            }
         }
+        result[i] = (uint8_t)r;
         if (mask) mask[i] = 0xFF;
     }
     return result;
@@ -89,6 +104,21 @@ uint8_t *smaug_str_lt(const smaug_series_str_t *s, const char *target,
 uint8_t *smaug_str_gt(const smaug_series_str_t *s, const char *target,
                       size_t target_len, smaug_mask_t **out_mask) {
     return str_compare(s, target, target_len, out_mask, 1);
+}
+
+uint8_t *smaug_str_ge(const smaug_series_str_t *s, const char *target,
+                      size_t target_len, smaug_mask_t **out_mask) {
+    return str_compare(s, target, target_len, out_mask, STR_CMP_GE);
+}
+
+uint8_t *smaug_str_le(const smaug_series_str_t *s, const char *target,
+                      size_t target_len, smaug_mask_t **out_mask) {
+    return str_compare(s, target, target_len, out_mask, STR_CMP_LE);
+}
+
+uint8_t *smaug_str_ne(const smaug_series_str_t *s, const char *target,
+                      size_t target_len, smaug_mask_t **out_mask) {
+    return str_compare(s, target, target_len, out_mask, STR_CMP_NE);
 }
 
 /* ===================================================================

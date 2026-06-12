@@ -203,4 +203,52 @@ check(x:lnot():get(2) == nil, "NOT NA = NA")
 -- ---- tostring da BoolSeries ----
 check(type(tostring(gt)) == "string", "BoolSeries __tostring")
 
+-- ---- ge / le / ne ----
+-- f64
+local cmpf = Series.from_table({10, 20, 30, smaug.NA}, "float64")
+check(cmpf:ge(20):get(1) == false,  "f64 ge: abaixo -> false")
+check(cmpf:ge(20):get(2) == true,   "f64 ge: igual -> true")
+check(cmpf:ge(20):get(3) == true,   "f64 ge: acima -> true")
+check(cmpf:ge(20):is_null(4),       "f64 ge: null -> NA")
+check(cmpf:le(20):get(1) == true,   "f64 le: abaixo -> true")
+check(cmpf:le(20):get(2) == true,   "f64 le: igual -> true")
+check(cmpf:le(20):get(3) == false,  "f64 le: acima -> false")
+check(cmpf:le(20):is_null(4),       "f64 le: null -> NA")
+check(cmpf:ne(20):get(1) == true,   "f64 ne: diferente -> true")
+check(cmpf:ne(20):get(2) == false,  "f64 ne: igual -> false")
+check(cmpf:ne(20):is_null(4),       "f64 ne: null -> NA")
+
+-- f64: NaN (valor presente, não null) — IEEE: NaN >= x = false
+local nan_s = Series.from_table({0/0}, "float64")
+check(nan_s:ge(0):get(1) == false,  "f64 ge: NaN -> false (IEEE)")
+check(nan_s:ne(0):get(1) == true,   "f64 ne: NaN != 0 -> true (IEEE)")
+
+-- i64
+local cmpi = Series.from_table({1, 2, 3, smaug.NA}, "int64")
+check(cmpi:ge(2):get(1) == false,   "i64 ge: abaixo -> false")
+check(cmpi:ge(2):get(2) == true,    "i64 ge: igual -> true")
+check(cmpi:ge(2):is_null(4),        "i64 ge: null -> NA")
+check(cmpi:le(2):get(3) == false,   "i64 le: acima -> false")
+check(cmpi:le(2):get(2) == true,    "i64 le: igual -> true")
+check(cmpi:ne(2):get(1) == true,    "i64 ne: diferente -> true")
+check(cmpi:ne(2):get(2) == false,   "i64 ne: igual -> false")
+
+-- string
+local cmps = Series.from_table({"a","b","c",smaug.NA}, "string")
+check(cmps:ge("b"):get(1) == false, "str ge: abaixo -> false")
+check(cmps:ge("b"):get(2) == true,  "str ge: igual -> true")
+check(cmps:ge("b"):get(3) == true,  "str ge: acima -> true")
+check(cmps:ge("b"):is_null(4),      "str ge: null -> NA")
+check(cmps:le("b"):get(1) == true,  "str le: abaixo -> true")
+check(cmps:le("b"):get(3) == false, "str le: acima -> false")
+check(cmps:ne("b"):get(1) == true,  "str ne: diferente -> true")
+check(cmps:ne("b"):get(2) == false, "str ne: igual -> false")
+check(cmps:ne("b"):is_null(4),      "str ne: null -> NA")
+
+-- integração: df[s:ge(x)]
+local ds = smaug.DataSet({{"v", {1,2,3,4,5}, "int64"}})
+check(ds[ds.v:ge(3)]:nrows() == 3,  "ge integração: >= 3 -> 3 linhas")
+check(ds[ds.v:le(2)]:nrows() == 2,  "le integração: <= 2 -> 2 linhas")
+check(ds[ds.v:ne(3)]:nrows() == 4,  "ne integração: != 3 -> 4 linhas")
+
 print(string.format("OK — %d checks passaram (Series f64 + i64 + bool)", n_ok))

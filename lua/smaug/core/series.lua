@@ -64,10 +64,14 @@ local DTYPES = {
         view = C.smaug_f64_view, take = C.smaug_f64_take,
         filter = C.smaug_f64_filter,
         gt = C.smaug_f64_gt, lt = C.smaug_f64_lt, eq = C.smaug_f64_eq,
+        ge = C.smaug_f64_ge, le = C.smaug_f64_le, ne = C.smaug_f64_ne,
         -- wrappers de comparação: validam escalar numérico e chamam a função C.
         cmp_gt = function(c, t, om) if type(t)~="number" then error("smaug: comparação f64 espera número",4) end return C.smaug_f64_gt(c,t,om) end,
         cmp_lt = function(c, t, om) if type(t)~="number" then error("smaug: comparação f64 espera número",4) end return C.smaug_f64_lt(c,t,om) end,
         cmp_eq = function(c, t, om) if type(t)~="number" then error("smaug: comparação f64 espera número",4) end return C.smaug_f64_eq(c,t,om) end,
+        cmp_ge = function(c, t, om) if type(t)~="number" then error("smaug: comparação f64 espera número",4) end return C.smaug_f64_ge(c,t,om) end,
+        cmp_le = function(c, t, om) if type(t)~="number" then error("smaug: comparação f64 espera número",4) end return C.smaug_f64_le(c,t,om) end,
+        cmp_ne = function(c, t, om) if type(t)~="number" then error("smaug: comparação f64 espera número",4) end return C.smaug_f64_ne(c,t,om) end,
         argsort = C.smaug_f64_argsort,
         -- Uma redução int (sum/min/max) devolveu o sentinela de erro?
         -- No f64 isso é detectado por NaN no próprio valor.
@@ -97,9 +101,13 @@ local DTYPES = {
         view = C.smaug_i64_view, take = C.smaug_i64_take,
         filter = C.smaug_i64_filter,
         gt = C.smaug_i64_gt, lt = C.smaug_i64_lt, eq = C.smaug_i64_eq,
+        ge = C.smaug_i64_ge, le = C.smaug_i64_le, ne = C.smaug_i64_ne,
         cmp_gt = function(c, t, om) if type(t)~="number" then error("smaug: comparação i64 espera número",4) end return C.smaug_i64_gt(c,t,om) end,
         cmp_lt = function(c, t, om) if type(t)~="number" then error("smaug: comparação i64 espera número",4) end return C.smaug_i64_lt(c,t,om) end,
         cmp_eq = function(c, t, om) if type(t)~="number" then error("smaug: comparação i64 espera número",4) end return C.smaug_i64_eq(c,t,om) end,
+        cmp_ge = function(c, t, om) if type(t)~="number" then error("smaug: comparação i64 espera número",4) end return C.smaug_i64_ge(c,t,om) end,
+        cmp_le = function(c, t, om) if type(t)~="number" then error("smaug: comparação i64 espera número",4) end return C.smaug_i64_le(c,t,om) end,
+        cmp_ne = function(c, t, om) if type(t)~="number" then error("smaug: comparação i64 espera número",4) end return C.smaug_i64_ne(c,t,om) end,
         argsort = C.smaug_i64_argsort,
         -- sum/min/max do i64 retornam INT64_MIN quando há nulo + !ignore_na.
         is_int_sentinel = function(v) return v == I64_MIN end,
@@ -130,6 +138,9 @@ local DTYPES = {
         cmp_eq = function(c, t, om) if type(t)~="string" then error("smaug: comparação de string espera string",4) end return C.smaug_str_eq(c,t,#t,om) end,
         cmp_lt = function(c, t, om) if type(t)~="string" then error("smaug: comparação de string espera string",4) end return C.smaug_str_lt(c,t,#t,om) end,
         cmp_gt = function(c, t, om) if type(t)~="string" then error("smaug: comparação de string espera string",4) end return C.smaug_str_gt(c,t,#t,om) end,
+        cmp_ge = function(c, t, om) if type(t)~="string" then error("smaug: comparação de string espera string",4) end return C.smaug_str_ge(c,t,#t,om) end,
+        cmp_le = function(c, t, om) if type(t)~="string" then error("smaug: comparação de string espera string",4) end return C.smaug_str_le(c,t,#t,om) end,
+        cmp_ne = function(c, t, om) if type(t)~="string" then error("smaug: comparação de string espera string",4) end return C.smaug_str_ne(c,t,#t,om) end,
         -- seleção: filter (por máscara) e take (por índices) -> nova série string
         filter = C.smaug_str_filter,
         take   = C.smaug_str_take,
@@ -639,6 +650,9 @@ end
 function methods.gt(self, target) return compare(self, "cmp_gt", target) end
 function methods.lt(self, target) return compare(self, "cmp_lt", target) end
 function methods.eq(self, target) return compare(self, "cmp_eq", target) end
+function methods.ge(self, target) return compare(self, "cmp_ge", target) end
+function methods.le(self, target) return compare(self, "cmp_le", target) end
+function methods.ne(self, target) return compare(self, "cmp_ne", target) end
 
 -- filter(bool_series): nova Series só com as linhas onde a máscara é true.
 -- NA na máscara conta como false (linha descartada).
@@ -843,6 +857,28 @@ function StrProxy:endswith(suffix)
     local n = #suffix
     return bool_map(self._s, function(v)
         return n == 0 or v:sub(-n) == suffix
+    end)
+end
+
+-- replace(old, new): substitui todas as ocorrências literais de `old` por `new`
+-- -> nova Series string. Null -> null. old vazio não substitui nada (retorna
+-- cópia). Semântica de bytes (não regex, não Unicode).
+function StrProxy:replace(old, new)
+    if type(old) ~= "string" then
+        error("smaug: str:replace espera string como 1º argumento; recebido " .. type(old), 2)
+    end
+    if type(new) ~= "string" then
+        error("smaug: str:replace espera string como 2º argumento; recebido " .. type(new), 2)
+    end
+    if #old == 0 then
+        -- substituição de string vazia é indefinida — devolve cópia sem alterar
+        return str_map(self._s, function(v) return v end)
+    end
+    -- gsub usa padrões Lua; escapamos metacaracteres para busca literal.
+    local esc_old = old:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1")
+    local esc_new = new:gsub("%%", "%%%%")
+    return str_map(self._s, function(v)
+        return (v:gsub(esc_old, esc_new))
     end)
 end
 

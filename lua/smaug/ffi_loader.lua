@@ -89,6 +89,9 @@ ffi.cdef([[
     uint8_t* smaug_f64_gt(const smaug_series_f64_t *s, double threshold, smaug_mask_t **out_mask);
     uint8_t* smaug_f64_lt(const smaug_series_f64_t *s, double threshold, smaug_mask_t **out_mask);
     uint8_t* smaug_f64_eq(const smaug_series_f64_t *s, double threshold, smaug_mask_t **out_mask);
+    uint8_t* smaug_f64_ge(const smaug_series_f64_t *s, double threshold, smaug_mask_t **out_mask);
+    uint8_t* smaug_f64_le(const smaug_series_f64_t *s, double threshold, smaug_mask_t **out_mask);
+    uint8_t* smaug_f64_ne(const smaug_series_f64_t *s, double threshold, smaug_mask_t **out_mask);
 
     /* --- Ordenacao --- */
     size_t*             smaug_f64_argsort(const smaug_series_f64_t *s, bool ascending);
@@ -153,6 +156,9 @@ ffi.cdef([[
     uint8_t* smaug_i64_gt(const smaug_series_i64_t *s, int64_t threshold, smaug_mask_t **out_mask);
     uint8_t* smaug_i64_lt(const smaug_series_i64_t *s, int64_t threshold, smaug_mask_t **out_mask);
     uint8_t* smaug_i64_eq(const smaug_series_i64_t *s, int64_t threshold, smaug_mask_t **out_mask);
+    uint8_t* smaug_i64_ge(const smaug_series_i64_t *s, int64_t threshold, smaug_mask_t **out_mask);
+    uint8_t* smaug_i64_le(const smaug_series_i64_t *s, int64_t threshold, smaug_mask_t **out_mask);
+    uint8_t* smaug_i64_ne(const smaug_series_i64_t *s, int64_t threshold, smaug_mask_t **out_mask);
 
     /* --- Ordenacao --- */
     size_t*             smaug_i64_argsort(const smaug_series_i64_t *s, bool ascending);
@@ -223,6 +229,9 @@ ffi.cdef([[
     uint8_t* smaug_str_eq(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
     uint8_t* smaug_str_lt(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
     uint8_t* smaug_str_gt(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
+    uint8_t* smaug_str_ge(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
+    uint8_t* smaug_str_le(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
+    uint8_t* smaug_str_ne(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
 
     /* --- Seleção --- */
     smaug_series_str_t* smaug_str_filter(const smaug_series_str_t *s, const uint8_t *mask);

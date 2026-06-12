@@ -37,6 +37,9 @@ double smaug_f64_std (const smaug_series_f64_t *s, bool ignore_na);
 uint8_t* smaug_f64_gt(const smaug_series_f64_t *s, double threshold, smaug_mask_t **out_mask);
 uint8_t* smaug_f64_lt(const smaug_series_f64_t *s, double threshold, smaug_mask_t **out_mask);
 uint8_t* smaug_f64_eq(const smaug_series_f64_t *s, double threshold, smaug_mask_t **out_mask);
+uint8_t* smaug_f64_ge(const smaug_series_f64_t *s, double threshold, smaug_mask_t **out_mask);
+uint8_t* smaug_f64_le(const smaug_series_f64_t *s, double threshold, smaug_mask_t **out_mask);
+uint8_t* smaug_f64_ne(const smaug_series_f64_t *s, double threshold, smaug_mask_t **out_mask);
 
 /* Ordenação (argsort retorna NULL se há nulos; caller libera com smaug_free) */
 size_t*             smaug_f64_argsort(const smaug_series_f64_t *s, bool ascending);
@@ -73,6 +76,9 @@ double  smaug_i64_std (const smaug_series_i64_t *s, bool ignore_na);
 uint8_t* smaug_i64_gt(const smaug_series_i64_t *s, int64_t threshold, smaug_mask_t **out_mask);
 uint8_t* smaug_i64_lt(const smaug_series_i64_t *s, int64_t threshold, smaug_mask_t **out_mask);
 uint8_t* smaug_i64_eq(const smaug_series_i64_t *s, int64_t threshold, smaug_mask_t **out_mask);
+uint8_t* smaug_i64_ge(const smaug_series_i64_t *s, int64_t threshold, smaug_mask_t **out_mask);
+uint8_t* smaug_i64_le(const smaug_series_i64_t *s, int64_t threshold, smaug_mask_t **out_mask);
+uint8_t* smaug_i64_ne(const smaug_series_i64_t *s, int64_t threshold, smaug_mask_t **out_mask);
 
 /* Ordenação */
 size_t*             smaug_i64_argsort(const smaug_series_i64_t *s, bool ascending);

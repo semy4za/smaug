@@ -18,13 +18,13 @@ e17b330ee167dc7261f469eca7788750b9a08c67baf19d5c31fa2c03c1afab66      46  .\docs
 ec1ae8442e32984127948c7e126da19f84f85193023143dc36ee82b8e352544d      29  .\include\smaug.h
 963e21a0d5b9b1857da7bbe7310a4a9340057fcf7560272f062e4e83727c5da3      40  .\include\smaug_bool.h
 31d4d936c265d46e39016d7e1861f01d2633cf476fed8f4798012bc385a009c3      78  .\include\smaug_core.h
-3299b0ce0035dda28a919d504830019a29bca7aa1ef77f63259d8cd70a34da43      86  .\include\smaug_numeric.h
-20b16d904f6a7395e37bdde4fa9bcd0a5177d0f1d9e28cc1258f3dcb1f233b0e     103  .\include\smaug_string.h
+a74507d9c0b21b860adafc5a088e9054fcea81fe32ff27e9438455c9f2bea779      92  .\include\smaug_numeric.h
+69cbc71a7894dd9fc631c290d2bb7e551173a0d8183ce257f24cd202002adc95     106  .\include\smaug_string.h
 9afb4a41fa4d3488b7a634b2d795e314707f8237eab34729656a89e1ef29f4e3      95  .\include\smaug_types.h
 4bc43a1508472d129c4d9e234bdbc5807cef6ab820084db8dbe90ae82c69fef7     298  .\lua\smaug\core\boolseries.lua
 fa88a2cfb2265a43a6bb0917d499dcfc4feada4184000709344c4c1c65e8314d     476  .\lua\smaug\core\dataset.lua
-1595dc3b3a0ce6349d689eaf9b8c937d903bc1109b85b329bd54424b2ac2f11a     872  .\lua\smaug\core\series.lua
-5d4a0a530bdf4f66466e462dbcf6cade8baf56440717aced7dcdd733e4f20619     268  .\lua\smaug\ffi_loader.lua
+9eaf7e5cb74372590df26719293f64c54e9170fb5f7b91e24f52fd60e62a7b9f     908  .\lua\smaug\core\series.lua
+145745628130819966811c8362cab54167800f74aaed06d665d93ccacbdc185b     277  .\lua\smaug\ffi_loader.lua
 e707eb9e0f1e00d7f170eb4c3f5f2b87fc7f38203bab2765a033e5e56423e161      36  .\lua\smaug\init.lua
 868626d77f7027a3192db17174bda522572388c700c022dbd5b3f82ffe9b99a0      87  .\Makefile
 9c5ea7cf7082229e22032d9b6c21f19ca523d529730090a089e546cadbb23e07     218  .\scripts\make_coverage.sh
@@ -33,9 +33,9 @@ ab62e2b7e4e545059419f9847988cc2bbc8c171a3a7f84048c02251dc9200487      65  .\scri
 d428054e2c4e838e6f9eacfcac27b56f96b427c615634277e6aea76b85f2c7a4     223  .\scripts\windows_build.ps1
 54ee409ef07cd25276d4cecb1fc40ba304474152e8168a5fa4a62c8f1c298eb0     436  .\src\smaug_core.c
 10f3b30d73e801e9263ac42fc7ef0dc44c1e59c10c680add29668e2dbacecf93     134  .\src\smaug_ops_bool.c
-3f1c1bb85136d54ecd1f1858cb47a66d084118178685e32e59344196f8ac14de     457  .\src\smaug_ops_f64.c
-15b7c6e2aeec29ee9e9c365518a4437fca8ca2e740e0dd9d9a2a4359cbe2ff14     445  .\src\smaug_ops_i64.c
-f1e554fd17de66cdae2f8f6841c26af821813186ed9766ebd7e3818ebb169e46     221  .\src\smaug_ops_str.c
+95cb7fd434e5fe04903d79e568d67804de385bce38b2dc9aebac6d741c2d3445     526  .\src\smaug_ops_f64.c
+4c7966913e1e4da03ebc2157a04e86db9291bbc68c3e4fbe3f1add4328e578e1     514  .\src\smaug_ops_i64.c
+6121d84b5906a1de2d5c69e60588da009d698cf63bd4ee7749e08666888c7f21     251  .\src\smaug_ops_str.c
 4a70832e24c42d6076930be0e23c6c5d5d134150def1ac789d72805030d17c73     336  .\src\smaug_str.c
 1c5ab396661dd9c3a67c1c9f49325e572b0450a48f65c51f59bc46469a559fb4     276  .\tests\test_alloc.c
 ec947e48835b0d7cc4bd84723f3d735232cb1da29a5e939276c383a72edb2cb1    1093  .\tests\test_allocfail.c
@@ -48,10 +48,10 @@ a83926f34671689c0bc95a07579aa587a318a8baf909c722e048546a74215531     228  .\test
 649352374847c05e07fcfc10d5406d6f19d0069500090e34158ec8b2e99db490      59  .\tests\test_ops.c
 f228fcd29b04e6f0e137458e782508af13dcf4bd0fd86fed9d11fad86c59892f     958  .\tests\test_ops_edge.c
 ff2855ff07b9d678c4314e9a05ea0e7271228a3ce80a4defbb6233ccb48c61c3     345  .\tests\test_props.lua
-c3eaa9b8d9204fa3e00a24e74029820ba5b6befc2f7a96deb7a6624ad2299629     206  .\tests\test_series.lua
+df061692234cf81f03609beb229c067ba64f292572c3b6d61868384679e48a66     254  .\tests\test_series.lua
 95b96ff3b9f6eb462c664326f654abe94262db625000b21e4f20f12afbb8a448     151  .\tests\test_special.lua
 e656ea4300fba405ffbbf1da95d6a2b5e18e4efdbc589ab7e7d77432ea33a871     339  .\tests\test_stress.c
 c91543e30b7f518c0cd084ed39fe46fab4ba261f66d937bad8ef9bed89bf3557     388  .\tests\test_string.c
-f5e6a72e8865ebd6e35892a10d98732f6b316fea7dc3648dd1cc52cdf0e3a06d     374  .\tests\test_string.lua
+eae490c076def8e7a07010c941eca3efba52ccfe0490ac1a79bcc77db8c4b842     408  .\tests\test_string.lua
 #
 # total de arquivos: 51

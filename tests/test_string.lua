@@ -371,4 +371,38 @@ end
 
 test_str_accessor()
 
+-- =====================================================================
+-- .str:replace — substituição literal de substring
+-- =====================================================================
+local function test_str_replace()
+    local s = S.from_table({"foo bar foo", "hello", smaug.NA, "foo"}, "string")
+
+    -- substituição básica
+    local r = s.str:replace("foo", "baz")
+    check(r:get(1) == "baz bar baz",  "str:replace: todas as ocorrências")
+    check(r:get(2) == "hello",        "str:replace: sem match: inalterado")
+    check(r:is_null(3),               "str:replace: null -> null")
+    check(r:get(4) == "baz",          "str:replace: ocorrência única")
+
+    -- substituição por string vazia (remoção)
+    local r2 = s.str:replace("foo", "")
+    check(r2:get(1) == " bar ",       "str:replace: remove todas ocorrências")
+    check(r2:get(4) == "",            "str:replace: string vira vazia")
+
+    -- old vazio: no-op (semântica indefinida -> cópia sem alterar)
+    check(s.str:replace("", "x"):get(1) == "foo bar foo", "str:replace: old vazio -> no-op")
+
+    -- metacaracteres Lua no old e new são tratados literalmente
+    local s2 = S.from_table({"a.b.c", "x+y", "2^3"}, "string")
+    check(s2.str:replace(".", "-"):get(1)    == "a-b-c",  "str:replace: '.' literal")
+    check(s2.str:replace("+", "plus"):get(2) == "xplusy", "str:replace: '+' literal")
+    check(s2.str:replace("^", ""):get(3)     == "23",     "str:replace: '^' literal")
+
+    -- argumentos de tipo errado
+    check(rejects(function() s.str:replace(1, "x")   end), "str:replace: old não-string -> erro")
+    check(rejects(function() s.str:replace("x", nil) end), "str:replace: new nil -> erro")
+end
+
+test_str_replace()
+
 print(string.format("OK — %d checks passaram (string frontend)", n_ok))

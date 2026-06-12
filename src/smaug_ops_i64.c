@@ -333,6 +333,75 @@ uint8_t *smaug_i64_eq(const smaug_series_i64_t *s, int64_t threshold,
     return result;
 }
 
+uint8_t *smaug_i64_ge(const smaug_series_i64_t *s, int64_t threshold,
+                       smaug_mask_t **out_mask) {
+    if (!s) return NULL;
+    uint8_t      *result = malloc(s->size * sizeof(uint8_t));
+    smaug_mask_t *mask   = NULL;
+    if (!result) return NULL;
+    if (out_mask) {
+        mask = malloc(s->size * sizeof(smaug_mask_t));
+        if (!mask) { free(result); return NULL; }
+        *out_mask = mask;
+    }
+    for (size_t i = 0; i < s->size; i++) {
+        if (VALID(s, i)) {
+            result[i] = s->data[i] >= threshold ? 1 : 0;
+            if (mask) mask[i] = 0xFF;
+        } else {
+            result[i] = 0;
+            if (mask) mask[i] = 0x00;
+        }
+    }
+    return result;
+}
+
+uint8_t *smaug_i64_le(const smaug_series_i64_t *s, int64_t threshold,
+                       smaug_mask_t **out_mask) {
+    if (!s) return NULL;
+    uint8_t      *result = malloc(s->size * sizeof(uint8_t));
+    smaug_mask_t *mask   = NULL;
+    if (!result) return NULL;
+    if (out_mask) {
+        mask = malloc(s->size * sizeof(smaug_mask_t));
+        if (!mask) { free(result); return NULL; }
+        *out_mask = mask;
+    }
+    for (size_t i = 0; i < s->size; i++) {
+        if (VALID(s, i)) {
+            result[i] = s->data[i] <= threshold ? 1 : 0;
+            if (mask) mask[i] = 0xFF;
+        } else {
+            result[i] = 0;
+            if (mask) mask[i] = 0x00;
+        }
+    }
+    return result;
+}
+
+uint8_t *smaug_i64_ne(const smaug_series_i64_t *s, int64_t threshold,
+                       smaug_mask_t **out_mask) {
+    if (!s) return NULL;
+    uint8_t      *result = malloc(s->size * sizeof(uint8_t));
+    smaug_mask_t *mask   = NULL;
+    if (!result) return NULL;
+    if (out_mask) {
+        mask = malloc(s->size * sizeof(smaug_mask_t));
+        if (!mask) { free(result); return NULL; }
+        *out_mask = mask;
+    }
+    for (size_t i = 0; i < s->size; i++) {
+        if (VALID(s, i)) {
+            result[i] = s->data[i] != threshold ? 1 : 0;
+            if (mask) mask[i] = 0xFF;
+        } else {
+            result[i] = 0;
+            if (mask) mask[i] = 0x00;
+        }
+    }
+    return result;
+}
+
 /* ===================================================================
    ORDENAÇÃO
    Retorna NULL se houver NULLs na série (posição de NA é indefinida).
