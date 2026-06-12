@@ -1,13 +1,210 @@
-# Contrato Defensivo do Backend C — `[Done]`
+# Contrato Defensivo — Smaug
 
-> Fase de maturidade do núcleo (régua v1.0). Objetivo: aumentar a **confiança**
-> no que já existe, não adicionar features. A pergunta-guia não é "quantas
-> features?", e sim "quão confiável é o núcleo?".
+Este documento especifica os contratos de comportamento do Ring 1 (frontend Lua)
+e do Ring 0 (backend C). Um contrato aqui significa: comportamento garantido,
+testado, e que não muda sem decisão explícita e versionada.
 
-## Princípio fundador: o engine não confia no caller
+---
+
+## Ring 1 — Frontend Lua
+
+### Contrato 1 — sem coerção implícita de dtype
+
+```lua
+local smaug = require("smaug")
+
+local payload = {
+    {"produto", {"caneta", "caderno", "régua"}, "string"},
+    {"qtd",     {10, 5, 8},                    "int64"},
+}
+local ds = smaug.DataSet(payload)
+
+ds["qtd"]:set(1, 1.5)   -- erro
+ds["qtd"]:set(1, "x")   -- erro
+ds["qtd"]:set(1, 12)    -- ok
+```
+
+```
+smaug: valor para int64 deve ser inteiro (sem coerção)
+smaug: valor para int64 deve ser inteiro (sem coerção)
+```
+
+O frontend recusa qualquer valor que exigiria coerção silenciosa. Não há
+surpresa de truncagem, arredondamento ou conversão implícita. Quando o dtype
+importa, ele é explícito — sempre.
+
+---
+
+### Contrato 2 — `astype` converte por elemento, tolerante a falha
+
+```lua
+local smaug = require("smaug")
+
+local payload = {
+    {"valor_str", {"1.5", "abc", smaug.NA, "3.0"}, "string"},
+}
+local ds = smaug.DataSet(payload)
+local f  = ds["valor_str"]:astype("float64")
+
+print(f:get(1))
+print(f:is_null(2))
+print(f:is_null(3))
+print(f:get(4))
+```
+
+```
+1.5
+true
+true
+3.0
+```
+
+`astype` nunca lança erro por causa de um elemento individual. Elementos
+inconversíveis tornam-se `null` — a série inteira não é descartada por um
+dado ruim. Operações em lote são tolerantes a dados imperfeitos.
+
+---
+
+### Contrato 3 — `fillna` não muta, não coerce
+
+```lua
+local smaug = require("smaug")
+
+local payload = {
+    {"vendas", {1.0, smaug.NA, 0/0, smaug.NA}},
+}
+local ds = smaug.DataSet(payload)
+local f  = ds["vendas"]:fillna(0.0)
+
+print(ds["vendas"]:is_null(2))
+print(f:is_null(2))
+print(f:get(2))
+print(f:get(3) ~= f:get(3))
+
+ds["vendas"]:fillna(1)   -- erro
+```
+
+```
+true
+false
+0.0
+true
+smaug: fillna em série float64 espera um número
+```
+
+`fillna` devolve nova série — o original é imutável. `NaN` é preservado:
+`fillna` substitui `null` (ausência), não `NaN` (valor indefinido presente).
+São coisas distintas no Smaug.
+
+---
+
+### Contrato 4 — `DataSet` nunca existe desalinhado
+
+```lua
+local smaug = require("smaug")
+
+local payload = {
+    {"cidade", {"SP", "RJ", "MG"}, "string"},
+    {"vendas", {120, 85},          "float64"},
+}
+local ds = smaug.DataSet(payload)   -- erro
+```
+
+```
+smaug: coluna 'vendas' tem 2 elemento(s); DataSet tem 3
+```
+
+Toda coluna de um DataSet tem o mesmo número de linhas. Violação é erro
+imediato — não existe estado intermediário desalinhado.
+
+---
+
+### Contrato 5 — `BoolSeries` é coluna de primeira classe
+
+```lua
+local smaug = require("smaug")
+
+local payload = {
+    {"nome",  {"Ana", "Bruno", "Carol"}, "string"},
+    {"ativo", {true, false, true},       "bool"},
+}
+local ds = smaug.DataSet(payload)
+
+print(ds:filter(ds["ativo"]):nrows())
+ds["ativo"] = ds["ativo"]:lnot()
+print(ds["ativo"]:describe())
+```
+
+```
+2
+{count=3, nulls=0, true=1, false=2}
+```
+
+Toda coluna aceita pelo DataSet funciona em toda a API do DataSet. O dtype
+da coluna não cria casos especiais na API.
+
+---
+
+### Contrato 6 — `filter` descarta `NA` na máscara
+
+```lua
+local smaug = require("smaug")
+
+local payload = {
+    {"cidade", {"SP", "RJ", "MG", "SP"}, "string"},
+    {"vendas", {10,   20,   30,   40}},
+}
+local ds   = smaug.DataSet(payload)
+local mask = ds["cidade"]:eq("SP")
+mask:set_null(1)
+
+local r = ds:filter(mask)
+print(r:nrows())
+print(r["cidade"]:get(1))
+```
+
+```
+1
+SP
+```
+
+`NA` na máscara descarta a linha — linha de origem desconhecida não passa.
+`filter` nunca lança erro por `NA` na máscara.
+
+---
+
+### Contrato 7 — índices são 1-based
+
+```lua
+local smaug = require("smaug")
+
+local payload = {
+    {"preco", {10.0, 20.0, 30.0}},
+}
+local ds = smaug.DataSet(payload)
+
+print(ds["preco"]:get(1))
+print(ds["preco"]:get(3))
+ds["preco"]:get(0)   -- erro
+```
+
+```
+10.0
+30.0
+smaug: índice 0 fora dos limites [1, 3]
+```
+
+Toda API pública Lua usa índices 1-based (convenção Lua). A conversão
+0-based↔1-based é feita internamente — nunca exposta.
+
+---
+
+## Ring 0 — Backend C
+
+### Princípio: o engine não confia no caller
 
 Toda fronteira pública em C **valida e comunica**; nunca assume que o caller
-validou. Garantias incondicionais (independem do que o caller passe):
+validou. Garantias incondicionais:
 
 1. **Validação na entrada.** Ponteiro, argumentos e índice são checados antes de
    qualquer acesso à memória. Entrada inválida nunca causa comportamento
@@ -17,20 +214,7 @@ validou. Garantias incondicionais (independem do que o caller passe):
 3. **Falha segura.** Em erro não há escrita parcial; leitura devolve sentinela
    documentada e o estado permanece consistente.
 
-Este princípio está registrado em `smaug_core.h` e substituiu a nota anterior
-("o caller garante a validade"), que afirmava exatamente o oposto.
-
-### Por que isto é coerente com o Shape 1 (get com status anulável)
-
-"Não confiar no caller" governa **validação e segurança** (obrigatórias,
-incondicionais) — **não** obriga o caller a *ler* o status. O engine sempre
-valida e sempre deixa o sistema em estado seguro (erro → sentinela definida, sem
-UB); o `status` anulável apenas decide se ele *também* informa a verdade a quem a
-pede. A segurança nunca depende de o caller checar nada. São eixos distintos.
-
-## Códigos de status
-
-Definidos em `include/smaug_types.h` (incluído por todos os headers):
+### Códigos de status
 
 ```c
 typedef enum {
@@ -44,12 +228,10 @@ typedef enum {
 
 Espelhado no cdef do FFI (`lua/smaug/ffi_loader.lua`).
 
-## Contrato por categoria
-
 ### Mutação pontual (`set` / `set_null`) — retorna `smaug_status_t`
 
 Em erro, **nenhuma escrita** ocorre. Em views, dispara COW detach antes de
-escrever (ver seção COW abaixo).
+escrever.
 
 | retorno | condição |
 |---|---|
@@ -58,25 +240,20 @@ escrever (ver seção COW abaixo).
 | `SMG_ERR_ARGUMENT` | `s == NULL` |
 | `SMG_ERR_NOMEM` | detach COW falhou por OOM — série intacta |
 
-Funções (5): `f64_set`, `f64_set_null`, `i64_set`, `i64_set_null`, `str_set_null`.
-
-> `str_set` já retorna `int` (precedente). `str_set_null` propagava internamente
-> o retorno do `str_set` — agora retorna `smaug_status_t` de forma consistente.
+Funções: `f64_set`, `f64_set_null`, `i64_set`, `i64_set_null`, `str_set`,
+`str_set_null`.
 
 ### Append dinâmico (`append` / `append_null`) — retorna `int` (0 / -1)
 
-Convenção histórica mantida (precedente). Em views, dispara COW detach antes do
-grow. Falha (detach-OOM ou grow-OOM) → `-1`; série permanece consistente.
-
-Funções (4 por tipo numérico): `f64_append`, `f64_append_null`, `i64_append`,
-`i64_append_null`.
+Convenção mantida. Em views, dispara COW detach antes do grow.
+Falha → `-1`; série permanece consistente.
 
 ### Leitura (`get`) — Shape 1: valor + status anulável
 
-Assinatura: `T smaug_<t>_get(const S *s, size_t idx, smaug_status_t *status)`.
-Retorna o valor; escreve `*status` se `status != NULL`. Em erro/null devolve
-sentinela **definida** (`NAN` p/ f64, `0` p/ i64) — segura mesmo para caller que
-ignore o status.
+`T smaug_<t>_get(const S *s, size_t idx, smaug_status_t *status)`
+
+Retorna o valor; escreve `*status` se `status != NULL`. Sentinelas definidas
+em erro (`NAN` para f64, `0` para i64) — seguro mesmo ignorando o status.
 
 | caso | retorno | `*status` |
 |---|---|---|
@@ -85,31 +262,13 @@ ignore o status.
 | `idx >= size` | sentinela | `SMG_ERR_OOB` |
 | `s == NULL` | sentinela | `SMG_ERR_ARGUMENT` |
 
-Funções (2): `f64_get`, `i64_get`. Elimina a colisão em que índice inválido e
-valor legítimo (NaN no f64, qualquer inteiro no i64) eram indistinguíveis.
+### Copy-on-Write em views
 
-> `str_get` já distingue erro de valor via `NULL` + `out_len` — sem colisão, sem
-> necessidade de status.
-
-### Já conformes — assinatura mantida
-
-`str_set` → `int`; operações `bool` e `view` → ponteiro com `NULL` como sinal
-de erro.
-
-### Validam e degradam com segurança — assinatura inalterada
-
-`is_null` (idx inválido → `true`, resposta conservadora) e `view` (faixa
-inválida → `NULL`).
-
-## Copy-on-Write em views
-
-O contrato COW é parte central do contrato defensivo. Toda operação que modifica
-uma view a materializa automaticamente antes de escrever, preservando o objeto
-original. Ver `docs/COW.md` para a especificação completa.
-
-Resumo para este documento:
+Toda mutação em uma view materializa um buffer privado antes de escrever —
+o objeto pai nunca é tocado.
 
 - `set` / `set_null`: retornam `SMG_ERR_NOMEM` se o detach falhar.
 - `append` / `append_null`: retornam `-1` se o detach ou o grow falharem.
-- Em qualquer falha, a view continua apontando para o pai (intacta) e o pai
-  permanece inalterado — falha segura em todos os caminhos.
+- Em qualquer falha, view e pai permanecem intactos.
+
+Ver `docs/COW.md` para a especificação completa.

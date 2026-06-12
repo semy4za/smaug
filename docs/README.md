@@ -1,176 +1,155 @@
 # 🐉 Smaug
 
-Biblioteca de dados tabulares para Lua com backend em C.
-
-> **Cobertura:** 100% branch-alvo (MC/DC) · 99.82% linhas · 767 checks OOM · 281083 checks property-based · Valgrind-clean
-
-Smaug fornece estruturas tipadas para análise e transformação de dados, combinando uma API de alto nível em Lua com um núcleo de processamento implementado em C e acessado através de LuaJIT FFI.
-
-O projeto foi desenvolvido com foco em:
-
-* previsibilidade semântica;
-* controle explícito de tipos;
-* suporte consistente a valores nulos;
-* robustez de memória;
-* baixo overhead de execução;
-* portabilidade.
+Biblioteca de dados tabulares em Lua com backend em C.
+Engine de Ring 0 em C puro — memória, tipos, operações primitivas.
+Frontend de Ring 1 em LuaJIT — `Series`, `BoolSeries`, `DataSet`, ergonomia.
 
 ---
 
-## Principais Características
-
-### Tipos suportados
-
-* float64
-* int64
-* bool
-* string
-
-Todos os tipos possuem suporte a valores nulos (NA).
-
----
-
-### Estruturas disponíveis
-
-#### Series
-
-Coluna tipada unidimensional.
-
-Exemplo:
+## O que parece na prática
 
 ```lua
 local smaug = require("smaug")
 
-local s = smaug.Series.from_table(
-    {10, 20, smaug.NA, 40},
-    "float64"
-)
+local payload = {
+    {"cidade",  {"SP", "RJ", "SP", "MG", "SP"}, "string"},
+    {"vendas",  {120,  85,   200,  smaug.NA, 95}},
+    {"ativo",   {true, false, true, true, false}, "bool"},
+}
+local ds = smaug.DataSet(payload)
 
-print(s:sum())
-print(s:mean())
+-- filtra ativos, preenche nulos, calcula total
+local resultado = ds
+    :filter(ds["ativo"])
+    :fillna({vendas = 0.0})
+
+print(resultado:describe())
+print(resultado["vendas"]:sum())
+```
+
+```
+DataSet '' [3 linhas x 3 colunas]
+   cidade  vendas  ativo
+1  SP      120.0   true
+2  SP      200.0   true
+3  MG      0.0     true
+
+320.0
 ```
 
 ---
 
-#### BoolSeries
+## Tipos suportados
 
-Resultado de operações lógicas e comparações.
+Todos com suporte a `null` via bitmask dedicada. `null` não é `NaN`, não é
+zero, não é string vazia — é ausência explícita.
 
-Implementa lógica booleana de três estados:
-
-* true
-* false
-* null
+| dtype | descrição |
+|---|---|
+| `float64` | IEEE 754 dupla precisão |
+| `int64` | inteiro com sinal 64-bit |
+| `bool` | lógica de três valores (Kleene) |
+| `string` | offset-based, estilo Arrow |
 
 ---
 
-#### DataSet
+## Estruturas
 
-Coleção de colunas tipadas organizadas em formato tabular.
+**`Series`** — coluna tipada unidimensional. 29 métodos: acesso, mutação,
+aritmética, reduções, comparações, sort, filter, astype, fillna, describe.
 
-Exemplo:
+**`BoolSeries`** — resultado de comparações e operações lógicas. Lógica de
+três valores (true / false / NA). Coluna de primeira classe no DataSet.
+
+**`DataSet`** — coleção de colunas alinhadas. 23 métodos: CRUD de colunas,
+filter, sort_by, select, dropna, fillna, describe, sample.
 
 ```lua
-local ds = smaug.DataSet.from_columns({
-    {"idade", {25, 30, 35}, "int64"},
-    {"salario", {5000, 7000, 9000}, "float64"}
-})
+local payload = {
+    {"uf",    {"SP", "RJ", "SP", "MG"}, "string"},
+    {"pop",   {12.3,  6.7, 12.3,  2.1}},
+    {"cap",   {true, true, false, true}, "bool"},
+}
+local ds = smaug.DataSet(payload)
+
+-- soma de pop onde uf == "SP"
+local sp  = ds:filter(ds["uf"]:eq("SP"))
+print(sp["pop"]:sum())
+```
+
+```
+24.6
 ```
 
 ---
 
-## Copy-on-Write (CoW)
+## Copy-on-Write
 
-Views compartilham armazenamento com o objeto de origem.
+Views compartilham o buffer da série pai zero-copy. Na primeira escrita,
+a view materializa um buffer privado — o original nunca é tocado.
 
-Na primeira operação de escrita ocorre materialização automática da view, criando um armazenamento privado e preservando a integridade do objeto original.
+```lua
+local payload = {{"vendas", {10.0, 20.0, 30.0}}}
+local ds = smaug.DataSet(payload)
 
-Esse comportamento permite:
+local v = ds["vendas"]:view(1, 2)   -- zero-copy
+v:set(1, 99.0)                       -- materializa aqui
 
-* criação de views sem cópia inicial;
-* isolamento automático após mutação;
-* redução de cópias desnecessárias.
-
----
-
-## Valores Nulos
-
-Smaug trata valores nulos explicitamente.
-
-Nulo (NA) não é equivalente a:
-
-* NaN
-* string vazia
-* zero
-* false
-
-A presença de um valor é controlada por uma máscara dedicada de nulidade.
-
----
-
-## Arquitetura
-
-```text
-Lua API
-   │
-LuaJIT FFI
-   │
-Backend C
+print(ds["vendas"]:get(1))           -- 10.0  (original intacto)
+print(v:get(1))                      -- 99.0
 ```
 
-Frontend:
-
-* Series
-* BoolSeries
-* DataSet
-
-Backend:
-
-* gerenciamento de memória
-* operações numéricas
-* operações de string
-* filtros
-* ordenação
-* reduções
-* comparações
+```
+10.0
+99.0
+```
 
 ---
 
-## Qualidade e Testes
+## Filosofia
 
-O projeto possui:
+Smaug é fluido e robusto — uma engine feita para processar dados.
 
-* testes unitários em C;
-* testes unitários em Lua;
-* testes de falha de alocação;
-* testes de Copy-on-Write;
-* validação com Valgrind;
-* medição de cobertura.
+Robustez é funcionalidade. Testes não são suporte às funcionalidades, são
+funcionalidades. Cobertura é ferramenta de confiança, não métrica de vaidade.
+Valgrind é parte do desenvolvimento, não etapa final. A capacidade de
+sobreviver a entradas inválidas é tão importante quanto qualquer operação
+matemática.
+
+E o design importa. O Smaug precisa ser confiável e fluido — uma API que
+funciona mas é difícil de escrever entregou só metade do trabalho. O fluxo
+de dados deve ser natural de ler e conciso de compor.
 
 ---
 
-## Compilação
+## Qualidade
 
-Linux:
+| métrica | valor | |
+|---|---|---|
+| branch-alvo (MC/DC) | 100% — 1095/1095 ramos | [Coverage](COVERAGE.md) |
+| cobertura de linhas | 99.82% | [Coverage](COVERAGE.md) |
+| checks OOM (allocfail) | 767 | [Build and Testing](Build_and_Testing.md) |
+| checks property-based | 281 083 | [Build and Testing](Build_and_Testing.md) |
+| Valgrind | clean | [Build and Testing](Build_and_Testing.md) |
+| warnings `-Wall -Wextra` | zero | [Contract](CONTRACT.md) |
+
+Modelo de referência: SQLite.
+
+---
+
+## Build
+
+**Linux**
 
 ```bash
-make
+make          # compila
+make test     # testes C
+make test-lua # testes Lua
+make coverage # cobertura (gcov)
+make valgrind # Valgrind
 ```
 
-Executar testes:
-
-```bash
-make test
-make test-lua
-```
-
-Cobertura:
-
-```bash
-make coverage
-```
-
-Windows:
+**Windows (MSYS2)**
 
 ```powershell
 scripts/windows_build.ps1
@@ -178,80 +157,29 @@ scripts/windows_build.ps1
 
 ---
 
-## Estrutura do Projeto
-
-```text
-include/
-src/
-lua/
-tests/
-docs/
-scripts/
-```
-
-### include
-
-Headers públicos.
-
-### src
-
-Implementação do backend C.
-
-### lua
-
-Frontend e integração LuaJIT FFI.
-
-### tests
-
-Testes automatizados.
-
-### docs
-
-Documentação técnica.
-
-### scripts
-
-Ferramentas auxiliares de build e cobertura.
-
----
-
 ## Documentação
 
-* API_INDEX.md
-* API_Reference.md
-* Build_and_Testing.md
-* CHANGELOG.md
-* CODE_REVIEW.md
-* CONTRACT.md
-* COVERAGE.md
-* COW.md
-* Roadmap.md
+### Entender o projeto
+| | |
+|---|---|
+| [Roadmap](Roadmap.md) | arquitetura em anéis, filosofia e direção |
+| [Contract](CONTRACT.md) | contratos de comportamento Ring 0 e Ring 1 |
+| [COW](COW.md) | especificação Copy-on-Write |
+| [Changelog](CHANGELOG.md) | histórico de mudanças por sessão |
 
----
+### Usar a API
+| | |
+|---|---|
+| [API Index](API_INDEX.md) | catálogo rápido de métodos por estrutura |
+| [API Reference](API_Reference.md) | referência completa do backend C |
 
-## Status Atual
+### Desenvolver
+| | |
+|---|---|
+| [Build and Testing](Build_and_Testing.md) | compilação, testes, Valgrind, cobertura |
+| [Coverage](COVERAGE.md) | relatório de cobertura (gerado por `make coverage`) |
 
-Implementado:
-
-* tipos numéricos
-* bool
-* string
-* suporte a nulos
-* Series
-* BoolSeries
-* DataSet
-* Copy-on-Write
-* contrato defensivo
-* testes de falha de alocação
-
-Em evolução:
-
-* expansão do ecossistema tabular
-* amadurecimento da semântica de Dataset
-* ampliação de operações e documentação
-
----
-
-## Licença
-
-Definida pelo projeto.
+### Arquivo histórico
+| | |
+|---|---|
+| [Code Review](CODE_REVIEW.md) | baseline pré-endurecimento (referência histórica) |
