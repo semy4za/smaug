@@ -13,7 +13,7 @@ e0573823ec9aaa68c30b3542e33b48ce65c833559065b7ffbad8720e7f4ea6ec     433  ./docs
 6915d4bb638998ba711ffa8c2f76f3298506eb18d3e0cfc76d42ce30ba202255     268  ./docs/CHANGELOG.md
 9a5745e0953b96ecc14c62e02951b104b7e2575938630a0bde0a5cecafee14ee      98  ./docs/CODE_REVIEW.md
 d725ddfecddc5c0ce7cae857ecb7bc57edc66202b40d66e723595709e2d14044     274  ./docs/CONTRACT.md
-35c2fd5fb6d5414dbab4cdb88a28a7d5dd928f1e5adeee9aa36db663e257eea5      50  ./docs/COVERAGE.md
+c94bbff68ddf2160c926339ea794c109ab6945852a1c2de05c243923a3ee1052      50  ./docs/COVERAGE.md
 0b780addfb2929a2af46aa31af0849d30b479a51a35a730f9863843cf095e910     159  ./docs/COW.md
 87d08d3b749e7a202c7367e61f7649c6d5515db58d580fc7f6b7e55ccda66f79     183  ./docs/README.md
 d39491958f6faa1e83b240e136576063a506f9f4708b41aab4e2d2eba06dca3c     254  ./docs/Roadmap.md
@@ -24,15 +24,15 @@ ec1ae8442e32984127948c7e126da19f84f85193023143dc36ee82b8e352544d      29  ./incl
 69cbc71a7894dd9fc631c290d2bb7e551173a0d8183ce257f24cd202002adc95     106  ./include/smaug_string.h
 b5761ed257045b6245efff9fd399fb576e2b69411759ae70d4c116d1fc5bfa4f     107  ./include/smaug_types.h
 4bc43a1508472d129c4d9e234bdbc5807cef6ab820084db8dbe90ae82c69fef7     298  ./lua/smaug/core/boolseries.lua
-91e4c2aac17fef0d6a16588e9902e57b204ee4756dd0a2a4fb0f71309dbf22eb     856  ./lua/smaug/core/dataset.lua
+356c8256b610e7f982a2965c621d6079ca09cb6c11e77518956fce6fcef1d5b0    1083  ./lua/smaug/core/dataset.lua
 c28e0c3b05b4e172ca91aa9eddeb0cac85a3831185a50eb78c06e15084846a64    1151  ./lua/smaug/core/series.lua
 63e9270f329d0ae525569027301abf12501e4d20a3e18bc19a00d7821a9eb9c2     329  ./lua/smaug/ffi_loader.lua
 d95249e3d28ff2d9c1c34bb3a3de611ecfc55c4715ea1219e3df34e09f26513c      35  ./lua/smaug/init.lua
-fbaea0b9f43fe0212535aea939d96abd746270b4e25905b58b45fbbfe0be0a3b     283  ./scripts/build.sh
-4070b05ffc2ff8ab0cdc3460f5ffef00f66c103d61dd23ccec3fda8122f83aa1     218  ./scripts/make_coverage.sh
+43700e2ba9bcc58adefe5459db4373b53d3779976d76a2e673bfddd5ceaeddd5     283  ./scripts/build.sh
+b0f64640f4dba8bb1c6365a4cc03cf4a14a60e68f230123932bb493bbeace6d3     218  ./scripts/make_coverage.sh
 5263600720e6fd8e0c3be46abe7d79f09ebf4362ff98ef21c5bf1caadae0d91f      64  ./scripts/make_manifest.ps1
 69322d8cf4dde498b76b4e463d02f66f355e541878e74b5fdee95aae80204805      34  ./scripts/make_manifest.sh
-225fac6bece4069f1c7d4d1f377f37e9b988c42cee8f72672743281390a03bb1     223  ./scripts/windows_build.ps1
+0fccb4896c2953985affcfb0022eed94622c30a0865d09581f5e82e6d718cef8     223  ./scripts/windows_build.ps1
 b655b8b2cdb754a05b7c117953e5cce9664db1ad6327f5400e59a4874c3a381f     638  ./src/smaug_core.c
 66fec31bbeb4d360dd0ef2cacacc02a05cf59ea5e14791da47d15d399ccd9036     281  ./src/smaug_ops_bool.c
 4a1cd48f7fd47790b0cebeed178235875a050129d84a2f14e774d3214aa5d1fb     528  ./src/smaug_ops_f64.c
@@ -51,6 +51,7 @@ f0d8bf2ec8f652f56029599d3d6061cc9617f5cee3e890642a4ebdb9f92b7c76     305  ./test
 23950c376fb42b510f6b0fa1aad4a93610e91112260f3b13c9120d7d9b9b6a4b     113  ./tests/test_fillna.lua
 c7fb913a9241cfba1a195474f7fb8e5056941d81905ac456093525b698afadc2     184  ./tests/test_groupby.lua
 e11738d78bc62f09619980186e4ec96c74c786660ac7d9bb0814ed9c003865f0     228  ./tests/test_i64.lua
+75e6373302e13d75a3351cfa40654a0ca567afdf317dedfa5e25160c3b4150ee     184  ./tests/test_join.lua
 649352374847c05e07fcfc10d5406d6f19d0069500090e34158ec8b2e99db490      58  ./tests/test_ops.c
 5eaddbf57166ba0de2c6c9cc6a9fdb993e89e3cf7a434d206f036c0b8cf84341    1002  ./tests/test_ops_edge.c
 ff2855ff07b9d678c4314e9a05ea0e7271228a3ce80a4defbb6233ccb48c61c3     345  ./tests/test_props.lua
@@ -60,4 +61,4 @@ e656ea4300fba405ffbbf1da95d6a2b5e18e4efdbc589ab7e7d77432ea33a871     339  ./test
 97fdc383f086ecd5f4e9d3bf54d9e6243c0eac53a513727a5005ce33deae8360     402  ./tests/test_string.c
 1690d6ca5587b6e09d8f8954e8be4fbe25e49aac4eda76fd098f018c5adc3119     408  ./tests/test_string.lua
 #
-# total de arquivos: 57
+# total de arquivos: 58

@@ -398,6 +398,233 @@ function methods.concat(self, other, name)
 end
 
 -- =====================================================================
+-- Join / Merge (Anel 2 — Operações Relacionais)
+--
+-- ds:join(other, on, [how], [suffixes])
+--
+-- Parâmetros:
+--   on       : string ou {left_key, right_key} — coluna(s) de junção
+--   how      : "inner" (default), "left", "right", "outer"
+--   suffixes : tabela {esq, dir} para colunas com mesmo nome (default {"_left","_right"})
+--
+-- Implementação: hash join — O(n+m) no tamanho das tabelas.
+--   1. Constrói hash table do lado direito: key → lista de índices de linha
+--   2. Varre o lado esquerdo e acumula pares (i_left, i_right)
+--   3. Para outer/right, acumula os índices direitos sem match
+--   4. Monta o DataSet resultado coluna a coluna
+--
+-- Restrições:
+--   * coluna(s) de junção não podem ter nulos nos dois lados
+--   * right join é implementado como left join com os operandos invertidos
+-- =====================================================================
+
+-- Converte valor de chave para string para uso como chave de tabela Lua.
+local function key_to_str(v)
+    if v == nil then return "\0NULL\0" end
+    return type(v) .. ":" .. tostring(v)
+end
+
+-- Extrai valor de chave de uma linha (chave simples ou composta).
+local function join_key(col_list, row)
+    if #col_list == 1 then return key_to_str(col_list[1]:get(row)) end
+    local parts = {}
+    for _, c in ipairs(col_list) do parts[#parts+1] = key_to_str(c:get(row)) end
+    return table.concat(parts, "\1")
+end
+
+-- Resolve os nomes das colunas no resultado, aplicando sufixos onde há conflito.
+local function resolve_names(left_names, right_names, join_keys_set, suffixes)
+    local sl, sr = suffixes[1] or "_left", suffixes[2] or "_right"
+    -- colunas da direita que não são chave de junção
+    local right_non_key = {}
+    for _, n in ipairs(right_names) do
+        if not join_keys_set[n] then right_non_key[#right_non_key+1] = n end
+    end
+    -- detectar conflitos entre esquerda e direita (excluindo chaves)
+    local left_set = {}
+    for _, n in ipairs(left_names) do left_set[n] = true end
+
+    local result_left  = {}   -- {original, final}
+    local result_right = {}
+
+    for _, n in ipairs(left_names) do
+        -- se a coluna esquerda é chave de junção, não recebe sufixo
+        if join_keys_set[n] then
+            result_left[#result_left+1] = {n, n}
+        else
+            -- recebe sufixo só se há coluna direita (não-chave) com mesmo nome
+            local has_conflict = false
+            for _, rn in ipairs(right_non_key) do
+                if rn == n then has_conflict = true; break end
+            end
+            result_left[#result_left+1] = {n, has_conflict and (n..sl) or n}
+        end
+    end
+    for _, n in ipairs(right_non_key) do
+        local final = left_set[n] and (n..sr) or n
+        result_right[#result_right+1] = {n, final}
+    end
+    return result_left, result_right
+end
+
+-- Constrói uma coluna do resultado a partir de pares de índices.
+-- i_left=0 ou i_right=0 significa NULL naquele lado.
+local function build_col(series, pairs_idx, side, NA_val)
+    local vals = {}
+    for _, p in ipairs(pairs_idx) do
+        local idx = (side == "left") and p[1] or p[2]
+        if idx == 0 then
+            vals[#vals+1] = NA_val
+        else
+            local v = series:get(idx)
+            vals[#vals+1] = (v == nil) and NA_val or v
+        end
+    end
+    return Series.from_table(vals, series._dtype)
+end
+
+function methods.join(self, other, on, how, suffixes)
+    -- validação de parâmetros
+    if getmetatable(other) ~= DataSet then
+        error("smaug: join — 'other' deve ser um DataSet", 2)
+    end
+    how      = how      or "inner"
+    suffixes = suffixes or {"_left", "_right"}
+
+    if how ~= "inner" and how ~= "left" and how ~= "right" and how ~= "outer" then
+        error("smaug: join — 'how' deve ser 'inner', 'left', 'right' ou 'outer'", 2)
+    end
+
+    -- right join = left join com operandos invertidos
+    if how == "right" then
+        return other:join(self, on, "left", {suffixes[2], suffixes[1]})
+    end
+
+    -- resolver chaves
+    local left_key_names, right_key_names
+    if type(on) == "string" then
+        left_key_names  = {on}
+        right_key_names = {on}
+    elseif type(on) == "table" and type(on[1]) == "string" and type(on[2]) == "string" then
+        left_key_names  = {on[1]}
+        right_key_names = {on[2]}
+    elseif type(on) == "table" then
+        left_key_names  = on
+        right_key_names = on
+    else
+        error("smaug: join — 'on' deve ser string ou {left_key, right_key}", 2)
+    end
+
+    for _, k in ipairs(left_key_names) do
+        if not self:has_column(k) then
+            error("smaug: join — coluna esquerda '"..k.."' não existe", 2)
+        end
+    end
+    for _, k in ipairs(right_key_names) do
+        if not other:has_column(k) then
+            error("smaug: join — coluna direita '"..k.."' não existe", 2)
+        end
+    end
+
+    local left_key_cols  = {}
+    for _, k in ipairs(left_key_names)  do left_key_cols[#left_key_cols+1]   = self:column(k)  end
+    local right_key_cols = {}
+    for _, k in ipairs(right_key_names) do right_key_cols[#right_key_cols+1] = other:column(k) end
+
+    -- set de chaves de junção (para resolver nomes)
+    local join_keys_set = {}
+    for _, k in ipairs(left_key_names)  do join_keys_set[k] = true end
+    for _, k in ipairs(right_key_names) do join_keys_set[k] = true end
+
+    local nl = self:nrows()
+    local nr = other:nrows()
+    local NA = Series.NA
+
+    -- 1. Construir hash table do lado direito: key_str → {idx, ...}
+    local hash = {}
+    for i = 1, nr do
+        local k = join_key(right_key_cols, i)
+        if hash[k] then
+            hash[k][#hash[k]+1] = i
+        else
+            hash[k] = {i}
+        end
+    end
+
+    -- 2. Varrer lado esquerdo, acumular pares (i_left, i_right)
+    local pairs_idx      = {}   -- {i_left, i_right}; 0 = NULL
+    local right_matched  = {}   -- para outer: registrar índices direitos com match
+
+    for i = 1, nl do
+        local k = join_key(left_key_cols, i)
+        local matches = hash[k]
+        if matches then
+            for _, j in ipairs(matches) do
+                pairs_idx[#pairs_idx+1] = {i, j}
+                right_matched[j] = true
+            end
+        elseif how == "left" or how == "outer" then
+            pairs_idx[#pairs_idx+1] = {i, 0}   -- 0 = NULL no lado direito
+        end
+    end
+
+    -- 3. Para outer: adicionar linhas direitas sem match
+    if how == "outer" then
+        for j = 1, nr do
+            if not right_matched[j] then
+                pairs_idx[#pairs_idx+1] = {0, j}
+            end
+        end
+    end
+
+    -- 4. Resolver nomes das colunas
+    local res_left, res_right = resolve_names(
+        self._col_names, other._col_names, join_keys_set, suffixes)
+
+    -- 5. Montar DataSet resultado
+    local result = DataSet.new(self._name .. "_join_" .. other._name)
+
+    -- colunas do lado esquerdo (inclui chave com valor esquerdo;
+    -- em outer, quando i_left=0 a chave vem do lado direito)
+    for ci, pair in ipairs(res_left) do
+        local orig, final = pair[1], pair[2]
+        local src = self:column(orig)
+        if join_keys_set[orig] then
+            -- chave: em outer com i_left=0 usa valor da chave direita
+            local right_key_idx = 1
+            for ri, rk in ipairs(right_key_names) do
+                if rk == orig or left_key_names[ri] == orig then
+                    right_key_idx = ri; break
+                end
+            end
+            local right_key_src = other:column(right_key_names[right_key_idx] or right_key_names[1])
+            local vals = {}
+            for _, p in ipairs(pairs_idx) do
+                if p[1] ~= 0 then
+                    local v = src:get(p[1])
+                    vals[#vals+1] = (v == nil) and NA or v
+                else
+                    local v = right_key_src:get(p[2])
+                    vals[#vals+1] = (v == nil) and NA or v
+                end
+            end
+            result:add_column(final, Series.from_table(vals, src._dtype, final))
+        else
+            result:add_column(final, build_col(src, pairs_idx, "left", NA))
+        end
+    end
+
+    -- colunas do lado direito (exceto chave)
+    for _, pair in ipairs(res_right) do
+        local orig, final = pair[1], pair[2]
+        local src = other:column(orig)
+        result:add_column(final, build_col(src, pairs_idx, "right", NA))
+    end
+
+    return result
+end
+
+-- =====================================================================
 -- GroupBy (Anel 2 — Operações Relacionais)
 --
 -- Implementação: sort-based. Ordena pela(s) chave(s) via argsort,
