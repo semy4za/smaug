@@ -319,6 +319,85 @@ end
 
 -- =====================================================================
 -- =====================================================================
+-- Concat (Anel 2 — Operações Relacionais)
+--
+-- concat(outros, [nome]): empilha DataSets verticalmente.
+-- Todos devem ter as mesmas colunas com os mesmos dtypes.
+-- Retorna um novo DataSet independente.
+--
+-- Uso:
+--   smaug.concat({ds1, ds2, ds3})
+--   smaug.concat({ds1, ds2}, "resultado")
+--   DataSet.concat({ds1, ds2})          -- alias de classe
+-- =====================================================================
+
+local function concat_datasets(list, name)
+    if type(list) ~= "table" or #list == 0 then
+        error("smaug: concat espera uma lista não-vazia de DataSets", 2)
+    end
+
+    -- primeiro DataSet como referência de esquema
+    local ref = list[1]
+    if getmetatable(ref) ~= DataSet then
+        error("smaug: concat — elemento 1 não é um DataSet", 2)
+    end
+    local col_names = ref._col_names
+
+    -- validar esquema de todos os outros
+    for k = 2, #list do
+        local ds = list[k]
+        if getmetatable(ds) ~= DataSet then
+            error("smaug: concat — elemento "..k.." não é um DataSet", 2)
+        end
+        if #ds._col_names ~= #col_names then
+            error("smaug: concat — elemento "..k.." tem número de colunas diferente"
+                  .." ("..#ds._col_names.." vs "..#col_names..")", 2)
+        end
+        for _, cname in ipairs(col_names) do
+            if not ds:has_column(cname) then
+                error("smaug: concat — elemento "..k.." não tem coluna '"..cname.."'", 2)
+            end
+            local dt1 = ref:column(cname)._dtype
+            local dt2 = ds:column(cname)._dtype
+            if dt1 ~= dt2 then
+                error("smaug: concat — coluna '"..cname.."': dtype incompatível"
+                      .." ('"..dt1.."' vs '"..dt2.."')", 2)
+            end
+        end
+    end
+
+    -- construir: por coluna, coleta todos os valores e cria Series nova
+    local result = DataSet.new(name or ref._name)
+    local NA = Series.NA
+
+    for _, cname in ipairs(col_names) do
+        local dtype = ref:column(cname)._dtype
+        local vals  = {}
+        for _, ds in ipairs(list) do
+            local col = ds:column(cname)
+            for i = 1, col:len() do
+                local v = col:get(i)
+                vals[#vals + 1] = (v == nil) and NA or v
+            end
+        end
+        result:add_column(cname, Series.from_table(vals, dtype, cname))
+    end
+    return result
+end
+
+-- Expõe como método de classe e como função do módulo (via smaug.concat)
+DataSet.concat = concat_datasets
+function methods.concat(self, other, name)
+    -- ds1:concat(ds2) ou ds1:concat({ds2, ds3})
+    if getmetatable(other) == DataSet then
+        return concat_datasets({self, other}, name)
+    elseif type(other) == "table" then
+        return concat_datasets({self, unpack(other)}, name)
+    end
+    error("smaug: concat espera um DataSet ou lista de DataSets", 2)
+end
+
+-- =====================================================================
 -- GroupBy (Anel 2 — Operações Relacionais)
 --
 -- Implementação: sort-based. Ordena pela(s) chave(s) via argsort,

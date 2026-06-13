@@ -20,6 +20,7 @@ local smaug = {
 -- API pública
 smaug.NA      = Series.NA
 smaug.dataset = DataSet     -- alias legado (smaug.dataset({...}))
+smaug.concat  = DataSet.concat   -- smaug.concat({ds1, ds2, ...})
 
 -- I/O (Ring 2 — futuro)
 -- smaug.read_csv     = require("smaug.io.csv").read

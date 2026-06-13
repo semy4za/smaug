@@ -3,7 +3,7 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `23ffb8c`  |  Data: 2026-06-13 01:30:32 -0300
+- Commit medido: `47264ed`  |  Data: 2026-06-13 15:39:39 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
 - **Branch-bruto** (todos os ramos): `1384/1407 = 98.37%` -- 23 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).

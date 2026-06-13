@@ -166,7 +166,7 @@ if ($luajit -and -not $SkipLua) {
     Write-Host ""
     Write-Host "== Testes em Lua ==" -ForegroundColor Cyan
     $luaTests = @("test_series", "test_dataset", "test_edge", "test_special",
-                  "test_fillna", "test_props", "test_i64", "test_string", "test_bool_dtype", "test_groupby")
+                  "test_fillna", "test_props", "test_i64", "test_string", "test_bool_dtype", "test_groupby", "test_concat")
     foreach ($lt in $luaTests) {
         # Captura stdout e stderr separados para distinguir output normal de erros
         $psi = New-Object System.Diagnostics.ProcessStartInfo
