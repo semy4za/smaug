@@ -254,6 +254,43 @@ static void af_f64_eq(void) {
     smaug_f64_free(x);
 }
 
+static void af_f64_ge(void) {
+    double arr[3] = {1, 2, 3};
+    smaug_series_f64_t *x = smaug_f64_create_from_array(arr, 3);
+    assert(x);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *mask = NULL;
+        uint8_t *res = smaug_f64_ge(x, 2.0, &mask);
+        if (res) { OK(mask != NULL, "f64 ge mask junto"); free(res); free(mask); }
+    }
+    smaug_f64_free(x);
+}
+static void af_f64_le(void) {
+    double arr[3] = {1, 2, 3};
+    smaug_series_f64_t *x = smaug_f64_create_from_array(arr, 3);
+    assert(x);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *mask = NULL;
+        uint8_t *res = smaug_f64_le(x, 2.0, &mask);
+        if (res) { OK(mask != NULL, "f64 le mask junto"); free(res); free(mask); }
+    }
+    smaug_f64_free(x);
+}
+static void af_f64_ne(void) {
+    double arr[3] = {1, 2, 3};
+    smaug_series_f64_t *x = smaug_f64_create_from_array(arr, 3);
+    assert(x);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *mask = NULL;
+        uint8_t *res = smaug_f64_ne(x, 2.0, &mask);
+        if (res) { OK(mask != NULL, "f64 ne mask junto"); free(res); free(mask); }
+    }
+    smaug_f64_free(x);
+}
+
 static void af_f64_argsort(void) {
     double arr[3] = {3, 1, 2};
     smaug_series_f64_t *x = smaug_f64_create_from_array(arr, 3);
@@ -395,6 +432,43 @@ static void af_i64_eq(void) {
         smaug_mask_t *mask = NULL;
         uint8_t *res = smaug_i64_eq(x, 2, &mask);
         if (res) { OK(mask != NULL, "i64 eq mask junto"); free(res); free(mask); }
+    }
+    smaug_i64_free(x);
+}
+
+static void af_i64_ge(void) {
+    int64_t arr[3] = {1, 2, 3};
+    smaug_series_i64_t *x = smaug_i64_create_from_array(arr, 3);
+    assert(x);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *mask = NULL;
+        uint8_t *res = smaug_i64_ge(x, 2, &mask);
+        if (res) { OK(mask != NULL, "i64 ge mask junto"); free(res); free(mask); }
+    }
+    smaug_i64_free(x);
+}
+static void af_i64_le(void) {
+    int64_t arr[3] = {1, 2, 3};
+    smaug_series_i64_t *x = smaug_i64_create_from_array(arr, 3);
+    assert(x);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *mask = NULL;
+        uint8_t *res = smaug_i64_le(x, 2, &mask);
+        if (res) { OK(mask != NULL, "i64 le mask junto"); free(res); free(mask); }
+    }
+    smaug_i64_free(x);
+}
+static void af_i64_ne(void) {
+    int64_t arr[3] = {1, 2, 3};
+    smaug_series_i64_t *x = smaug_i64_create_from_array(arr, 3);
+    assert(x);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *mask = NULL;
+        uint8_t *res = smaug_i64_ne(x, 2, &mask);
+        if (res) { OK(mask != NULL, "i64 ne mask junto"); free(res); free(mask); }
     }
     smaug_i64_free(x);
 }
@@ -1277,6 +1351,9 @@ int main(void) {
     af_f64_compare();
     af_f64_lt();
     af_f64_eq();
+    af_f64_ge();
+    af_f64_le();
+    af_f64_ne();
     af_f64_argsort();
     af_f64_sort();
     af_f64_take();
@@ -1298,6 +1375,9 @@ int main(void) {
     af_i64_compare();
     af_i64_lt();
     af_i64_eq();
+    af_i64_ge();
+    af_i64_le();
+    af_i64_ne();
     af_i64_argsort();
     af_i64_sort();
     af_i64_take();

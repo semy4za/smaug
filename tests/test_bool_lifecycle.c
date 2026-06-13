@@ -65,15 +65,54 @@ static int test_guards(void) {
     OK(smaug_bool_append_null(NULL) == -1, "append_null(NULL) -> -1");
     OK(smaug_bool_clone(NULL) == NULL, "clone(NULL) -> NULL");
 
+    /* status == NULL combinado com erro: cobre o ramo `if (status)` em cada
+       caminho de saída do get (serie NULL, OOB, e null-value). */
+    OK(smaug_bool_get(NULL, 0, NULL) == 0, "get(NULL, status=NULL) -> 0");
+
     smaug_series_bool_t *s = smaug_bool_create(2);
     OK(smaug_bool_set(s, 99, 1) == SMG_ERR_OOB, "set OOB");
     smaug_bool_get(s, 99, &st); OK(st == SMG_ERR_OOB, "get OOB -> OOB");
+    OK(smaug_bool_get(s, 99, NULL) == 0, "get OOB (status=NULL) -> 0");  /* ramo status em OOB */
+    smaug_bool_set_null(s, 0);
+    smaug_bool_get(s, 0, &st); OK(st == SMG_NULL_VALUE, "get null -> NULL_VALUE");
+    OK(smaug_bool_get(s, 0, NULL) == 0, "get null (status=NULL) -> 0");  /* ramo status em null */
+    OK(smaug_bool_get(s, 1, NULL) == 0, "get valido (status=NULL) -> valor");  /* ramo status em SMG_OK */
     OK(smaug_bool_is_null(s, 99) == true, "is_null OOB -> true");
     OK(smaug_bool_view(s, 1, 5) == NULL, "view OOB -> NULL");
+    OK(smaug_bool_set(NULL, 0, 1) == SMG_ERR_ARGUMENT, "set(NULL) idx valido");
+    OK(smaug_bool_set_null(NULL, 0) == SMG_ERR_ARGUMENT, "set_null(NULL) idx valido");
     smaug_bool_free(s);
 
     smaug_bool_free(NULL);   /* NULL-safe */
     OK(1, "free(NULL) seguro");
+
+    /* with_capacity: size > capacity -> NULL (ramo :467) */
+    OK(smaug_bool_create_with_capacity(5, 2) == NULL, "with_capacity size>cap -> NULL");
+
+    /* clone de serie vazia: ramo `s->size > 0` falso (:526) */
+    smaug_series_bool_t *empty = smaug_bool_create(0);
+    smaug_series_bool_t *ce = smaug_bool_clone(empty);
+    OK(ce != NULL && ce->size == 0, "clone de vazio -> vazio");
+    smaug_bool_free(ce);
+
+    /* view guards isolados (:538): start>size e len>size-start */
+    smaug_series_bool_t *base = smaug_bool_create(3);
+    OK(smaug_bool_view(base, 4, 0) == NULL, "view start>size -> NULL");
+    OK(smaug_bool_view(base, 1, 5) == NULL, "view len>size-start -> NULL");
+    OK(smaug_bool_view(NULL, 0, 1) == NULL, "view(NULL) -> NULL");
+
+    /* COW detach de view vazia: ramo `s->size == 0` (:556).
+       view de len 0; mutar forca detach com size 0. */
+    smaug_series_bool_t *v0 = smaug_bool_view(base, 1, 0);
+    OK(v0 != NULL && v0->size == 0, "view vazia criada");
+    OK(smaug_bool_append(v0, 1) == 0, "append em view vazia (detach size==0)");
+    OK(v0->size == 1 && !v0->meta.is_view, "view vazia detachada e cresceu");
+    smaug_bool_free(v0);
+
+    /* set_null OOB (:598) */
+    OK(smaug_bool_set_null(base, 99) == SMG_ERR_OOB, "set_null OOB -> OOB");
+    smaug_bool_free(base);
+    smaug_bool_free(empty);
     return 0;
 }
 
@@ -146,12 +185,17 @@ static int test_kleene(void) {
     for (int i = 0; i < 9; i++) OK(rd(r, i) == exp_not[i], "Kleene NOT");
     smaug_bool_free(r);
 
-    /* mismatch e NULL */
+    /* mismatch e NULL — cobre cada operando do guard `!a || !b || size` (MC/DC) */
     smaug_series_bool_t *small = mk("1");
     OK(smaug_bool_series_and(a, small) == NULL, "and mismatch -> NULL");
     OK(smaug_bool_series_or(a, small)  == NULL, "or mismatch -> NULL");
     OK(smaug_bool_series_xor(a, small) == NULL, "xor mismatch -> NULL");
-    OK(smaug_bool_series_and(NULL, b)  == NULL, "and(NULL) -> NULL");
+    OK(smaug_bool_series_and(NULL, b)  == NULL, "and(NULL, b) -> NULL");   /* !a */
+    OK(smaug_bool_series_and(a, NULL)  == NULL, "and(a, NULL) -> NULL");   /* !b */
+    OK(smaug_bool_series_or(NULL, b)   == NULL, "or(NULL, b) -> NULL");    /* !a */
+    OK(smaug_bool_series_or(a, NULL)   == NULL, "or(a, NULL) -> NULL");    /* !b */
+    OK(smaug_bool_series_xor(NULL, b)  == NULL, "xor(NULL, b) -> NULL");   /* !a */
+    OK(smaug_bool_series_xor(a, NULL)  == NULL, "xor(a, NULL) -> NULL");   /* !b */
     OK(smaug_bool_series_not(NULL)     == NULL, "not(NULL) -> NULL");
 
     smaug_bool_free(a); smaug_bool_free(b); smaug_bool_free(small);
@@ -232,6 +276,16 @@ static int test_sort(void) {
     OK(smaug_bool_argsort(withna, true) == NULL, "argsort recusa NULL");
     OK(smaug_bool_sort(NULL, true) == NULL, "sort(NULL) -> NULL");
     OK(smaug_bool_argsort(NULL, true) == NULL, "argsort(NULL) -> NULL");
+
+    /* série vazia: argsort/sort válidos, size 0 (cobre o ramo size==0 do malloc) */
+    smaug_series_bool_t *empty = smaug_bool_create(0);
+    size_t *pe = smaug_bool_argsort(empty, true);
+    OK(pe != NULL, "argsort de vazio -> nao-nulo");
+    smaug_free(pe);
+    smaug_series_bool_t *se = smaug_bool_sort(empty, true);
+    OK(se != NULL && se->size == 0, "sort de vazio -> vazio");
+    smaug_bool_free(se);
+    smaug_bool_free(empty);
 
     smaug_bool_free(a); smaug_bool_free(asc); smaug_bool_free(desc); smaug_bool_free(withna);
     return 0;

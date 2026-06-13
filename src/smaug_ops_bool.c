@@ -155,7 +155,7 @@ static smaug_series_bool_t *bool_series_from_pair(uint8_t *vals, smaug_mask_t *m
     if (!r) { smaug_free(vals); smaug_free(m); return NULL; }
     for (size_t i = 0; i < n; i++) {
         r->data[i]      = vals[i] ? 1 : 0;
-        r->null_mask[i] = m ? m[i] : 0xFF;
+        r->null_mask[i] = m ? m[i] : 0xFF;  /* COV-EXCL-BR: m sempre fornecido pelas Kleene raw (out_mask != NULL); ramo :0xFF defensivo, uso interno controlado */
     }
     smaug_free(vals);
     smaug_free(m);

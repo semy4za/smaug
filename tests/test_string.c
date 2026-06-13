@@ -249,6 +249,20 @@ int main(void) {
         OK(r[3]==1, "lt desempata por comprimento (MG < MGA)");
         free(r); free(m); m=NULL;
 
+        /* le/ge: cobrem os cases STR_CMP_LE/GE do switch. s = [SP,RJ,N,MG,SP,""] */
+        r = smaug_str_le(s, "RJ", 2, &m);   /* <= RJ: RJ(1), MG(3), ""(5); SP nao */
+        OK(r[1]==1 && r[3]==1 && r[5]==1 && r[0]==0 && r[4]==0, "le lexicografico");
+        OK(m && m[2]==0x00, "le NULL -> mascara 0");
+        free(r); free(m); m=NULL;
+
+        r = smaug_str_ge(s, "RJ", 2, &m);   /* >= RJ: SP(0), RJ(1), SP(4); MG e "" nao */
+        OK(r[0]==1 && r[1]==1 && r[4]==1 && r[3]==0 && r[5]==0, "ge lexicografico");
+        free(r); free(m); m=NULL;
+
+        r = smaug_str_le(s, "RJ", 2, NULL);  /* sem out_mask */
+        OK(r && r[1]==1, "le sem out_mask funciona");
+        free(r);
+
         /* eq sem out_mask (NULL) nao deve crashar */
         r = smaug_str_eq(s, "SP", 2, NULL);
         OK(r && r[0]==1, "eq sem out_mask funciona");

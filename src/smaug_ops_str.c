@@ -77,7 +77,7 @@ static uint8_t *str_compare(const smaug_series_str_t *s, const char *target,
             r = (mode == STR_CMP_EQ) ? eq : !eq;
         } else {
             int c = str_cmp_at(s, i, target, target_len);
-            switch (mode) {
+            switch (mode) {   /* COV-EXCL-BR: mode e enum interno (LT/GT/LE/GE aqui); case default inalcancavel */
                 case STR_CMP_LT: r = (c <  0); break;
                 case STR_CMP_GT: r = (c >  0); break;
                 case STR_CMP_LE: r = (c <= 0); break;

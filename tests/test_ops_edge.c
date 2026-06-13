@@ -185,6 +185,13 @@ static void f64_scalar_edge(void) {
     OK(dz && smaug_f64_is_null(dz, 0), "f64 div_scalar por zero = NULL");
     smaug_f64_free(dz);
 
+    /* div_scalar normal sobre serie com null: ramo VALID verdadeiro (idx 0) e
+       falso (idx 1, null preservado) */
+    smaug_series_f64_t *dn = smaug_f64_div_scalar(a, 2);
+    OK(dn && smaug_f64_get(dn, 0, NULL) == 5.0, "f64 div_scalar valor");
+    OK(smaug_f64_is_null(dn, 1), "f64 div_scalar preserva NULL");
+    smaug_f64_free(dn);
+
     smaug_f64_free(a);
 }
 
@@ -205,6 +212,31 @@ static void f64_compare_edge(void) {
     smaug_mask_t *m = NULL;
     r = smaug_f64_lt(s, 5, &m);
     OK(m && m[1] == 0x00, "f64 lt NULL -> mascara 0");
+    free(r); free(m);
+
+    /* ge/le/ne: mesma matriz de ramos (NULL serie, out_mask NULL, mask 0xFF/0x00) */
+    OK(smaug_f64_ge(NULL, 0, NULL) == NULL, "f64 ge NULL serie -> NULL");
+    OK(smaug_f64_le(NULL, 0, NULL) == NULL, "f64 le NULL serie -> NULL");
+    OK(smaug_f64_ne(NULL, 0, NULL) == NULL, "f64 ne NULL serie -> NULL");
+
+    r = smaug_f64_ge(s, 1, NULL);   /* out_mask NULL */
+    OK(r != NULL && r[0] == 1 && r[2] == 1, "f64 ge sem out_mask");
+    free(r);
+    r = smaug_f64_le(s, 1, NULL);
+    OK(r != NULL && r[0] == 1 && r[2] == 0, "f64 le sem out_mask");
+    free(r);
+    r = smaug_f64_ne(s, 1, NULL);
+    OK(r != NULL && r[0] == 0 && r[2] == 1, "f64 ne sem out_mask");
+    free(r);
+
+    m = NULL; r = smaug_f64_ge(s, 1, &m);   /* com mask: 0xFF nos validos, 0x00 no NULL */
+    OK(m && m[0] == 0xFF && m[1] == 0x00, "f64 ge mask valido/NULL");
+    free(r); free(m);
+    m = NULL; r = smaug_f64_le(s, 1, &m);
+    OK(m && m[1] == 0x00, "f64 le mask NULL -> 0");
+    free(r); free(m);
+    m = NULL; r = smaug_f64_ne(s, 1, &m);
+    OK(m && m[1] == 0x00, "f64 ne mask NULL -> 0");
     free(r); free(m);
 
     smaug_f64_free(s);
@@ -265,6 +297,18 @@ static void i64_scalar_compare_sort_edge(void) {
     uint8_t *c = smaug_i64_gt(a, 5, NULL);
     OK(c && c[0] == 1, "i64 gt sem out_mask");
     free(c);
+
+    /* ge/le/ne: NULL serie, out_mask NULL, mask 0xFF/0x00 (a = [10, null]) */
+    OK(smaug_i64_ge(NULL, 0, NULL) == NULL, "i64 ge NULL -> NULL");
+    OK(smaug_i64_le(NULL, 0, NULL) == NULL, "i64 le NULL -> NULL");
+    OK(smaug_i64_ne(NULL, 0, NULL) == NULL, "i64 ne NULL -> NULL");
+    c = smaug_i64_ge(a, 10, NULL); OK(c && c[0] == 1, "i64 ge sem out_mask"); free(c);
+    c = smaug_i64_le(a, 10, NULL); OK(c && c[0] == 1, "i64 le sem out_mask"); free(c);
+    c = smaug_i64_ne(a, 10, NULL); OK(c && c[0] == 0, "i64 ne sem out_mask"); free(c);
+    smaug_mask_t *mi = NULL;
+    c = smaug_i64_ge(a, 10, &mi); OK(mi && mi[0] == 0xFF && mi[1] == 0x00, "i64 ge mask valido/NULL"); free(c); free(mi);
+    mi = NULL; c = smaug_i64_le(a, 10, &mi); OK(mi && mi[1] == 0x00, "i64 le mask NULL -> 0"); free(c); free(mi);
+    mi = NULL; c = smaug_i64_ne(a, 10, &mi); OK(mi && mi[1] == 0x00, "i64 ne mask NULL -> 0"); free(c); free(mi);
 
     /* sort/argsort recusam NULL */
     OK(smaug_i64_argsort(a, true) == NULL, "i64 argsort recusa NULL");
