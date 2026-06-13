@@ -318,6 +318,304 @@ function methods.dropna(self, subset)
 end
 
 -- =====================================================================
+-- =====================================================================
+-- GroupBy (Anel 2 — Operações Relacionais)
+--
+-- Implementação: sort-based. Ordena pela(s) chave(s) via argsort,
+-- percorre runs contíguos e aplica a agregação em cada grupo.
+-- Zero infraestrutura de hash — reutiliza o argsort existente.
+--
+-- API:
+--   ds:groupby("uf"):sum()              → todas as colunas numéricas
+--   ds:groupby("uf"):sum("v1","v2")     → colunas específicas
+--   ds:groupby("uf"):mean("pop")
+--   ds:groupby("uf"):min("pop")
+--   ds:groupby("uf"):max("pop")
+--   ds:groupby("uf"):count()            → coluna "count" (int64)
+--   ds:groupby({"uf","ano"}):sum()      → chave composta
+--
+-- Restrições:
+--   * coluna(s)-chave não podem ter nulos (use dropna primeiro)
+--   * colunas bool e string são ignoradas nas agregações numéricas
+--   * count conta todas as linhas do grupo (incluindo nulos nas outras cols)
+-- =====================================================================
+
+local GroupBy   = {}
+GroupBy.__index = GroupBy
+
+-- Compara dois valores de chave. Suporta string, número e bool.
+local function key_eq(a, b)
+    if type(a) ~= type(b) then return false end
+    return a == b
+end
+
+-- Extrai o valor de chave de uma linha, suportando chave simples ou composta.
+-- Para chave composta retorna uma tabela {v1, v2, ...}.
+local function get_key(key_cols, row)
+    if #key_cols == 1 then
+        return key_cols[1]:get(row)
+    end
+    local k = {}
+    for _, c in ipairs(key_cols) do k[#k+1] = c:get(row) end
+    return k
+end
+
+-- Compara chaves compostas.
+local function keys_eq(a, b)
+    if type(a) ~= "table" then return key_eq(a, b) end
+    if #a ~= #b then return false end
+    for i = 1, #a do
+        if not key_eq(a[i], b[i]) then return false end
+    end
+    return true
+end
+
+-- Ordena por múltiplas chaves: argsort pela primeira, depois estabiliza pelas
+-- demais com insertion sort (N grupos pequenos — custo real é baixo).
+local function multi_argsort(ds, key_names)
+    if #key_names == 1 then
+        local p = ds:column(key_names[1]):argsort(true)
+        if p == nil then
+            error("smaug: groupby — coluna '"..key_names[1].."' tem nulos"
+                  .." (use dropna primeiro)", 4)
+        end
+        return p
+    end
+    -- chave composta: ordena pelo índice de linha com comparação lexicográfica
+    local n = ds:nrows()
+    local cols = {}
+    for _, name in ipairs(key_names) do
+        local col = ds:column(name)
+        -- validar ausência de nulos em cada chave
+        for i = 1, n do
+            if col:is_null(i) then
+                error("smaug: groupby — coluna '"..name.."' tem nulos"
+                      .." (use dropna primeiro)", 4)
+            end
+        end
+        cols[#cols+1] = col
+    end
+    -- índices 1-based
+    local idx = {}
+    for i = 1, n do idx[i] = i end
+    table.sort(idx, function(a, b)
+        for _, col in ipairs(cols) do
+            local va, vb = col:get(a), col:get(b)
+            if type(va) == "boolean" then va = va and 1 or 0 end
+            if type(vb) == "boolean" then vb = vb and 1 or 0 end
+            if va ~= vb then return va < vb end
+        end
+        return false
+    end)
+    return idx
+end
+
+-- Constrói a lista de grupos: { key=valor_ou_tabela, idx={linha,...} }
+local function build_groups(ds, key_names)
+    local perm = multi_argsort(ds, key_names)
+    local key_cols = {}
+    for _, name in ipairs(key_names) do key_cols[#key_cols+1] = ds:column(name) end
+
+    local groups = {}
+    local n = ds:nrows()
+    if n == 0 then return groups end
+
+    local cur_key = get_key(key_cols, perm[1])
+    local cur_idx = { perm[1] }
+
+    for i = 2, n do
+        local k = get_key(key_cols, perm[i])
+        if keys_eq(k, cur_key) then
+            cur_idx[#cur_idx+1] = perm[i]
+        else
+            groups[#groups+1] = { key = cur_key, idx = cur_idx }
+            cur_key = k
+            cur_idx = { perm[i] }
+        end
+    end
+    groups[#groups+1] = { key = cur_key, idx = cur_idx }
+    return groups
+end
+
+-- Determina quais colunas agregar: as pedidas, ou todas as numéricas exceto chaves.
+local function resolve_agg_cols(ds, key_set, col_names)
+    if col_names and #col_names > 0 then
+        for _, c in ipairs(col_names) do
+            if not ds:has_column(c) then
+                error("smaug: groupby agg — coluna '"..c.."' não existe", 4)
+            end
+        end
+        return col_names
+    end
+    local result = {}
+    for _, c in ipairs(ds._col_names) do
+        if not key_set[c] then
+            local dt = ds:column(c)._dtype
+            if dt == "float64" or dt == "int64" then
+                result[#result+1] = c
+            end
+        end
+    end
+    return result
+end
+
+-- Funções de agregação elementares.
+local function agg_sum(col, idx)
+    local s = 0
+    for _, i in ipairs(idx) do
+        local v = col:get(i); if v ~= nil then s = s + v end
+    end
+    return s
+end
+local function agg_mean(col, idx)
+    local s, n = 0, 0
+    for _, i in ipairs(idx) do
+        local v = col:get(i); if v ~= nil then s = s + v; n = n + 1 end
+    end
+    return n > 0 and (s / n) or nil
+end
+local function agg_min(col, idx)
+    local m = nil
+    for _, i in ipairs(idx) do
+        local v = col:get(i)
+        if v ~= nil and (m == nil or v < m) then m = v end
+    end
+    return m
+end
+local function agg_max(col, idx)
+    local m = nil
+    for _, i in ipairs(idx) do
+        local v = col:get(i)
+        if v ~= nil and (m == nil or v > m) then m = v end
+    end
+    return m
+end
+
+-- Monta o DataSet de resultado: colunas-chave + colunas agregadas.
+local function build_result(gb, agg_fn, col_names, result_col_name)
+    local ds       = gb._ds
+    local key_names = gb._key_names
+    local groups   = gb._groups
+    local key_set  = gb._key_set
+
+    local result = DataSet.new(ds._name .. "_groupby")
+
+    -- colunas-chave
+    if #key_names == 1 then
+        local key_dtype = ds:column(key_names[1])._dtype
+        local vals = {}
+        for _, g in ipairs(groups) do vals[#vals+1] = g.key end
+        result:add_column(key_names[1],
+            Series.from_table(vals, key_dtype, key_names[1]))
+    else
+        -- chave composta: uma coluna por campo
+        for ki, kname in ipairs(key_names) do
+            local key_dtype = ds:column(kname)._dtype
+            local vals = {}
+            for _, g in ipairs(groups) do vals[#vals+1] = g.key[ki] end
+            result:add_column(kname,
+                Series.from_table(vals, key_dtype, kname))
+        end
+    end
+
+    -- colunas agregadas
+    local agg_cols = resolve_agg_cols(ds, key_set, col_names)
+    for _, cname in ipairs(agg_cols) do
+        local src    = ds:column(cname)
+        local vals   = {}
+        local out_name = result_col_name or cname
+        for _, g in ipairs(groups) do
+            vals[#vals+1] = agg_fn(src, g.idx)
+        end
+        local out_dtype = src._dtype == "int64" and "int64" or "float64"
+        -- mean sempre float64; min/max/sum herdam dtype da coluna
+        if agg_fn == agg_mean then out_dtype = "float64" end
+        result:add_column(cname,
+            Series.from_table(vals, out_dtype, out_name))
+    end
+    return result
+end
+
+function GroupBy:sum(...)
+    local cols = select('#', ...) > 0 and {...} or nil
+    return build_result(self, agg_sum, cols)
+end
+function GroupBy:mean(...)
+    local cols = select('#', ...) > 0 and {...} or nil
+    return build_result(self, agg_mean, cols)
+end
+function GroupBy:min(...)
+    local cols = select('#', ...) > 0 and {...} or nil
+    return build_result(self, agg_min, cols)
+end
+function GroupBy:max(...)
+    local cols = select('#', ...) > 0 and {...} or nil
+    return build_result(self, agg_max, cols)
+end
+function GroupBy:count()
+    local ds        = self._ds
+    local key_names = self._key_names
+    local groups    = self._groups
+    local result    = DataSet.new(ds._name .. "_groupby")
+
+    if #key_names == 1 then
+        local key_dtype = ds:column(key_names[1])._dtype
+        local kv, cv = {}, {}
+        for _, g in ipairs(groups) do
+            kv[#kv+1] = g.key; cv[#cv+1] = #g.idx
+        end
+        result:add_column(key_names[1],
+            Series.from_table(kv, key_dtype, key_names[1]))
+        result:add_column("count",
+            Series.from_table(cv, "int64", "count"))
+    else
+        for ki, kname in ipairs(key_names) do
+            local key_dtype = ds:column(kname)._dtype
+            local vals = {}
+            for _, g in ipairs(groups) do vals[#vals+1] = g.key[ki] end
+            result:add_column(kname,
+                Series.from_table(vals, key_dtype, kname))
+        end
+        local cv = {}
+        for _, g in ipairs(groups) do cv[#cv+1] = #g.idx end
+        result:add_column("count", Series.from_table(cv, "int64", "count"))
+    end
+    return result
+end
+
+function methods.groupby(self, key)
+    -- aceita string (chave simples) ou tabela de strings (chave composta)
+    local key_names
+    if type(key) == "string" then
+        key_names = { key }
+    elseif type(key) == "table" then
+        if #key == 0 then
+            error("smaug: groupby espera pelo menos uma coluna-chave", 2)
+        end
+        key_names = key
+    else
+        error("smaug: groupby espera string ou lista de strings", 2)
+    end
+
+    for _, k in ipairs(key_names) do
+        if not self:has_column(k) then
+            error("smaug: groupby — coluna '"..k.."' não existe", 2)
+        end
+    end
+
+    -- key_set: lookup O(1) para saber se uma coluna é chave
+    local key_set = {}
+    for _, k in ipairs(key_names) do key_set[k] = true end
+
+    local groups = build_groups(self, key_names)
+    return setmetatable({
+        _ds        = self,
+        _key_names = key_names,
+        _key_set   = key_set,
+        _groups    = groups,
+    }, GroupBy)
+end
+
 -- Inspeção
 -- =====================================================================
 -- describe: tabela { coluna = (describe da Series) } para colunas numéricas.
