@@ -672,6 +672,45 @@ static void af_str_compare(void) {
     }
     smaug_str_free(s);
 }
+static void af_str_ge(void) {
+    const char *arr[] = {"SP", "RJ", "MG"};
+    reset(-1);
+    smaug_series_str_t *s = smaug_str_create_from_array(arr, 3);
+    assert(s);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *m = NULL;
+        uint8_t *r = smaug_str_ge(s, "RJ", 2, &m);
+        if (r) { OK(1, "str ge ok"); free(r); free(m); }
+    }
+    smaug_str_free(s);
+}
+static void af_str_le(void) {
+    const char *arr[] = {"SP", "RJ", "MG"};
+    reset(-1);
+    smaug_series_str_t *s = smaug_str_create_from_array(arr, 3);
+    assert(s);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *m = NULL;
+        uint8_t *r = smaug_str_le(s, "RJ", 2, &m);
+        if (r) { OK(1, "str le ok"); free(r); free(m); }
+    }
+    smaug_str_free(s);
+}
+static void af_str_ne(void) {
+    const char *arr[] = {"SP", "RJ", "MG"};
+    reset(-1);
+    smaug_series_str_t *s = smaug_str_create_from_array(arr, 3);
+    assert(s);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *m = NULL;
+        uint8_t *r = smaug_str_ne(s, "SP", 2, &m);
+        if (r) { OK(1, "str ne ok"); free(r); free(m); }
+    }
+    smaug_str_free(s);
+}
 static void af_str_filter(void) {
     const char *arr[] = {"a", "bb", "ccc", "d"};
     uint8_t mask[] = {1, 0, 1, 1};
@@ -1390,6 +1429,9 @@ int main(void) {
     af_str_append_grow();
     af_str_append_null_grow();
     af_str_compare();
+    af_str_ge();
+    af_str_le();
+    af_str_ne();
     af_str_filter();
     af_str_take();
     af_str_argsort();

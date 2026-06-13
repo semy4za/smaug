@@ -319,6 +319,210 @@ PROPERTIES["str_filter_reduz"] = function()
           "str filter: tamanho " .. filtered:len() .. " ≠ " .. count_true)
 end
 
+-- INV-STR-5: filter reduz o tamanho proporcionalmente à máscara
+PROPERTIES["str_filter_reduz"] = function()
+    local n = math.random(2, 30)
+    local s = gen_str(n)
+    -- máscara aleatória
+    local mask_vals = {}
+    local count_true = 0
+    for i = 1, n do
+        mask_vals[i] = math.random() < 0.5
+        if mask_vals[i] then count_true = count_true + 1 end
+    end
+    local mask = S.new("float64", n)
+    for i = 1, n do mask:set(i, mask_vals[i] and 1.0 or 0.0) end
+    local bool_mask = mask:gt(0.5)
+    local filtered = s:filter(bool_mask)
+    check(filtered:len() == count_true,
+          "str filter: tamanho " .. filtered:len() .. " ≠ " .. count_true)
+end
+
+-- =====================================================================
+-- INV Anel 2 — Operações relacionais
+-- =====================================================================
+
+local DataSet = require("smaug.core.dataset")
+local NA      = S.NA
+local GROUPS  = {"A","B","C"}
+
+-- INV-G1: groupby sum de cada grupo == sum(serie filtrada por grupo)
+PROPERTIES["groupby_sum_consistente"] = function()
+    local n   = math.random(3, 30)
+    local cat = S.new("string", n)
+    local val = S.new("int64",  n)
+    local group_sum = {}
+    for g in pairs({A=true,B=true,C=true}) do group_sum[g] = 0 end
+    for i = 1, n do
+        local g = GROUPS[math.random(#GROUPS)]
+        cat:set(i, g)
+        local v = math.random(-100, 100)
+        val:set(i, v)
+        group_sum[g] = group_sum[g] + v
+    end
+    local ds = DataSet.from_columns({{"g", cat, "string"}, {"v", val, "int64"}})
+    local gb = ds:groupby("g"):sum("v")
+    for i = 1, gb:nrows() do
+        local g = gb:col("g"):get(i)
+        local s = gb:col("v"):get(i)
+        check(s == group_sum[g], "groupby sum difere para grupo " .. g)
+    end
+end
+
+-- INV-G2: groupby count: soma dos counts == nrows do DataSet original
+PROPERTIES["groupby_count_total"] = function()
+    local n = math.random(2, 30)
+    local cat = S.new("string", n)
+    for i = 1, n do cat:set(i, GROUPS[math.random(#GROUPS)]) end
+    local val = S.new("int64", n)
+    for i = 1, n do val:set(i, math.random(100)) end
+    local ds = DataSet.from_columns({{"g", cat, "string"}, {"v", val, "int64"}})
+    local cnt = ds:groupby("g"):count()
+    local total = 0
+    for i = 1, cnt:nrows() do total = total + cnt:col("count"):get(i) end
+    check(total == n, "groupby count: soma " .. total .. " ≠ " .. n)
+end
+
+-- INV-C1: concat preserva nrows (len(concat(a,b)) == len(a) + len(b))
+PROPERTIES["concat_nrows"] = function()
+    local na = math.random(1, 20)
+    local nb = math.random(1, 20)
+    local va = S.new("int64", na)
+    local vb = S.new("int64", nb)
+    for i = 1, na do va:set(i, math.random(100)) end
+    for i = 1, nb do vb:set(i, math.random(100)) end
+    local da = DataSet.from_columns({{"v", va, "int64"}})
+    local db = DataSet.from_columns({{"v", vb, "int64"}})
+    local r  = smaug.concat({da, db})
+    check(r:nrows() == na + nb, "concat nrows: " .. r:nrows() .. " ≠ " .. (na+nb))
+    -- valores preservados
+    for i = 1, na do
+        check(r:col("v"):get(i) == va:get(i), "concat: valor esq idx " .. i)
+    end
+    for i = 1, nb do
+        check(r:col("v"):get(na + i) == vb:get(i), "concat: valor dir idx " .. i)
+    end
+end
+
+-- INV-J1: inner join ⊆ cross product (toda linha do inner tem match nos dois lados)
+PROPERTIES["join_inner_match"] = function()
+    local na = math.random(2, 10)
+    local nb = math.random(2, 10)
+    local keys_a, keys_b = {}, {}
+    for i = 1, na do keys_a[i] = math.random(1, 5) end
+    for i = 1, nb do keys_b[i] = math.random(1, 5) end
+    local ka = S.new("int64", na); for i=1,na do ka:set(i, keys_a[i]) end
+    local va = S.new("int64", na); for i=1,na do va:set(i, i*10) end
+    local kb = S.new("int64", nb); for i=1,nb do kb:set(i, keys_b[i]) end
+    local vb = S.new("int64", nb); for i=1,nb do vb:set(i, i*100) end
+    local da = DataSet.from_columns({{"k",ka,"int64"},{"va",va,"int64"}})
+    local db = DataSet.from_columns({{"k",kb,"int64"},{"vb",vb,"int64"}})
+    local r  = da:join(db, "k", "inner")
+    -- todo resultado deve ter chave que existe em ambos os lados
+    local ka_set, kb_set = {}, {}
+    for _, v in ipairs(keys_a) do ka_set[v] = true end
+    for _, v in ipairs(keys_b) do kb_set[v] = true end
+    for i = 1, r:nrows() do
+        local k = r:col("k"):get(i)
+        check(ka_set[k] and kb_set[k], "join inner: chave " .. k .. " sem match")
+    end
+end
+
+-- INV-J2: left join preserva todos os rows do lado esquerdo
+PROPERTIES["join_left_preserva_esq"] = function()
+    local na = math.random(2, 10)
+    local nb = math.random(2, 10)
+    local ka = S.new("int64", na); for i=1,na do ka:set(i, math.random(1,5)) end
+    local va = S.new("int64", na); for i=1,na do va:set(i, i) end
+    local kb = S.new("int64", nb); for i=1,nb do kb:set(i, math.random(3,7)) end
+    local vb = S.new("int64", nb); for i=1,nb do vb:set(i, i*100) end
+    local da = DataSet.from_columns({{"k",ka,"int64"},{"va",va,"int64"}})
+    local db = DataSet.from_columns({{"k",kb,"int64"},{"vb",vb,"int64"}})
+    local r  = da:join(db, "k", "left")
+    -- contamos quantas linhas do esquerdo têm match no direito
+    local kb_set = {}
+    for i = 1, nb do kb_set[kb:get(i)] = true end
+    local expected = 0
+    for i = 1, na do
+        local k = ka:get(i)
+        if kb_set[k] then
+            -- pode ter múltiplos matches; conta todos
+            for j = 1, nb do if kb:get(j) == k then expected = expected + 1 end end
+        else
+            expected = expected + 1
+        end
+    end
+    check(r:nrows() == expected, "join left nrows: " .. r:nrows() .. " ≠ " .. expected)
+end
+
+-- INV-U1: unique preserva ordem de primeira aparição
+PROPERTIES["unique_ordem_aparicao"] = function()
+    local n = math.random(2, 30)
+    local s = S.new("int64", n)
+    for i = 1, n do s:set(i, math.random(1, 5)) end
+    local u  = s:unique()
+    -- verifica que cada valor de u aparece pela primeira vez antes de qualquer
+    -- valor subsequente de u na série original
+    local first_seen = {}
+    for i = 1, n do
+        local v = s:get(i)
+        if v ~= nil and not first_seen[v] then first_seen[v] = i end
+    end
+    local prev_first = 0
+    for i = 1, u:len() do
+        local v = u:get(i)
+        if v ~= nil then
+            check(first_seen[v] > prev_first, "unique: ordem de aparição violada idx " .. i)
+            prev_first = first_seen[v]
+        end
+    end
+end
+
+-- INV-U2: value_counts: sum(count) == count_nonnull(s)
+PROPERTIES["value_counts_soma"] = function()
+    local n = math.random(2, 30)
+    local s = S.new("int64", n)
+    for i = 1, n do
+        if math.random() < 0.2 then s:set_null(i)
+        else s:set(i, math.random(1, 5)) end
+    end
+    local vc   = s:value_counts()
+    local soma = 0
+    for i = 1, vc:nrows() do soma = soma + vc:col("count"):get(i) end
+    check(soma == s:count_nonnull(), "value_counts soma: " .. soma .. " ≠ " .. s:count_nonnull())
+end
+
+-- INV-CS1: diff(cumsum(s)) == s (para séries sem NA)
+PROPERTIES["diff_cumsum_identidade"] = function()
+    local n = math.random(2, 30)
+    local s = S.new("int64", n)
+    for i = 1, n do s:set(i, math.random(-100, 100)) end
+    local back = s:cumsum():diff()
+    -- primeiros periods=1 são NA; do 2 em diante deve bater
+    for i = 2, n do
+        check(back:get(i) == s:get(i), "diff(cumsum) ≠ s no idx " .. i)
+    end
+    check(back:is_null(1), "diff(cumsum): idx 1 deve ser NA")
+end
+
+-- INV-R1: rolling(w):sum() == manual (sem NA)
+PROPERTIES["rolling_sum_manual"] = function()
+    local n = math.random(3, 20)
+    local w = math.random(2, n)
+    local s = S.new("int64", n)
+    for i = 1, n do s:set(i, math.random(1, 100)) end
+    local r = s:rolling(w):sum()
+    for i = 1, n do
+        if i < w then
+            check(r:is_null(i), "rolling sum: idx " .. i .. " deveria ser NA")
+        else
+            local expected = 0
+            for j = i - w + 1, i do expected = expected + s:get(j) end
+            check(r:get(i) == expected, "rolling sum: idx " .. i .. " difere")
+        end
+    end
+end
+
 local order = {
     "clone_independente", "view_compartilha", "sort_permutacao",
     "sort_recusa_null_nan", "filter_count_true", "take_inversa",
@@ -327,6 +531,12 @@ local order = {
     -- string
     "str_set_get", "str_clone_independente", "str_sort_ordenado",
     "str_count_nonnull", "str_filter_reduz",
+    -- Anel 2
+    "groupby_sum_consistente", "groupby_count_total",
+    "concat_nrows",
+    "join_inner_match", "join_left_preserva_esq",
+    "unique_ordem_aparicao", "value_counts_soma",
+    "diff_cumsum_identidade", "rolling_sum_manual",
 }
 
 for _, name in ipairs(order) do

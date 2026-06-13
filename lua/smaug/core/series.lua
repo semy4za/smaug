@@ -598,6 +598,90 @@ function methods.shift(self, periods)
     return Series.from_table(vals, self._dtype, self._name)
 end
 
+-- =====================================================================
+-- Rolling (janela deslizante) na Series
+-- Uso: s:rolling(3):sum() / s:rolling(3):mean() / etc.
+-- Primeiras (window-1) posições são NA. Nulos dentro da janela são ignorados.
+-- =====================================================================
+local SeriesRolling = {}
+SeriesRolling.__index = SeriesRolling
+
+function SeriesRolling:_agg(fn)
+    local col  = self._s
+    local n    = col:len()
+    local w    = self._window
+    local NA   = Series.NA
+    local vals = {}
+    for i = 1, n do
+        if i < w then
+            vals[i] = NA
+        else
+            local wv = {}
+            for j = i - w + 1, i do
+                local v = col:get(j)
+                if v ~= nil then wv[#wv+1] = v end
+            end
+            vals[i] = fn(wv)
+        end
+    end
+    return Series.from_table(vals, col._dtype, col._name)
+end
+
+function SeriesRolling:sum()
+    return self:_agg(function(vs)
+        local s = 0; for _, v in ipairs(vs) do s = s + v end; return s
+    end)
+end
+function SeriesRolling:mean()
+    local col  = self._s
+    local n    = col:len()
+    local w    = self._window
+    local NA   = Series.NA
+    local vals = {}
+    for i = 1, n do
+        if i < w then
+            vals[i] = NA
+        else
+            local wv = {}
+            for j = i - w + 1, i do
+                local v = col:get(j)
+                if v ~= nil then wv[#wv+1] = v end
+            end
+            if #wv == 0 then vals[i] = NA
+            else
+                local s = 0; for _, v in ipairs(wv) do s = s + v end
+                vals[i] = s / #wv
+            end
+        end
+    end
+    return Series.from_table(vals, "float64", col._name)
+end
+function SeriesRolling:min()
+    return self:_agg(function(vs)
+        if #vs == 0 then return nil end
+        local m = vs[1]; for _, v in ipairs(vs) do if v < m then m = v end end
+        return m
+    end)
+end
+function SeriesRolling:max()
+    return self:_agg(function(vs)
+        if #vs == 0 then return nil end
+        local m = vs[1]; for _, v in ipairs(vs) do if v > m then m = v end end
+        return m
+    end)
+end
+
+function methods.rolling(self, window)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: rolling() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    if type(window) ~= "number" or window < 1 or window ~= math.floor(window) then
+        error("smaug: rolling — window deve ser inteiro >= 1", 2)
+    end
+    return setmetatable({ _s = self, _window = window }, SeriesRolling)
+end
+
+
 function methods.count_nonnull(self)
     return tonumber(self._d.count_nonnull(self._c))
 end
@@ -1316,15 +1400,170 @@ function StrProxy:replace(old, new)
         error("smaug: str:replace espera string como 2º argumento; recebido " .. type(new), 2)
     end
     if #old == 0 then
-        -- substituição de string vazia é indefinida — devolve cópia sem alterar
         return str_map(self._s, function(v) return v end)
     end
-    -- gsub usa padrões Lua; escapamos metacaracteres para busca literal.
     local esc_old = old:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1")
     local esc_new = new:gsub("%%", "%%%%")
     return str_map(self._s, function(v)
         return (v:gsub(esc_old, esc_new))
     end)
+end
+
+-- =====================================================================
+-- .str Tier B
+-- =====================================================================
+
+-- find(sub): índice (1-based) da primeira ocorrência de `sub`, ou 0 se ausente.
+-- Null -> null. String vazia sub -> 0 (comportamento estável).
+function StrProxy:find(sub)
+    if type(sub) ~= "string" then
+        error("smaug: str:find espera uma string; recebido " .. type(sub), 2)
+    end
+    local n   = self._s:len()
+    local out = Series.new("int64", n, self._s._name)
+    for i = 1, n do
+        local v = self._s:get(i)
+        if v == nil then
+            out:set_null(i)
+        else
+            local pos = v:find(sub, 1, true)
+            out:set(i, pos or 0)
+        end
+    end
+    return out
+end
+
+-- slice(start, [stop]): substring de `start` até `stop` (1-based, inclusivo).
+-- Índices negativos contam do fim. Null -> null.
+-- Se stop for omitido, vai até o final.
+function StrProxy:slice(start, stop)
+    if type(start) ~= "number" then
+        error("smaug: str:slice espera número como start; recebido " .. type(start), 2)
+    end
+    return str_map(self._s, function(v)
+        return v:sub(start, stop)
+    end)
+end
+
+-- pad(width, [side], [fillchar]): preenche até `width` caracteres.
+-- side: "left" (default), "right", "both".
+-- fillchar: caractere de preenchimento (default " ").
+-- Null -> null. Strings mais longas que `width` são retornadas intactas.
+function StrProxy:pad(width, side, fillchar)
+    if type(width) ~= "number" or width < 0 then
+        error("smaug: str:pad espera width >= 0; recebido " .. tostring(width), 2)
+    end
+    side     = side     or "left"
+    fillchar = fillchar or " "
+    if #fillchar ~= 1 then
+        error("smaug: str:pad fillchar deve ter exatamente 1 caractere", 2)
+    end
+    if side ~= "left" and side ~= "right" and side ~= "both" then
+        error("smaug: str:pad side deve ser 'left', 'right' ou 'both'", 2)
+    end
+    return str_map(self._s, function(v)
+        local missing = width - #v
+        if missing <= 0 then return v end
+        if side == "right" then
+            return v .. fillchar:rep(missing)
+        elseif side == "left" then
+            return fillchar:rep(missing) .. v
+        else  -- both: metade à esquerda, metade à direita
+            local left  = math.floor(missing / 2)
+            local right = missing - left
+            return fillchar:rep(left) .. v .. fillchar:rep(right)
+        end
+    end)
+end
+
+-- zfill(width): preenche com '0' à esquerda até `width` caracteres.
+-- Equivalente a str:pad(width, "left", "0"). Null -> null.
+function StrProxy:zfill(width)
+    return self:pad(width, "left", "0")
+end
+
+-- rep(n, [sep]): repete a string `n` vezes, separada por `sep` (default "").
+-- n deve ser >= 0. n=0 -> string vazia. Null -> null.
+function StrProxy:rep(n, sep)
+    if type(n) ~= "number" or n < 0 or n ~= math.floor(n) then
+        error("smaug: str:rep espera inteiro >= 0; recebido " .. tostring(n), 2)
+    end
+    sep = sep or ""
+    return str_map(self._s, function(v)
+        if n == 0 then return "" end
+        return string.rep(v, n, sep)
+    end)
+end
+
+-- cat([sep]): concatena todos os valores não-nulos numa única string Lua.
+-- sep: separador (default ""). Nulos são ignorados.
+-- Retorna string Lua (não Series).
+function StrProxy:cat(sep)
+    sep = sep or ""
+    local parts = {}
+    local n = self._s:len()
+    for i = 1, n do
+        local v = self._s:get(i)
+        if v ~= nil then parts[#parts+1] = v end
+    end
+    return table.concat(parts, sep)
+end
+
+-- split(sep, [n]): divide cada elemento pelo separador `sep`.
+-- Retorna uma tabela Lua de Series string (uma por posição de resultado).
+-- Posições sem valor (split curto) ficam como NA. Nulos na entrada -> NA em todas.
+-- n: número máximo de splits (0 = ilimitado, default).
+-- Nota: retorna tabela, não DataSet, para manter o tipo correto.
+function StrProxy:split(sep, max_splits)
+    if type(sep) ~= "string" or #sep == 0 then
+        error("smaug: str:split espera separador string não-vazio", 2)
+    end
+    max_splits = max_splits or 0
+
+    local rows = self._s:len()
+    -- primeiro passo: descobrir o máximo de partes para alocar as Series
+    local all_parts = {}
+    local max_parts = 0
+    local sep_len = #sep
+    for i = 1, rows do
+        local v = self._s:get(i)
+        if v == nil then
+            all_parts[i] = nil
+        else
+            local parts = {}
+            local start = 1
+            local count = 0
+            while true do
+                local found = v:find(sep, start, true)
+                if not found or (max_splits > 0 and count >= max_splits) then
+                    parts[#parts+1] = v:sub(start)
+                    break
+                end
+                parts[#parts+1] = v:sub(start, found - 1)
+                start = found + sep_len
+                count = count + 1
+            end
+            all_parts[i] = parts
+            if #parts > max_parts then max_parts = #parts end
+        end
+    end
+
+    -- construir uma Series por posição
+    local NA = Series.NA
+    local result = {}
+    for col = 1, max_parts do
+        local vals = {}
+        for i = 1, rows do
+            local parts = all_parts[i]
+            if parts == nil or parts[col] == nil then
+                vals[i] = NA
+            else
+                vals[i] = parts[col]
+            end
+        end
+        result[col] = Series.from_table(vals, "string")
+    end
+    return result  -- tabela Lua de Series; col = result[1], result[2], ...
 end
 
 -- __index: índice numérico -> get(); "str" em série string -> proxy; senão, método.

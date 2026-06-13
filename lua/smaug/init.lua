@@ -21,6 +21,9 @@ local smaug = {
 smaug.NA      = Series.NA
 smaug.dataset = DataSet     -- alias legado (smaug.dataset({...}))
 smaug.concat  = DataSet.concat   -- smaug.concat({ds1, ds2, ...})
+smaug.join    = function(a, b, on, how, suffixes)  -- smaug.join(a, b, ...)
+    return a:join(b, on, how, suffixes)
+end
 
 -- I/O (Ring 2 — futuro)
 -- smaug.read_csv     = require("smaug.io.csv").read
