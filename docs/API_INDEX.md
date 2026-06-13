@@ -142,6 +142,29 @@ Trata bytes crus (UTF-8 = dívida futura). String vazia `""` é distinta de NULL
 **Operadores:** `+ - * /` (série×série e série×escalar; `+`/`*` comutam c/ escalar à esquerda), `tostring`, `serie[i]`.
 **Operadores bool** (só em `Series<bool>`): `*`=and, `+`=or, `-`=xor.
 
+**Análise de distintos:**
+| Método | O que faz |
+|---|---|
+| `:unique()` | valores distintos na ordem de 1ª aparição → nova Series |
+| `:nunique()` | contagem de distintos não-nulos → número |
+| `:value_counts()` | DataSet `{value, count}` ordenado por freq. desc |
+
+**Transformações elementares:**
+| Método | O que faz |
+|---|---|
+| `:abs()` | valor absoluto elemento a elemento (nulos propagam) |
+| `:round([n])` | arredonda para n casas decimais (half-away-from-zero) |
+| `:clip([lo], [hi])` | limita ao intervalo [lo, hi] |
+
+**Janela temporal:**
+| Método | O que faz |
+|---|---|
+| `:cumsum()` | soma cumulativa (nulos propagam) |
+| `:cumprod()` | produto cumulativo (nulos propagam) |
+| `:diff([periods])` | diferença entre elemento i e i-periods (default 1) |
+| `:shift([periods])` | desloca values; periods < 0 = shift para trás |
+| `:rolling(w):sum/mean/min/max()` | agregação em janela deslizante de tamanho w |
+
 **`.str` — proxy de operações sobre Series string:**
 | Método | O que faz |
 |--------|-----------|
@@ -149,6 +172,17 @@ Trata bytes crus (UTF-8 = dívida futura). String vazia `""` é distinta de NULL
 | `.str:lower()` / `.str:upper()` | caixa → nova Series string (ASCII) |
 | `.str:strip()` | remove espaços → nova Series string |
 | `.str:replace(pat, rep)` | substituição literal → nova Series string |
+
+**`.str` Tier B:**
+| Método | O que faz |
+|---|---|
+| `.str:find(sub)` | índice 1-based da 1ª ocorrência (0 se ausente) → `Series<int64>` |
+| `.str:slice(start, [stop])` | substring por índices (negativos contam do fim) → Series string |
+| `.str:pad(width, [side], [fillchar])` | preenche até `width` chars (left/right/both) → Series string |
+| `.str:zfill(width)` | pad com '0' à esquerda → Series string |
+| `.str:rep(n, [sep])` | repete n vezes → Series string |
+| `.str:cat([sep])` | concatena todos os não-nulos → string Lua |
+| `.str:split(sep, [max])` | divide pelo separador → tabela Lua de Series string |
 | `.str:contains(sub)` / `.str:startswith(p)` / `.str:endswith(s)` | → `Series<bool>` |
 
 **Métodos exclusivos de `Series<bool>`:**
@@ -177,6 +211,18 @@ Trata bytes crus (UTF-8 = dívida futura). String vazia `""` é distinta de NULL
 | `:select(nomes)` | subconjunto/reordenação de colunas → novo DataSet |
 | `:dropna([subset])` | remove linhas com NULL (todas ou subset de colunas) → novo DataSet |
 | `:update_column(nome, series)` | substitui coluna existente (valida comprimento) |
+| `:assign(nome, fn_ou_series)` | adiciona/substitui coluna calculada → novo DataSet |
+| `:nunique()` | tabela `{coluna → nº distintos não-nulos}` |
+
+**Anel 2 — Operações Relacionais:**
+| Método | O que faz |
+|---|---|
+| `:groupby(key):sum/mean/min/max/count(...)` | agrupamento sort-based; chave simples ou composta |
+| `:join(other, on, [how], [suffixes])` | join hash-based: inner/left/right/outer |
+| `smaug.concat({ds1, ds2, ...})` / `:concat(other)` | empilha DataSets verticalmente |
+| `:pivot(index, columns, values)` | long → wide |
+| `:melt(id_vars, [value_vars], ...)` | wide → long |
+| `:rolling(w):sum/mean/min/max(col)` | agregação em janela deslizante por coluna |
 | `:describe()` / `:to_table([na])` | inspeção |
 **Operadores:** `tostring` (tabular), `df[coluna]`.
 
@@ -188,7 +234,6 @@ Trata bytes crus (UTF-8 = dívida futura). String vazia `""` é distinta de NULL
 
 ## NÃO existe ainda (não procure — consulte o Roadmap para a fase)
 
-`median`/`quantile` nativos, `abs`/`round`/`clip`, `cumsum`/`cumprod`,
-`diff`/`shift`, `unique`/`value_counts`, broadcasting, `datetime`,
-`categorical`, I/O (CSV/JSON/XML/SQL), GroupBy/joins. Ver `Roadmap.md` para
-quando cada um entra.
+`median`/`quantile` nativos, broadcasting, `datetime`, `categorical`,
+I/O (CSV/JSON — Anel 3, próxima fase), SQL/Excel (v1.5), Lazy evaluation (v2.x).
+Ver `Roadmap.md` para quando cada um entra.

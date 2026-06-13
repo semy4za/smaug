@@ -108,9 +108,9 @@ features possíveis existem.
 
 | Componente | Status |
 |---|---|
-| `Series` (32 métodos — incluindo `ge`/`le`/`ne`, `map`) | `[Done]` |
-| `BoolSeries` (20 métodos, Kleene, coluna de primeira classe) | `[Done]` |
-| `DataSet` (23 métodos, CRUD, filter, sort, select) | `[Done]` |
+| `Series` (51 métodos — incluindo `ge`/`le`/`ne`, `map`, `rolling`, unique/value_counts, abs/round/clip, cumsum/diff/shift) | `[Done]` |
+| `bool` como dtype de primeira classe (`Series<bool>`, Kleene, `land`/`lor`/`lnot`/`lxor`) | `[Done]` |
+| `DataSet` (31 métodos, CRUD, filter, sort, select, assign, nunique, rolling) | `[Done]` |
 | `df[mask]` — indexação por BoolSeries (`__index` dispatch) | `[Done]` |
 | `.str` Tier A: `len`, `lower`/`upper`, `strip`, `contains`, `startswith`/`endswith`, `replace` | `[Done]` |
 | Comparações `ge`/`le`/`ne` para f64, i64 e string | `[Done]` |
@@ -141,9 +141,14 @@ local adultos = ds[ds.idade:gt(18)]   -- df[mask] funciona
 
 ---
 
-## Ring 2+ — I/O, persistência, analytics `[Planned / Concept]`
+## Ring 2 — Operações Relacionais `[Done]`
 
-Expande a engine para fontes de dados reais. Depende do Ring 1 estável.
+GroupBy, Join, Concat, Pivot, Melt, Rolling — implementados e testados.
+Ver `ARCHITECTURE.md` para o modelo completo de anéis.
+
+## Ring 3 — I/O `[Planned]`
+
+Expande a engine para fontes de dados reais. Depende do Ring 1+2 estáveis.
 
 ### I/O — CSV + JSON `[Planned]`
 
@@ -158,18 +163,10 @@ Foco inicial: só SQLite. Abstração de dialeto adiada (prematura com um banco 
 Toda interação SQL concentrada num único módulo de fronteira — adicionar dialetos
 no futuro é mexer num módulo, não caçar SQL espalhado.
 
-### Analytics — GroupBy, Join, Window `[Concept]`
+### DSL encadeável `[Done]`
 
-Cada um exige estrutura nova: GroupBy precisa de estrutura intermediária
-(grupos → agregações); Join precisa de indexação/hashing de chaves; Window
-precisa de janelas deslizantes com estado. Vêm depois do I/O — analytics
-sem dados de fontes reais vale menos.
-
-### DSL encadeável `[Concept]`
-
-A evolução natural é uma DSL baseada em Lua do tipo
-`dados:filter(...):groupby(...):agg(...)`. Objetivo: forma consistente de
-expressar operações, não sintaxe nova.
+`ds:filter(...):groupby(...):sum()` e `ds:join(other, "k"):sort_by("v")` funcionam
+hoje — propriedade emergente do design eager (cada operação retorna DataSet).
 
 ### Lazy evaluation `[Concept]` (por último)
 
@@ -210,7 +207,7 @@ estejam finalizados, mas todos devem estar concluídos para uma
 release v1.0 pública e mantível.
 
 - [ ] Docstrings no source Lua — contrato, parâmetros e exemplo em cada
-      método público de `Series`, `BoolSeries` e `DataSet`. Estilo pandas:
+      método público de `Series` e `DataSet`. Estilo pandas:
       quem lê o source ou usa um LSP encontra o comportamento sem precisar
       dos docs externos.
 - [ ] `API_Reference.md` — seção String e atualização geral para Ring 1.
@@ -242,9 +239,9 @@ e introduz semântica de shape sem base nos contratos atuais.
 Broadcasting real (axis-aware) pertence ao `Tensor2D`/ML, onde a
 semântica pode ser definida explicitamente.
 
-**Ring 1 — `.str` (incremental por camadas):**
-- Tier A: `[Done]` — `len`, `lower`/`upper`, `strip`, `contains`, `startswith`/`endswith`, `replace`.
-- Tier B: `split`, `cat`/join, `slice`, `pad`/`zfill`, `repeat`, `find`.
+**Ring 1 — `.str` (Tier A+B completos):** `[Done]`
+- Tier A: `len`, `lower`/`upper`, `strip`, `contains`, `startswith`/`endswith`, `replace`.
+- Tier B: `find`, `slice`, `pad`/`zfill`, `rep`, `cat`, `split`.
 - Tier C: regex (`extract`/`findall`/`match` — subprojeto), normalização UTF-8
   (hoje trata bytes crus; case-folding Unicode-aware exige tabelas de caso).
 

@@ -80,7 +80,7 @@ externo. Não conhece Series, DataSet, CSV, SQL, modelos nem interfaces.
 
 ---
 
-## Anel 1 — Abstrações de Dados
+## Anel 2 — Abstrações de Dados
 
 **Status: `[Done]`**
 
@@ -88,8 +88,7 @@ Transforma mecanismos do Anel 0 em estruturas semânticas. Define a forma
 como usuários interagem e raciocinam sobre dados.
 
 **Responsabilidades:**
-- `Series` — coluna tipada 1D com null handling
-- `BoolSeries` — máscara booleana com lógica Kleene
+- `Series` — coluna tipada 1D com null handling (dtypes: f64/i64/bool/string)
 - `DataSet` — coleção de Series alinhadas
 - Filtros, agregações, ordenação, operações relacionais
 - Ergonomia Lua: açúcar sintático, metamétodos, accessor `.str`
@@ -100,7 +99,7 @@ como usuários interagem e raciocinam sobre dados.
 
 ## Anel 2 — Operações Relacionais
 
-**Status: `[Planned]`**
+**Status: `[Done]`**
 
 Completa o modelo tabular com operações que transformam conjuntos de linhas
 em novos DataSets. Pertence ao Anel 2 — não ao I/O — porque depende apenas
@@ -310,9 +309,14 @@ Avaliação de robustez e confiabilidade dos Anéis 0 e 1.
 | Lógica booleana Kleene (`Series<bool>`, dtype pleno) | ✅ Forte |
 | Filtros e seleção | ✅ Forte |
 | Ordenação (sort/argsort) | ✅ Forte |
-| Transformações (map, astype, fillna) | ✅ Forte |
+| Transformações (map, astype, fillna, assign) | ✅ Forte |
+| Elementares (abs, round, clip) | ✅ Forte |
+| `.str` Tier A+B (15 métodos) | ✅ Forte |
 | `.str` Tier A | ✅ Forte |
-| GroupBy | ⏳ Anel 2+ |
-| Join | ⏳ Anel 2+ |
-| Window functions | ⏳ Anel 2+ |
-| Agregações avançadas | ⏳ Anel 2+ |
+| GroupBy (sum/mean/min/max/count, chave simples e composta) | ✅ Forte |
+| Join (inner/left/right/outer, hash-based) | ✅ Forte |
+| Concat (vertical, valida esquema) | ✅ Forte |
+| Pivot / Melt | ✅ Forte |
+| Window functions (rolling sum/mean/min/max) | ✅ Forte |
+| Cumsum / Cumprod / Diff / Shift | ✅ Forte |
+| Unique / Value counts / Nunique | ✅ Forte |

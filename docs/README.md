@@ -55,12 +55,19 @@ zero, não é string vazia — é ausência explícita.
 
 ## Estruturas
 
-**`Series`** — coluna tipada unidimensional. 47 métodos: acesso, mutação,
+**`Series`** — coluna tipada unidimensional. 51 métodos: acesso, mutação,
 aritmética, reduções, comparações (→ `Series<bool>`), sort, filter, astype,
-fillna, describe, map, `.str` (Tier A), Kleene (land/lor/lnot/lxor).
+fillna, describe, map, unique/nunique/value_counts, abs/round/clip,
+cumsum/cumprod/diff/shift, rolling, Kleene (land/lor/lnot/lxor).
 
-**`DataSet`** — coleção de colunas alinhadas. 24 métodos: CRUD de colunas,
-filter (por `Series<bool>`), sort_by, select, dropna, fillna, describe, sample.
+**`.str`** — proxy para operações sobre Series string (15 métodos Tier A+B):
+len, lower/upper, strip, contains/startswith/endswith, replace,
+find, slice, pad/zfill, rep, cat, split.
+
+**`DataSet`** — coleção de colunas alinhadas. 31 métodos: CRUD de colunas,
+filter (por `Series<bool>`), sort_by, select, dropna, fillna, describe, sample,
+groupby (sum/mean/min/max/count, chave simples e composta), join (inner/left/right/outer),
+concat, pivot, melt, assign, nunique, rolling (sum/mean/min/max).
 
 ```lua
 local payload = {
