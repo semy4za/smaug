@@ -47,7 +47,7 @@ partir do código real (não de memória).
 | `smaug_<t>_add/sub/mul/div(a, b)` | aritmética série×série (propaga NA) |
 | `smaug_<t>_add/sub/mul/div_scalar(a, k)` | aritmética série×escalar |
 
-Notas: f64 `div`/0 segue IEEE (±Inf/NaN); i64 `div`/0 → NULL.
+Notas: `div`/0 → NULL em ambos os tipos (f64 e i64). Sem ±Inf/NaN por divisão — NaN só existe como valor presente em f64.
 
 ### Reduções (`smaug_numeric.h`)
 | Função | Retorno |
@@ -61,7 +61,7 @@ Notas: f64 `div`/0 segue IEEE (±Inf/NaN); i64 `div`/0 → NULL.
 ### Comparações e ordenação (`smaug_numeric.h`)
 | Função | O que faz |
 |--------|-----------|
-| `smaug_<t>_gt/lt/eq(s, k, &out_mask)` | → bool array (uint8_t*); caller libera c/ `smaug_free` |
+| `smaug_<t>_gt/lt/eq/ge/le/ne(s, k, &out_mask)` | → bool array (uint8_t*); caller libera c/ `smaug_free` |
 | `smaug_<t>_argsort(s, asc)` | → size_t* (permutação); NULL se há nulos; libera c/ `smaug_free` |
 | `smaug_<t>_sort(s, asc)` | → nova série ordenada; NULL se há nulos |
 | `smaug_<t>_take(s, idx, len)` | → nova série com os índices dados |
@@ -136,18 +136,27 @@ Trata bytes crus (UTF-8 = dívida futura). String vazia `""` é distinta de NULL
 | `:fillna(value)` | nova Series com NULLs→value; sem coerção; NaN intacto; sem arg=erro |
 | `:to_table([na])` | → tabela Lua |
 | `:describe()` | resumo estatístico (count, nulls, mean, std, min, quartis, max) |
-| `:gt(k)` / `:lt(k)` / `:eq(k)` | comparação → BoolSeries |
-| `:filter(boolseries)` | → nova Series filtrada |
+| `:gt(k)` / `:lt(k)` / `:eq(k)` / `:ge(k)` / `:le(k)` / `:ne(k)` | comparação → `Series<bool>` |
+| `:filter(mask)` | `Series<bool>` como máscara → nova Series filtrada |
+| `:map(fn, [dtype])` | transforma elemento a elemento → nova Series |
 **Operadores:** `+ - * /` (série×série e série×escalar; `+`/`*` comutam c/ escalar à esquerda), `tostring`, `serie[i]`.
+**Operadores bool** (só em `Series<bool>`): `*`=and, `+`=or, `-`=xor.
 
-### `BoolSeries` (`core/boolseries.lua`)
+**`.str` — proxy de operações sobre Series string:**
 | Método | O que faz |
 |--------|-----------|
-| `:get(i)` | true/false/nil(NA), 1-based |
-| `:is_null(i)` / `:len()` / `:to_table([na])` | acesso |
+| `.str:len()` | comprimento em bytes → `Series<int64>` |
+| `.str:lower()` / `.str:upper()` | caixa → nova Series string (ASCII) |
+| `.str:strip()` | remove espaços → nova Series string |
+| `.str:replace(pat, rep)` | substituição literal → nova Series string |
+| `.str:contains(sub)` / `.str:startswith(p)` / `.str:endswith(s)` | → `Series<bool>` |
+
+**Métodos exclusivos de `Series<bool>`:**
+| Método | O que faz |
+|--------|-----------|
 | `:count_true()` / `:any()` / `:all()` | agregações (NA ignorado) |
-| `:land/:lor/:lxor(other)` / `:lnot()` | lógica Kleene |
-**Operadores:** `*`=and, `+`=or, `-`=xor, `tostring`, `bs[i]`.
+| `:land(b)` / `:lor(b)` / `:lxor(b)` / `:lnot()` | lógica Kleene |
+| `:describe()` | retorna `{count, nulls, count_true, count_false}` |
 
 ### `DataSet` (`core/dataset.lua`) — tabela 2D de Series alinhadas
 **Construção:** `DataSet.new(name)`, `DataSet.from_columns({{nome, dados, dtype?}, ...})`.
@@ -160,17 +169,19 @@ Trata bytes crus (UTF-8 = dívida futura). String vazia `""` é distinta de NULL
 | `:has_column(nome)` / `:columns()` | metadados |
 | `:ncols()` / `:nrows()` / `:len()` | dimensões |
 | `:dtypes()` / `:row(i, [na])` | tipos por coluna / linha como tabela |
-| `:filter(boolseries)` | linhas onde mask é true → novo DataSet |
+| `:filter(mask)` | `Series<bool>` como máscara → novo DataSet; `df[mask]` é açúcar equivalente |
 | `:fillna(value)` / `:fillna({col=value})` | preenche NULLs (todas as colunas, ou por coluna) → novo DataSet |
 | `:sort_by(col, asc)` | ordena todas as colunas pela chave → novo DataSet |
 | `:head(n)` / `:tail(n)` / `:iloc(start, stop)` / `:take(idx)` | fatias → novo DataSet |
 | `:sample(n, [seed])` | amostra aleatória → novo DataSet |
 | `:select(nomes)` | subconjunto/reordenação de colunas → novo DataSet |
+| `:dropna([subset])` | remove linhas com NULL (todas ou subset de colunas) → novo DataSet |
+| `:update_column(nome, series)` | substitui coluna existente (valida comprimento) |
 | `:describe()` / `:to_table([na])` | inspeção |
 **Operadores:** `tostring` (tabular), `df[coluna]`.
 
 ### Entry point (`init.lua`)
-`require("smaug")` expõe: `.Series`, `.BoolSeries`, `.DataSet`, e açúcares
+`require("smaug")` expõe: `.Series`, `.DataSet`, e açúcares
 `.float64`, `.int64`, `.from_table`, `.NA`, `.dataset` (= `DataSet.from_columns`).
 
 ---
@@ -178,7 +189,6 @@ Trata bytes crus (UTF-8 = dívida futura). String vazia `""` é distinta de NULL
 ## NÃO existe ainda (não procure — consulte o Roadmap para a fase)
 
 `median`/`quantile` nativos, `abs`/`round`/`clip`, `cumsum`/`cumprod`,
-`diff`/`shift`, `unique`/`value_counts`, broadcasting, `apply`/`map`,
-`.str` (lower/upper/strip/contains/...), `DataSet:dropna`, `datetime`,
+`diff`/`shift`, `unique`/`value_counts`, broadcasting, `datetime`,
 `categorical`, I/O (CSV/JSON/XML/SQL), GroupBy/joins. Ver `Roadmap.md` para
 quando cada um entra.

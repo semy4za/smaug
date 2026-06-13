@@ -84,7 +84,7 @@ ramos, 19 exclusões `COV-EXCL-BR` documentadas). Valgrind-clean. Zero warnings
 
 ### Sistema de tipos
 
-- **Tier 1 — núcleo:** `float64` `[Done]`, `int64` `[Done]`, `bool` `[Done]`,
+- **Tier 1 — núcleo:** `float64` `[Done]`, `int64` `[Done]`, `bool` `[Done]` (dtype pleno, `Series<bool>`),
   `string` `[Done]`.
 - **Tier 2 — alto valor (Ring 1 futuro):** `datetime` (epoch ms); `categorical`
   (codes `int32` + levels, dictionary encoding — acelera groupby/sort com
@@ -100,7 +100,7 @@ explícita via `astype`.
 ## Ring 1 — Frontend Lua `[Done]`
 
 Series, BoolSeries, DataSet, ergonomia. A API Lua é a linguagem principal do
-Smaug. Ring 1 está fechado quando Series/BoolSeries/DataSet têm contratos
+Smaug. Ring 1 está fechado quando Series/DataSet têm contratos
 estáveis e operações tabulares fundamentais maduras — não quando todas as
 features possíveis existem.
 
@@ -230,20 +230,10 @@ Itens conscientemente adiados. Os já pagos saíram desta lista (ver `CHANGELOG.
   operações) — fase dedicada, sem penalizar loops quentes.
 - Build: decidir futuro do bloco CMake (atrelado à decisão Lua 5.4).
 
-**Ring 1 — `bool` não é dtype de primeira classe (dívida de contrato):**
-Hoje `bool` é uma classe Lua paralela (`BoolSeries`), não um dtype despachado
-por descritor como `f64`/`i64`/`string`. Isso viola o próprio contrato:
-- **P3 (propriedade semântica isolada):** "coluna booleana" existe em dois
-  lugares — `BoolSeries` e o mecanismo de dtype. Duplicação conceitual.
-- **Nomenclatura cruza anéis:** `smaug_bool.h` (Anel 0/C) usa o nome
-  "BoolSeries", um conceito do Anel 1/Lua. O núcleo não deveria conhecê-lo.
-- **Consistência de dtype:** `bool` não é criável via `from_table({...}, "bool")`
-  nem reportado por `dtypes()`; os exemplos da doc com `"bool"` não executam.
-
-Decisão: unificar `bool` no modelo de dtype antes do 1.0 (Caminho 1). Criar
-`smaug_series_bool_t` no Anel 0 (armazenamento), descritor `bool` no Anel 1,
-comparações passam a retornar `Series<bool>`, `BoolSeries` é aposentada.
-Não é melhoria opcional — é pagamento de dívida de contrato existente.
+**Ring 1 — `bool` como dtype de primeira classe: `[Done]`**
+`bool` é dtype pleno: `smaug_series_bool_t` no Anel 0, descritor `bool` em DTYPES,
+comparações retornam `Series<bool>`, Kleene via `land/lor/lxor/lnot`,
+`BoolSeries` aposentada. Dívida de contrato paga.
 
 **Broadcasting — rejeitado:**
 Operações escalares (`serie * 2`) já cobrem o caso de uso.

@@ -98,35 +98,67 @@ como usuários interagem e raciocinam sobre dados.
 
 ---
 
-## Anel 2 — Conectividade
+## Anel 2 — Operações Relacionais
 
 **Status: `[Planned]`**
 
-Integra o ecossistema com sistemas externos. Transporta dados — não define
-semântica, não define persistência, não define regras de negócio.
+Completa o modelo tabular com operações que transformam conjuntos de linhas
+em novos DataSets. Pertence ao Anel 2 — não ao I/O — porque depende apenas
+do Anel 1. GroupBy/Join são o coração do DataFrame; vêm antes de I/O por
+valor e por dependência técnica.
 
 **Responsabilidades:**
+- GroupBy + agregações (sum/mean/count/min/max por grupo)
+- Join / Merge (inner, left, outer)
+- Window functions (rolling, cumulative)
+- Concat (vertical e horizontal)
+- Pivot / Melt
 
-| Fonte → DataSet | DataSet → Destino |
-|---|---|
-| CSV / TSV | CSV / TSV |
-| JSON | JSON |
-| SQLite | SQLite |
-| PostgreSQL | PostgreSQL |
-| Arrow / Parquet | Arrow / Parquet |
-| REST | — |
-
-**Contrato funcional:**
-```
-Sistema Externo → Conectividade → DataSet   (entrada)
-DataSet → Conectividade → Sistema Externo   (saída)
-```
+**DSL encadeável** (propriedade emergente, já presente no Anel 1):
+`ds:filter(...):sort_by(...):head(n)` funciona hoje porque cada operação
+retorna um DataSet. GroupBy/Join seguirão o mesmo padrão quando implementados.
 
 **Dependência:** Anel 2 → Anel 1 → Anel 0.
 
 ---
 
-## Anel 3 — Persistência
+## Anel 3 — Conectividade / I/O
+
+**Status: `[Planned]`**
+
+Integra o ecossistema com fontes externas de dados. Transporta dados — não
+define semântica, não define persistência, não define regras de negócio.
+
+**Versões e dependências externas:**
+
+| Formato | Versão | Dependência externa |
+|---|---|---|
+| CSV | **1.0** | nenhuma — parser próprio |
+| JSON | **1.0** | nenhuma — parser próprio |
+| SQLite | **1.5** | libsqlite3 |
+| Excel `.xlsx` | **1.5** | zlib + XML |
+| Arrow / Parquet | futuro | — |
+
+**Princípio de zero-dependências no 1.0:** CSV e JSON são parsers escritos do
+zero. Nenhuma biblioteca externa no 1.0. A linha de versão passa exatamente
+onde a independência do núcleo seria quebrada.
+
+**Fronteira plugável:** todo leitor produz DataSet, todo escritor parte de
+DataSet. Adicionar um novo formato é implementar um plugue — sem tocar no
+núcleo nem nos anéis internos.
+
+**Contrato funcional (P5):**
+```
+Fonte externa → Conectividade → DataSet   (carregar)
+DataSet → Conectividade → Destino         (exportar)
+```
+Este ciclo é inquebrável a partir do 1.0.
+
+**Dependência:** Anel 3 → Anel 2 → Anel 1 → Anel 0.
+
+---
+
+## Anel 4 — Persistência
 
 **Status: `[Concept]`**
 
@@ -139,14 +171,14 @@ Gerencia estruturas persistidas e sua evolução ao longo do tempo.
 - Versionamento de schema
 
 **Distinção importante:**
-- Conectividade responde: *como os dados entram e saem?*
+- Conectividade (Anel 3) responde: *como os dados entram e saem?*
 - Persistência responde: *como estruturas persistidas são organizadas e evoluem?*
 
-**Dependência:** Anel 3 → Anel 2 → Anel 1 → Anel 0.
+**Dependência:** Anel 4 → Anel 3 → Anel 2 → Anel 1 → Anel 0.
 
 ---
 
-## Anel 4 — Analytics e Machine Learning
+## Anel 5 — Analytics e Machine Learning
 
 **Status: `[Concept]`**
 
@@ -166,11 +198,16 @@ associado ao tipo `Tensor2D` (distinto do `DataSet` heterogêneo). Broadcasting
 de Series de tamanho 1 foi rejeitado no Anel 1 — operações escalares já cobrem
 o caso sem introduzir semântica de shape.
 
-**Dependência:** Anel 4 → Anel 3 → Anel 2 → Anel 1 → Anel 0.
+**Lazy evaluation:** vem depois do SQL (Anel 3, v1.5), porque o maior ganho
+é o *predicate pushdown* sobre fontes externas. `LazyDataSet → plano → .collect()`
+só vale a pena quando há uma fonte externa rica o suficiente para o pushdown
+ser o diferencial.
+
+**Dependência:** Anel 5 → anéis internos conforme necessário.
 
 ---
 
-## Anel 5 — Ferramentas
+## Anel 6 — Ferramentas
 
 **Status: `[Concept]`**
 
@@ -181,11 +218,11 @@ Observabilidade e produtividade. Ferramentas observam — não definem semântic
 - Relatórios de profiling
 - Ferramentas de debug e exploração de dados
 
-**Dependência:** Anel 5 → anéis internos conforme necessário.
+**Dependência:** Anel 6 → anéis internos conforme necessário.
 
 ---
 
-## Anel 6 — Interação
+## Anel 7 — Interação
 
 **Status: `[Concept]`**
 
@@ -197,7 +234,20 @@ lógica de negócio nem semântica de dados.
 - Dashboards, integrações com notebooks
 - Interfaces web, exploradores visuais
 
-**Dependência:** Anel 6 → anéis internos conforme necessário.
+**Dependência:** Anel 7 → anéis internos conforme necessário.
+
+---
+
+## Régua de versões
+
+Derivada dos princípios, não arbitrária:
+
+| Versão | Marco | Critério |
+|---|---|---|
+| **1.0** | Ciclo de dados fechado | Anel 0+1+2+3 (CSV/JSON). Zero dependências externas. P5 ativo. |
+| **1.5** | SQL + Excel | Primeiro anel com dependência externa (zlib, libsqlite3). |
+| **2.0** | Persistência/ORM | Estruturas que evoluem no tempo (schema, migração). |
+| **2.x** | Lazy evaluation | Pushdown sobre SQL — só vale depois que SQL existe. |
 
 ---
 
@@ -257,7 +307,7 @@ Avaliação de robustez e confiabilidade dos Anéis 0 e 1.
 | Aritmética vetorizada (f64/i64) | ✅ Forte |
 | Comparações vetorizadas (gt/lt/eq/ge/le/ne) | ✅ Forte |
 | Reduções (sum/min/max/mean/var/std) | ✅ Forte |
-| Lógica booleana (Kleene completo) | ✅ Forte |
+| Lógica booleana Kleene (`Series<bool>`, dtype pleno) | ✅ Forte |
 | Filtros e seleção | ✅ Forte |
 | Ordenação (sort/argsort) | ✅ Forte |
 | Transformações (map, astype, fillna) | ✅ Forte |

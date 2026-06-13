@@ -2,7 +2,7 @@
 
 Biblioteca de dados tabulares em Lua com backend em C.
 Engine de Ring 0 em C puro — memória, tipos, operações primitivas.
-Frontend de Ring 1 em LuaJIT — `Series`, `BoolSeries`, `DataSet`, ergonomia.
+Frontend de Ring 1 em LuaJIT — `Series`, `DataSet`, ergonomia. Dtypes: `float64`, `int64`, `string`, `bool`.
 
 ---
 
@@ -55,14 +55,12 @@ zero, não é string vazia — é ausência explícita.
 
 ## Estruturas
 
-**`Series`** — coluna tipada unidimensional. 29 métodos: acesso, mutação,
-aritmética, reduções, comparações, sort, filter, astype, fillna, describe.
+**`Series`** — coluna tipada unidimensional. 47 métodos: acesso, mutação,
+aritmética, reduções, comparações (→ `Series<bool>`), sort, filter, astype,
+fillna, describe, map, `.str` (Tier A), Kleene (land/lor/lnot/lxor).
 
-**`BoolSeries`** — resultado de comparações e operações lógicas. Lógica de
-três valores (true / false / NA). Coluna de primeira classe no DataSet.
-
-**`DataSet`** — coleção de colunas alinhadas. 23 métodos: CRUD de colunas,
-filter, sort_by, select, dropna, fillna, describe, sample.
+**`DataSet`** — coleção de colunas alinhadas. 24 métodos: CRUD de colunas,
+filter (por `Series<bool>`), sort_by, select, dropna, fillna, describe, sample.
 
 ```lua
 local payload = {
