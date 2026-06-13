@@ -1007,6 +1007,249 @@ static void af_bool_not(void) {
 }
 
 /* ======================================================================
+   B3: bool struct-based (smaug_series_bool_t) — dtype de primeira classe.
+   Espelha a varredura de i64: lifecycle, seleção, COW, e Kleene struct→struct.
+   Distinto do bloco B2 (raw arrays), que cobre as funções legadas.
+   ====================================================================== */
+static void af_bool_create(void) {
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_bool_t *s = smaug_bool_create(5);
+        if (s) { OK(s->size == 5, "bool create size"); smaug_bool_free(s); }
+    }
+}
+static void af_bool_create_from_array(void) {
+    uint8_t arr[4] = {1, 0, 1, 1};
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_bool_t *s = smaug_bool_create_from_array(arr, 4);
+        if (s) { OK(smaug_bool_count_nonnull(s) == 4, "bool from_array"); smaug_bool_free(s); }
+    }
+}
+static void af_bool_clone(void) {
+    smaug_series_bool_t *base = smaug_bool_create(5);
+    assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_bool_t *c = smaug_bool_clone(base);
+        if (c) { OK(c->size == 5, "bool clone size"); smaug_bool_free(c); }
+    }
+    smaug_bool_free(base);
+}
+static void af_bool_view(void) {
+    smaug_series_bool_t *base = smaug_bool_create(5);
+    assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_bool_t *v = smaug_bool_view(base, 0, 2);
+        if (v) { OK(v->size == 2, "bool view size"); smaug_bool_free(v); }
+    }
+    smaug_bool_free(base);
+}
+static void af_bool_append_grow(void) {
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        smaug_series_bool_t *s = smaug_bool_create_with_capacity(0, 0);
+        assert(s);
+        reset(k);
+        int rc = smaug_bool_append(s, 1);
+        OK(rc == 0 || rc == -1, "bool append rc valido");
+        if (rc == 0) OK(s->size == 1, "bool append cresceu");
+        else         OK(s->size == 0, "bool append falhou sem corromper");
+        reset(-1);
+        smaug_bool_free(s);
+    }
+}
+static void af_bool_take(void) {
+    uint8_t arr[3] = {1, 0, 1};
+    size_t  idx[]  = {2, 0, 1};
+    reset(-1);
+    smaug_series_bool_t *s = smaug_bool_create_from_array(arr, 3);
+    assert(s);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_bool_t *t = smaug_bool_take(s, idx, 3);
+        if (t) { OK(t->size == 3, "bool take size"); smaug_bool_free(t); }
+    }
+    smaug_bool_free(s);
+}
+static void af_bool_filter(void) {
+    uint8_t arr[4] = {1, 0, 1, 1};
+    uint8_t mask[] = {1, 0, 1, 1};
+    reset(-1);
+    smaug_series_bool_t *s = smaug_bool_create_from_array(arr, 4);
+    assert(s);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_bool_t *f = smaug_bool_filter(s, mask);
+        if (f) { OK(f->size == 3, "bool filter size"); smaug_bool_free(f); }
+    }
+    smaug_bool_free(s);
+}
+static void af_bool_argsort(void) {
+    uint8_t arr[4] = {1, 0, 1, 0};
+    reset(-1);
+    smaug_series_bool_t *s = smaug_bool_create_from_array(arr, 4);
+    assert(s);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        size_t *p = smaug_bool_argsort(s, true);
+        if (p) { OK(p[0] == 1, "bool argsort"); smaug_free(p); }
+    }
+    smaug_bool_free(s);
+}
+static void af_bool_sort(void) {
+    uint8_t arr[4] = {1, 0, 1, 0};
+    reset(-1);
+    smaug_series_bool_t *s = smaug_bool_create_from_array(arr, 4);
+    assert(s);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_bool_t *r = smaug_bool_sort(s, true);
+        if (r) { OK(r->size == 4, "bool sort size"); smaug_bool_free(r); }
+    }
+    smaug_bool_free(s);
+}
+/* Kleene struct→struct: a única alocação extra é a série resultado (via
+   bool_series_from_pair, que chama smaug_bool_create + os pares internos). */
+static void af_bool_series_and(void) {
+    uint8_t a[3] = {1, 0, 1}, b[3] = {1, 1, 0};
+    reset(-1);
+    smaug_series_bool_t *x = smaug_bool_create_from_array(a, 3);
+    smaug_series_bool_t *y = smaug_bool_create_from_array(b, 3);
+    assert(x && y);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_bool_t *r = smaug_bool_series_and(x, y);
+        if (r) { OK(r->size == 3, "bool series_and size"); smaug_bool_free(r); }
+    }
+    smaug_bool_free(x); smaug_bool_free(y);
+}
+static void af_bool_series_or(void) {
+    uint8_t a[3] = {1, 0, 1}, b[3] = {1, 1, 0};
+    reset(-1);
+    smaug_series_bool_t *x = smaug_bool_create_from_array(a, 3);
+    smaug_series_bool_t *y = smaug_bool_create_from_array(b, 3);
+    assert(x && y);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_bool_t *r = smaug_bool_series_or(x, y);
+        if (r) { OK(r->size == 3, "bool series_or size"); smaug_bool_free(r); }
+    }
+    smaug_bool_free(x); smaug_bool_free(y);
+}
+static void af_bool_series_xor(void) {
+    uint8_t a[3] = {1, 0, 1}, b[3] = {1, 1, 0};
+    reset(-1);
+    smaug_series_bool_t *x = smaug_bool_create_from_array(a, 3);
+    smaug_series_bool_t *y = smaug_bool_create_from_array(b, 3);
+    assert(x && y);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_bool_t *r = smaug_bool_series_xor(x, y);
+        if (r) { OK(r->size == 3, "bool series_xor size"); smaug_bool_free(r); }
+    }
+    smaug_bool_free(x); smaug_bool_free(y);
+}
+static void af_bool_series_not(void) {
+    uint8_t a[3] = {1, 0, 1};
+    reset(-1);
+    smaug_series_bool_t *x = smaug_bool_create_from_array(a, 3);
+    assert(x);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_bool_t *r = smaug_bool_series_not(x);
+        if (r) { OK(r->size == 3, "bool series_not size"); smaug_bool_free(r); }
+    }
+    smaug_bool_free(x);
+}
+/* COW em view de bool: set, set_null, append, append_null */
+static void af_bool_cow_set(void) {
+    uint8_t arr[4] = {1, 0, 1, 0};
+    reset(-1);
+    smaug_series_bool_t *pai = smaug_bool_create_from_array(arr, 4);
+    assert(pai);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_bool_t *v = smaug_bool_view(pai, 1, 2);
+        assert(v);
+        reset(k);
+        smaug_status_t rc = smaug_bool_set(v, 0, 1);
+        if (rc == SMG_OK) {
+            OK(v->meta.is_view == false, "bool cow_set: view detachada");
+            OK(pai->data[1] == 0,        "bool cow_set: pai preservada");
+        } else {
+            OK(rc == SMG_ERR_NOMEM,      "bool cow_set OOM: status NOMEM");
+            OK(v->meta.is_view == true,  "bool cow_set OOM: view nao detachada");
+            OK(pai->data[1] == 0,        "bool cow_set OOM: pai preservada");
+        }
+        reset(-1);
+        smaug_bool_free(v);
+    }
+    smaug_bool_free(pai);
+}
+static void af_bool_cow_set_null(void) {
+    uint8_t arr[4] = {1, 0, 1, 0};
+    reset(-1);
+    smaug_series_bool_t *pai = smaug_bool_create_from_array(arr, 4);
+    assert(pai);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_bool_t *v = smaug_bool_view(pai, 0, 4);
+        assert(v);
+        reset(k);
+        smaug_status_t rc = smaug_bool_set_null(v, 0);
+        if (rc == SMG_OK) {
+            OK(v->meta.is_view == false,      "bool cow_set_null: detachada");
+            OK(pai->null_mask[0] == 0xFF,     "bool cow_set_null: pai preservada");
+        } else {
+            OK(rc == SMG_ERR_NOMEM,           "bool cow_set_null OOM: NOMEM");
+            OK(pai->null_mask[0] == 0xFF,     "bool cow_set_null OOM: pai preservada");
+        }
+        reset(-1);
+        smaug_bool_free(v);
+    }
+    smaug_bool_free(pai);
+}
+static void af_bool_cow_append(void) {
+    uint8_t arr[4] = {1, 0, 1, 0};
+    reset(-1);
+    smaug_series_bool_t *pai = smaug_bool_create_from_array(arr, 4);
+    assert(pai);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_bool_t *v = smaug_bool_view(pai, 0, 2);
+        assert(v);
+        reset(k);
+        int rc = smaug_bool_append(v, 1);
+        OK(rc == 0 || rc == -1, "bool cow_append rc valido");
+        if (rc == 0) OK(v->meta.is_view == false, "bool cow_append: detachada");
+        OK(pai->size == 4, "bool cow_append: pai intacta");
+        reset(-1);
+        smaug_bool_free(v);
+    }
+    smaug_bool_free(pai);
+}
+static void af_bool_cow_append_null(void) {
+    uint8_t arr[4] = {1, 0, 1, 0};
+    reset(-1);
+    smaug_series_bool_t *pai = smaug_bool_create_from_array(arr, 4);
+    assert(pai);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_bool_t *v = smaug_bool_view(pai, 0, 2);
+        assert(v);
+        reset(k);
+        int rc = smaug_bool_append_null(v);
+        OK(rc == 0 || rc == -1, "bool cow_append_null rc valido");
+        if (rc == 0) OK(v->meta.is_view == false, "bool cow_append_null: detachada");
+        OK(pai->size == 4, "bool cow_append_null: pai intacta");
+        reset(-1);
+        smaug_bool_free(v);
+    }
+    smaug_bool_free(pai);
+}
+
+/* ======================================================================
    sanidade: sem falha injetada, tudo funciona (garante que o teste não
    está sabotando além da conta)
    ====================================================================== */
@@ -1085,6 +1328,25 @@ int main(void) {
     af_bool_or();
     af_bool_xor();
     af_bool_not();
+
+    /* bool struct-based (dtype de primeira classe) */
+    af_bool_create();
+    af_bool_create_from_array();
+    af_bool_clone();
+    af_bool_view();
+    af_bool_append_grow();
+    af_bool_take();
+    af_bool_filter();
+    af_bool_argsort();
+    af_bool_sort();
+    af_bool_series_and();
+    af_bool_series_or();
+    af_bool_series_xor();
+    af_bool_series_not();
+    af_bool_cow_set();
+    af_bool_cow_set_null();
+    af_bool_cow_append();
+    af_bool_cow_append_null();
 
     sanity_no_fail();
 
