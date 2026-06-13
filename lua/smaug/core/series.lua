@@ -396,6 +396,208 @@ function methods.max(self, ignore_na)  return reduce_num(self, "max",  ignore_na
 function methods.var(self, ignore_na)  return reduce_num(self, "var",  ignore_na) end
 function methods.std(self, ignore_na)  return reduce_num(self, "std",  ignore_na) end
 
+-- =====================================================================
+-- Análise de distintos
+-- =====================================================================
+
+-- unique(): nova Series com os valores distintos na ordem de primeira aparição.
+-- Nulos são incluídos (como nil/NA).
+function methods.unique(self)
+    local n    = self:len()
+    local seen = {}
+    local vals = {}
+    local NA   = Series.NA
+    for i = 1, n do
+        local v   = self:get(i)
+        local key = (v == nil) and "\0NULL\0" or (type(v)..":"..tostring(v))
+        if not seen[key] then
+            seen[key]    = true
+            vals[#vals+1] = (v == nil) and NA or v
+        end
+    end
+    return Series.from_table(vals, self._dtype, self._name)
+end
+
+-- nunique(): contagem de valores distintos não-nulos.
+function methods.nunique(self)
+    local seen = {}
+    local n    = self:len()
+    local c    = 0
+    for i = 1, n do
+        local v = self:get(i)
+        if v ~= nil then
+            local key = type(v)..":"..tostring(v)
+            if not seen[key] then seen[key] = true; c = c + 1 end
+        end
+    end
+    return c
+end
+
+-- value_counts(): DataSet com colunas "value" e "count", ordenado por count desc.
+-- Nulos são excluídos da contagem.
+function methods.value_counts(self)
+    local n     = self:len()
+    local cnt   = {}    -- key -> count
+    local order = {}    -- preserva primeira aparição para estabilidade
+    for i = 1, n do
+        local v = self:get(i)
+        if v ~= nil then
+            local key = type(v)..":"..tostring(v)
+            if not cnt[key] then
+                cnt[key]         = 0
+                order[#order+1] = {key=key, val=v}
+            end
+            cnt[key] = cnt[key] + 1
+        end
+    end
+    -- ordena por count desc, estável por ordem de aparição
+    table.sort(order, function(a, b) return cnt[a.key] > cnt[b.key] end)
+    local vals, counts = {}, {}
+    local NA = Series.NA
+    for _, item in ipairs(order) do
+        vals[#vals+1]   = item.val
+        counts[#counts+1] = cnt[item.key]
+    end
+    -- importar DataSet inline para evitar dependência circular
+    local DataSet = require("smaug.core.dataset")
+    local ds = DataSet.new("value_counts")
+    ds:add_column("value", Series.from_table(vals,   self._dtype, "value"))
+    ds:add_column("count", Series.from_table(counts, "int64",     "count"))
+    return ds
+end
+
+-- =====================================================================
+-- Transformações elementares (retornam nova Series numérica)
+-- =====================================================================
+
+-- abs(): valor absoluto elemento a elemento. Nulos propagam.
+function methods.abs(self)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: abs() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    return self:map(function(v) return v ~= nil and math.abs(v) or nil end, self._dtype, self._name)
+end
+
+-- round(ndigits): arredonda para `ndigits` casas decimais (default 0). float64.
+function methods.round(self, ndigits)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: round() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    ndigits = ndigits or 0
+    local factor = 10 ^ ndigits
+    return self:map(function(v)
+        if v == nil then return nil end
+        -- round half-away-from-zero (comportamento padrão do pandas/Python)
+        if v >= 0 then
+            return math.floor(v * factor + 0.5) / factor
+        else
+            return math.ceil(v * factor - 0.5) / factor
+        end
+    end, "float64", self._name)
+end
+
+-- clip(lo, hi): limita valores ao intervalo [lo, hi]. Nulos propagam.
+function methods.clip(self, lo, hi)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: clip() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    if lo == nil and hi == nil then return self:clone() end
+    return self:map(function(v)
+        if v == nil then return nil end
+        if lo ~= nil and v < lo then return lo end
+        if hi ~= nil and v > hi then return hi end
+        return v
+    end, self._dtype, self._name)
+end
+
+-- =====================================================================
+-- Operações de janela temporal (retornam nova Series alinhada)
+-- =====================================================================
+
+-- cumsum(): soma cumulativa. Nulos propagam (resultado é NA a partir do 1º nulo).
+function methods.cumsum(self)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: cumsum() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    local NA   = Series.NA
+    local n    = self:len()
+    local vals = {}
+    local acc  = 0
+    local null = false
+    for i = 1, n do
+        local v = self:get(i)
+        if v == nil or null then
+            null = true; vals[i] = NA
+        else
+            acc = acc + v; vals[i] = acc
+        end
+    end
+    return Series.from_table(vals, self._dtype, self._name)
+end
+
+-- cumprod(): produto cumulativo. Nulos propagam.
+function methods.cumprod(self)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: cumprod() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    local NA   = Series.NA
+    local n    = self:len()
+    local vals = {}
+    local acc  = 1
+    local null = false
+    for i = 1, n do
+        local v = self:get(i)
+        if v == nil or null then
+            null = true; vals[i] = NA
+        else
+            acc = acc * v; vals[i] = acc
+        end
+    end
+    return Series.from_table(vals, self._dtype, self._name)
+end
+
+-- diff(periods): diferença entre elemento i e elemento i-periods.
+-- Primeiros `periods` elementos são NA. Nulos propagam.
+function methods.diff(self, periods)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: diff() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    periods = periods or 1
+    if periods < 1 then error("smaug: diff() requer periods >= 1", 2) end
+    local NA   = Series.NA
+    local n    = self:len()
+    local vals = {}
+    for i = 1, n do
+        if i <= periods then
+            vals[i] = NA
+        else
+            local cur  = self:get(i)
+            local prev = self:get(i - periods)
+            vals[i] = (cur == nil or prev == nil) and NA or (cur - prev)
+        end
+    end
+    return Series.from_table(vals, self._dtype, self._name)
+end
+
+-- shift(periods): desloca os valores `periods` posições para frente (> 0) ou
+-- para trás (< 0). Posições descobertas viram NA.
+function methods.shift(self, periods)
+    periods = periods or 1
+    local NA   = Series.NA
+    local n    = self:len()
+    local vals = {}
+    for i = 1, n do
+        local src = i - periods
+        if src < 1 or src > n then
+            vals[i] = NA
+        else
+            local v = self:get(src)
+            vals[i] = (v == nil) and NA or v
+        end
+    end
+    return Series.from_table(vals, self._dtype, self._name)
+end
+
 function methods.count_nonnull(self)
     return tonumber(self._d.count_nonnull(self._c))
 end

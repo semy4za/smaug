@@ -922,6 +922,299 @@ function methods.groupby(self, key)
     }, GroupBy)
 end
 
+-- =====================================================================
+-- Transformações de colunas (Anel 2)
+-- =====================================================================
+
+-- assign(nome, fn_ou_series): adiciona ou substitui uma coluna calculada.
+-- Se o segundo argumento for uma função, ela recebe o DataSet e deve retornar
+-- uma Series. Se for uma Series, é usada diretamente.
+-- Retorna um NOVO DataSet (imutável).
+function methods.assign(self, name, fn_or_series)
+    if type(name) ~= "string" then
+        error("smaug: assign — nome deve ser string", 2)
+    end
+    local col
+    if is_series(fn_or_series) or is_boolseries(fn_or_series) then
+        col = fn_or_series
+    elseif type(fn_or_series) == "function" then
+        col = fn_or_series(self)
+        if not (is_series(col) or is_boolseries(col)) then
+            error("smaug: assign — função deve retornar uma Series", 2)
+        end
+    else
+        error("smaug: assign — segundo argumento deve ser Series ou função", 2)
+    end
+    if col:len() ~= self:nrows() then
+        error("smaug: assign — Series tem tamanho diferente do DataSet ("
+              ..col:len().." vs "..self:nrows()..")", 2)
+    end
+    -- clonar o DataSet e adicionar/substituir a coluna
+    local result = DataSet.new(self._name)
+    for _, cname in ipairs(self._col_names) do
+        if cname ~= name then
+            result:add_column(cname, self:column(cname):clone())
+        end
+    end
+    -- se a coluna já existe, mantém a posição; senão vai para o fim
+    if self:has_column(name) then
+        -- recriar na ordem original com a coluna substituída
+        local result2 = DataSet.new(self._name)
+        for _, cname in ipairs(self._col_names) do
+            if cname == name then
+                result2:add_column(name, col)
+            else
+                result2:add_column(cname, self:column(cname):clone())
+            end
+        end
+        return result2
+    end
+    result:add_column(name, col)
+    return result
+end
+
+-- nunique(): tabela { coluna = contagem_de_distintos_nao_nulos }.
+function methods.nunique(self)
+    local t = {}
+    for _, name in ipairs(self._col_names) do
+        t[name] = self:column(name):nunique()
+    end
+    return t
+end
+
+-- =====================================================================
+-- Window / Rolling (Anel 2)
+--
+-- ds:rolling(window):sum/mean/min/max(col)
+-- Retorna uma nova Series com a agregação sobre a janela deslizante.
+-- Primeiras (window-1) posições são NA. Nulos dentro da janela são ignorados.
+-- =====================================================================
+local Rolling = {}
+Rolling.__index = Rolling
+
+function Rolling:_agg(col_name, fn)
+    local col = self._ds:column(col_name)
+    local n   = col:len()
+    local w   = self._window
+    local NA  = Series.NA
+    local vals = {}
+    for i = 1, n do
+        if i < w then
+            vals[i] = NA
+        else
+            local window_vals = {}
+            for j = i - w + 1, i do
+                local v = col:get(j)
+                if v ~= nil then window_vals[#window_vals+1] = v end
+            end
+            vals[i] = fn(window_vals)
+        end
+    end
+    return Series.from_table(vals, col._dtype, col_name)
+end
+
+function Rolling:sum(col_name)
+    return self:_agg(col_name, function(vs)
+        local s = 0; for _, v in ipairs(vs) do s = s + v end; return s
+    end)
+end
+function Rolling:mean(col_name)
+    return self:_agg(col_name, function(vs)
+        if #vs == 0 then return nil end
+        local s = 0; for _, v in ipairs(vs) do s = s + v end
+        return s / #vs
+    end)
+end
+function Rolling:min(col_name)
+    return self:_agg(col_name, function(vs)
+        if #vs == 0 then return nil end
+        local m = vs[1]; for _, v in ipairs(vs) do if v < m then m = v end end
+        return m
+    end)
+end
+function Rolling:max(col_name)
+    return self:_agg(col_name, function(vs)
+        if #vs == 0 then return nil end
+        local m = vs[1]; for _, v in ipairs(vs) do if v > m then m = v end end
+        return m
+    end)
+end
+
+function methods.rolling(self, window)
+    if type(window) ~= "number" or window < 1 or window ~= math.floor(window) then
+        error("smaug: rolling — window deve ser inteiro >= 1", 2)
+    end
+    return setmetatable({ _ds = self, _window = window }, Rolling)
+end
+
+-- =====================================================================
+-- Pivot / Melt (Anel 2)
+-- =====================================================================
+
+-- pivot(index, columns, values): transforma de long para wide.
+--   index   : coluna que vira índice das linhas (valores únicos)
+--   columns : coluna cujos valores únicos viram novas colunas
+--   values  : coluna cujos valores preenchem as células (NA onde sem match)
+--
+-- Exemplo:
+--   ds = {uf, produto, vendas}
+--   ds:pivot("uf","produto","vendas")
+--   → DataSet com coluna "uf" + uma coluna por produto
+function methods.pivot(self, index, columns, values)
+    for _, arg in ipairs({index, columns, values}) do
+        if type(arg) ~= "string" then
+            error("smaug: pivot — argumentos devem ser strings (index, columns, values)", 2)
+        end
+    end
+    for _, col in ipairs({index, columns, values}) do
+        if not self:has_column(col) then
+            error("smaug: pivot — coluna '"..col.."' não existe", 2)
+        end
+    end
+
+    local n          = self:nrows()
+    local idx_col    = self:column(index)
+    local col_col    = self:column(columns)
+    local val_col    = self:column(values)
+    local NA         = Series.NA
+
+    -- coletar valores únicos de cada dimensão (na ordem de aparição)
+    local idx_vals, idx_seen   = {}, {}
+    local col_vals, col_seen   = {}, {}
+    for i = 1, n do
+        local iv = idx_col:get(i)
+        if iv ~= nil then
+            local k = tostring(iv)
+            if not idx_seen[k] then idx_seen[k]=true; idx_vals[#idx_vals+1]=iv end
+        end
+        local cv = col_col:get(i)
+        if cv ~= nil then
+            local k = tostring(cv)
+            if not col_seen[k] then col_seen[k]=true; col_vals[#col_vals+1]=cv end
+        end
+    end
+    table.sort(idx_vals, function(a,b) return tostring(a) < tostring(b) end)
+    table.sort(col_vals, function(a,b) return tostring(a) < tostring(b) end)
+
+    -- construir lookup: (idx_key, col_key) -> valor
+    local lookup = {}
+    for i = 1, n do
+        local iv = idx_col:get(i)
+        local cv = col_col:get(i)
+        local vv = val_col:get(i)
+        if iv ~= nil and cv ~= nil then
+            local k = tostring(iv).."\1"..tostring(cv)
+            lookup[k] = vv
+        end
+    end
+
+    -- montar resultado
+    local result = DataSet.new(self._name.."_pivot")
+    -- coluna de índice
+    local idx_dtype = idx_col._dtype
+    result:add_column(index, Series.from_table(idx_vals, idx_dtype, index))
+    -- uma coluna por valor de "columns"
+    local val_dtype = val_col._dtype
+    for _, cv in ipairs(col_vals) do
+        local cname = tostring(cv)
+        local vals  = {}
+        for _, iv in ipairs(idx_vals) do
+            local k = tostring(iv).."\1"..tostring(cv)
+            vals[#vals+1] = lookup[k] ~= nil and lookup[k] or NA
+        end
+        result:add_column(cname, Series.from_table(vals, val_dtype, cname))
+    end
+    return result
+end
+
+-- melt(id_vars, value_vars, [var_name], [value_name]):
+-- transforma de wide para long (inverso de pivot).
+--   id_vars    : colunas que permanecem como identificadores
+--   value_vars : colunas que viram linhas (nil = todas as não-id)
+--   var_name   : nome da nova coluna de variável (default "variable")
+--   value_name : nome da nova coluna de valor    (default "value")
+function methods.melt(self, id_vars, value_vars, var_name, value_name)
+    id_vars    = id_vars    or {}
+    var_name   = var_name   or "variable"
+    value_name = value_name or "value"
+
+    if type(id_vars) == "string" then id_vars = {id_vars} end
+    local id_set = {}
+    for _, n in ipairs(id_vars) do
+        if not self:has_column(n) then
+            error("smaug: melt — id_var '"..n.."' não existe", 2)
+        end
+        id_set[n] = true
+    end
+
+    -- determinar value_vars
+    if value_vars == nil then
+        value_vars = {}
+        for _, n in ipairs(self._col_names) do
+            if not id_set[n] then value_vars[#value_vars+1] = n end
+        end
+    elseif type(value_vars) == "string" then
+        value_vars = {value_vars}
+    end
+    for _, n in ipairs(value_vars) do
+        if not self:has_column(n) then
+            error("smaug: melt — value_var '"..n.."' não existe", 2)
+        end
+    end
+
+    local nrows   = self:nrows()
+    local NA      = Series.NA
+
+    -- inferir dtype do value: se todas as value_vars têm mesmo dtype, usa esse;
+    -- senão converte tudo para string (dtypes misturados)
+    local val_dtype = nil
+    for _, vv in ipairs(value_vars) do
+        local dt = self:column(vv)._dtype
+        if val_dtype == nil then
+            val_dtype = dt
+        elseif val_dtype ~= dt then
+            val_dtype = "string"  -- dtypes misturados → string
+            break
+        end
+    end
+    val_dtype = val_dtype or "string"
+
+    -- montar linhas: para cada linha × cada value_var
+    local id_data   = {}   -- { col_name -> {valores} }
+    for _, n in ipairs(id_vars) do id_data[n] = {} end
+    local var_data   = {}
+    local value_data = {}
+
+    for _, vv in ipairs(value_vars) do
+        local src = self:column(vv)
+        for i = 1, nrows do
+            -- replicar id columns
+            for _, n in ipairs(id_vars) do
+                local v = self:column(n):get(i)
+                id_data[n][#id_data[n]+1] = (v == nil) and NA or v
+            end
+            var_data[#var_data+1]   = vv
+            local v = src:get(i)
+            if v == nil then
+                value_data[#value_data+1] = NA
+            elseif val_dtype == "string" then
+                value_data[#value_data+1] = tostring(v)
+            else
+                value_data[#value_data+1] = v
+            end
+        end
+    end
+
+    local result = DataSet.new(self._name.."_melt")
+    for _, n in ipairs(id_vars) do
+        local dtype = self:column(n)._dtype
+        result:add_column(n, Series.from_table(id_data[n], dtype, n))
+    end
+    result:add_column(var_name,   Series.from_table(var_data,   "string", var_name))
+    result:add_column(value_name, Series.from_table(value_data, val_dtype, value_name))
+    return result
+end
+
 -- Inspeção
 -- =====================================================================
 -- describe: tabela { coluna = (describe da Series) } para colunas numéricas.

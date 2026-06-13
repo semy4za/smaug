@@ -28,7 +28,7 @@ SRCS="smaug_core smaug_ops_f64 smaug_ops_i64 smaug_ops_bool smaug_str smaug_ops_
 # Tudo que exercita o backend. Se test_stress deixar a medicao lenta demais,
 # pode remove-lo daqui -- ele cobre majoritariamente ramos que ops ja pega.
 C_TESTS="test_alloc test_ops test_ops_edge test_bool test_bool_lifecycle test_string test_cow test_stress"
-LUA_TESTS="test_series test_dataset test_edge test_special test_fillna test_props test_i64 test_string test_bool_dtype test_groupby test_concat test_join"
+LUA_TESTS="test_series test_dataset test_edge test_special test_fillna test_props test_i64 test_string test_bool_dtype test_groupby test_concat test_join test_series_ops test_dataset_ops"
 COVDIR=cov
 OUT=docs/COVERAGE.md
 
