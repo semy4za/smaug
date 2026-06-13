@@ -331,15 +331,14 @@ check(sf4:get(1) == 1,        "Series.full: bool true → 1")
 check(sf4._dtype == "int64",  "Series.full: bool dtype int64")
 
 -- =====================================================================
--- BoolSeries como coluna de primeira classe no DataSet
+-- Series<bool> como coluna de primeira classe no DataSet
 -- =====================================================================
-local BoolSeries = smaug.BoolSeries
 local df_bool = smaug.DataSet({
     {"preco",  {10.0, 20.0, 30.0, 40.0}, "float64"},
     {"cidade", {"SP", "RJ", "SP", "MG"}, "string"},
 })
 
--- broadcast de boolean cria coluna int64 (1/0), não BoolSeries
+-- broadcast de boolean cria coluna int64 (1/0), não Series<bool>
 df_bool["flag"] = true
 check(df_bool:col("flag")._dtype == "int64", "broadcast bool -> int64")
 check(df_bool:col("flag"):get(1) == 1,       "broadcast bool valor")
@@ -367,11 +366,11 @@ local sp_df = df_bool:filter(df_bool:col("cidade"):eq("SP"))
 check(sp_df:nrows() == 2,                          "filter com bool coluna")
 check(sp_df:col("eh_sp")._dtype == "bool",         "filter preserva bool coluna")
 
--- to_table sobre DataSet com coluna BoolSeries
+-- to_table sobre DataSet com coluna bool
 local tt = df_bool:to_table()
-check(type(tt.eh_sp) == "table",   "to_table: BoolSeries vira tabela")
-check(tt.eh_sp[1] == true,         "to_table: BoolSeries valor 1")
-check(tt.eh_sp[2] == false,        "to_table: BoolSeries valor 2")
+check(type(tt.eh_sp) == "table",   "to_table: bool coluna vira tabela")
+check(tt.eh_sp[1] == true,         "to_table: bool valor 1")
+check(tt.eh_sp[2] == false,        "to_table: bool valor 2")
 
 -- describe sobre DataSet com coluna bool
 local desc = df_bool:describe()
@@ -395,7 +394,7 @@ local bs_fn = df_bool:col("eh_sp"):fillna(false)
 check(bs_fn._dtype == "bool", "fillna DataSet: bool coluna preservada")
 
 -- =====================================================================
--- df[mask]: indexação por BoolSeries (__index dispatch)
+-- df[mask]: indexação por Series<bool> (__index dispatch)
 -- =====================================================================
 -- df[mask] é açúcar para df:filter(mask); testa o dispatch do __index.
 local mask_caros = df["preco"]:gt(25)          -- preco > 25 -> linhas 3,4,5

@@ -47,7 +47,7 @@ do
     check(e:head(3):len() == 0, "vazia: head vazia")
     check(e:tail(3):len() == 0, "vazia: tail vazia")
     check(e:take({}):len() == 0, "vazia: take vazio")
-    -- comparação de vazia → BoolSeries vazia
+    -- comparação de vazia → Series<bool> vazia
     check(e:gt(0):len() == 0, "vazia: gt len 0")
     check(e:gt(0):count_true() == 0, "vazia: gt count_true 0")
     check(e:gt(0):any() == false, "vazia: any false")

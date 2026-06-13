@@ -118,7 +118,7 @@ do
 end
 
 -- ===================================================================
--- Comparações (eq/lt/gt) -> BoolSeries
+-- Comparações (eq/lt/gt) -> Series<bool>
 -- ===================================================================
 do
     local s = S.from_table({"SP", "RJ", smaug.NA, "MG", "SP"}, "string")

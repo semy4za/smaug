@@ -161,7 +161,7 @@ check(approx(dd["50%"], 2.5), "describe mediana")
 
 -- ===== Camada bool: comparações, filter, lógica Kleene =====
 
--- ---- comparações -> BoolSeries ----
+-- ---- comparações -> Series<bool> ----
 local cmp = Series.from_table({10, 20, 30, 40}, "float64")
 local gt = cmp:gt(25)                       -- [F, F, T, T]
 check(gt:len() == 4, "gt len")
@@ -177,7 +177,7 @@ check(eq:get(3) == true and eq:count_true() == 1, "eq")
 local kept = cmp:filter(gt)
 check(kept:len() == 2 and kept:get(1) == 30.0 and kept:get(2) == 40.0, "filter")
 local filt_dtype = pcall(function() return cmp:filter({}) end)
-check(not filt_dtype, "filter exige BoolSeries")
+check(not filt_dtype, "filter exige Series<bool>")
 
 -- ---- lógica AND/OR/XOR/NOT (métodos e operadores * + -) ----
 local a = Series.from_table({1, 1, 0, 0}, "int64"):gt(0)   -- [T,T,F,F]
@@ -200,8 +200,8 @@ check(kor:get(2) == nil,  "NA or F = NA (Kleene)")
 check(kor:get(3) == true, "NA or T = T (Kleene)")
 check(x:lnot():get(2) == nil, "NOT NA = NA")
 
--- ---- tostring da BoolSeries ----
-check(type(tostring(gt)) == "string", "BoolSeries __tostring")
+-- ---- tostring da Series<bool> ----
+check(type(tostring(gt)) == "string", "Series<bool> __tostring")
 
 -- ---- ge / le / ne ----
 -- f64

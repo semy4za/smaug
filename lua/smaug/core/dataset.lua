@@ -24,16 +24,14 @@
 -- independentes, portanto DataSets derivados são sempre seguros.
 
 local Series     = require("smaug.core.series")
-local BoolSeries = require("smaug.core.boolseries")
 
 local DataSet = {}
 local methods = {}
 
 local function is_series(x)     return getmetatable(x) == Series end
--- Aceita BoolSeries (legada) ou Series<bool> (novo dtype de primeira classe).
+-- Detecta uma Series<bool> — o dtype booleano de primeira classe do Smaug.
 local function is_boolseries(x)
-    return getmetatable(x) == BoolSeries
-        or (type(x) == "table" and x._dtype == "bool")
+    return type(x) == "table" and x._dtype == "bool"
 end
 
 -- =====================================================================
@@ -68,7 +66,7 @@ end
 function methods.add_column(self, name, series)
     if type(name) ~= "string" then error("smaug: nome de coluna deve ser string", 2) end
     if not (is_series(series) or is_boolseries(series)) then
-        error("smaug: add_column espera uma Series ou BoolSeries", 2)
+        error("smaug: add_column espera uma Series ou Series<bool>", 2)
     end
     if self._columns[name] ~= nil then
         error("smaug: coluna '"..name.."' já existe; use df[\""..name.."\"] = s para atualizar", 2)
@@ -90,7 +88,7 @@ end
 function methods.update_column(self, name, series)
     if type(name) ~= "string" then error("smaug: nome de coluna deve ser string", 2) end
     if not (is_series(series) or is_boolseries(series)) then
-        error("smaug: update_column espera uma Series ou BoolSeries", 2)
+        error("smaug: update_column espera uma Series ou Series<bool>", 2)
     end
     if self._columns[name] == nil then
         error("smaug: coluna '"..name.."' não existe; use df[\""..name.."\"] = s para criar", 2)
@@ -271,7 +269,7 @@ end
 -- Aceita Series<bool> (novo) ou BoolSeries (legado).
 function methods.filter(self, mask)
     if not is_boolseries(mask) then
-        error("smaug: filter espera uma Series<bool> ou BoolSeries (use coluna:gt/:lt/:eq)", 2)
+        error("smaug: filter espera uma Series<bool> (use coluna:gt/:lt/:eq)", 2)
     end
     if mask:len() ~= self:nrows() then
         error("smaug: filter com máscara de tamanho diferente ("..
@@ -392,7 +390,7 @@ DataSet.__tostring = function(self)
 end
 
 -- __index: df["coluna"] OU df:metodo() OU df[bool_series].
--- Prioridades: método > BoolSeries (filtragem) > string (coluna).
+-- Prioridades: método > Series<bool> (filtragem) > string (coluna).
 -- Para coluna cujo nome colide com um método, use df:column(nome).
 -- df[mask] é açúcar para df:filter(mask); semântica idêntica.
 DataSet.__index = function(self, k)
@@ -405,7 +403,7 @@ end
 
 -- __newindex: df["coluna"] = serie_ou_escalar
 -- Semântica: muta o DataSet in-place (consistente com add_column/update_column).
---   - Series ou BoolSeries: passada diretamente.
+--   - Series ou Series<bool>: passada diretamente.
 --   - Escalar (string, number, boolean): broadcast para Series.full(nrows, val).
 -- Invariante preservada: todas as colunas mantêm o mesmo número de linhas.
 -- Coluna existente → update_column (substitui, preserva posição).
@@ -439,7 +437,7 @@ DataSet.__len = function(self) return self:nrows() end
 -- Permite usar a classe como construtor público: DataSet({...})
 -- Preserva acesso a DataSet.from_columns, DataSet.new etc. via a classe.
 -- Lógica de inferência de dtype: string→"string", inteiro→"int64",
--- fracionário→"float64". Series/BoolSeries passadas diretamente.
+-- fracionário→"float64". Series/Series<bool> passadas diretamente.
 local function infer_dtype(arr)
     for _, v in ipairs(arr) do
         if type(v) == "string" then return "string" end

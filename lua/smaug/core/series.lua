@@ -15,7 +15,6 @@
 
 local ffi = require("ffi")
 local C   = require("smaug.ffi_loader")
-local BoolSeries = require("smaug.core.boolseries")
 
 local NAN     = 0 / 0
 local I64_MIN = -9223372036854775807LL - 1LL   -- INT64_MIN sem overflow de literal
@@ -804,11 +803,9 @@ end
 -- =====================================================================
 
 -- Helper: extrai (uint8_t* vals, smaug_mask_t* nulls, size_t n) de uma
--- máscara booleana, seja ela BoolSeries (legada) ou Series<bool> (nova).
+-- Series<bool>. Retorna nil se o argumento não for uma Series<bool> válida.
 local function bool_mask_parts(mask)
-    if getmetatable(mask) == BoolSeries then
-        return mask._vals, mask._nulls, mask._n
-    elseif type(mask) == "table" and mask._dtype == "bool" then
+    if type(mask) == "table" and mask._dtype == "bool" then
         return mask._c.data, mask._c.null_mask, tonumber(mask._c.size)
     end
     return nil
@@ -876,16 +873,11 @@ local function kleene_binop(a, b, fn, opname)
     if a._dtype ~= "bool" then
         error("smaug: " .. opname .. " requer Series<bool>", 3)
     end
-    local bv, bn
+    local bv
     if type(b) == "table" and b._dtype == "bool" then
         bv = b._c
-    elseif getmetatable(b) == BoolSeries then
-        -- converte BoolSeries legada para série bool temporária
-        local tmp = C.smaug_bool_create_from_array(b._vals, b._n)
-        if tmp == nil then error("smaug: OOM em Kleene", 3) end
-        bv = ffi.gc(tmp, C.smaug_bool_free)
     else
-        error("smaug: " .. opname .. " requer Series<bool> ou BoolSeries", 3)
+        error("smaug: " .. opname .. " requer Series<bool>", 3)
     end
     local r = fn(a._c, bv)
     if r == nil then error("smaug: " .. opname .. " falhou (tamanhos diferentes ou OOM)", 3) end
@@ -1035,45 +1027,20 @@ local function str_map(src, fn)
     return out
 end
 
--- bool_map: itera e devolve BoolSeries (null -> NA na máscara).
+-- bool_map: itera e devolve Series<bool> (null -> NA na máscara).
 local function bool_map(src, fn)
-    local n    = src:len()
-    local vals = {}
-    local has_na = false
+    local n = src:len()
+    local s = C.smaug_bool_create(n)
+    if s == nil then error("smaug: OOM em bool_map", 2) end
     for i = 1, n do
         local v = src:get(i)
         if v == nil then
-            vals[i] = false
-            has_na  = true
+            C.smaug_bool_set_null(s, i - 1)
         else
-            vals[i] = fn(v)
+            C.smaug_bool_set(s, i - 1, fn(v) and 1 or 0)
         end
     end
-    -- monta os arrays de uint8_t para BoolSeries._own via from_lua_arrays
-    local sz   = n == 0 and 1 or n
-    local vptr = ffi.new("uint8_t[?]", sz)
-    local nptr = has_na and ffi.new("uint8_t[?]", sz) or nil
-    for i = 0, n - 1 do
-        vptr[i] = vals[i + 1] and 1 or 0
-        if nptr then
-            nptr[i] = (src:get(i + 1) == nil) and 0x00 or 0xFF
-        end
-    end
-    -- BoolSeries._own assume posse (ffi.gc) dos ponteiros passados.
-    -- Aqui os arrays são ffi.new — o GC deles é o Lua, não smaug_free.
-    -- Contornamos criando uma BoolSeries a partir de uma tabela usando
-    -- o construtor interno _from_lua do boolseries.lua.
-    -- Como BoolSeries não expõe esse construtor publicamente, aproveitamos
-    -- o mesmo mecanismo que boolseries.lua usa internamente: construímos
-    -- com setmetatable direto, ancorando os arrays via _base/_nbase.
-    return setmetatable({
-        _vals  = ffi.cast("uint8_t*", vptr),
-        _nulls = nptr and ffi.cast("uint8_t*", nptr) or nil,
-        _n     = n,
-        _name  = src._name,
-        _base  = vptr,
-        _nbase = nptr,
-    }, BoolSeries)
+    return wrap(ffi.gc(s, C.smaug_bool_free), "bool", src._name)
 end
 
 -- len(): comprimento em bytes de cada elemento -> Series int64.
@@ -1107,7 +1074,7 @@ function StrProxy:strip()
     end)
 end
 
--- contains(sub): BoolSeries true onde a string contém a substring `sub`.
+-- contains(sub): Series<bool> true onde a string contém a substring `sub`.
 -- Null -> NA. String vazia "" é substring de qualquer string.
 function StrProxy:contains(sub)
     if type(sub) ~= "string" then
@@ -1116,7 +1083,7 @@ function StrProxy:contains(sub)
     return bool_map(self._s, function(v) return v:find(sub, 1, true) ~= nil end)
 end
 
--- startswith(prefix): BoolSeries true onde a string começa com `prefix`.
+-- startswith(prefix): Series<bool> true onde a string começa com `prefix`.
 function StrProxy:startswith(prefix)
     if type(prefix) ~= "string" then
         error("smaug: str:startswith espera uma string; recebido " .. type(prefix), 2)
@@ -1125,7 +1092,7 @@ function StrProxy:startswith(prefix)
     return bool_map(self._s, function(v) return v:sub(1, n) == prefix end)
 end
 
--- endswith(suffix): BoolSeries true onde a string termina com `suffix`.
+-- endswith(suffix): Series<bool> true onde a string termina com `suffix`.
 function StrProxy:endswith(suffix)
     if type(suffix) ~= "string" then
         error("smaug: str:endswith espera uma string; recebido " .. type(suffix), 2)

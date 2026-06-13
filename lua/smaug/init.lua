@@ -9,13 +9,11 @@
 -- Infraestrutura: DataSet.new/from_columns, Series.new/from_table (uso interno)
 
 local Series     = require("smaug.core.series")
-local BoolSeries = require("smaug.core.boolseries")
 local DataSet    = require("smaug.core.dataset")
 
 local smaug = {
     _VERSION   = "1.0.0-dev",
     Series     = Series,
-    BoolSeries = BoolSeries,
     DataSet    = DataSet,   -- classe com __call: smaug.DataSet({...}) e .from_columns(...)
 }
 
