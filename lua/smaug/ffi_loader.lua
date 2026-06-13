@@ -175,6 +175,58 @@ ffi.cdef([[
     void smaug_free(void *ptr);
 
     /* ===================================================================
+       Series Bool — dtype de primeira classe (Fase 2: Anel 1)
+       Struct-based, espelha f64/i64. As funções raw abaixo (smaug_bool_and
+       etc.) permanecem para a BoolSeries legada até a Fase 4.
+       =================================================================== */
+
+    typedef struct {
+        uint8_t          *data;
+        smaug_mask_t     *null_mask;
+        size_t            size;
+        size_t            capacity;
+        smaug_metadata_t  meta;
+    } smaug_series_bool_t;
+
+    /* --- Lifecycle --- */
+    smaug_series_bool_t* smaug_bool_create(size_t size);
+    smaug_series_bool_t* smaug_bool_create_with_capacity(size_t size, size_t capacity);
+    smaug_series_bool_t* smaug_bool_create_from_array(const uint8_t *array, size_t len);
+    void                 smaug_bool_free(smaug_series_bool_t *s);
+    smaug_series_bool_t* smaug_bool_clone(const smaug_series_bool_t *s);
+    smaug_series_bool_t* smaug_bool_view(smaug_series_bool_t *s, size_t start, size_t len);
+
+    /* --- Getters / Setters --- */
+    uint8_t        smaug_bool_get(const smaug_series_bool_t *s, size_t idx, smaug_status_t *status);
+    smaug_status_t smaug_bool_set(smaug_series_bool_t *s, size_t idx, uint8_t val);
+    smaug_status_t smaug_bool_set_null(smaug_series_bool_t *s, size_t idx);
+    bool           smaug_bool_is_null(smaug_series_bool_t *s, size_t idx);
+
+    /* --- Append dinamico --- */
+    int smaug_bool_append(smaug_series_bool_t *s, uint8_t val);
+    int smaug_bool_append_null(smaug_series_bool_t *s);
+
+    /* --- Selecao --- */
+    size_t               smaug_bool_count_nonnull(const smaug_series_bool_t *s);
+    smaug_series_bool_t* smaug_bool_take  (const smaug_series_bool_t *s, const size_t *idx, size_t len);
+    smaug_series_bool_t* smaug_bool_filter(const smaug_series_bool_t *s, const uint8_t *mask);
+
+    /* --- Agregacoes struct-based --- */
+    size_t smaug_bool_series_count_true(const smaug_series_bool_t *s);
+    bool   smaug_bool_series_any(const smaug_series_bool_t *s);
+    bool   smaug_bool_series_all(const smaug_series_bool_t *s);
+
+    /* --- Logica Kleene struct->struct --- */
+    smaug_series_bool_t* smaug_bool_series_and(const smaug_series_bool_t *a, const smaug_series_bool_t *b);
+    smaug_series_bool_t* smaug_bool_series_or (const smaug_series_bool_t *a, const smaug_series_bool_t *b);
+    smaug_series_bool_t* smaug_bool_series_xor(const smaug_series_bool_t *a, const smaug_series_bool_t *b);
+    smaug_series_bool_t* smaug_bool_series_not(const smaug_series_bool_t *a);
+
+    /* --- Ordenacao: false < true; recusa NULL --- */
+    size_t*              smaug_bool_argsort(const smaug_series_bool_t *s, bool ascending);
+    smaug_series_bool_t* smaug_bool_sort   (const smaug_series_bool_t *s, bool ascending);
+
+    /* ===================================================================
        Operações Boolean (BoolSeries) — lógica de três valores (Kleene)
        =================================================================== */
     uint8_t* smaug_bool_and(const uint8_t *a, const smaug_mask_t *am,

@@ -151,6 +151,46 @@ local DTYPES = {
         -- O método genérico checa a existência do campo e recusa com erro claro.
         is_int_sentinel = function(_) return false end,
     },
+
+    -- ----------------------------------------------------------------
+    -- bool: dtype de primeira classe. Armazenamento smaug_series_bool_t.
+    -- true/false/nil (NA) são os valores Lua. Internamente 0/1 + null_mask.
+    -- Comparações (gt/lt/eq/...) retornam Series<bool> — Fase 3.
+    -- ----------------------------------------------------------------
+    bool = {
+        name        = "bool",
+        free        = C.smaug_bool_free,
+        create      = C.smaug_bool_create,
+        clone       = C.smaug_bool_clone,
+        -- get_value: converte uint8_t C para boolean Lua (ou nil se null).
+        get_value   = function(c, i)
+            local st = ffi.new("smaug_status_t[1]")
+            local v  = C.smaug_bool_get(c, i, st)
+            if st[0] == C.SMG_NULL_VALUE or st[0] == C.SMG_ERR_OOB then return nil end
+            return v ~= 0   -- 0 -> false, 1 -> true
+        end,
+        -- set: aceita boolean Lua, nil (→ null) ou número (0/1 canônico).
+        set = function(c, i, v)
+            if v == nil then return C.smaug_bool_set_null(c, i) end
+            return C.smaug_bool_set(c, i, v and 1 or 0)
+        end,
+        set_null    = C.smaug_bool_set_null,
+        is_null     = C.smaug_bool_is_null,
+        append = function(c, v)
+            if v == nil then return C.smaug_bool_append_null(c) end
+            return C.smaug_bool_append(c, v and 1 or 0)
+        end,
+        append_null = C.smaug_bool_append_null,
+        count_nonnull = C.smaug_bool_count_nonnull,
+        -- seleção
+        filter  = C.smaug_bool_filter,
+        take    = C.smaug_bool_take,
+        -- ordenação: false < true; recusa NULL
+        sort    = C.smaug_bool_sort,
+        argsort = C.smaug_bool_argsort,
+        -- bool NÃO tem ops numéricas nem comparações nesta fase.
+        is_int_sentinel = function(_) return false end,
+    },
 }
 
 local Series = {}
@@ -202,6 +242,11 @@ local function check_value(self, v, level)
     elseif dt == "string" then
         if type(v) ~= "string" then
             error("smaug: valor para string deve ser uma string Lua; "
+                  .. "recebido " .. type(v), level or 3)
+        end
+    elseif dt == "bool" then
+        if type(v) ~= "boolean" then
+            error("smaug: valor para bool deve ser boolean Lua (true/false); "
                   .. "recebido " .. type(v), level or 3)
         end
     else  -- float64
@@ -498,6 +543,24 @@ function methods.astype(self, dtype, name)
         local v = self:get(i)
         if v == nil then
             out:set_null(i)
+        elseif src == "bool" and dtype ~= "bool" then
+            -- bool → numérico: true=1, false=0; bool → string: "true"/"false"
+            if dtype == "string" then
+                out:set(i, tostring(v))
+            elseif dtype == "int64" then
+                out:set(i, v and 1 or 0)
+            else -- float64
+                out:set(i, v and 1.0 or 0.0)
+            end
+        elseif dtype == "bool" and src ~= "bool" then
+            -- numérico/string → bool: 0/""/"false" = false, resto = true; nulo propaga
+            if src == "string" then
+                if v == "true" then out:set(i, true)
+                elseif v == "false" then out:set(i, false)
+                else out:set_null(i) end  -- string não reconhecida → null
+            else -- numérico
+                out:set(i, v ~= 0)
+            end
         elseif src == "string" and dtype ~= "string" then
             -- string → numérico: tonumber; falha de parse → null
             local num = tonumber(v)
@@ -545,6 +608,11 @@ function methods.fillna(self, value)
     if dt == "string" then
         if type(value) ~= "string" then
             error("smaug: fillna em série string espera uma string Lua; "
+                  .. "recebido " .. type(value), 2)
+        end
+    elseif dt == "bool" then
+        if type(value) ~= "boolean" then
+            error("smaug: fillna em série bool espera boolean (true/false); "
                   .. "recebido " .. type(value), 2)
         end
     else
@@ -664,6 +732,20 @@ end
 function methods.describe(self)
     local n = self:len()
     local nulls = n - self:count_nonnull()
+    -- bool: estatísticas categóricas (count_true, count_false, nulls)
+    if self._dtype == "bool" then
+        local count_true = 0
+        for i = 1, n do
+            local v = self:get(i)
+            if v == true then count_true = count_true + 1 end
+        end
+        return {
+            count       = n - nulls,
+            nulls       = nulls,
+            count_true  = count_true,
+            count_false = (n - nulls) - count_true,
+        }
+    end
     -- string: estatísticas categóricas (sem média/std/percentis)
     if self._dtype == "string" then
         local freq = {}
@@ -718,13 +800,39 @@ function methods.describe(self)
 end
 
 -- =====================================================================
--- Comparações -> BoolSeries, e filtragem
+-- Comparações -> Series<bool>, e filtragem
 -- =====================================================================
+
+-- Helper: extrai (uint8_t* vals, smaug_mask_t* nulls, size_t n) de uma
+-- máscara booleana, seja ela BoolSeries (legada) ou Series<bool> (nova).
+local function bool_mask_parts(mask)
+    if getmetatable(mask) == BoolSeries then
+        return mask._vals, mask._nulls, mask._n
+    elseif type(mask) == "table" and mask._dtype == "bool" then
+        return mask._c.data, mask._c.null_mask, tonumber(mask._c.size)
+    end
+    return nil
+end
+
+-- Constrói uma Series<bool> a partir de arrays crus (uint8_t* vals,
+-- smaug_mask_t* nulls, size_t n). Copia os dados e libera os originais.
+local function bool_series_from_raw(vals, nulls, n, name)
+    local s = C.smaug_bool_create(n)
+    if s == nil then
+        C.smaug_free(vals)
+        if nulls ~= nil then C.smaug_free(nulls) end
+        error("smaug: OOM ao criar Series<bool>", 3)
+    end
+    for i = 0, n - 1 do
+        s.data[i]      = vals[i]
+        s.null_mask[i] = nulls ~= nil and nulls[i] or 0xFF
+    end
+    C.smaug_free(vals)
+    if nulls ~= nil then C.smaug_free(nulls) end
+    return wrap(ffi.gc(s, C.smaug_bool_free), "bool", name)
+end
+
 local function compare(self, cmp_name, target)
-    -- cada dtype tem seu wrapper de comparação no descritor (cmp_eq/cmp_lt/
-    -- cmp_gt): ele valida o alvo no tipo certo e chama a função C com a
-    -- assinatura adequada (numéricos passam escalar; string passa ponteiro+len).
-    -- Mantém os métodos genéricos agnósticos ao dtype (encapsulamento limpo).
     local wrapper = self._d[cmp_name]
     if wrapper == nil then
         error("smaug: comparação '" .. cmp_name .. "' não se aplica ao tipo "
@@ -733,7 +841,7 @@ local function compare(self, cmp_name, target)
     local om = ffi.new("smaug_mask_t*[1]")
     local vals = wrapper(self._c, target, om)
     if vals == nil then error("smaug: comparação falhou", 3) end
-    return BoolSeries._own(vals, om[0], self:len(), self._name)
+    return bool_series_from_raw(vals, om[0], self:len(), self._name)
 end
 
 function methods.gt(self, target) return compare(self, "cmp_gt", target) end
@@ -743,19 +851,84 @@ function methods.ge(self, target) return compare(self, "cmp_ge", target) end
 function methods.le(self, target) return compare(self, "cmp_le", target) end
 function methods.ne(self, target) return compare(self, "cmp_ne", target) end
 
--- filter(bool_series): nova Series só com as linhas onde a máscara é true.
--- NA na máscara conta como false (linha descartada).
+-- filter(mask): nova Series só com as linhas onde a máscara é true.
+-- Aceita Series<bool> (novo) ou BoolSeries (legado).
 function methods.filter(self, mask)
-    if getmetatable(mask) ~= BoolSeries then
-        error("smaug: filter espera uma BoolSeries (use :gt/:lt/:eq)", 2)
+    local vals, _, mlen = bool_mask_parts(mask)
+    if vals == nil then
+        error("smaug: filter espera uma Series<bool> ou BoolSeries (use :gt/:lt/:eq)", 2)
     end
-    if mask:len() ~= self:len() then
+    if mlen ~= self:len() then
         error("smaug: filter com máscara de tamanho diferente ("..
-              mask:len().." vs "..self:len()..")", 2)
+              mlen.." vs "..self:len()..")", 2)
     end
-    local r = self._d.filter(self._c, mask._vals)
+    local r = self._d.filter(self._c, vals)
     if r == nil then error("smaug: filter falhou", 2) end
     return wrap(r, self._dtype, self._name)
+end
+
+-- =====================================================================
+-- Lógica Kleene para Series<bool> (land/lor/lxor/lnot).
+-- Espelham os métodos da BoolSeries legada, usando as funções struct-based
+-- do Anel 0 (smaug_bool_series_and/or/xor/not).
+-- =====================================================================
+local function kleene_binop(a, b, fn, opname)
+    if a._dtype ~= "bool" then
+        error("smaug: " .. opname .. " requer Series<bool>", 3)
+    end
+    local bv, bn
+    if type(b) == "table" and b._dtype == "bool" then
+        bv = b._c
+    elseif getmetatable(b) == BoolSeries then
+        -- converte BoolSeries legada para série bool temporária
+        local tmp = C.smaug_bool_create_from_array(b._vals, b._n)
+        if tmp == nil then error("smaug: OOM em Kleene", 3) end
+        bv = ffi.gc(tmp, C.smaug_bool_free)
+    else
+        error("smaug: " .. opname .. " requer Series<bool> ou BoolSeries", 3)
+    end
+    local r = fn(a._c, bv)
+    if r == nil then error("smaug: " .. opname .. " falhou (tamanhos diferentes ou OOM)", 3) end
+    return wrap(ffi.gc(r, C.smaug_bool_free), "bool", a._name)
+end
+
+function methods.land(self, other)
+    return kleene_binop(self, other, C.smaug_bool_series_and, "land")
+end
+function methods.lor(self, other)
+    return kleene_binop(self, other, C.smaug_bool_series_or, "lor")
+end
+function methods.lxor(self, other)
+    return kleene_binop(self, other, C.smaug_bool_series_xor, "lxor")
+end
+function methods.lnot(self)
+    if self._dtype ~= "bool" then
+        error("smaug: lnot requer Series<bool>", 2)
+    end
+    local r = C.smaug_bool_series_not(self._c)
+    if r == nil then error("smaug: lnot falhou (OOM)", 2) end
+    return wrap(ffi.gc(r, C.smaug_bool_free), "bool", self._name)
+end
+
+-- Agregações booleanas: count_true, any, all.
+-- Espelham os métodos da BoolSeries, usando funções struct-based do Anel 0.
+function methods.count_true(self)
+    if self._dtype ~= "bool" then
+        error("smaug: count_true requer Series<bool>", 2)
+    end
+    return tonumber(C.smaug_bool_series_count_true(self._c))
+end
+function methods.any(self)
+    if self._dtype ~= "bool" then
+        error("smaug: any requer Series<bool>", 2)
+    end
+    return C.smaug_bool_series_any(self._c)
+end
+function methods.all(self)
+    if self._dtype ~= "bool" then
+        error("smaug: all requer Series<bool>", 2)
+    end
+    return C.smaug_bool_series_all(self._c)
 end
 
 -- =====================================================================
@@ -774,6 +947,20 @@ local function binop(a, b, series_fn, scalar_fn, scalar_left_ok, opname)
         end
         if a._c.size ~= b._c.size then
             error("smaug: '"..opname.."' entre séries de tamanhos diferentes", 2)
+        end
+        -- Series<bool>: operadores aritméticos mapeiam para Kleene
+        -- (+ = or, - = xor, * = and), espelhando o comportamento da BoolSeries.
+        if a._dtype == "bool" then
+            local kleene_fn = (series_fn == "add") and C.smaug_bool_series_or
+                           or (series_fn == "sub") and C.smaug_bool_series_xor
+                           or (series_fn == "mul") and C.smaug_bool_series_and
+                           or nil
+            if kleene_fn == nil then
+                error("smaug: operação '"..opname.."' não se aplica a Series<bool>", 2)
+            end
+            local r = kleene_fn(a._c, b._c)
+            if r == nil then error("smaug: '"..opname.."' falhou", 2) end
+            return wrap(ffi.gc(r, C.smaug_bool_free), "bool", a._name)
         end
         local r = a._d[series_fn](a._c, b._c)
         if r == nil then error("smaug: '"..opname.."' falhou", 2) end

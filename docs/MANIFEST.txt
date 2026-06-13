@@ -13,7 +13,7 @@ e0573823ec9aaa68c30b3542e33b48ce65c833559065b7ffbad8720e7f4ea6ec     433  ./docs
 6915d4bb638998ba711ffa8c2f76f3298506eb18d3e0cfc76d42ce30ba202255     268  ./docs/CHANGELOG.md
 9a5745e0953b96ecc14c62e02951b104b7e2575938630a0bde0a5cecafee14ee      98  ./docs/CODE_REVIEW.md
 d725ddfecddc5c0ce7cae857ecb7bc57edc66202b40d66e723595709e2d14044     274  ./docs/CONTRACT.md
-c50911ff515f7ffe940ef485f528e3f9a87b2c2d1d3fe39244df38d9a6fd90ca      50  ./docs/COVERAGE.md
+016a55cd441ae84075a019be6f1b2ce88245753ebd7cc8a17ad290e58fb194d7      50  ./docs/COVERAGE.md
 0b780addfb2929a2af46aa31af0849d30b479a51a35a730f9863843cf095e910     159  ./docs/COW.md
 933b663060a49dfc050323f43b0d0c4f69b348462702c6f440ceb5c732dbf0ed     185  ./docs/README.md
 c2a9c9fd6f2f2b2432aca96c3c7d00f286e0479265bb2871d9193a261ab4557c     264  ./docs/Roadmap.md
@@ -24,14 +24,15 @@ ec1ae8442e32984127948c7e126da19f84f85193023143dc36ee82b8e352544d      29  ./incl
 69cbc71a7894dd9fc631c290d2bb7e551173a0d8183ce257f24cd202002adc95     106  ./include/smaug_string.h
 b5761ed257045b6245efff9fd399fb576e2b69411759ae70d4c116d1fc5bfa4f     107  ./include/smaug_types.h
 4bc43a1508472d129c4d9e234bdbc5807cef6ab820084db8dbe90ae82c69fef7     298  ./lua/smaug/core/boolseries.lua
-fa88a2cfb2265a43a6bb0917d499dcfc4feada4184000709344c4c1c65e8314d     476  ./lua/smaug/core/dataset.lua
-2d04785412d593888eb9700c48e0a93dc458abea322c0bcbbefc934b04c96fcc     997  ./lua/smaug/core/series.lua
-145745628130819966811c8362cab54167800f74aaed06d665d93ccacbdc185b     277  ./lua/smaug/ffi_loader.lua
+8b015451e5866fbd7d836d352f4d0d418426d7a01000c92bd5b115e18859de33     481  ./lua/smaug/core/dataset.lua
+4a57b2cadbfaa68fd77ae3685773c83b604e805bf13ca7fd9bd5100f40a12a05    1184  ./lua/smaug/core/series.lua
+63e9270f329d0ae525569027301abf12501e4d20a3e18bc19a00d7821a9eb9c2     329  ./lua/smaug/ffi_loader.lua
 e707eb9e0f1e00d7f170eb4c3f5f2b87fc7f38203bab2765a033e5e56423e161      36  ./lua/smaug/init.lua
-84184d6d732d517c7d56f6a7350a66b54af07a6355ab55da95702a12a832145a     218  ./scripts/make_coverage.sh
+25f3668d56630118539a69dc9970cd39e8d6395729d13ca07f1c2b096e932f92     283  ./scripts/build.sh
+90c9f36192fb19971183029d722a82be2b065b4b056830cf7973394a8ecad779     218  ./scripts/make_coverage.sh
 5263600720e6fd8e0c3be46abe7d79f09ebf4362ff98ef21c5bf1caadae0d91f      64  ./scripts/make_manifest.ps1
 69322d8cf4dde498b76b4e463d02f66f355e541878e74b5fdee95aae80204805      34  ./scripts/make_manifest.sh
-4d3e51d05112187ab9a69a4914044bfb3d3c13158aab92ba858febcea2d41933     223  ./scripts/windows_build.ps1
+c23916a562f859ddb1e45f10b6f99f5d637dcb0b7a23447355f832f42f165515     223  ./scripts/windows_build.ps1
 b655b8b2cdb754a05b7c117953e5cce9664db1ad6327f5400e59a4874c3a381f     638  ./src/smaug_core.c
 66fec31bbeb4d360dd0ef2cacacc02a05cf59ea5e14791da47d15d399ccd9036     281  ./src/smaug_ops_bool.c
 4a1cd48f7fd47790b0cebeed178235875a050129d84a2f14e774d3214aa5d1fb     528  ./src/smaug_ops_f64.c
@@ -41,9 +42,10 @@ ed1bac28c4cc7adc333a09a76056edba22d6679141e3b2b2097fd899473955c9     251  ./src/
 1c5ab396661dd9c3a67c1c9f49325e572b0450a48f65c51f59bc46469a559fb4     276  ./tests/test_alloc.c
 02f5f9d67fdc988d986b20ded078a71c4eb20e3648febca2b4be2ab283e0a28d    1435  ./tests/test_allocfail.c
 0542967f3be7181bbab4110ba8b991c6cc4cc549c78912d9f95de2b2202dcd21     217  ./tests/test_bool.c
+06666a71c5ad3137275c6a99a3d114f14757da4977df771beb3b9b7d62700a63     152  ./tests/test_bool_dtype.lua
 f0d8bf2ec8f652f56029599d3d6061cc9617f5cee3e890642a4ebdb9f92b7c76     305  ./tests/test_bool_lifecycle.c
 0d87515dd11969c713c672793f5a23ae9ab82ad0f8065e19f6b864af85a81e37     428  ./tests/test_cow.c
-804e7645df8f9b119fd5d99af7c42927066b7e68f5b0bfa685ea2b608c246996     422  ./tests/test_dataset.lua
+9cb49846ab080db682a36097edbafe36e857fe8c1f272a3c139d319068f6e4e6     422  ./tests/test_dataset.lua
 5d2b0ac1d55681b7d392744d7133aac357d5062a1e92a2ceec8cde895134f2a3     195  ./tests/test_edge.lua
 23950c376fb42b510f6b0fa1aad4a93610e91112260f3b13c9120d7d9b9b6a4b     113  ./tests/test_fillna.lua
 a83926f34671689c0bc95a07579aa587a318a8baf909c722e048546a74215531     228  ./tests/test_i64.lua
@@ -56,4 +58,4 @@ e656ea4300fba405ffbbf1da95d6a2b5e18e4efdbc589ab7e7d77432ea33a871     339  ./test
 97fdc383f086ecd5f4e9d3bf54d9e6243c0eac53a513727a5005ce33deae8360     402  ./tests/test_string.c
 eae490c076def8e7a07010c941eca3efba52ccfe0490ac1a79bcc77db8c4b842     408  ./tests/test_string.lua
 #
-# total de arquivos: 53
+# total de arquivos: 55

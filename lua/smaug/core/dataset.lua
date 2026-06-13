@@ -30,7 +30,11 @@ local DataSet = {}
 local methods = {}
 
 local function is_series(x)     return getmetatable(x) == Series end
-local function is_boolseries(x) return getmetatable(x) == BoolSeries end
+-- Aceita BoolSeries (legada) ou Series<bool> (novo dtype de primeira classe).
+local function is_boolseries(x)
+    return getmetatable(x) == BoolSeries
+        or (type(x) == "table" and x._dtype == "bool")
+end
 
 -- =====================================================================
 -- Construção
@@ -263,10 +267,11 @@ function methods.sample(self, n, seed)
     return self:take(idx)
 end
 
--- filter(bool_series): novo DataSet só com as linhas onde a máscara é true.
+-- filter(mask): novo DataSet só com as linhas onde a máscara é true.
+-- Aceita Series<bool> (novo) ou BoolSeries (legado).
 function methods.filter(self, mask)
     if not is_boolseries(mask) then
-        error("smaug: filter espera uma BoolSeries (use coluna:gt/:lt/:eq)", 2)
+        error("smaug: filter espera uma Series<bool> ou BoolSeries (use coluna:gt/:lt/:eq)", 2)
     end
     if mask:len() ~= self:nrows() then
         error("smaug: filter com máscara de tamanho diferente ("..

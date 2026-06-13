@@ -344,28 +344,28 @@ df_bool["flag"] = true
 check(df_bool:col("flag")._dtype == "int64", "broadcast bool -> int64")
 check(df_bool:col("flag"):get(1) == 1,       "broadcast bool valor")
 
--- adicionar coluna BoolSeries explícita via __newindex
+-- adicionar coluna Series<bool> explícita via __newindex
 local mask_sp = df_bool:col("cidade"):eq("SP")
 df_bool["eh_sp"] = mask_sp
-check(getmetatable(df_bool:col("eh_sp")) == BoolSeries, "BoolSeries como coluna")
-check(df_bool:col("eh_sp"):get(1) == true,  "BoolSeries coluna: pos 1 = true")
-check(df_bool:col("eh_sp"):get(2) == false, "BoolSeries coluna: pos 2 = false")
+check(df_bool:col("eh_sp")._dtype == "bool",  "Series<bool> como coluna")
+check(df_bool:col("eh_sp"):get(1) == true,    "bool coluna: pos 1 = true")
+check(df_bool:col("eh_sp"):get(2) == false,   "bool coluna: pos 2 = false")
 
--- head/tail sobre DataSet com coluna BoolSeries
+-- head/tail sobre DataSet com coluna bool
 local h = df_bool:head(2)
-check(h:nrows() == 2,                              "head com BoolSeries coluna")
-check(getmetatable(h:col("eh_sp")) == BoolSeries,  "head preserva BoolSeries")
-check(h:col("eh_sp"):get(1) == true,               "head BoolSeries valor correto")
+check(h:nrows() == 2,                            "head com bool coluna")
+check(h:col("eh_sp")._dtype == "bool",           "head preserva bool coluna")
+check(h:col("eh_sp"):get(1) == true,             "head bool valor correto")
 
 local tl = df_bool:tail(2)
-check(tl:nrows() == 2,                             "tail com BoolSeries coluna")
-check(tl:col("eh_sp"):get(1) == true,              "tail BoolSeries: pos 1 = SP (true)")
-check(tl:col("eh_sp"):get(2) == false,             "tail BoolSeries: pos 2 = MG (false)")
+check(tl:nrows() == 2,                        "tail com bool coluna")
+check(tl:col("eh_sp"):get(1) == true,         "tail bool: pos 1 = SP (true)")
+check(tl:col("eh_sp"):get(2) == false,        "tail bool: pos 2 = MG (false)")
 
--- filter sobre DataSet com coluna BoolSeries
+-- filter sobre DataSet com coluna bool
 local sp_df = df_bool:filter(df_bool:col("cidade"):eq("SP"))
-check(sp_df:nrows() == 2,                                    "filter com BoolSeries coluna")
-check(getmetatable(sp_df:col("eh_sp")) == BoolSeries,        "filter preserva BoolSeries")
+check(sp_df:nrows() == 2,                          "filter com bool coluna")
+check(sp_df:col("eh_sp")._dtype == "bool",         "filter preserva bool coluna")
 
 -- to_table sobre DataSet com coluna BoolSeries
 local tt = df_bool:to_table()
@@ -373,26 +373,26 @@ check(type(tt.eh_sp) == "table",   "to_table: BoolSeries vira tabela")
 check(tt.eh_sp[1] == true,         "to_table: BoolSeries valor 1")
 check(tt.eh_sp[2] == false,        "to_table: BoolSeries valor 2")
 
--- describe sobre DataSet com coluna BoolSeries
+-- describe sobre DataSet com coluna bool
 local desc = df_bool:describe()
-check(type(desc.eh_sp) == "table",  "describe: BoolSeries tem entrada")
-check(desc.eh_sp.count == 4,        "describe BoolSeries: count")
-check(desc.eh_sp.true_ == 2,        "describe BoolSeries: true_")
-check(desc.eh_sp.false_ == 2,       "describe BoolSeries: false_")
+check(type(desc.eh_sp) == "table",         "describe: bool coluna tem entrada")
+check(desc.eh_sp.count == 4,               "describe bool: count")
+check(desc.eh_sp.count_true == 2,          "describe bool: count_true")
+check(desc.eh_sp.count_false == 2,         "describe bool: count_false")
 
--- sort_by com coluna BoolSeries (false < true)
+-- sort_by com coluna bool (false < true)
 local sorted_b = df_bool:sort_by("eh_sp", true)
-check(sorted_b:nrows() == 4,                         "sort_by BoolSeries")
-check(sorted_b:col("eh_sp"):get(1) == false,         "sort_by BoolSeries: falses primeiro")
-check(sorted_b:col("eh_sp"):get(3) == true,          "sort_by BoolSeries: trues depois")
+check(sorted_b:nrows() == 4,                        "sort_by bool coluna")
+check(sorted_b:col("eh_sp"):get(1) == false,        "sort_by bool: falses primeiro")
+check(sorted_b:col("eh_sp"):get(3) == true,         "sort_by bool: trues depois")
 
--- dropna com coluna BoolSeries (sem NAs aqui — deve retornar tudo)
+-- dropna com coluna bool (sem NAs aqui — deve retornar tudo)
 local dn = df_bool:dropna()
-check(dn:nrows() == 4, "dropna com BoolSeries sem NAs")
+check(dn:nrows() == 4, "dropna com bool coluna sem NAs")
 
--- fillna sobre BoolSeries diretamente (sem NAs: fillna é no-op semântico)
+-- fillna sobre Series<bool> diretamente (sem NAs: fillna é no-op semântico)
 local bs_fn = df_bool:col("eh_sp"):fillna(false)
-check(getmetatable(bs_fn) == BoolSeries, "fillna DataSet: BoolSeries preservada")
+check(bs_fn._dtype == "bool", "fillna DataSet: bool coluna preservada")
 
 -- =====================================================================
 -- df[mask]: indexação por BoolSeries (__index dispatch)
