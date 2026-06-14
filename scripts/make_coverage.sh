@@ -4,7 +4,7 @@
 # Como funciona: compila cada src/*.c como um .o instrumentado (--coverage) UMA
 # vez; TODOS os executores de teste linkam contra esses MESMOS .o (mesmos .gcno),
 # entao os .gcda agregam de tres fontes:
-#   1. testes C diretos (incl. test_cow test_io test_io_real_c e test_stress) -- linkados contra a .so;
+#   1. testes C diretos (incl. test_cow test_io test_io_real test_enrich_c e test_stress) -- linkados contra a .so;
 #   2. testes Lua (carregam a mesma .so via FFI);
 #   3. test_allocfail (--wrap malloc/realloc) -- linka contra os MESMOS .o.
 #

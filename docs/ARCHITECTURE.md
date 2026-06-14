@@ -216,10 +216,8 @@ lógica de negócio nem semântica de dados.
 
 | Versão | Marco | Critério |
 |---|---|---|
-| **1.0** | Ciclo de dados fechado | Anéis 0+1+2+3 (CSV/JSON). Zero dependências externas. P5 ativo. |
-| **1.1** | Estatística robusta | `median`, `quantile`, `ffill`/`bfill`, `groupby.std/var`, `rolling.std/var/count`, `datetime` básico. |
-| **1.2** | Categorias e transformações | `categorical`, `cummin`/`cummax`, `where`/`mask`, `argmin`/`argmax`, funções matemáticas vetorizadas, NDJSON. |
-| **1.5** | Conectividade avançada + Lazy | SQLite, Excel, Parquet/Arrow, `lazy execution`, `groupby.agg/transform`. |
+| **1.0** | DataFrame library completa | Anéis 0+1+2+3 + estatística robusta + dtypes `datetime`/`categorical` + transformações vetorizadas. Zero dependências externas. |
+| **1.5** | Conectividade avançada + Lazy | SQLite, Excel, Parquet/Arrow, `lazy execution`, `groupby.agg/transform`. Primeira dependência externa (libsqlite3, zlib). |
 | **2.0** | Persistência/ORM | Schema, migrations, audit trail. Anel 4 completo. |
 | **2.x** | ML e Analytics | `Matrix`/`Tensor2D`, broadcasting, pipelines. Anel 5. |
 

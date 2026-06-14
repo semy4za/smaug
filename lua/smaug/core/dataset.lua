@@ -796,9 +796,73 @@ local function agg_max(col, idx)
     end
     return m
 end
+local function agg_std(col, idx)
+    local vals = {}
+    for _, i in ipairs(idx) do
+        local v = col:get(i); if v ~= nil then vals[#vals+1] = v end
+    end
+    local n = #vals
+    if n < 2 then return nil end
+    local mean = 0; for _, v in ipairs(vals) do mean = mean + v end; mean = mean / n
+    local s = 0; for _, v in ipairs(vals) do local d = v - mean; s = s + d*d end
+    return math.sqrt(s / (n - 1))
+end
+local function agg_var(col, idx)
+    local vals = {}
+    for _, i in ipairs(idx) do
+        local v = col:get(i); if v ~= nil then vals[#vals+1] = v end
+    end
+    local n = #vals
+    if n < 2 then return nil end
+    local mean = 0; for _, v in ipairs(vals) do mean = mean + v end; mean = mean / n
+    local s = 0; for _, v in ipairs(vals) do local d = v - mean; s = s + d*d end
+    return s / (n - 1)
+end
+local function agg_median(col, idx)
+    local vals = {}
+    for _, i in ipairs(idx) do
+        local v = col:get(i); if v ~= nil then vals[#vals+1] = v end
+    end
+    local n = #vals
+    if n == 0 then return nil end
+    table.sort(vals)
+    local m = math.floor(n / 2)
+    return (n % 2 == 1) and vals[m+1] or (vals[m] + vals[m+1]) / 2
+end
+local function agg_first(col, idx)
+    for _, i in ipairs(idx) do
+        local v = col:get(i); if v ~= nil then return v end
+    end
+    return nil
+end
+local function agg_last(col, idx)
+    local last = nil
+    for _, i in ipairs(idx) do
+        local v = col:get(i); if v ~= nil then last = v end
+    end
+    return last
+end
+local function agg_nunique(col, idx)
+    local seen = {}; local cnt = 0
+    for _, i in ipairs(idx) do
+        local v = col:get(i)
+        if v ~= nil then
+            local k = tostring(v)
+            if not seen[k] then seen[k] = true; cnt = cnt + 1 end
+        end
+    end
+    return cnt
+end
+local function agg_prod(col, idx)
+    local p, n = 1, 0
+    for _, i in ipairs(idx) do
+        local v = col:get(i); if v ~= nil then p = p * v; n = n + 1 end
+    end
+    return n > 0 and p or nil
+end
 
 -- Monta o DataSet de resultado: colunas-chave + colunas agregadas.
-local function build_result(gb, agg_fn, col_names, result_col_name)
+local function build_result(gb, agg_fn, col_names, out_dtype_override)
     local ds       = gb._ds
     local key_names = gb._key_names
     local groups   = gb._groups
@@ -829,13 +893,23 @@ local function build_result(gb, agg_fn, col_names, result_col_name)
     for _, cname in ipairs(agg_cols) do
         local src    = ds:column(cname)
         local vals   = {}
-        local out_name = result_col_name or cname
-        for _, g in ipairs(groups) do
-            vals[#vals+1] = agg_fn(src, g.idx)
+        local out_name = cname
+        for gi, g in ipairs(groups) do
+            local v = agg_fn(src, g.idx)
+            vals[gi] = (v ~= nil) and v or Series.NA
         end
-        local out_dtype = src._dtype == "int64" and "int64" or "float64"
-        -- mean sempre float64; min/max/sum herdam dtype da coluna
-        if agg_fn == agg_mean then out_dtype = "float64" end
+        -- dtype do resultado
+        local out_dtype
+        if out_dtype_override then
+            out_dtype = out_dtype_override
+        elseif agg_fn == agg_mean or agg_fn == agg_std or agg_fn == agg_var
+           or agg_fn == agg_median then
+            out_dtype = "float64"
+        elseif agg_fn == agg_nunique then
+            out_dtype = "int64"
+        else
+            out_dtype = src._dtype == "int64" and "int64" or "float64"
+        end
         result:add_column(cname,
             Series.from_table(vals, out_dtype, out_name))
     end
@@ -858,6 +932,169 @@ function GroupBy:max(...)
     local cols = select('#', ...) > 0 and {...} or nil
     return build_result(self, agg_max, cols)
 end
+function GroupBy:std(...)
+    local cols = select('#', ...) > 0 and {...} or nil
+    return build_result(self, agg_std, cols)
+end
+function GroupBy:var(...)
+    local cols = select('#', ...) > 0 and {...} or nil
+    return build_result(self, agg_var, cols)
+end
+function GroupBy:median(...)
+    local cols = select('#', ...) > 0 and {...} or nil
+    return build_result(self, agg_median, cols)
+end
+function GroupBy:first(...)
+    local cols = select('#', ...) > 0 and {...} or nil
+    return build_result(self, agg_first, cols)
+end
+function GroupBy:last(...)
+    local cols = select('#', ...) > 0 and {...} or nil
+    return build_result(self, agg_last, cols)
+end
+function GroupBy:prod(...)
+    local cols = select('#', ...) > 0 and {...} or nil
+    return build_result(self, agg_prod, cols)
+end
+
+-- groupby:nunique(): número de valores distintos não-nulos por grupo.
+-- Retorna DataSet com chave + uma coluna "nunique" por coluna agregada.
+function GroupBy:nunique(...)
+    local cols = select('#', ...) > 0 and {...} or nil
+    local ds, key_names, key_set, groups = self._ds, self._key_names, self._key_set, self._groups
+    local result = DataSet.new(ds._name .. "_groupby")
+    -- colunas-chave
+    if #key_names == 1 then
+        local key_dtype = ds:column(key_names[1])._dtype
+        local vals = {}
+        for _, g in ipairs(groups) do vals[#vals+1] = g.key end
+        result:add_column(key_names[1], Series.from_table(vals, key_dtype, key_names[1]))
+    else
+        for ki, kname in ipairs(key_names) do
+            local key_dtype = ds:column(kname)._dtype
+            local vals = {}
+            for _, g in ipairs(groups) do vals[#vals+1] = g.key[ki] end
+            result:add_column(kname, Series.from_table(vals, key_dtype, kname))
+        end
+    end
+    local agg_cols = resolve_agg_cols(ds, key_set, cols)
+    for _, cname in ipairs(agg_cols) do
+        local src = ds:column(cname)
+        local vals = {}
+        for _, g in ipairs(groups) do vals[#vals+1] = agg_nunique(src, g.idx) end
+        result:add_column(cname, Series.from_table(vals, "int64", cname))
+    end
+    return result
+end
+
+-- groupby:quantile(q): percentil por grupo.
+function GroupBy:quantile(q, ...)
+    if type(q) ~= "number" or q < 0 or q > 1 then
+        error("smaug: groupby:quantile() espera 0 ≤ q ≤ 1", 2)
+    end
+    local cols = select('#', ...) > 0 and {...} or nil
+    local fn = function(col, idx)
+        local vals = {}
+        for _, i in ipairs(idx) do
+            local v = col:get(i); if v ~= nil then vals[#vals+1] = v end
+        end
+        local n = #vals
+        if n == 0 then return nil end
+        table.sort(vals)
+        if n == 1 then return vals[1] end
+        local pos  = q * (n - 1)
+        local lo   = math.floor(pos)
+        local frac = pos - lo
+        local hi   = lo + 1
+        if hi >= n then return vals[n] end
+        return vals[lo+1] + frac * (vals[hi+1] - vals[lo+1])
+    end
+    return build_result(self, fn, cols, "float64")
+end
+
+-- groupby:agg({col = fn | {fn1, fn2, ...}}): múltiplas agregações de uma vez.
+-- Exemplo: ds:groupby("uf"):agg({vendas = {"sum","mean"}, custo = "max"})
+-- Nomes de coluna resultado: "vendas_sum", "vendas_mean", "custo_max".
+-- fn pode ser string ("sum","mean","min","max","std","var","median","first","last","prod","count")
+-- ou função Lua (col, idx) -> valor.
+function GroupBy:agg(spec)
+    if type(spec) ~= "table" then
+        error("smaug: groupby:agg() espera uma tabela {coluna = fn | {fn,...}}", 2)
+    end
+    local ds, key_names, key_set, groups = self._ds, self._key_names, self._key_set, self._groups
+    local builtin = {
+        sum=agg_sum, mean=agg_mean, min=agg_min, max=agg_max,
+        std=agg_std, var=agg_var, median=agg_median,
+        first=agg_first, last=agg_last, prod=agg_prod, nunique=agg_nunique,
+        count=function(_, idx) return #idx end,
+    }
+    local result = DataSet.new(ds._name .. "_groupby")
+    -- colunas-chave
+    if #key_names == 1 then
+        local key_dtype = ds:column(key_names[1])._dtype
+        local vals = {}
+        for _, g in ipairs(groups) do vals[#vals+1] = g.key end
+        result:add_column(key_names[1], Series.from_table(vals, key_dtype, key_names[1]))
+    else
+        for ki, kname in ipairs(key_names) do
+            local key_dtype = ds:column(kname)._dtype
+            local vals = {}
+            for _, g in ipairs(groups) do vals[#vals+1] = g.key[ki] end
+            result:add_column(kname, Series.from_table(vals, key_dtype, kname))
+        end
+    end
+    -- colunas agregadas
+    for cname, fns in pairs(spec) do
+        if not ds:has_column(cname) then
+            error("smaug: groupby:agg() — coluna '"..cname.."' não existe", 2)
+        end
+        if type(fns) ~= "table" then fns = {fns} end
+        local src = ds:column(cname)
+        for _, fn in ipairs(fns) do
+            local fn_real = type(fn) == "string" and builtin[fn] or fn
+            if not fn_real then
+                error("smaug: groupby:agg() — função desconhecida '"..tostring(fn).."'", 2)
+            end
+            local out_name = type(fn) == "string" and (cname.."_"..fn) or cname
+            local vals = {}
+            for gi, g in ipairs(groups) do
+                local v = fn_real(src, g.idx)
+                vals[gi] = (v ~= nil) and v or Series.NA
+            end
+            result:add_column(out_name, Series.from_table(vals, "float64", out_name))
+        end
+    end
+    return result
+end
+
+-- groupby:transform(fn_name): aplica agregação e faz broadcast de volta ao tamanho original.
+-- Exemplo: ds:groupby("uf"):transform("mean", "vendas") → Series do tamanho de ds com
+-- cada linha substituída pela média do seu grupo.
+function GroupBy:transform(fn_name, col_name)
+    local ds, groups = self._ds, self._groups
+    if not ds:has_column(col_name) then
+        error("smaug: groupby:transform() — coluna '"..col_name.."' não existe", 2)
+    end
+    local builtin = {
+        sum=agg_sum, mean=agg_mean, min=agg_min, max=agg_max,
+        std=agg_std, var=agg_var, median=agg_median,
+        first=agg_first, last=agg_last, prod=agg_prod,
+    }
+    local fn = type(fn_name) == "string" and builtin[fn_name] or fn_name
+    if not fn then
+        error("smaug: groupby:transform() — função desconhecida '"..tostring(fn_name).."'", 2)
+    end
+    local src  = ds:column(col_name)
+    local n    = ds:nrows()
+    local vals = {}
+    for i = 1, n do vals[i] = Series.NA end
+    for _, g in ipairs(groups) do
+        local agg_val = fn(src, g.idx)
+        for _, i in ipairs(g.idx) do vals[i] = agg_val end
+    end
+    return Series.from_table(vals, "float64", col_name)
+end
+
 function GroupBy:count()
     local ds        = self._ds
     local key_names = self._key_names
@@ -1218,6 +1455,182 @@ end
 -- Inspeção
 -- =====================================================================
 -- describe: tabela { coluna = (describe da Series) } para colunas numéricas.
+-- rename({old=new, ...}): renomeia múltiplas colunas de uma vez → novo DataSet.
+function methods.rename(self, mapping)
+    if type(mapping) ~= "table" then
+        error("smaug: rename() espera tabela {old=new, ...}", 2)
+    end
+    -- validar: todas as colunas-fonte existem e os novos nomes não colidem
+    for old, new in pairs(mapping) do
+        if not self:has_column(old) then
+            error("smaug: rename() — coluna '"..old.."' não existe", 2)
+        end
+        if type(new) ~= "string" or new == "" then
+            error("smaug: rename() — nome inválido para '"..old.."': "..tostring(new), 2)
+        end
+    end
+    local result = DataSet.new(self._name)
+    for _, cname in ipairs(self._col_names) do
+        local new_name = mapping[cname] or cname
+        result:add_column(new_name, self:column(cname):clone())
+    end
+    return result
+end
+
+-- pivot_table(index, columns, values, aggfunc): pivot com agregação.
+-- aggfunc: "sum" (default), "mean", "min", "max", "count", "first", "last".
+-- Linhas = valores únicos de `index`, colunas = valores únicos de `columns`.
+function methods.pivot_table(self, index, columns, values, aggfunc)
+    if not self:has_column(index)   then error("smaug: pivot_table — coluna '"..index.."' não existe",   2) end
+    if not self:has_column(columns) then error("smaug: pivot_table — coluna '"..columns.."' não existe", 2) end
+    if not self:has_column(values)  then error("smaug: pivot_table — coluna '"..values.."' não existe",  2) end
+    aggfunc = aggfunc or "sum"
+    local fns = {
+        sum=agg_sum, mean=agg_mean, min=agg_min, max=agg_max,
+        count=function(_, idx) return #idx end,
+        first=agg_first, last=agg_last,
+    }
+    local fn = fns[aggfunc]
+    if not fn then error("smaug: pivot_table — aggfunc desconhecida '"..aggfunc.."'", 2) end
+
+    local idx_col  = self:column(index)
+    local col_col  = self:column(columns)
+    local val_col  = self:column(values)
+    local n        = self:nrows()
+
+    -- coletar valores únicos (em ordem de aparição)
+    local idx_vals, idx_seen = {}, {}
+    local col_vals, col_seen = {}, {}
+    for i = 1, n do
+        local iv = idx_col:get(i)
+        local cv = col_col:get(i)
+        if iv ~= nil and not idx_seen[tostring(iv)] then
+            idx_seen[tostring(iv)] = true; idx_vals[#idx_vals+1] = iv
+        end
+        if cv ~= nil and not col_seen[tostring(cv)] then
+            col_seen[tostring(cv)] = true; col_vals[#col_vals+1] = cv
+        end
+    end
+    table.sort(idx_vals, function(a, b) return tostring(a) < tostring(b) end)
+    table.sort(col_vals, function(a, b) return tostring(a) < tostring(b) end)
+
+    -- agrupar linhas por (index, column)
+    local buckets = {}  -- buckets[idx_key][col_key] = {indices}
+    for i = 1, n do
+        local ik = tostring(idx_col:get(i) or "")
+        local ck = tostring(col_col:get(i) or "")
+        if not buckets[ik] then buckets[ik] = {} end
+        if not buckets[ik][ck] then buckets[ik][ck] = {} end
+        buckets[ik][ck][#buckets[ik][ck]+1] = i
+    end
+
+    -- construir resultado
+    local result = DataSet.new(self._name.."_pivot")
+    local idx_dtype = idx_col._dtype
+    local idx_data  = {}
+    for _, iv in ipairs(idx_vals) do idx_data[#idx_data+1] = iv end
+    result:add_column(index, Series.from_table(idx_data, idx_dtype, index))
+
+    local val_dtype = val_col._dtype
+    for _, cv in ipairs(col_vals) do
+        local ck    = tostring(cv)
+        local cdata = {}
+        for _, iv in ipairs(idx_vals) do
+            local ik  = tostring(iv)
+            local ids = buckets[ik] and buckets[ik][ck] or {}
+            cdata[#cdata+1] = (#ids > 0) and fn(val_col, ids) or Series.NA
+        end
+        result:add_column(tostring(cv), Series.from_table(cdata, val_dtype, tostring(cv)))
+    end
+    return result
+end
+
+-- stack(col_names): empilha colunas selecionadas em duas colunas (variable, value).
+-- Mantém id_vars como as colunas restantes. Equivale a melt com nomes padrão.
+function methods.stack(self, col_names)
+    if type(col_names) ~= "table" or #col_names == 0 then
+        error("smaug: stack() espera lista de colunas a empilhar", 2)
+    end
+    local id_vars = {}
+    for _, cname in ipairs(self._col_names) do
+        local is_val = false
+        for _, v in ipairs(col_names) do if v == cname then is_val = true; break end end
+        if not is_val then id_vars[#id_vars+1] = cname end
+    end
+    return self:melt(id_vars, col_names, "variable", "value")
+end
+
+-- unstack(col, index): operação inversa do stack.
+-- Equivale a pivot com aggfunc="first".
+function methods.unstack(self, index, col, values)
+    return self:pivot_table(index, col, values, "first")
+end
+
+-- explode(col_name): expande uma coluna cujos valores são tabelas Lua em múltiplas linhas.
+-- As demais colunas têm seus valores repetidos. Nulos na coluna → linha com NA.
+function methods.explode(self, col_name)
+    if not self:has_column(col_name) then
+        error("smaug: explode() — coluna '"..col_name.."' não existe", 2)
+    end
+    local src   = self:column(col_name)
+    local n     = self:nrows()
+    -- contagem de linhas no resultado
+    local total = 0
+    for i = 1, n do
+        local v = src:get(i)
+        if v == nil then total = total + 1
+        elseif type(v) == "table" then total = total + math.max(#v, 1)
+        else total = total + 1 end
+    end
+    -- construir colunas resultado
+    local other_cols = {}
+    for _, cname in ipairs(self._col_names) do
+        if cname ~= col_name then
+            other_cols[cname] = { col=self:column(cname), vals={} }
+        end
+    end
+    local exploded_vals = {}
+    for i = 1, n do
+        local v = src:get(i)
+        local items
+        if v == nil then
+            items = {Series.NA}
+        elseif type(v) == "table" then
+            items = #v > 0 and v or {Series.NA}
+        else
+            items = {v}
+        end
+        for _, item in ipairs(items) do
+            exploded_vals[#exploded_vals+1] = item
+            for _, info in pairs(other_cols) do
+                info.vals[#info.vals+1] = info.col:get(i)
+            end
+        end
+    end
+    local result = DataSet.new(self._name)
+    for _, cname in ipairs(self._col_names) do
+        if cname == col_name then
+            -- inferir dtype da coluna explodida
+            local dtype = "string"
+            for _, v in ipairs(exploded_vals) do
+                if v ~= nil and v ~= Series.NA then
+                    if type(v) == "number" then
+                        dtype = (v % 1 == 0) and "int64" or "float64"
+                    elseif type(v) == "boolean" then
+                        dtype = "bool"
+                    end
+                    break
+                end
+            end
+            result:add_column(col_name, Series.from_table(exploded_vals, dtype, col_name))
+        else
+            local info   = other_cols[cname]
+            result:add_column(cname, Series.from_table(info.vals, info.col._dtype, cname))
+        end
+    end
+    return result
+end
+
 function methods.describe(self)
     local t = {}
     for _, n in ipairs(self._col_names) do

@@ -671,6 +671,117 @@ function SeriesRolling:max()
     end)
 end
 
+-- rolling:std() / var(): desvio padrão / variância amostral (÷ n-1) da janela.
+function SeriesRolling:std()
+    return self:_agg(function(vs)
+        local n = #vs
+        if n < 2 then return nil end
+        local mean = 0; for _, v in ipairs(vs) do mean = mean + v end; mean = mean / n
+        local s = 0; for _, v in ipairs(vs) do local d = v - mean; s = s + d*d end
+        return math.sqrt(s / (n - 1))
+    end, "float64")
+end
+
+function SeriesRolling:var()
+    return self:_agg(function(vs)
+        local n = #vs
+        if n < 2 then return nil end
+        local mean = 0; for _, v in ipairs(vs) do mean = mean + v end; mean = mean / n
+        local s = 0; for _, v in ipairs(vs) do local d = v - mean; s = s + d*d end
+        return s / (n - 1)
+    end, "float64")
+end
+
+-- rolling:count(): número de não-nulos na janela.
+function SeriesRolling:count()
+    local col, w, NA = self._s, self._window, Series.NA
+    local n    = col:len()
+    local vals = {}
+    for i = 1, n do
+        if i < w then vals[i] = NA
+        else
+            local cnt = 0
+            for j = i - w + 1, i do
+                if col:get(j) ~= nil then cnt = cnt + 1 end
+            end
+            vals[i] = cnt
+        end
+    end
+    return Series.from_table(vals, "int64", col._name)
+end
+
+-- rolling:median(): mediana da janela.
+function SeriesRolling:median()
+    return self:_agg(function(vs)
+        if #vs == 0 then return nil end
+        local sv = {}; for _, v in ipairs(vs) do sv[#sv+1] = v end
+        table.sort(sv)
+        local n = #sv
+        local m = math.floor(n / 2)
+        return (n % 2 == 1) and sv[m+1] or (sv[m] + sv[m+1]) / 2
+    end, "float64")
+end
+
+-- rolling:quantile(q): percentil da janela (interpolação linear).
+function SeriesRolling:quantile(q)
+    if type(q) ~= "number" or q < 0 or q > 1 then
+        error("smaug: rolling:quantile() espera 0 ≤ q ≤ 1", 2)
+    end
+    return self:_agg(function(vs)
+        local n = #vs
+        if n == 0 then return nil end
+        local sv = {}; for _, v in ipairs(vs) do sv[#sv+1] = v end
+        table.sort(sv)
+        if n == 1 then return sv[1] end
+        local pos  = q * (n - 1)
+        local lo   = math.floor(pos)
+        local frac = pos - lo
+        local hi   = lo + 1
+        if hi >= n then return sv[n] end
+        return sv[lo+1] + frac * (sv[hi+1] - sv[lo+1])
+    end)
+end
+
+-- rolling:min_periods(p): define mínimo de não-nulos para produzir resultado.
+-- Retorna novo objeto rolling com min_periods configurado.
+function SeriesRolling:min_periods(p)
+    if type(p) ~= "number" or p < 1 then
+        error("smaug: rolling:min_periods() espera p >= 1", 2)
+    end
+    return setmetatable({ _s=self._s, _window=self._window, _min_periods=p }, SeriesRolling)
+end
+
+-- Aplica min_periods na _agg base também
+-- min_periods: mínimo de não-nulos necessários dentro da janela para produzir
+-- resultado. A janela sempre tem tamanho `w`; posições anteriores a `w` são NA
+-- a menos que min_periods < w (nesse caso janelas parciais são permitidas).
+function SeriesRolling:_agg(fn, out_dtype)
+    local col  = self._s
+    local n    = col:len()
+    local w    = self._window
+    local min_p = self._min_periods or 1   -- default: 1 não-nulo na janela
+    local NA   = Series.NA
+    local vals = {}
+    for i = 1, n do
+        -- janela efetiva: sem min_periods, começa em i-w+1; com min_periods < w,
+        -- pode começar em i-w+1 mesmo se i < w, desde que haja dados suficientes.
+        local wstart = math.max(1, i - w + 1)
+        -- se i < w e não há min_periods customizado: janela incompleta → NA
+        if i < w and not self._min_periods then
+            vals[i] = NA
+        else
+            local wv = {}
+            for j = wstart, i do
+                local v = col:get(j)
+                if v ~= nil then wv[#wv+1] = v end
+            end
+            local res = (#wv >= min_p) and fn(wv) or nil
+            vals[i] = (res ~= nil) and res or NA
+        end
+    end
+    return Series.from_table(vals, out_dtype or col._dtype, col._name)
+end
+
 function methods.rolling(self, window)
     if self._dtype ~= "float64" and self._dtype ~= "int64" then
         error("smaug: rolling() requer dtype numérico, não '"..self._dtype.."'", 2)
@@ -1577,6 +1688,550 @@ Series.__index = function(self, k)
         return setmetatable({ _s = self }, StrProxy)
     end
     return methods[k]
+end
+
+-- =====================================================================
+-- Enriquecimento: reduções, transformações e conveniência
+-- =====================================================================
+
+-- Helper: coleta valores não-nulos da série em tabela Lua ordenada.
+local function collect_sorted(self)
+    local n, vals = self:len(), {}
+    for i = 1, n do
+        local v = self:get(i)
+        if v ~= nil then vals[#vals+1] = v end
+    end
+    table.sort(vals)
+    return vals
+end
+
+-- Helper: mediana de uma tabela Lua já ordenada (pode estar vazia).
+local function median_sorted(vals)
+    local n = #vals
+    if n == 0 then return nil end
+    local m = math.floor(n / 2)
+    return (n % 2 == 1) and vals[m+1] or (vals[m] + vals[m+1]) / 2
+end
+
+-- Helper: quantil de tabela Lua ordenada, 0 ≤ q ≤ 1 (interpolação linear).
+local function quantile_sorted(vals, q)
+    local n = #vals
+    if n == 0 then return nil end
+    if n == 1 then return vals[1] end
+    local pos  = q * (n - 1)          -- posição 0-based
+    local lo   = math.floor(pos)
+    local frac = pos - lo
+    local hi   = lo + 1
+    if hi >= n then return vals[n] end -- evita out-of-bounds
+    return vals[lo+1] + frac * (vals[hi+1] - vals[lo+1])
+end
+
+-- prod([ignore_na]): produto de todos os valores.
+function methods.prod(self, ignore_na)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: prod() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    ignore_na = (ignore_na == nil) and true or ignore_na
+    local p, n = 1, 0
+    for i = 1, self:len() do
+        local v = self:get(i)
+        if v == nil then
+            if not ignore_na then return nil end
+        else
+            p = p * v; n = n + 1
+        end
+    end
+    return n > 0 and p or nil
+end
+
+-- median([ignore_na]): mediana (ignora nulos por padrão). float64.
+function methods.median(self, ignore_na)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: median() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    ignore_na = (ignore_na == nil) and true or ignore_na
+    if not ignore_na then
+        for i = 1, self:len() do
+            if self:get(i) == nil then return nil end
+        end
+    end
+    return median_sorted(collect_sorted(self))
+end
+
+-- quantile(q, [ignore_na]): percentil 0 ≤ q ≤ 1. Interpolação linear. float64.
+function methods.quantile(self, q, ignore_na)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: quantile() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    if type(q) ~= "number" or q < 0 or q > 1 then
+        error("smaug: quantile() espera 0 ≤ q ≤ 1", 2)
+    end
+    ignore_na = (ignore_na == nil) and true or ignore_na
+    if not ignore_na then
+        for i = 1, self:len() do
+            if self:get(i) == nil then return nil end
+        end
+    end
+    return quantile_sorted(collect_sorted(self), q)
+end
+
+-- mode(): valor mais frequente (ignora nulos). Empate: primeiro em ordem de valor.
+function methods.mode(self)
+    if self._dtype == "bool" then
+        error("smaug: mode() não suportado para bool", 2)
+    end
+    local freq = {}
+    local order = {}
+    for i = 1, self:len() do
+        local v = self:get(i)
+        if v ~= nil then
+            local k = tostring(v)
+            if not freq[k] then freq[k] = 0; order[#order+1] = v end
+            freq[k] = freq[k] + 1
+        end
+    end
+    if #order == 0 then return nil end
+    local best, best_f = order[1], 0
+    for _, v in ipairs(order) do
+        local f = freq[tostring(v)]
+        if f > best_f then best = v; best_f = f end
+    end
+    return best
+end
+
+-- ffill(): preenche nulos com o último valor válido anterior.
+function methods.ffill(self)
+    local NA   = Series.NA
+    local n    = self:len()
+    local vals = {}
+    local last = NA
+    for i = 1, n do
+        local v = self:get(i)
+        if v ~= nil then last = v end
+        vals[i] = last
+    end
+    return Series.from_table(vals, self._dtype, self._name)
+end
+
+-- bfill(): preenche nulos com o próximo valor válido seguinte.
+function methods.bfill(self)
+    local NA   = Series.NA
+    local n    = self:len()
+    local vals = {}
+    local next_val = NA
+    for i = n, 1, -1 do
+        local v = self:get(i)
+        if v ~= nil then next_val = v end
+        vals[i] = next_val
+    end
+    return Series.from_table(vals, self._dtype, self._name)
+end
+
+-- cummin(): mínimo cumulativo. Nulos propagam.
+function methods.cummin(self)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: cummin() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    local NA, n, vals = Series.NA, self:len(), {}
+    local cur = nil
+    for i = 1, n do
+        local v = self:get(i)
+        if v == nil then
+            vals[i] = NA
+        else
+            cur = (cur == nil or v < cur) and v or cur
+            vals[i] = cur
+        end
+    end
+    return Series.from_table(vals, self._dtype, self._name)
+end
+
+-- cummax(): máximo cumulativo. Nulos propagam.
+function methods.cummax(self)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: cummax() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    local NA, n, vals = Series.NA, self:len(), {}
+    local cur = nil
+    for i = 1, n do
+        local v = self:get(i)
+        if v == nil then
+            vals[i] = NA
+        else
+            cur = (cur == nil or v > cur) and v or cur
+            vals[i] = cur
+        end
+    end
+    return Series.from_table(vals, self._dtype, self._name)
+end
+
+-- argmin(): índice 1-based do mínimo (ignora nulos). nil se vazia ou toda nula.
+function methods.argmin(self)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: argmin() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    local best_v, best_i = nil, nil
+    for i = 1, self:len() do
+        local v = self:get(i)
+        if v ~= nil and (best_v == nil or v < best_v) then
+            best_v, best_i = v, i
+        end
+    end
+    return best_i
+end
+
+-- argmax(): índice 1-based do máximo (ignora nulos).
+function methods.argmax(self)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: argmax() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    local best_v, best_i = nil, nil
+    for i = 1, self:len() do
+        local v = self:get(i)
+        if v ~= nil and (best_v == nil or v > best_v) then
+            best_v, best_i = v, i
+        end
+    end
+    return best_i
+end
+
+-- rank([method]): posição de cada valor no ranking (1-based, ignora nulos → NA).
+-- method: "average" (default), "min", "max", "first".
+function methods.rank(self, method)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: rank() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    method = method or "average"
+    local n    = self:len()
+    local NA   = Series.NA
+    -- coleta pares (valor, índice_original) não-nulos
+    local pairs_list = {}
+    for i = 1, n do
+        local v = self:get(i)
+        if v ~= nil then pairs_list[#pairs_list+1] = {v=v, i=i} end
+    end
+    table.sort(pairs_list, function(a, b)
+        return a.v < b.v or (a.v == b.v and a.i < b.i)
+    end)
+    -- atribui ranks
+    local ranks = {}  -- ranks[índice_original] = rank
+    local m = #pairs_list
+    local p = 1
+    while p <= m do
+        local q = p
+        while q < m and pairs_list[q+1].v == pairs_list[p].v do q = q + 1 end
+        local r_min, r_max = p, q
+        for k = p, q do
+            local idx = pairs_list[k].i
+            if     method == "min"     then ranks[idx] = r_min
+            elseif method == "max"     then ranks[idx] = r_max
+            elseif method == "first"   then ranks[idx] = k
+            else   -- average
+                ranks[idx] = (r_min + r_max) / 2
+            end
+        end
+        p = q + 1
+    end
+    local vals = {}
+    for i = 1, n do
+        vals[i] = ranks[i] ~= nil and ranks[i] or NA
+    end
+    return Series.from_table(vals, "float64", self._name)
+end
+
+-- pct_rank(): rank normalizado para [0, 1]. Atalho sobre rank("average") / n.
+function methods.pct_rank(self)
+    local r = self:rank("average")
+    local n = tonumber(self._d.count_nonnull and self._d.count_nonnull(self._c) or self:count_nonnull())
+    if n == 0 then return r end
+    return r:map(function(v) return v ~= nil and (v / n) or nil end, "float64", self._name)
+end
+
+-- skew(): assimetria amostral (denominador n-1). nil se < 3 valores.
+function methods.skew(self)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: skew() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    local vals = collect_sorted(self)  -- sorted não importa, só precisamos dos valores
+    local n = #vals
+    if n < 3 then return nil end
+    local mean = 0
+    for _, v in ipairs(vals) do mean = mean + v end
+    mean = mean / n
+    local m2, m3 = 0, 0
+    for _, v in ipairs(vals) do
+        local d = v - mean
+        m2 = m2 + d*d
+        m3 = m3 + d*d*d
+    end
+    m2 = m2 / n; m3 = m3 / n
+    if m2 == 0 then return 0 end
+    -- ajuste amostral: G1 = (n / ((n-1)*(n-2))) * (m3 / m2^1.5)
+    local g1 = (m3 / (m2 ^ 1.5)) * (math.sqrt(n*(n-1)) / (n-2))
+    return g1
+end
+
+-- kurtosis(): curtose amostral (excess kurtosis, base normal = 0).
+function methods.kurtosis(self)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: kurtosis() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    local vals = collect_sorted(self)
+    local n = #vals
+    if n < 4 then return nil end
+    local mean = 0
+    for _, v in ipairs(vals) do mean = mean + v end
+    mean = mean / n
+    local m2, m4 = 0, 0
+    for _, v in ipairs(vals) do
+        local d = v - mean
+        local d2 = d * d
+        m2 = m2 + d2
+        m4 = m4 + d2 * d2
+    end
+    m2 = m2 / n; m4 = m4 / n
+    if m2 == 0 then return 0 end
+    -- ajuste amostral de Fisher
+    local kurt = (n*(n+1) / ((n-1)*(n-2)*(n-3))) * (m4/(m2*m2)) - 3*(n-1)^2/((n-2)*(n-3))
+    return kurt
+end
+
+-- mad(): desvio absoluto mediano (robusto a outliers).
+function methods.mad(self)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: mad() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    local vals = collect_sorted(self)
+    if #vals == 0 then return nil end
+    local med = median_sorted(vals)
+    local devs = {}
+    for _, v in ipairs(vals) do devs[#devs+1] = math.abs(v - med) end
+    table.sort(devs)
+    return median_sorted(devs)
+end
+
+-- sem(): erro padrão da média = std / sqrt(n).
+function methods.sem(self)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: sem() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    local vals = collect_sorted(self)
+    local n = #vals
+    if n < 2 then return nil end
+    local mean = 0
+    for _, v in ipairs(vals) do mean = mean + v end
+    mean = mean / n
+    local s2 = 0
+    for _, v in ipairs(vals) do local d = v - mean; s2 = s2 + d*d end
+    local std = math.sqrt(s2 / (n - 1))   -- desvio padrão amostral
+    return std / math.sqrt(n)
+end
+
+-- where(cond, other): mantém valor onde cond é true, substitui por `other` onde false/NA.
+-- cond: Series<bool> do mesmo tamanho. other: escalar ou Series.
+function methods.where(self, cond, other)
+    if type(cond) ~= "table" or cond._dtype ~= "bool" then
+        error("smaug: where() espera Series<bool> como primeiro argumento", 2)
+    end
+    if cond:len() ~= self:len() then
+        error("smaug: where() — tamanhos diferentes ("..cond:len().." vs "..self:len()..")", 2)
+    end
+    local NA   = Series.NA
+    local n    = self:len()
+    local vals = {}
+    local is_series_other = type(other) == "table" and other._dtype ~= nil
+    for i = 1, n do
+        local c = cond:get(i)
+        if c == true then
+            vals[i] = self:get(i)
+        else
+            vals[i] = is_series_other and other:get(i) or (other == nil and NA or other)
+        end
+    end
+    return Series.from_table(vals, self._dtype, self._name)
+end
+
+-- mask(cond, other): inverso de where — substitui onde cond é true.
+function methods.mask(self, cond, other)
+    if type(cond) ~= "table" or cond._dtype ~= "bool" then
+        error("smaug: mask() espera Series<bool> como primeiro argumento", 2)
+    end
+    if cond:len() ~= self:len() then
+        error("smaug: mask() — tamanhos diferentes ("..cond:len().." vs "..self:len()..")", 2)
+    end
+    local NA   = Series.NA
+    local n    = self:len()
+    local vals = {}
+    local is_series_other = type(other) == "table" and other._dtype ~= nil
+    for i = 1, n do
+        local c = cond:get(i)
+        if c == true then
+            vals[i] = is_series_other and other:get(i) or (other == nil and NA or other)
+        else
+            vals[i] = self:get(i)
+        end
+    end
+    return Series.from_table(vals, self._dtype, self._name)
+end
+
+-- ifelse(cond, a, b): vetorizado — a onde cond=true, b onde cond=false/NA.
+-- cond: Series<bool>. a, b: escalar ou Series.
+function Series.ifelse(cond, a, b)
+    if type(cond) ~= "table" or cond._dtype ~= "bool" then
+        error("smaug: ifelse() espera Series<bool> como primeiro argumento", 2)
+    end
+    local n    = cond:len()
+    local NA   = Series.NA
+    local is_a = type(a) == "table" and a._dtype ~= nil
+    local is_b = type(b) == "table" and b._dtype ~= nil
+    -- inferir dtype do resultado
+    local dtype = "float64"
+    if is_a     then dtype = a._dtype
+    elseif is_b then dtype = b._dtype
+    elseif type(a) == "string" or type(b) == "string" then dtype = "string"
+    elseif type(a) == "boolean" or type(b) == "boolean" then dtype = "bool"
+    elseif type(a) == "number" and a % 1 == 0 and
+           (b == nil or (type(b) == "number" and b % 1 == 0)) then dtype = "int64"
+    end
+    local vals = {}
+    for i = 1, n do
+        local c = cond:get(i)
+        if c == true then
+            vals[i] = is_a and a:get(i) or (a == nil and NA or a)
+        else
+            vals[i] = is_b and b:get(i) or (b == nil and NA or b)
+        end
+    end
+    return Series.from_table(vals, dtype)
+end
+
+-- isna(i) / notna(i): alias de is_null / not is_null.
+function methods.isna(self, i)  return self:is_null(i) end
+function methods.notna(self, i) return not self:is_null(i) end
+
+-- nlargest(n): os n maiores valores → nova Series ordenada desc.
+function methods.nlargest(self, n)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: nlargest() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    if type(n) ~= "number" or n < 1 then
+        error("smaug: nlargest() espera n >= 1", 2)
+    end
+    local vals = collect_sorted(self)
+    local result = {}
+    local m = #vals
+    for i = m, math.max(m - n + 1, 1), -1 do
+        result[#result+1] = vals[i]
+    end
+    return Series.from_table(result, self._dtype, self._name)
+end
+
+-- nsmallest(n): os n menores valores → nova Series ordenada asc.
+function methods.nsmallest(self, n)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: nsmallest() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    if type(n) ~= "number" or n < 1 then
+        error("smaug: nsmallest() espera n >= 1", 2)
+    end
+    local vals = collect_sorted(self)
+    local result = {}
+    for i = 1, math.min(n, #vals) do result[i] = vals[i] end
+    return Series.from_table(result, self._dtype, self._name)
+end
+
+-- Funções matemáticas vetorizadas: sin, cos, tan, exp, log, sqrt.
+-- Nulos propagam. Resultado sempre float64.
+local _math_fns = {
+    sin  = math.sin,  cos = math.cos, tan = math.tan,
+    exp  = math.exp,  log = math.log, sqrt = math.sqrt,
+}
+for fname, fn in pairs(_math_fns) do
+    methods[fname] = function(self)
+        if self._dtype ~= "float64" and self._dtype ~= "int64" then
+            error("smaug: "..fname.."() requer dtype numérico, não '"..self._dtype.."'", 2)
+        end
+        return self:map(function(v) return v ~= nil and fn(v) or nil end, "float64", self._name)
+    end
+end
+
+-- expanding(): janela crescente — equivale a rolling(i) para cada posição i.
+-- Retorna objeto com os mesmos métodos do rolling.
+local SeriesExpanding = {}
+SeriesExpanding.__index = SeriesExpanding
+
+function SeriesExpanding:_agg(fn)
+    local col  = self._s
+    local n    = col:len()
+    local NA   = Series.NA
+    local min_p = self._min_periods or 1
+    local vals = {}
+    for i = 1, n do
+        local wv = {}
+        for j = 1, i do
+            local v = col:get(j)
+            if v ~= nil then wv[#wv+1] = v end
+        end
+        vals[i] = (#wv >= min_p) and fn(wv) or NA
+    end
+    return Series.from_table(vals, col._dtype, col._name)
+end
+
+function SeriesExpanding:sum()
+    return self:_agg(function(vs) local s=0; for _,v in ipairs(vs) do s=s+v end; return s end)
+end
+function SeriesExpanding:mean()
+    return self:_agg(function(vs)
+        if #vs == 0 then return nil end
+        local s=0; for _,v in ipairs(vs) do s=s+v end; return s/#vs
+    end)
+end
+function SeriesExpanding:min()
+    return self:_agg(function(vs)
+        if #vs == 0 then return nil end
+        local m=vs[1]; for _,v in ipairs(vs) do if v<m then m=v end end; return m
+    end)
+end
+function SeriesExpanding:max()
+    return self:_agg(function(vs)
+        if #vs == 0 then return nil end
+        local m=vs[1]; for _,v in ipairs(vs) do if v>m then m=v end end; return m
+    end)
+end
+function SeriesExpanding:std()
+    return self:_agg(function(vs)
+        local n = #vs
+        if n < 2 then return nil end
+        local mean = 0; for _,v in ipairs(vs) do mean=mean+v end; mean=mean/n
+        local s = 0; for _,v in ipairs(vs) do local d=v-mean; s=s+d*d end
+        return math.sqrt(s / (n-1))
+    end)
+end
+function SeriesExpanding:var()
+    return self:_agg(function(vs)
+        local n = #vs
+        if n < 2 then return nil end
+        local mean = 0; for _,v in ipairs(vs) do mean=mean+v end; mean=mean/n
+        local s = 0; for _,v in ipairs(vs) do local d=v-mean; s=s+d*d end
+        return s / (n-1)
+    end)
+end
+function SeriesExpanding:count()
+    return self:_agg(function(vs) return #vs end)
+end
+function SeriesExpanding:median()
+    return self:_agg(function(vs)
+        local sv = {}; for _,v in ipairs(vs) do sv[#sv+1]=v end
+        table.sort(sv)
+        return median_sorted(sv)
+    end)
+end
+
+function methods.expanding(self, min_periods)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: expanding() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    return setmetatable({ _s=self, _min_periods=min_periods or 1 }, SeriesExpanding)
 end
 
 -- __newindex: série[i] = v -> set(); outras chaves gravam no objeto.

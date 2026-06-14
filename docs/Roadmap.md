@@ -159,34 +159,64 @@ Parsers próprios, zero dependências externas. Fronteira `smaug_table_t` plugá
 
 ---
 
-## Próximas versões
+## Pré-1.0 — O que falta para o tag
 
-### v1.1 — Estatística robusta e séries temporais básicas
+1.0 fecha quando os itens abaixo estiverem implementados, testados e
+com `bash scripts/build.sh --all` verde. Tudo aqui é Lua puro + C puro,
+sem dependências externas — mesma classe dos Anéis 0-3.
+
+### Bloco A — Estatística e valores ausentes
 
 | Item | Área |
 |---|---|
-| `datetime` (tipo + year/month/day/weekday/diff) | dtype novo |
-| `median` / `quantile` | reduções |
+| `median` / `quantile` (qualquer percentil) | reduções Series |
 | `ffill` / `bfill` | valores ausentes |
 | `groupby.std` / `var` / `median` | groupby |
 | `rolling.std` / `var` / `count` + `min_periods` | rolling |
 
-### v1.2 — Categorias, transformações e conveniência
+### Bloco B — Dtypes novos
 
 | Item | Área |
 |---|---|
-| `categorical` (dictionary encoding) | dtype novo |
+| `datetime` (epoch ms + year/month/day/weekday/diff) | dtype novo |
+| `categorical` (dictionary encoding, codes int32 + levels) | dtype novo |
+
+### Bloco C — Transformações e seleção
+
+| Item | Área |
+|---|---|
 | `cummin` / `cummax` | janela temporal |
-| `argmin` / `argmax` | ordenação |
+| `argmin` / `argmax` | ordenação e seleção |
 | `nlargest` / `nsmallest` | seleção |
 | `where` / `mask` / `ifelse` (vetorizados) | booleano |
 | `groupby.first` / `last` / `nunique` / `prod` | groupby |
-| `sin`, `cos`, `exp`, `log`, `sqrt` (vetorizadas) | matemática |
+| `groupby.quantile` / `rolling.median` / `quantile` | estatística avançada |
+| `mode` / `prod` | reduções |
+
+### Bloco D — Matemática e conveniência
+
+| Item | Área |
+|---|---|
+| `sin` / `cos` / `tan` / `exp` / `log` / `sqrt` (vetorizadas) | matemática |
 | `isna` / `notna` (alias de `is_null`) | conveniência |
 | `rename` em lote | DataSet |
-| NDJSON | I/O |
+| NDJSON I/O | I/O |
 
-### v1.5 — Conectividade avançada e lazy evaluation
+### Checklist de release
+
+- [ ] Bloco A implementado e testado.
+- [ ] Bloco B implementado e testado.
+- [ ] Bloco C implementado e testado.
+- [ ] Bloco D implementado e testado.
+- [ ] `test_io_real.lua` para cotações (float64 alta precisão, SHIB).
+- [ ] Docstrings nos métodos públicos de `Series` e `DataSet`.
+- [ ] `bash scripts/build.sh --all` verde.
+- [ ] CHANGELOG entry v1.0.0.
+- [ ] `git tag v1.0.0`.
+
+---
+
+## Pós-1.0 — v1.5 (com dependências externas)
 
 | Item | Área |
 |---|---|
@@ -196,26 +226,19 @@ Parsers próprios, zero dependências externas. Fronteira `smaug_table_t` plugá
 | `lazy execution` (`LazyDataSet → plano → .collect()`) | engine |
 | predicate / projection pushdown | engine |
 | `groupby.agg` / `transform` / `apply` | groupby |
-| `rolling.median` / `quantile` / `expanding` | rolling |
-| `resample` (agg por período temporal) | temporal |
+| `expanding.*` / `resample` | rolling / temporal |
+| `interpolate` | valores ausentes |
 | regex string operations | `.str` Tier C |
-| schema formal e lineage (primeira versão) | engenharia de dados |
+| `rank` / `pct_rank` / `skew` / `kurtosis` / `mad` / `sem` | estatística |
+| `cross_join` / `join por expressão` | joins |
+| `query` / `eval` / `explode` / `pivot_table` / `stack` / `unstack` | DataSet |
+| schema formal e lineage | engenharia de dados |
+| `stable sort` (timsort) | ordenação |
 
-### v2.0 — Persistência/ORM
+## Pós-1.0 — v2.0 (Persistência e ML)
 
-ORM, schema declarativo, engine de migração, versionamento de schema.
-Anel 4 completo. Ver `ARCHITECTURE.md`.
-
----
-
-## Pré-1.0 — Checklist de release
-
-- [ ] Docstrings no source Lua — contrato e exemplo em cada método público de `Series` e `DataSet`.
-- [ ] `API_Reference.md` — seção I/O e atualização geral.
-- [ ] `test_io_real.lua` para cotações (float64 alta precisão, SHIB values pequenos).
-- [ ] Linux: `bash scripts/build.sh --all` verde.
-- [ ] CHANGELOG entry v1.0.0.
-- [ ] `git tag v1.0.0`.
+ORM, schema declarativo, engine de migração. `Matrix`/`Tensor2D`.
+Broadcasting axis-aware. Paralelismo. Anel 4 + Anel 5. Ver `ARCHITECTURE.md`.
 
 ---
 
