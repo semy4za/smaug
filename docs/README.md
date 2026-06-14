@@ -1,8 +1,7 @@
 # 🐉 Smaug
 
-Biblioteca de dados tabulares em Lua com backend em C.
-Engine de Ring 0 em C puro — memória, tipos, operações primitivas.
-Frontend de Ring 1 em LuaJIT — `Series`, `DataSet`, ergonomia. Dtypes: `float64`, `int64`, `string`, `bool`.
+Biblioteca de dados tabulares em Lua com backend em C puro.
+Dtypes: `float64`, `int64`, `bool`, `string`. Null por bitmask. Zero dependências externas no núcleo.
 
 ---
 
@@ -11,38 +10,38 @@ Frontend de Ring 1 em LuaJIT — `Series`, `DataSet`, ergonomia. Dtypes: `float6
 ```lua
 local smaug = require("smaug")
 
-local payload = {
-    {"cidade",  {"SP", "RJ", "SP", "MG", "SP"}, "string"},
-    {"vendas",  {120,  85,   200,  smaug.NA, 95}},
-    {"ativo",   {true, false, true, true, false}, "bool"},
-}
-local ds = smaug.DataSet(payload)
+-- carrega CSV com inferência automática de tipo
+local ds = smaug.read_csv("pedidos.csv", {sep = ";"})
 
--- filtra ativos, preenche nulos, calcula total
+-- filtra, agrupa, exporta
 local resultado = ds
+    :filter(ds["ativo"]:eq(true))
+    :groupby("empresa"):sum("vendas")
+
+resultado:to_json("resumo.json")
+print(resultado)
+```
+
+```lua
+-- ou com dados inline
+local ds = smaug.DataSet({
+    {"cidade",  {"SP", "RJ", "SP", "MG"},          "string"},
+    {"vendas",  {120,  85,   200,  smaug.NA}              },
+    {"ativo",   {true, false, true, true},           "bool"},
+})
+
+local sp = ds
     :filter(ds["ativo"])
-    :fillna({vendas = 0.0})
+    :fillna({vendas = 0})
 
-print(resultado:describe())
-print(resultado["vendas"]:sum())
-```
-
-```
-DataSet '' [3 linhas x 3 colunas]
-   cidade  vendas  ativo
-1  SP      120.0   true
-2  SP      200.0   true
-3  MG      0.0     true
-
-320.0
+print(sp["vendas"]:sum())   -- 320
 ```
 
 ---
 
 ## Tipos suportados
 
-Todos com suporte a `null` via bitmask dedicada. `null` não é `NaN`, não é
-zero, não é string vazia — é ausência explícita.
+`null` não é `NaN`, não é zero, não é string vazia — é ausência explícita via bitmask dedicada.
 
 | dtype | descrição |
 |---|---|
@@ -69,21 +68,17 @@ filter (por `Series<bool>`), sort_by, select, dropna, fillna, describe, sample,
 groupby (sum/mean/min/max/count, chave simples e composta), join (inner/left/right/outer),
 concat, pivot, melt, assign, nunique, rolling (sum/mean/min/max).
 
+**I/O (Anel 3)** — parsers próprios, zero dependências:
+
 ```lua
-local payload = {
-    {"uf",    {"SP", "RJ", "SP", "MG"}, "string"},
-    {"pop",   {12.3,  6.7, 12.3,  2.1}},
-    {"cap",   {true, true, false, true}, "bool"},
-}
-local ds = smaug.DataSet(payload)
+local ds = smaug.read_csv("dados.csv", {sep=","})
+local ds = smaug.read_json("dados.json")
+ds:to_csv("saida.csv")
+ds:to_json("saida.json", {pretty=true})
 
--- soma de pop onde uf == "SP"
-local sp  = ds:filter(ds["uf"]:eq("SP"))
-print(sp["pop"]:sum())
-```
-
-```
-24.6
+-- ou em memória
+local buf = ds:to_csv_mem()
+local ds2 = smaug.read_csv_mem(buf)
 ```
 
 ---
@@ -94,19 +89,11 @@ Views compartilham o buffer da série pai zero-copy. Na primeira escrita,
 a view materializa um buffer privado — o original nunca é tocado.
 
 ```lua
-local payload = {{"vendas", {10.0, 20.0, 30.0}}}
-local ds = smaug.DataSet(payload)
-
+local ds = smaug.DataSet({{"vendas", {10.0, 20.0, 30.0}}})
 local v = ds["vendas"]:view(1, 2)   -- zero-copy
 v:set(1, 99.0)                       -- materializa aqui
-
 print(ds["vendas"]:get(1))           -- 10.0  (original intacto)
 print(v:get(1))                      -- 99.0
-```
-
-```
-10.0
-99.0
 ```
 
 ---
@@ -118,8 +105,7 @@ Smaug é fluido e robusto — uma engine feita para processar dados.
 Robustez é funcionalidade. Testes não são suporte às funcionalidades, são
 funcionalidades. Cobertura é ferramenta de confiança, não métrica de vaidade.
 Valgrind é parte do desenvolvimento, não etapa final. A capacidade de
-sobreviver a entradas inválidas é tão importante quanto qualquer operação
-matemática.
+sobreviver a entradas inválidas é tão importante quanto qualquer operação matemática.
 
 E o design importa. O Smaug precisa ser confiável e fluido — uma API que
 funciona mas é difícil de escrever entregou só metade do trabalho. O fluxo
@@ -131,11 +117,11 @@ de dados deve ser natural de ler e conciso de compor.
 
 | métrica | valor | |
 |---|---|---|
-| branch-alvo (MC/DC) | 100% — 1095/1095 ramos | [Coverage](COVERAGE.md) |
-| cobertura de linhas | 99.82% | [Coverage](COVERAGE.md) |
-| checks OOM (allocfail) | 767 | [Build and Testing](Build_and_Testing.md) |
-| checks property-based | 281 083 | [Build and Testing](Build_and_Testing.md) |
-| Valgrind | clean | [Build and Testing](Build_and_Testing.md) |
+| cobertura de linhas | 97.95% — 1909/1949 | [Coverage](COVERAGE.md) |
+| branch-alvo (MC/DC) | 92.18% — 1981/2149 ramos | [Coverage](COVERAGE.md) |
+| checks OOM (allocfail) | 1158 verificações | [Build and Testing](Build_and_Testing.md) |
+| checks property-based | 360 862 | [Build and Testing](Build_and_Testing.md) |
+| Valgrind | clean em todos os 10 binários | [Build and Testing](Build_and_Testing.md) |
 | warnings `-Wall -Wextra` | zero | [Contract](CONTRACT.md) |
 
 Modelo de referência: SQLite.
@@ -144,17 +130,15 @@ Modelo de referência: SQLite.
 
 ## Build
 
-**Linux**
+**Linux (desenvolvimento e cobertura)**
 
 ```bash
-make          # compila
-make test     # testes C
-make test-lua # testes Lua
-make coverage # cobertura (gcov)
-make valgrind # Valgrind
+bash scripts/build.sh        # build + todos os testes
+bash scripts/build.sh --all  # idem + Valgrind + coverage + manifest
+make coverage                 # só cobertura (gcov)
 ```
 
-**Windows (MSYS2)**
+**Windows (MSYS2-UCRT64)**
 
 ```powershell
 scripts/windows_build.ps1
@@ -167,8 +151,9 @@ scripts/windows_build.ps1
 ### Entender o projeto
 | | |
 |---|---|
-| [Roadmap](Roadmap.md) | arquitetura em anéis, filosofia e direção |
-| [Contract](CONTRACT.md) | contratos de comportamento Ring 0 e Ring 1 |
+| [Architecture](ARCHITECTURE.md) | modelo de anéis, princípios, régua de versões |
+| [Roadmap](Roadmap.md) | estado de cada anel, entregas planejadas |
+| [Contract](CONTRACT.md) | contratos de comportamento Anel 0 e Anel 1 |
 | [COW](COW.md) | especificação Copy-on-Write |
 | [Changelog](CHANGELOG.md) | histórico de mudanças por sessão |
 

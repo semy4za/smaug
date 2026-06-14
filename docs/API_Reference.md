@@ -464,3 +464,78 @@ dos structs de série.
 4. **`memset(s->data, 0.0, ...)`** (caso aparecer em algum reimplemento): o
    `0.0` vira `int(0)`; correto em IEEE 754, mas gera warning com `-Wall`. Use
    `memset(s->data, 0, ...)`.
+
+---
+
+## Anel 3 — I/O (`smaug_io.h`)
+
+Parsers CSV e JSON escritos do zero, zero dependências externas.
+Fronteira `smaug_table_t` entre leitores e o frontend Lua.
+
+### `smaug_table_t` — struct intermediária
+
+```c
+typedef struct {
+    const char          *name;     /* nome da coluna */
+    const char          *dtype;    /* "float64" | "int64" | "bool" | "string" */
+    smaug_series_f64_t  *f64;
+    smaug_series_i64_t  *i64;
+    smaug_series_bool_t *boolcol;
+    smaug_series_str_t  *str;
+} smaug_column_t;
+
+typedef struct {
+    smaug_column_t *columns;
+    size_t          ncols;
+    size_t          nrows;
+    char           *error;   /* NULL se ok; mensagem de erro se falhou */
+} smaug_table_t;
+```
+
+Verificar `t->error != NULL` antes de usar. Liberar sempre com `smaug_table_free`.
+
+### CSV
+
+```c
+smaug_csv_opts_t smaug_csv_default_opts(void);
+/* sep=',', header=1, quote='"', na={"","NA","null","N/A","nan","NaN","NULL"} */
+
+smaug_table_t* smaug_read_csv(const char *path, const smaug_csv_opts_t *opts);
+smaug_table_t* smaug_read_csv_mem(const char *buf, size_t len,
+                                   const smaug_csv_opts_t *opts);
+
+smaug_csv_write_opts_t smaug_csv_write_default_opts(void);
+int   smaug_write_csv(const char *path, const smaug_table_t *t,
+                      const smaug_csv_write_opts_t *opts);
+char* smaug_write_csv_mem(const smaug_table_t *t,
+                           const smaug_csv_write_opts_t *opts, size_t *out_len);
+/* buffer retornado terminado em \0; liberar com smaug_free */
+```
+
+**Inferência de tipo:** cada coluna testada em ordem `int64 → float64 → bool → string`.
+Coluna mista sobe para o tipo mais abrangente. Coluna toda NA → string.
+
+**RFC 4180:** aspas duplas suportadas (`"campo com, vírgula"`, `""aspas""` → `"`).
+
+### JSON
+
+```c
+smaug_table_t* smaug_read_json(const char *path);
+smaug_table_t* smaug_read_json_mem(const char *buf, size_t len);
+/* Formato: array de records [ {...}, {...} ] */
+
+int   smaug_write_json(const char *path, const smaug_table_t *t,
+                       const smaug_json_write_opts_t *opts);
+char* smaug_write_json_mem(const smaug_table_t *t,
+                            const smaug_json_write_opts_t *opts, size_t *out_len);
+/* NaN → null no JSON. Escapes: \n \t \\ \" \uXXXX para controles. */
+```
+
+### Ciclo de vida
+
+```c
+void smaug_table_free(smaug_table_t *t);   /* NULL-safe */
+```
+
+Propriedade: `smaug_table_t*` possui seus recursos. O frontend Lua chama
+`smaug_table_free` após consumir a tabela e construir o `DataSet`.
