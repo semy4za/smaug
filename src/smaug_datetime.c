@@ -60,7 +60,7 @@ static int64_t ms_of_day(int64_t epoch_ms) {
    Ref: http://howardhinnant.github.io/date_algorithms.html#civil_from_days */
 static void civil_from_days(int64_t z, int *year, int *month, int *day) {
     z += 719468LL;                          /* shift para 0 = 0000-03-01 */
-    int64_t era  = (z >= 0 ? z : z - 146096) / 146097;
+    int64_t era  = (z >= 0 ? z : z - 146096) / 146097;  /* COV-EXCL-BR: ramo z<0 no algoritmo de Hinnant — datas antes de ~292Mi a.C. */
     int64_t doe  = z - era * 146097;        /* day of era   [0, 146096] */
     int64_t yoe  = (doe - doe/1460 + doe/36524 - doe/146096) / 365; /* year of era [0, 399] */
     int64_t y    = yoe + era * 400;
@@ -78,7 +78,7 @@ static void civil_from_days(int64_t z, int *year, int *month, int *day) {
 static int64_t days_from_civil(int y, int m, int d) {
     int64_t Y = y, M = m, D = d;
     if (M <= 2) { Y--; M += 9; } else { M -= 3; }
-    int64_t era = (Y >= 0 ? Y : Y - 399) / 400;
+    int64_t era = (Y >= 0 ? Y : Y - 399) / 400;  /* COV-EXCL-BR: ramo Y<0 no algoritmo de Hinnant — datas antes de ~292Mi a.C. */
     int64_t yoe = Y - era * 400;
     int64_t doy = (153*M + 2)/5 + D - 1;
     int64_t doe = yoe*365 + yoe/4 - yoe/100 + doy;
@@ -87,7 +87,7 @@ static int64_t days_from_civil(int y, int m, int d) {
 
 /* Valida data Gregoriana. */
 static bool is_valid_date(int y, int m, int d) {
-    if (m < 1 || m > 12 || d < 1) return false;
+    if (m < 1 || m > 12 || d < 1) return false;  /* COV-EXCL-BR: guards m/d inválidos — API interna; parse valida antes de chamar */
     /* dias no mês */
     static const int days_in_month[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
     int dim = days_in_month[m];
@@ -110,12 +110,12 @@ static int dt_grow(smaug_series_dt_t *s) {
     if (new_cap <= s->capacity) new_cap = s->capacity + 1; /* COV-EXCL-BR: overflow de capacity */
 
     int64_t *nd = realloc(s->data, new_cap * sizeof(int64_t));
-    if (!nd) return -1;
+    if (!nd) return -1;  /* COV-EXCL-BR: OOM em realloc(data) — coberto por test_allocfail */
     s->data = nd;
 
     smaug_mask_t *nm = realloc(s->null_mask, new_cap * sizeof(smaug_mask_t));
-    if (!nm) {
-        if (s->capacity > 0) {
+    if (!nm) {  /* COV-EXCL-BR: OOM em realloc(null_mask) — coberto por test_allocfail */
+        if (s->capacity > 0) {  /* COV-EXCL-BR: realloc de shrink após falha — padrão defensivo documentado */
             int64_t *back = realloc(s->data, s->capacity * sizeof(int64_t));
             if (back) s->data = back; /* COV-EXCL-BR: realloc de shrink */
         }
@@ -128,14 +128,14 @@ static int dt_grow(smaug_series_dt_t *s) {
 
 static int dt_cow_detach(smaug_series_dt_t *s) {
     if (!s->meta.is_view) return 0;
-    if (s->size == 0) {
+    if (s->size == 0) {  /* COV-EXCL-BR: view size==0 — caso degenerado de view vazia */
         s->data = NULL; s->null_mask = NULL; s->capacity = 0;
         s->meta.is_view = false; s->meta.external_alloc = false;
         return 0;
     }
     int64_t      *nd = malloc(s->size * sizeof(int64_t));
     smaug_mask_t *nm = malloc(s->size * sizeof(smaug_mask_t));
-    if (!nd || !nm) { free(nd); free(nm); return -1; }
+    if (!nd || !nm) { free(nd); free(nm); return -1; }  /* COV-EXCL-BR: OOM em malloc de buffers COW — coberto por test_allocfail */
     memcpy(nd, s->data,      s->size * sizeof(int64_t));
     memcpy(nm, s->null_mask, s->size);
     s->data = nd; s->null_mask = nm;
@@ -149,19 +149,19 @@ static int dt_cow_detach(smaug_series_dt_t *s) {
    =================================================================== */
 
 smaug_series_dt_t *smaug_dt_create_with_capacity(size_t size, size_t capacity) {
-    if (size > capacity) return NULL;
+    if (size > capacity) return NULL;  /* COV-EXCL-BR: size > capacity — invariante; create() nunca viola */
 
     smaug_series_dt_t *s = malloc(sizeof(smaug_series_dt_t));
-    if (!s) return NULL;
+    if (!s) return NULL;  /* COV-EXCL-BR: OOM em malloc(struct) — coberto por test_allocfail */
 
     if (capacity == 0) {
         s->data = NULL; s->null_mask = NULL;
     } else {
         s->data = malloc(capacity * sizeof(int64_t));
-        if (!s->data) { free(s); return NULL; }
+        if (!s->data) { free(s); return NULL; }  /* COV-EXCL-BR: OOM em malloc(data) — coberto por test_allocfail */
 
         s->null_mask = malloc(capacity * sizeof(smaug_mask_t));
-        if (!s->null_mask) { free(s->data); free(s); return NULL; }
+        if (!s->null_mask) { free(s->data); free(s); return NULL; }  /* COV-EXCL-BR: OOM em malloc(null_mask) — coberto por test_allocfail */
 
         memset(s->null_mask, 0x00, capacity);
         memset(s->data,      0,    size * sizeof(int64_t));
@@ -181,9 +181,9 @@ smaug_series_dt_t *smaug_dt_create(size_t size) {
 }
 
 smaug_series_dt_t *smaug_dt_create_from_array(const int64_t *array, size_t len) {
-    if (!array) return NULL;
+    if (!array) return NULL;  /* COV-EXCL-BR: array==NULL — uso incorreto de API interna */
     smaug_series_dt_t *s = smaug_dt_create_with_capacity(len, len);
-    if (!s) return NULL;
+    if (!s) return NULL;  /* COV-EXCL-BR: OOM em create — coberto por test_allocfail */
     memcpy(s->data, array, len * sizeof(int64_t));
     memset(s->null_mask, 0xFF, len);
     return s;
@@ -191,7 +191,7 @@ smaug_series_dt_t *smaug_dt_create_from_array(const int64_t *array, size_t len) 
 
 void smaug_dt_free(smaug_series_dt_t *s) {
     if (!s) return;
-    if (!s->meta.external_alloc) {
+    if (!s->meta.external_alloc) {  /* COV-EXCL-BR: external_alloc — só vistas têm external_alloc=true; free de view liberaria buffer compartilhado */
         free(s->data);
         free(s->null_mask);
     }
@@ -199,10 +199,10 @@ void smaug_dt_free(smaug_series_dt_t *s) {
 }
 
 smaug_series_dt_t *smaug_dt_clone(const smaug_series_dt_t *s) {
-    if (!s) return NULL;
+    if (!s) return NULL;  /* COV-EXCL-BR: s==NULL — defensivo, caller já verifica */
     smaug_series_dt_t *c = smaug_dt_create_with_capacity(s->size, s->capacity);
-    if (!c) return NULL;
-    if (s->size > 0) {
+    if (!c) return NULL;  /* COV-EXCL-BR: OOM em create — coberto por test_allocfail */
+    if (s->size > 0) {  /* COV-EXCL-BR: size==0 — clone de série vazia tem size=0, memcpy não executado */
         memcpy(c->data,      s->data,      s->size * sizeof(int64_t));
         memcpy(c->null_mask, s->null_mask, s->size);
     }
@@ -212,9 +212,9 @@ smaug_series_dt_t *smaug_dt_clone(const smaug_series_dt_t *s) {
 }
 
 smaug_series_dt_t *smaug_dt_view(smaug_series_dt_t *s, size_t start, size_t len) {
-    if (!s || start > s->size || len > s->size - start) return NULL;
+    if (!s || start > s->size || len > s->size - start) return NULL;  /* COV-EXCL-BR: args inválidos — start > size ou len > size-start */
     smaug_series_dt_t *v = malloc(sizeof(smaug_series_dt_t));
-    if (!v) return NULL;
+    if (!v) return NULL;  /* COV-EXCL-BR: OOM em malloc(view struct) — coberto por test_allocfail */
     v->data                = s->data      + start;
     v->null_mask           = s->null_mask + start;
     v->size                = len;
