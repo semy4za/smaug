@@ -247,7 +247,7 @@ A implementação ocorre nesse anel — nunca mais profundamente do que o necess
 | Ordenação determinística | ✅ Forte |
 | Contratos defensivos | ✅ Forte — toda fronteira pública valida |
 | Tratamento de OOM | ✅ Forte — todos os pontos públicos cobertos, incluindo parsers I/O |
-| Integridade de memória | ✅ Forte — Valgrind-clean em 10 binários |
+| Integridade de memória | ✅ Forte — Valgrind-clean em 9 binários |
 | Views e Copy-on-Write | ✅ Forte |
 | Isolamento após COW detach | ✅ Forte |
 | Álgebra booleana Kleene | ✅ Forte |
@@ -265,8 +265,8 @@ A implementação ocorre nesse anel — nunca mais profundamente do que o necess
 | Stress tests (51k+ checks) | ✅ Forte |
 | Property-based testing (360k+ checks) | ✅ Forte |
 | AllocFail testing (1158 verificações) | ✅ Forte — inclui parsers CSV/JSON |
-| Branch coverage / MC/DC | ✅ 92.18% branch-alvo (parsers I/O incluídos) |
-| Cobertura de linhas | ✅ 97.95% |
+| Branch coverage / MC/DC | ✅ 88.12% branch-alvo (parsers I/O incluídos, 90 exclusões) |
+| Cobertura de linhas | ✅ 95.99% |
 | Cross-platform (Windows/Linux) | ✅ Validado — MSYS2-UCRT64 + Fedora |
 | Dados reais | ✅ pedidos_digitados.csv (916 linhas), cotações CSV/JSON |
 | Fuzzing | ⚠️ Ausente — lacuna registrada |

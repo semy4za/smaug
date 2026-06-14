@@ -6,6 +6,135 @@ decisões, achados, motivações.
 
 ---
 
+## 2026-06-14 — Decisão: enriquecimento dos núcleos entra na v1.0
+
+Após auditoria comparativa contra a API pública do pandas (Series + DataFrame),
+decisão arquitetural: a v1.0 não fecha com o mínimo viável. Fecha com cobertura
+operacional ampla, mantendo zero dependências externas.
+
+**6 pacotes adicionados ao Pré-1.0 (Bloco F):**
+- F.1 — Estatístico (`corr`/`cov`/`autocorr`/`dot`/`pct_change`)
+- F.2 — Predicados (`between`/`isin`/`is_unique`/`is_monotonic_*`/`equals`/`compare`/`idxmin`/`idxmax`/`first/last_valid_index`)
+- F.3 — `.dt` estendido (`is_*_start/end`/`is_leap_year`/`days_in_month`/`round`/`ceil`/`strftime`/`normalize`/`month_name`/`day_name`)
+- F.4 — `.str` Tier C parcial (`count`/`isalnum`/`isalpha`/etc/`removeprefix`/`removesuffix`/`capitalize`/`title`/`swapcase`/`join`) — sem regex, sem Unicode
+- F.5 — Acesso e ergonomia (`at`/`iat`/`insert`/`to_dict`/`from_dict`/`to_markdown`/`to_string`)
+- F.6 — Duplicatas e binárias (`duplicated`/`drop_duplicates`/`combine_first`/`searchsorted`/`repeat`)
+
+**Decisões de não-fazer (permanentes, registradas em Roadmap.md):**
+- Index nomeado e toda família dependente (`loc`/`MultiIndex`/`reindex`/`align`/
+  `set_index`/`reset_index`/`xs`/`swaplevel`/`droplevel`/`at_time`/`between_time`/
+  `asof`/`asfreq`/`resample`/`to_period`/`to_timestamp`/`tz_*`).
+- Plotting (`.plot`/`.hist`/`.boxplot`).
+- I/O exótico (`pickle`/`hdf`/`xarray`/`stata`/`clipboard`/`latex`/`orc`/`feather`/
+  `html`/`style`/`__dataframe__`).
+- Tipos extras (`sparse`/`list`/`struct`/`period`/`timedelta`/`interval`/`decimal`).
+- Operadores reversos (`radd`/`rsub`/etc.) — não-issue em Lua.
+- `pipe`/`combine`/`update`/`squeeze`/`to_frame`.
+
+**Trade-off:** v1.0 atrasa em ~6 sessões. Aceito conscientemente porque
+v1.0 com cobertura ampla muda a régua do projeto — quando alguém abrir o README,
+vê paridade significativa com pandas no que importa, sem o ruído.
+
+Roadmap.md tem a lista detalhada de cada pacote, justificativa de cada
+decisão de não-fazer, e checklist atualizado.
+
+---
+
+## 2026-06-14 — Tier 2 dtypes + bugfix Valgrind dos parsers I/O
+
+### Adicionado — datetime no frontend Lua
+
+Backend C de `smaug_datetime.c` já estava pronto (epoch ms UTC, calendário
+Gregoriano proléptico, 201 checks em `test_datetime_c`). Esta sessão fechou
+a integração com o frontend:
+
+- Descriptor `datetime` no `DTYPES` de `series.lua` (factory, set/get com
+  string ISO 8601 ou epoch_ms, append, comparações, sort/filter/take).
+- Accessor `.dt` com 19 métodos: 11 componentes calendário (`year`/`month`/
+  `day`/`hour`/`minute`/`second`/`ms`/`weekday`/`yearday`/`quarter`/`week`),
+  `format`, `truncate(unit)` para `s/m/h/D/W/M/Q/Y`, `diff([periods])` em
+  milissegundos, `add_ms`/`add_days`/`add_hours`/`add_minutes`/`add_seconds`.
+- Helpers públicos: `Series.dt_parse`, `Series.dt_format`, `Series.dt_from_parts`,
+  `Series.datetime(size, name)`.
+- `astype` estendido com 6 branches novos: `datetime ↔ string` (via ISO 8601),
+  `datetime ↔ int64`, `datetime ↔ float64` (epoch_ms).
+- `describe` estendido com branch `datetime` — retorna `{dtype, count, nulls, min, max}`
+  onde min/max são strings ISO 8601 formatadas.
+- `test_datetime.lua` (188 checks): factories, `.dt`, comparações, sort, filter,
+  astype, integração DataSet (filter/sort_by/assign/select/head/dropna/describe).
+
+### Adicionado — categorical (Lua puro)
+
+`CategoricalSeries` implementado inteiramente em Lua usando dictionary encoding.
+Decisão consciente de não criar C backend — o tipo é essencialmente um índice
++ tabela de strings, não justifica fragmentar o contrato C.
+
+- Armazenamento: `_codes` (int 1-based; nil = null), `_levels` (lista ordenada
+  por primeira aparição), `_level_map` (hash inverso).
+- Factories: `Series.from_table(arr, "categorical")`, `Series.Categorical.from_codes(...)`.
+- 31 métodos de instância (espelham `Series` onde cabe): acesso, append,
+  clone/head/tail/take/filter/dropna/fillna, sort/argsort (lexicográfico),
+  comparações (`eq`/`ne`/`lt`/`le`/`gt`/`ge`), `unique`/`nunique`/`value_counts`,
+  `describe`, `astype` (para `string`, `int64`, `float64`), `to_table`.
+- Accessor `.cat` com 6 métodos: `codes()` → `Series<int64>`, `levels()`,
+  `rename_categories`, `set_categories`, `add_categories`, `remove_categories`.
+- Integração total com DataSet: `add_column`, `update_column`, `assign`,
+  `__newindex`, `__call` todos aceitam `CategoricalSeries`. Princípio
+  "toda coluna aceita pelo DataSet funciona em toda a API do DataSet".
+- `test_categorical.lua` (199 checks).
+
+### Corrigido — leaks nos parsers I/O capturados pelo Valgrind
+
+Após validar `datetime` + `categorical` no Fedora com `make valgrind`, o
+Valgrind capturou ~762 bytes vazando em 79 blocos no `test_allocfail`. Stack
+traces apontaram para `smaug_csv.c:227` (strdup de `col_names`) e
+`smaug_json.c:267/273` (malloc/calloc após strdups).
+
+**Bugs identificados:**
+- Em ambos os parsers, quando `calloc(dtypes)` ou alocações subsequentes
+  falhavam **depois** do loop de strdup de `col_names[c]`, o cleanup fazia
+  `free(col_names)` (o array) mas não liberava as strings individuais.
+- No CSV, o label `done:` (alcançado quando `smaug_X_create` falha no loop
+  final) liberava `col_names` mas não os strdups dos índices ainda não
+  transferidos para `t->columns[c].name`.
+- No JSON, `oom_recs:` libera `recs` mas nem `col_names` nem `dtypes` eram
+  visíveis no escopo do label.
+
+**Estratégia comum:**
+- Inicializar `col_names[c] = NULL` antes do loop de strdup; libertar
+  parcialmente em caso de falha.
+- Marcar transferência de ownership com `col_names[c] = NULL` ao atribuir
+  ao `tbl->columns[c].name`. `free(NULL)` é seguro, o cleanup itera pelo
+  array inteiro.
+- No JSON, mover `col_names`/`dtypes` para o escopo da função (com `n_cols_io`)
+  para serem visíveis no label de cleanup. No CSV, estender `done:` para
+  liberar strdups não-transferidos.
+
+Resultado: Valgrind 100% clean em todos os 9 binários no Fedora. `test_allocfail`
+com 15330 allocs / 15330 frees, `test_stress` com 90751/90751.
+
+### Corrigido — warning `-Wtype-limits` no test_allocfail
+
+`t->nrows >= 0` onde `nrows` é `size_t` (unsigned) — sempre verdadeiro.
+Substituído por `1` constante; o check útil (`!t || t->error`) permanece.
+
+### Decisão — NDJSON adiado para pós-1.0
+
+Tentativa de implementar NDJSON expôs limitação fundamental: o parser JSON C
+infere dtypes por linha. Uma linha com `"a":null` infere `string`, conflitando
+com outra linha com `"a":1` que infere `int64`. Sem schema global declarativo,
+NDJSON é inerentemente frágil para dados com null. Decisão: adiar para o ciclo
+do schema/ORM (v2.0). Registrado em `Roadmap.md`.
+
+### Cobertura
+
+Linha 95.99% (2248/2342), branch-alvo 88.12% (2270/2576, 90 exclusões).
+Queda em relação a sessões anteriores (96.99% / 88.82%) é resultado dos
+cleanup paths novos — código adicionado mas ainda não exercitado pelo
+`test_allocfail`. Vai ser fechado no hardening global.
+
+---
+
 ## 2026-06-14 · f66ba99 — Anel 3 completo + hardening I/O
 
 ### Adicionado — Anel 3: I/O CSV e JSON

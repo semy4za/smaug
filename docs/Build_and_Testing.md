@@ -77,6 +77,7 @@ Compila `libsmaug.dll` e todos os testes. Coverage/Valgrind rodam no Fedora.
 | `test_string` | 118 | lifecycle string, sort, filter |
 | `test_cow` | 15 | COW detach, isolamento após mutação |
 | `test_io_c` | 174 | parsers CSV/JSON: CRLF, aspas RFC 4180, NA, inferência, roundtrips |
+| `test_datetime_c` | 201 | datetime C: lifecycle, parse ISO 8601, componentes calendário, aritmética, comparações, sort, COW, datas negativas, bissextos |
 | `test_allocfail` | 1158 | OOM em todos os pontos públicos (Anéis 0+3, via `--wrap`) |
 | `test_stress` | 51k+ | N=1M, chains, 200 views simultâneas, 10k ciclos |
 
@@ -102,6 +103,9 @@ Compila `libsmaug.dll` e todos os testes. Coverage/Valgrind rodam no Fedora.
 | `test_rolling_series.lua` | 37 | rolling sum/mean/min/max em Series |
 | `test_io.lua` | 70 | I/O CSV+JSON: roundtrips, inferência, NA, bool false, aspas |
 | `test_io_real.lua` | 55 | dados reais: pedidos_digitados.csv (916 linhas, sep `;`) |
+| `test_enrich.lua` | 151 | enriquecimento: median/quantile/mode/prod, ffill/bfill, cummin/cummax, argmin/argmax, rank/pct_rank, skew/kurtosis, mad/sem, where/mask, nlargest/nsmallest, rolling.std/var/count/median/quantile/min_periods, expanding, groupby estendido, pivot_table, stack/unstack, explode |
+| `test_datetime.lua` | 188 | datetime frontend: factories, `.dt` accessor (componentes, format, truncate, diff, add_\*), comparações, sort, filter, astype, integração DataSet |
+| `test_categorical.lua` | 199 | categorical: factories, acesso, `.cat` accessor (codes/levels/rename/set/add/remove), comparações, sort, seleção, fillna, unique/value_counts, describe, astype, integração DataSet |
 
 ### Fixtures de dados reais
 
@@ -126,8 +130,12 @@ bash scripts/make_coverage.sh
 Agrega: testes C diretos, `test_allocfail` (via `--wrap`) e testes Lua (via FFI).
 Resultado gerado em `docs/COVERAGE.md`.
 
-**Métricas atuais:** linha 97.95%, branch-alvo 92.18% (66 exclusões `COV-EXCL-BR`
-documentadas no rodapé de `COVERAGE.md`).
+**Métricas atuais:** linha 95.99% (2248/2342), branch-alvo 88.12% (2270/2576,
+90 exclusões `COV-EXCL-BR` documentadas no rodapé de `COVERAGE.md`).
+
+A queda em relação a sessões anteriores (96.99% / 88.82%) é resultado dos
+cleanup paths adicionados nos parsers I/O (sessão de bugfix Valgrind) —
+código novo ainda não exercitado pelos testes de OOM. Fechar no hardening global.
 
 **Critério `COV-EXCL-BR`:** ramo inalcançável via API pública com justificativa
 técnica auditável. Exemplos: overflow de `SIZE_MAX`, guard de realloc-shrink,
@@ -141,15 +149,20 @@ flush via FFI instável — cobertura sempre medida no Linux.
 ## Valgrind
 
 ```bash
-bash scripts/build.sh --all   # roda Valgrind em todos os 10 binários
+bash scripts/build.sh --all   # roda Valgrind em todos os 9 binários
 ```
 
-**Estado atual:** clean em todos os 10 binários. Zero leaks, zero reads de
-memória não inicializada.
+**Estado atual:** clean em todos os 9 binários. Zero leaks, zero reads de
+memória não inicializada. `test_allocfail` com 15330 allocs / 15330 frees,
+`test_stress` com 90 751 / 90 751.
 
-Dois bugs encontrados e corrigidos pelo Valgrind no Anel 3:
-- `smaug_json.c`: `col_names` (array) não liberado no caminho de sucesso.
-- Writers CSV/JSON: buffer retornado sem terminador `\0`.
+Bugs encontrados e corrigidos pelo Valgrind:
+- **Anel 3 (sessão inicial):** `smaug_json.c` — `col_names` (array) não liberado
+  no caminho de sucesso. Writers CSV/JSON — buffer retornado sem terminador `\0`.
+- **Anel 3 (sessão de hardening):** ambos os parsers — `strdup`s de `col_names`
+  vazavam quando OOM acontecia depois do strdup (calloc de `dtypes`, alocação
+  de `tbl`, falha de `smaug_X_create` no loop final). Corrigido com transferência
+  de ownership marcada (`col_names[c] = NULL`) e cleanup robusto nos paths de erro.
 
 ---
 

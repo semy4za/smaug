@@ -167,15 +167,57 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `:round([n])` | arredonda para n casas decimais |
 | `:clip([lo], [hi])` | limita ao intervalo [lo, hi] |
 
+**Reduções estatísticas adicionais:**
+
+| Método | O que faz |
+|--------|-----------|
+| `:median([ignore_na])` | mediana |
+| `:quantile(q, [ignore_na])` | percentil q ∈ [0, 1] (interpolação linear) |
+| `:mode()` | valor mais frequente; primeira aparição em empates |
+| `:prod([ignore_na])` | produto |
+| `:rank([method])` | rank (`average`/`min`/`max`/`dense`); default `average` |
+| `:pct_rank()` | rank percentual (0..1) |
+| `:skew()` / `:kurtosis()` | assimetria / curtose (Fisher; bias-corrected) |
+| `:mad()` | desvio absoluto mediano |
+| `:sem()` | erro padrão da média = std / √n |
+| `:isna(i)` / `:notna(i)` | alias de `:is_null(i)` / não-null |
+
+**Valores ausentes:**
+
+| Método | O que faz |
+|--------|-----------|
+| `:ffill()` | forward fill (propaga último não-nulo) |
+| `:bfill()` | backward fill (propaga próximo não-nulo) |
+
+**Seleção condicional:**
+
+| Método | O que faz |
+|--------|-----------|
+| `:where(cond, other)` | onde cond=true mantém self; senão usa other (Series ou escalar) |
+| `:mask(cond, other)` | inverso de where |
+| `Series.ifelse(cond, a, b)` | vetorizado: a onde cond=true, b senão |
+| `:nlargest(n)` | n maiores valores |
+| `:nsmallest(n)` | n menores valores |
+| `:argmin()` / `:argmax()` | índice (1-based) do mínimo/máximo |
+
 **Janela temporal:**
 
 | Método | O que faz |
 |--------|-----------|
 | `:cumsum()` | soma cumulativa (nulos propagam) |
 | `:cumprod()` | produto cumulativo (nulos propagam) |
+| `:cummin()` / `:cummax()` | mínimo/máximo cumulativo |
 | `:diff([periods])` | diferença entre elemento i e i-periods |
 | `:shift([periods])` | desloca valores |
-| `:rolling(w):sum/mean/min/max()` | agregação em janela de tamanho w |
+| `:rolling(w):sum/mean/min/max/std/var/count/median/quantile/min_periods()` | agregação em janela |
+| `:expanding([min_periods]):sum/mean/min/max/std/var/count/median()` | janela crescente |
+
+**Matemática vetorizada (resultado sempre float64):**
+
+| Método | O que faz |
+|--------|-----------|
+| `:sin()` / `:cos()` / `:tan()` | trigonométricas |
+| `:exp()` / `:log()` / `:sqrt()` | exponencial / log natural / raiz quadrada |
 
 **Operadores:** `+ - * /` (série×série e série×escalar), `serie[i]`.
 **Operadores bool** (só em `Series<bool>`): `*`=and, `+`=or, `-`=xor.
@@ -204,6 +246,44 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `.str:cat([sep])` | concatena todos os não-nulos → string Lua |
 | `.str:split(sep, [max])` | divide pelo separador → tabela de Series |
 
+### `.dt` — proxy de operações de calendário sobre Series datetime
+
+Disponível quando `s._dtype == "datetime"`. Erro claro em qualquer outro dtype.
+
+**Componentes calendário** (todos retornam `Series<int64>`; nulo propaga):
+
+| Método | O que faz |
+|--------|-----------|
+| `.dt:year()` | ano (ex.: 2026) |
+| `.dt:month()` | 1–12 |
+| `.dt:day()` | 1–31 |
+| `.dt:hour()` | 0–23 |
+| `.dt:minute()` | 0–59 |
+| `.dt:second()` | 0–59 |
+| `.dt:ms()` | 0–999 |
+| `.dt:weekday()` | 0=seg … 6=dom |
+| `.dt:yearday()` | 1–366 |
+| `.dt:quarter()` | 1–4 |
+| `.dt:week()` | 1–53 (ISO 8601) |
+
+**Formatação e transformação:**
+
+| Método | O que faz |
+|--------|-----------|
+| `.dt:format()` | → `Series<string>` ISO 8601 `"YYYY-MM-DDTHH:MM:SS.mmmZ"` |
+| `.dt:truncate(unit)` | trunca para início do período: `'s'`/`'m'`/`'h'`/`'D'`/`'W'`/`'M'`/`'Q'`/`'Y'` |
+| `.dt:diff([periods])` | diferença em ms entre elemento i e i-periods (default 1) |
+| `.dt:add_ms(delta)` / `:add_days(n)` / `:add_hours(n)` / `:add_minutes(n)` / `:add_seconds(n)` | aritmética temporal → novo `Series<datetime>` |
+
+**Helpers estáticos** (não passam pelo proxy):
+
+| Função | O que faz |
+|--------|-----------|
+| `Series.dt_parse(str)` | ISO 8601 → epoch_ms (número Lua); `nil` se inválido |
+| `Series.dt_format(epoch_ms)` | epoch_ms → string ISO 8601; `nil` em overflow |
+| `Series.dt_from_parts(y, m, d, [h], [mi], [s], [ms])` | constrói epoch_ms; `nil` se data inválida |
+| `Series.datetime(size, name)` | factory: `Series.new("datetime", size, name)` |
+
 ### Métodos exclusivos de `Series<bool>`
 
 | Método | O que faz |
@@ -211,6 +291,51 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `:count_true()` / `:any()` / `:all()` | agregações (NA ignorado) |
 | `:land(b)` / `:lor(b)` / `:lxor(b)` / `:lnot()` | lógica Kleene |
 | `:describe()` | `{count, nulls, count_true, count_false}` |
+
+### `CategoricalSeries` (`core/series.lua`)
+
+Dtype Tier 2 implementado em Lua puro (sem C backend). Armazenamento via
+dictionary encoding: `_codes` (int 1-based), `_levels` (lista ordenada),
+`_level_map` (hash inverso). Detectado por `Series.is_categorical(x)`.
+
+**Factories:**
+
+```lua
+Series.from_table({"SP","RJ","SP",NA,"MG"}, "categorical")    -- ordem de 1ª aparição
+Series.Categorical.from_table(arr, [name])
+Series.Categorical.from_codes(codes_arr, levels_arr, [name], [n])
+```
+
+`from_codes` aceita `NA` como marcador de null e `n` explícito para arrays
+com `nil` no meio (limitação do `#` do Lua).
+
+**Métodos** (espelham `Series` quando faz sentido):
+
+| Método | O que faz |
+|--------|-----------|
+| `:get(i)` / `:set(i, v)` / `:set_null(i)` / `:is_null(i)` | acesso 1-based |
+| `:append(v)` | adiciona ao fim (cria level se valor é novo) |
+| `:len()` / `:size()` / `:count_nonnull()` | dimensões |
+| `:clone()` / `:head(n)` / `:tail(n)` / `:take(idx)` | seleção (clone profundo de levels) |
+| `:filter(mask)` | `Series<bool>` → novo `CategoricalSeries` |
+| `:dropna()` / `:fillna(value)` | valores ausentes |
+| `:sort(asc)` / `:argsort(asc)` | ordenação lexicográfica por label |
+| `:eq/ne/lt/le/gt/ge(target)` | comparação → `Series<bool>` |
+| `:unique()` / `:nunique()` / `:value_counts()` | distintos |
+| `:describe()` | `{dtype, count, nulls, unique, levels, top, freq}` |
+| `:astype(dtype)` | → `string`, `int64`, `float64` (parseia labels), ou clone categorical |
+| `:to_table([na])` | → tabela Lua |
+
+### `.cat` — proxy de operações sobre Series categorical
+
+| Método | O que faz |
+|--------|-----------|
+| `.cat:codes()` | → `Series<int64>` com índices 1-based (null → null) |
+| `.cat:levels()` | tabela Lua ordenada com os labels |
+| `.cat:rename_categories({old=new, ...})` | renomeia labels; preserva dados |
+| `.cat:set_categories(novos)` | reordena/restringe; valores fora viram null |
+| `.cat:add_categories(lista)` | adiciona novos labels (idempotente) |
+| `.cat:remove_categories(lista)` | remove labels; referências viram null |
 
 ### `DataSet` (`core/dataset.lua`)
 
@@ -234,6 +359,7 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `:update_column(nome, series)` | substitui coluna existente |
 | `:assign(nome, fn_ou_series)` | adiciona/substitui coluna calculada |
 | `:nunique()` | `{coluna → nº distintos não-nulos}` |
+| `:rename(mapping)` | renomeia colunas em lote: `{old=new, ...}` → novo DataSet |
 | `:describe()` / `:to_table([na])` | inspeção |
 
 **Operações relacionais (Anel 2):**
@@ -241,10 +367,17 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | Método | O que faz |
 |--------|-----------|
 | `:groupby(key):sum/mean/min/max/count(col)` | agrupamento; chave simples ou composta |
+| `:groupby(key):std/var/median/quantile(col)` | reduções estatísticas por grupo |
+| `:groupby(key):first/last/prod/nunique(col)` | seleções e agregações adicionais |
+| `:groupby(key):agg({col = fn \| {fn1, ...}})` | múltiplas agregações de uma vez |
+| `:groupby(key):transform(fn_name, col)` | broadcast do resultado de volta ao tamanho original |
 | `:join(other, on, [how], [suffixes])` | inner/left/right/outer; chave simples ou composta |
 | `smaug.concat({ds1, ds2, ...})` | empilha DataSets verticalmente |
 | `:pivot(index, columns, values)` | long → wide |
-| `:melt(id_vars, [value_vars], ...)` | wide → long |
+| `:pivot_table(index, columns, values, [aggfunc])` | pivot com agregação (default `mean`) |
+| `:melt(id_vars, [value_vars], [var_name], [value_name])` | wide → long |
+| `:stack(col_names)` / `:unstack(index, col, values)` | reshape eixo→linha / linha→eixo |
+| `:explode(col)` | uma linha por elemento da coluna-lista |
 | `:rolling(w):sum/mean/min/max(col)` | janela deslizante por coluna |
 
 **I/O (Anel 3):**
@@ -262,26 +395,26 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 local smaug = require("smaug")
 
 -- I/O
-smaug.read_csv(path, [opts])       -- opts: {sep, header, na_values, quote}
+smaug.read_csv(path, [opts])        -- opts: {sep, header, na_values, quote}
 smaug.read_csv_mem(buf, [opts])
 smaug.read_json(path)
 smaug.read_json_mem(buf)
 
 -- construção
 smaug.DataSet({{nome, dados, dtype?}, ...})
-smaug.Series                        -- classe
-smaug.NA                            -- sentinela de nulo
+smaug.Series                         -- classe (com .Categorical, .NA, .datetime, factories)
+smaug.NA                             -- sentinela de nulo
 smaug.concat({ds1, ds2, ...})
 smaug.join(a, b, on, [how], [suffixes])
 ```
 
 ---
 
-## Não existe ainda
+## Próximas versões
 
-`median`/`quantile`, `ffill`/`bfill`, `datetime`, `categorical`,
-`groupby.std/var/median`, `rolling.std/var/count`, `argmin`/`argmax`,
-`where`/`mask`, `cummin`/`cummax`, funções matemáticas vetorizadas (`sin`/`cos`/`exp`/`log`/`sqrt`),
-NDJSON, SQLite, Excel, Parquet, lazy evaluation.
+Itens documentados em `Roadmap.md`:
 
-Ver `Roadmap.md` (seção "Próximas versões") para quando cada um entra.
+- **v1.0 (em finalização):** auditoria de docs, hardening global de cobertura, docstrings.
+- **v1.5:** NDJSON (depende de schema), SQLite, Excel, Parquet, lazy execution,
+  regex (`.str` Tier C), `interpolate`, `cross_join`, `query`/`eval`, stable sort.
+- **v2.0:** ORM, schema declarativo, `Matrix`/`Tensor2D`, broadcasting axis-aware, paralelismo.

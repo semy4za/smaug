@@ -539,3 +539,92 @@ void smaug_table_free(smaug_table_t *t);   /* NULL-safe */
 
 Propriedade: `smaug_table_t*` possui seus recursos. O frontend Lua chama
 `smaug_table_free` após consumir a tabela e construir o `DataSet`.
+
+---
+
+## Anel 0 — Datetime (`smaug_datetime.h`)
+
+Dtype Tier 2 implementado em C puro. Armazenamento: `int64_t` representando
+**epoch em milissegundos UTC**. Calendário Gregoriano proléptico, sem
+dependência de timezone (UTC no armazenamento, apresentação local é do caller).
+
+Mesmos contratos defensivos dos outros dtypes: `smaug_status_t` em `get`/`set`,
+null por bitmask, COW em views.
+
+### Lifecycle
+
+```c
+smaug_series_dt_t* smaug_dt_create(size_t size);
+smaug_series_dt_t* smaug_dt_create_with_capacity(size_t size, size_t capacity);
+smaug_series_dt_t* smaug_dt_create_from_array(const int64_t *array, size_t len);
+void               smaug_dt_free(smaug_series_dt_t *s);                  /* NULL-safe */
+smaug_series_dt_t* smaug_dt_clone(const smaug_series_dt_t *s);
+smaug_series_dt_t* smaug_dt_view(smaug_series_dt_t *s, size_t start, size_t len);
+```
+
+### Acesso
+
+```c
+int64_t        smaug_dt_get(const smaug_series_dt_t *s, size_t idx, smaug_status_t *status);
+smaug_status_t smaug_dt_set(smaug_series_dt_t *s, size_t idx, int64_t epoch_ms);
+smaug_status_t smaug_dt_set_null(smaug_series_dt_t *s, size_t idx);
+bool           smaug_dt_is_null(const smaug_series_dt_t *s, size_t idx);
+int            smaug_dt_append(smaug_series_dt_t *s, int64_t epoch_ms);   /* 0=ok */
+int            smaug_dt_append_null(smaug_series_dt_t *s);
+```
+
+Sentinela em erro/null no `get`: `INT64_MIN` (igual `i64`).
+
+### Parsing / formatação ISO 8601
+
+```c
+int smaug_dt_parse(const char *str, size_t len, int64_t *epoch_ms);
+/* Aceita: "YYYY-MM-DD", "YYYY-MM-DDTHH:MM:SS[.mmm][Z|±HH:MM]". */
+/* Retorna 0 em sucesso, -1 em formato inválido. epoch_ms escrito só em sucesso. */
+
+int smaug_dt_format(int64_t epoch_ms, char *buf, size_t buf_size);
+/* Formato fixo: "YYYY-MM-DDTHH:MM:SS.mmmZ" (25 chars + \0). Buf >= 26. */
+```
+
+### Extração de componentes (operam em epoch_ms escalar; retornam -1 em erro)
+
+```c
+int smaug_dt_year   (int64_t epoch_ms);   int smaug_dt_month  (int64_t epoch_ms);
+int smaug_dt_day    (int64_t epoch_ms);   int smaug_dt_hour   (int64_t epoch_ms);
+int smaug_dt_minute (int64_t epoch_ms);   int smaug_dt_second (int64_t epoch_ms);
+int smaug_dt_ms     (int64_t epoch_ms);   int smaug_dt_weekday(int64_t epoch_ms);
+int smaug_dt_yearday(int64_t epoch_ms);   int smaug_dt_quarter(int64_t epoch_ms);
+int smaug_dt_week   (int64_t epoch_ms);   /* ISO 8601 (semana 1 = primeira com >= 4 dias) */
+```
+
+### Construção e aritmética
+
+```c
+int64_t smaug_dt_from_parts(int year, int month, int day,
+                             int hour, int minute, int second, int ms);
+/* Retorna INT64_MIN em data inválida (ex.: 13/30/etc). */
+
+int64_t smaug_dt_diff_ms(int64_t a, int64_t b);              /* a - b */
+int64_t smaug_dt_add_ms (int64_t epoch_ms, int64_t delta_ms);/* saturação em overflow → INT64_MIN */
+int64_t smaug_dt_truncate(int64_t epoch_ms, char unit);
+/* unit: 's'=segundo 'm'=minuto 'h'=hora 'D'=dia 'W'=semana(seg) 'M'=mês 'Q'=tri 'Y'=ano */
+```
+
+### Comparações, ordenação e seleção
+
+Mesma assinatura dos outros dtypes; o threshold é `int64_t` (epoch_ms):
+
+```c
+uint8_t* smaug_dt_gt/lt/eq/ge/le/ne(const smaug_series_dt_t *s,
+                                     int64_t threshold,
+                                     smaug_mask_t **out_mask);
+/* Caller libera com smaug_free. NULL em erro. */
+
+size_t*             smaug_dt_argsort(const smaug_series_dt_t *s, bool ascending);
+smaug_series_dt_t*  smaug_dt_sort   (const smaug_series_dt_t *s, bool ascending);
+size_t              smaug_dt_count_nonnull(const smaug_series_dt_t *s);
+smaug_series_dt_t*  smaug_dt_take  (const smaug_series_dt_t *s, const size_t *idx, size_t len);
+smaug_series_dt_t*  smaug_dt_filter(const smaug_series_dt_t *s, const uint8_t *mask);
+```
+
+`sort`/`argsort` recusam séries com null (retornam `NULL`), igual aos outros dtypes.

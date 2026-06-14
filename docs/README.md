@@ -1,7 +1,7 @@
 # 🐉 Smaug
 
 Biblioteca de dados tabulares em Lua com backend em C puro.
-Dtypes: `float64`, `int64`, `bool`, `string`. Null por bitmask. Zero dependências externas.
+Dtypes: `float64`, `int64`, `bool`, `string`, `datetime`, `categorical`. Null por bitmask. Zero dependências externas.
 
 ---
 
@@ -199,6 +199,54 @@ cidades.str:zfill(6)           -- pad com '0'
 cidades.str:rep(2, "-")        -- repete com separador
 cidades.str:cat(", ")          -- concatena tudo → string Lua
 cidades.str:split(" ")         -- divide → tabela de Series
+```
+
+### `.dt` — operações de calendário sobre Series datetime
+
+```lua
+local datas = smaug.Series.from_table({
+    "2026-01-15T12:30:00.500Z",
+    "2026-06-30T00:00:00Z",
+    "2026-12-31T23:59:59Z",
+}, "datetime")
+
+datas.dt:year()              -- {2026, 2026, 2026}
+datas.dt:month()             -- {1, 6, 12}
+datas.dt:quarter()           -- {1, 2, 4}
+datas.dt:weekday()           -- 0=seg … 6=dom
+datas.dt:format()            -- → Series<string> ISO 8601
+
+-- truncamento e aritmética
+datas.dt:truncate("M")       -- início do mês
+datas.dt:add_days(30)        -- +30 dias
+datas.dt:diff()              -- diferença em ms entre elementos consecutivos
+
+-- helpers estáticos
+smaug.Series.dt_parse("2026-06-14T15:30:00Z")     -- → epoch_ms
+smaug.Series.dt_from_parts(2026, 6, 14, 15, 30)   -- → epoch_ms
+```
+
+### Series categorical
+
+Dictionary encoding em Lua puro. Útil para colunas com poucos valores distintos
+(cidades, categorias, status). Comparação por igualdade é rápida e o armazenamento
+é compacto.
+
+```lua
+local cidade = smaug.Series.from_table(
+    {"SP", "RJ", "SP", "MG", "RJ", "SP"}, "categorical"
+)
+
+cidade.cat:codes()           -- → Series<int64> {1, 2, 1, 3, 2, 1}
+cidade.cat:levels()          -- → {"SP", "RJ", "MG"}  (ordem de 1ª aparição)
+cidade:value_counts()        -- {value, count} ordenado por frequência
+
+-- renomear sem alterar dados
+cidade.cat:rename_categories({SP="São Paulo", RJ="Rio de Janeiro"})
+
+-- restringir ou reordenar levels
+cidade.cat:set_categories({"SP", "RJ"})     -- MG → null
+cidade.cat:add_categories({"BA", "PR"})     -- adiciona sem alterar dados
 ```
 
 ---
@@ -428,6 +476,8 @@ smaug.Series.from_table({1, NA, 3}, "int64")  -- elemento 2 = null
 | `int64` | inteiro com sinal 64-bit | bitmask |
 | `bool` | Kleene (true/false/NA) | bitmask |
 | `string` | offset-based, estilo Arrow | bitmask |
+| `datetime` | epoch ms UTC (int64 interno) | bitmask |
+| `categorical` | dictionary encoding (Lua puro) | `_codes[i] == nil` |
 
 ```lua
 -- NaN ≠ null
@@ -447,12 +497,14 @@ s:is_null(3)   -- false
 
 | métrica | valor |
 |---|---|
-| cobertura de linhas | 97.95% |
-| branch-alvo (MC/DC) | 92.18% |
+| cobertura de linhas | 95.99% (2248/2342) |
+| branch-alvo (MC/DC) | 88.12% (2270/2576, 90 exclusões documentadas) |
 | checks OOM (allocfail) | 1 158 verificações |
 | checks property-based | 360 862 |
-| Valgrind | clean em todos os binários |
+| checks de stress | 51 851 |
+| Valgrind | clean em todos os 9 binários |
 | warnings `-Wall -Wextra` | zero |
+| suítes de teste | 10 em C, 21 em Lua |
 
 ---
 
