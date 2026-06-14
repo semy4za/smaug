@@ -1,0 +1,213 @@
+# scripts/parity/exceptions.txt
+#
+# Decisões conscientes de não-paridade. Formato:
+#   EIXO:CHAVE  razão
+#
+# Comentários começam com '#'. Linhas em branco ignoradas.
+# Cada eixo define seu próprio formato de CHAVE.
+
+# ===================================================================
+# Eixo 1 — Paridade entre dtypes
+# Formato: 1:método/dtype  razão
+# ===================================================================
+
+# Reduções aritméticas não fazem sentido em dtypes não-numéricos
+1:sum/string           sem semântica matemática
+1:sum/bool             usa count_true (ver Eixo 8)
+1:sum/datetime         soma de timestamps não tem semântica
+1:sum/categorical      sem semântica matemática
+1:mean/string          sem semântica matemática
+1:mean/bool            sem semântica matemática
+1:mean/datetime        média de timestamps tem semântica mas requer tipo "duration" — pós-1.0
+1:mean/categorical     sem semântica matemática
+1:median/string        sem semântica de ordem total contínua
+1:median/bool          sem semântica
+1:median/categorical   sem ordem total numérica (lexicográfica != mediana)
+1:quantile/string      idem median
+1:quantile/bool        idem
+1:quantile/categorical idem
+1:var/string           sem semântica
+1:var/bool             sem semântica
+1:var/datetime         sem semântica (escala temporal)
+1:var/categorical      sem semântica
+1:std/string           idem var
+1:std/bool             idem
+1:std/datetime         idem
+1:std/categorical      idem
+1:skew/string          sem semântica
+1:skew/bool            sem semântica
+1:skew/datetime        sem semântica
+1:skew/categorical     sem semântica
+1:kurtosis/string      sem semântica
+1:kurtosis/bool        sem semântica
+1:kurtosis/datetime    sem semântica
+1:kurtosis/categorical sem semântica
+1:mad/string           sem semântica
+1:mad/bool             sem semântica
+1:mad/datetime         sem semântica
+1:mad/categorical      sem semântica
+1:sem/string           sem semântica
+1:sem/bool             sem semântica
+1:sem/datetime         sem semântica
+1:sem/categorical      sem semântica
+1:prod/string          sem semântica
+1:prod/bool            usa all (Kleene)
+1:prod/datetime        sem semântica
+1:prod/categorical     sem semântica
+1:cumsum/string        sem semântica
+1:cumsum/bool          sem semântica
+1:cumsum/datetime      sem semântica
+1:cumsum/categorical   sem semântica
+1:cumprod/string       sem semântica
+1:cumprod/bool         sem semântica
+1:cumprod/datetime     sem semântica
+1:cumprod/categorical  sem semântica
+1:cummin/string        sem semântica de ordem útil (poderia ser lexicográfico — decisão futura)
+1:cummax/string        idem cummin
+1:cummin/bool          sem semântica
+1:cummax/bool          sem semântica
+1:cummin/categorical   sem ordem útil (lexicográfica != intenção)
+1:cummax/categorical   idem
+1:diff/string          sem semântica
+1:diff/bool            sem semântica
+1:diff/categorical     sem semântica
+1:abs/string           sem semântica
+1:abs/bool             sem semântica
+1:abs/datetime         sem semântica
+1:abs/categorical      sem semântica
+1:round/string         sem semântica
+1:round/bool           sem semântica
+1:round/datetime       use .dt:truncate/.dt:round (acessor dedicado)
+1:round/categorical    sem semântica
+1:clip/string          sem semântica clara (lexicográfico ambíguo)
+1:clip/bool            sem semântica
+1:clip/datetime        semântica clara mas implementação pendente — registrar como gap real
+1:clip/categorical     sem semântica
+1:rank/string          ranking lexicográfico tem semântica mas não implementado — gap real
+1:rank/bool            sem semântica útil
+1:rank/datetime        ranking temporal tem semântica mas não implementado — gap real
+1:rank/categorical     sem semântica
+1:pct_rank/string      idem rank
+1:pct_rank/bool        sem semântica
+1:pct_rank/datetime    idem rank
+1:pct_rank/categorical sem semântica
+
+# Lifecycle / armazenamento
+1:view/string          string não suporta view (decisão registrada em COW.md)
+1:view/categorical     CategoricalSeries é Lua puro, sem buffer C compartilhável
+1:view/bool            registrar status — bool tem view?
+
+# Métodos Kleene são exclusivos de bool
+1:land/f64             exclusivo Kleene/bool
+1:land/i64             exclusivo Kleene/bool
+1:land/string          exclusivo Kleene/bool
+1:land/datetime        exclusivo Kleene/bool
+1:land/categorical     exclusivo Kleene/bool
+1:lor/f64              exclusivo Kleene/bool
+1:lor/i64              exclusivo Kleene/bool
+1:lor/string           exclusivo Kleene/bool
+1:lor/datetime         exclusivo Kleene/bool
+1:lor/categorical      exclusivo Kleene/bool
+1:lxor/f64             exclusivo Kleene/bool
+1:lxor/i64             exclusivo Kleene/bool
+1:lxor/string          exclusivo Kleene/bool
+1:lxor/datetime        exclusivo Kleene/bool
+1:lxor/categorical     exclusivo Kleene/bool
+1:lnot/f64             exclusivo Kleene/bool
+1:lnot/i64             exclusivo Kleene/bool
+1:lnot/string          exclusivo Kleene/bool
+1:lnot/datetime        exclusivo Kleene/bool
+1:lnot/categorical     exclusivo Kleene/bool
+1:all/f64              exclusivo bool
+1:all/i64              exclusivo bool
+1:all/string           exclusivo bool
+1:all/datetime         exclusivo bool
+1:all/categorical      exclusivo bool
+1:any/f64              exclusivo bool
+1:any/i64              exclusivo bool
+1:any/string           exclusivo bool
+1:any/datetime         exclusivo bool
+1:any/categorical      exclusivo bool
+1:count_true/f64       exclusivo bool
+1:count_true/i64       exclusivo bool
+1:count_true/string    exclusivo bool
+1:count_true/datetime  exclusivo bool
+1:count_true/categorical exclusivo bool
+
+# argmin/argmax dependem de ordem total numérica
+1:argmin/string        ordem lexicográfica — implementação possível mas não feita (gap registrado)
+1:argmax/string        idem
+1:argmin/bool          sem semântica
+1:argmax/bool          sem semântica
+1:argmin/categorical   sem ordem numérica
+1:argmax/categorical   sem ordem numérica
+
+# nlargest/nsmallest
+1:nlargest/string      lexicográfico, possível mas não implementado
+1:nsmallest/string     idem
+1:nlargest/bool        sem semântica
+1:nsmallest/bool       sem semântica
+1:nlargest/categorical sem ordem numérica
+1:nsmallest/categorical sem ordem numérica
+1:nlargest/datetime    semântica clara mas implementação pendente — gap real
+1:nsmallest/datetime   idem
+
+# mode aplicável em string/categorical/bool/datetime — verificar implementação
+1:mode/string          registrar como gap se ausente
+1:mode/bool            registrar como gap se ausente
+1:mode/datetime        registrar como gap se ausente
+1:mode/categorical     registrar como gap se ausente
+
+# Matemática vetorizada é só numérica
+1:sin/string           só numérico
+1:sin/bool             só numérico
+1:sin/datetime         só numérico
+1:sin/categorical      só numérico
+1:cos/string           só numérico
+1:cos/bool             só numérico
+1:cos/datetime         só numérico
+1:cos/categorical      só numérico
+1:tan/string           só numérico
+1:tan/bool             só numérico
+1:tan/datetime         só numérico
+1:tan/categorical      só numérico
+1:exp/string           só numérico
+1:exp/bool             só numérico
+1:exp/datetime         só numérico
+1:exp/categorical      só numérico
+1:log/string           só numérico
+1:log/bool             só numérico
+1:log/datetime         só numérico
+1:log/categorical      só numérico
+1:sqrt/string          só numérico
+1:sqrt/bool            só numérico
+1:sqrt/datetime        só numérico
+1:sqrt/categorical     só numérico
+
+# Rolling/Expanding
+1:rolling/string       sem semântica de janela aritmética
+1:rolling/bool         sem semântica
+1:rolling/datetime     pode fazer sentido com min/max (gap real, registrar pós-1.0)
+1:rolling/categorical  sem semântica
+1:expanding/string     sem semântica
+1:expanding/bool       sem semântica
+1:expanding/datetime   pode fazer sentido com min/max (idem rolling)
+1:expanding/categorical sem semântica
+
+# ===================================================================
+# Eixo 10 — Lifecycle paridade
+# ===================================================================
+10:view/string        sem suporte (COW.md)
+10:view/categorical   Lua puro
+
+# ===================================================================
+# Eixo 6 — Tipos de retorno
+# Documentar quando intencional. Quando inconsistente sem razão, deixar
+# o checker apontar como ❌.
+# ===================================================================
+# (vazio por enquanto — preencher após primeira rodada do checker)
+
+# ===================================================================
+# Eixo 8 — Nomenclatura
+# ===================================================================
+# (vazio — preencher após primeira rodada)
