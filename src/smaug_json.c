@@ -216,6 +216,10 @@ static int parse_record(json_lex_t *l, json_record_t *rec) {
 smaug_table_t *smaug_read_json_mem(const char *buf, size_t len) {
     json_lex_t l = {buf, len, 0, NULL, 0, 0, 0};
     json_tok_t t;
+    /* alocações visíveis em oom_recs (NULL = não-alocado ou já liberado) */
+    char **col_names = NULL;
+    int   *dtypes    = NULL;
+    size_t n_cols_io = 0;
 
     t = next_token(&l);
     if (t != TOK_LBRACKET)
@@ -264,14 +268,27 @@ smaug_table_t *smaug_read_json_mem(const char *buf, size_t len) {
 
     /* descobrir colunas (ordem do primeiro record) */
     size_t n_cols = recs[0].count;
-    char **col_names = malloc(n_cols * sizeof(char*));
+    n_cols_io     = n_cols;
+    col_names     = malloc(n_cols * sizeof(char*));
     if (!col_names) goto oom_recs;
-    for (size_t c = 0; c < n_cols; c++)
+    /* zera antes de strdup para permitir cleanup parcial seguro */
+    for (size_t c = 0; c < n_cols; c++) col_names[c] = NULL;
+    for (size_t c = 0; c < n_cols; c++) {
         col_names[c] = strdup(recs[0].keys[c]);
+        if (!col_names[c]) {
+            for (size_t k = 0; k < c; k++) free(col_names[k]);
+            free(col_names);
+            goto oom_recs;
+        }
+    }
 
     /* inferir dtypes */
-    int *dtypes = calloc(n_cols, sizeof(int));
-    if (!dtypes) { free(col_names); goto oom_recs; }
+    dtypes = calloc(n_cols, sizeof(int));
+    if (!dtypes) {
+        for (size_t c = 0; c < n_cols; c++) free(col_names[c]);
+        free(col_names); col_names = NULL;
+        goto oom_recs;
+    }
 
     for (size_t r = 0; r < n_recs; r++) {
         for (size_t c = 0; c < n_cols && c < recs[r].count; c++) {
@@ -292,14 +309,22 @@ smaug_table_t *smaug_read_json_mem(const char *buf, size_t len) {
 
     /* construir tabela */
     smaug_table_t *tbl = calloc(1, sizeof(smaug_table_t));
-    if (!tbl) { free(dtypes); free(col_names); goto oom_recs; }
+    if (!tbl) {
+        for (size_t c = 0; c < n_cols; c++) free(col_names[c]);
+        free(dtypes); free(col_names); goto oom_recs;
+    }
     tbl->columns = calloc(n_cols, sizeof(smaug_column_t));
-    if (!tbl->columns) { free(tbl); free(dtypes); free(col_names); goto oom_recs; }
+    if (!tbl->columns) {
+        free(tbl);
+        for (size_t c = 0; c < n_cols; c++) free(col_names[c]);
+        free(dtypes); free(col_names); goto oom_recs;
+    }
     tbl->ncols = n_cols;
     tbl->nrows = n_recs;
 
     for (size_t c = 0; c < n_cols; c++) {
         tbl->columns[c].name  = col_names[c];
+        col_names[c]          = NULL;   /* ownership transferida ao tbl */
         tbl->columns[c].dtype = dtype_name(dtypes[c]);
 
         switch (dtypes[c]) {
@@ -362,6 +387,11 @@ smaug_table_t *smaug_read_json_mem(const char *buf, size_t len) {
     return tbl;
 
 oom_recs:
+    if (col_names) {
+        for (size_t c = 0; c < n_cols_io; c++) free(col_names[c]);
+        free(col_names);
+    }
+    free(dtypes);
     for (size_t r = 0; r < n_recs; r++) free_record(&recs[r]);
     free(recs);
     return make_error("smaug_read_json: OOM");

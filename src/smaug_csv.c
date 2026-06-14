@@ -222,19 +222,37 @@ smaug_table_t *smaug_read_csv_mem(const char *buf, size_t len,
     /* nomes das colunas */
     char **col_names = malloc(n_cols * sizeof(char *));
     if (!col_names) goto oom_cleanup;
+    /* zera antes de strdup para permitir cleanup parcial seguro */
+    for (size_t c = 0; c < n_cols; c++) col_names[c] = NULL;
     if (opts->header) {
-        for (size_t c = 0; c < n_cols; c++)
-            col_names[c] = (c < row_sizes[0]) ? strdup(rows[0][c]) : strdup(""); /* COV-EXCL-BR: c<n_cols<=row_sizes[0] por construção */
+        for (size_t c = 0; c < n_cols; c++) {
+            const char *src = (c < row_sizes[0]) ? rows[0][c] : ""; /* COV-EXCL-BR: c<n_cols<=row_sizes[0] por construção */
+            col_names[c] = strdup(src);
+            if (!col_names[c]) {
+                for (size_t k = 0; k < c; k++) free(col_names[k]);
+                free(col_names);
+                goto oom_cleanup;
+            }
+        }
     } else {
         for (size_t c = 0; c < n_cols; c++) {
             char tmp[32]; snprintf(tmp, sizeof(tmp), "col%zu", c);
             col_names[c] = strdup(tmp);
+            if (!col_names[c]) {
+                for (size_t k = 0; k < c; k++) free(col_names[k]);
+                free(col_names);
+                goto oom_cleanup;
+            }
         }
     }
 
     /* --- Passo 2: inferência de dtype --- */
     int *dtypes = calloc(n_cols, sizeof(int));
-    if (!dtypes) { free(col_names); goto oom_cleanup; }
+    if (!dtypes) {
+        for (size_t c = 0; c < n_cols; c++) free(col_names[c]);
+        free(col_names);
+        goto oom_cleanup;
+    }
     for (size_t r = 0; r < data_rows; r++) {
         char **row = rows[r + header_row];
         size_t rsz = row_sizes[r + header_row];
@@ -256,9 +274,16 @@ smaug_table_t *smaug_read_csv_mem(const char *buf, size_t len,
 
     /* --- Passo 3: alocar e preencher séries --- */
     smaug_table_t *t = calloc(1, sizeof(smaug_table_t));
-    if (!t) { free(dtypes); free(col_names); goto oom_cleanup; }
+    if (!t) {
+        for (size_t c = 0; c < n_cols; c++) free(col_names[c]);
+        free(dtypes); free(col_names); goto oom_cleanup;
+    }
     t->columns = calloc(n_cols, sizeof(smaug_column_t));
-    if (!t->columns) { free(t); free(dtypes); free(col_names); goto oom_cleanup; }
+    if (!t->columns) {
+        free(t);
+        for (size_t c = 0; c < n_cols; c++) free(col_names[c]);
+        free(dtypes); free(col_names); goto oom_cleanup;
+    }
     t->ncols = n_cols;
     t->nrows = data_rows;
 
@@ -322,7 +347,12 @@ smaug_table_t *smaug_read_csv_mem(const char *buf, size_t len,
     }
 
 done:
-    free(col_names); free(dtypes);
+    /* libera nomes ainda não transferidos para t (NULL = já transferido) */
+    if (col_names) {
+        for (size_t c = 0; c < n_cols; c++) free(col_names[c]);
+        free(col_names);
+    }
+    free(dtypes);
     for (size_t r = 0; r < n_rows; r++) {
         for (size_t c = 0; c < row_sizes[r]; c++) free(rows[r][c]);
         free(rows[r]);

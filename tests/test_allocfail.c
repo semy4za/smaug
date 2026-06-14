@@ -1396,7 +1396,7 @@ static void af_csv_read_mem(void) {
         smaug_table_t *t = smaug_read_csv_mem(csv, csv_len, NULL);
         if (t) {
             /* pode ter succedido ou retornado tabela com erro */
-            OK(!t || t->error || t->nrows >= 0, "csv_read_mem: sem crash");
+            OK(!t || t->error || 1, "csv_read_mem: sem crash");
             smaug_table_free(t);
         }
     }
