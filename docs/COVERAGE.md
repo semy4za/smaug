@@ -3,9 +3,9 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `c8917d1`  |  Data: 2026-06-14 01:39:45 -0300
+- Commit medido: `0512f9e`  |  Data: 2026-06-14 02:05:39 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `1981/2215 = 89.44%` -- 66 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- **Branch-bruto** (todos os ramos): `1981/2630 = 75.32%` -- 70 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 | Arquivo | Linhas | Branch-alvo (taken) |
@@ -18,7 +18,8 @@
 | `smaug_ops_str.c` | `115/116 = 99.14%` `[█████████░]` | `115/115 = 100.00%` `[██████████]` |
 | `smaug_csv.c` | `249/257 = 96.89%` `[█████████░]` | `292/343 = 85.13%` `[████████░░]` |
 | `smaug_json.c` | `242/271 = 89.30%` `[████████░░]` | `305/422 = 72.27%` `[███████░░░]` |
-| **TOTAL** | `1909/1949 = 97.95%` `[█████████░]` | `1981/2149 = 92.18%` `[█████████░]` |
+| `smaug_datetime.c` | `0/396 = 0.00%` `[░░░░░░░░░░]` | `0/411 = 0.00%` `[░░░░░░░░░░]` |
+| **TOTAL** | `1909/2345 = 81.41%` `[████████░░]` | `1981/2560 = 77.38%` `[███████░░░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
@@ -144,6 +145,137 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_json.c:501` — if (!buf) return -1;
 - `smaug_json.c:505` — return (w == len) ? 0 : -1;
 
+**`smaug_datetime.c`** — 129 linha(s) com ramo descoberto:
+- `smaug_datetime.c:47` — if (epoch_ms >= 0) return epoch_ms / MS_PER_DAY;
+- `smaug_datetime.c:54` — if (ms < 0) ms += MS_PER_DAY;
+- `smaug_datetime.c:63` — int64_t era  = (z >= 0 ? z : z - 146096) / 146097;
+- `smaug_datetime.c:70` — int64_t m    = mp + (mp < 10 ? 3 : -9);
+- `smaug_datetime.c:71` — if (m <= 2) y++;
+- `smaug_datetime.c:80` — if (M <= 2) { Y--; M += 9; } else { M -= 3; }
+- `smaug_datetime.c:81` — int64_t era = (Y >= 0 ? Y : Y - 399) / 400;
+- `smaug_datetime.c:90` — if (m < 1 || m > 12 || d < 1) return false;
+- `smaug_datetime.c:94` — if (m == 2) {
+- `smaug_datetime.c:95` — bool leap = (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0);
+- `smaug_datetime.c:96` — if (leap) dim = 29;
+- `smaug_datetime.c:109` — size_t new_cap = s->capacity ? (s->capacity + (s->capacity >> 1)) : 4;
+- `smaug_datetime.c:113` — if (!nd) return -1;
+- `smaug_datetime.c:117` — if (!nm) {
+- `smaug_datetime.c:118` — if (s->capacity > 0) {
+- `smaug_datetime.c:130` — if (!s->meta.is_view) return 0;
+- `smaug_datetime.c:131` — if (s->size == 0) {
+- `smaug_datetime.c:138` — if (!nd || !nm) { free(nd); free(nm); return -1; }
+- `smaug_datetime.c:152` — if (size > capacity) return NULL;
+- `smaug_datetime.c:155` — if (!s) return NULL;
+- `smaug_datetime.c:157` — if (capacity == 0) {
+- `smaug_datetime.c:161` — if (!s->data) { free(s); return NULL; }
+- `smaug_datetime.c:164` — if (!s->null_mask) { free(s->data); free(s); return NULL; }
+- `smaug_datetime.c:184` — if (!array) return NULL;
+- `smaug_datetime.c:186` — if (!s) return NULL;
+- `smaug_datetime.c:193` — if (!s) return;
+- `smaug_datetime.c:194` — if (!s->meta.external_alloc) {
+- `smaug_datetime.c:202` — if (!s) return NULL;
+- `smaug_datetime.c:204` — if (!c) return NULL;
+- `smaug_datetime.c:205` — if (s->size > 0) {
+- `smaug_datetime.c:215` — if (!s || start > s->size || len > s->size - start) return NULL;
+- `smaug_datetime.c:217` — if (!v) return NULL;
+- `smaug_datetime.c:234` — if (!s)             { if (status) *status = SMG_ERR_ARGUMENT; return DT_SENTINEL; }
+- `smaug_datetime.c:235` — if (idx >= s->size) { if (status) *status = SMG_ERR_OOB;      return DT_SENTINEL; }
+- `smaug_datetime.c:236` — if (INVALID_DT(s, idx)) { if (status) *status = SMG_NULL_VALUE; return DT_SENTINEL; }
+- `smaug_datetime.c:237` — if (status) *status = SMG_OK;
+- `smaug_datetime.c:242` — if (!s)             return SMG_ERR_ARGUMENT;
+- `smaug_datetime.c:243` — if (idx >= s->size) return SMG_ERR_OOB;
+- `smaug_datetime.c:244` — if (dt_cow_detach(s) != 0) return SMG_ERR_NOMEM;
+- `smaug_datetime.c:251` — if (!s)             return SMG_ERR_ARGUMENT;
+- `smaug_datetime.c:252` — if (idx >= s->size) return SMG_ERR_OOB;
+- `smaug_datetime.c:253` — if (dt_cow_detach(s) != 0) return SMG_ERR_NOMEM;
+- `smaug_datetime.c:260` — if (!s || idx >= s->size) return true;
+- `smaug_datetime.c:265` — if (!s) return -1;
+- `smaug_datetime.c:266` — if (dt_cow_detach(s) != 0) return -1;
+- `smaug_datetime.c:267` — if (s->size >= s->capacity) {
+- `smaug_datetime.c:268` — if (dt_grow(s) != 0) return -1;
+- `smaug_datetime.c:277` — if (!s) return -1;
+- `smaug_datetime.c:278` — if (dt_cow_detach(s) != 0) return -1;
+- `smaug_datetime.c:279` — if (s->size >= s->capacity) {
+- `smaug_datetime.c:280` — if (dt_grow(s) != 0) return -1;
+- `smaug_datetime.c:303` — if (p + n > end) return NULL;
+- `smaug_datetime.c:305` — for (int i = 0; i < n; i++) {
+- `smaug_datetime.c:306` — if (p[i] < '0' || p[i] > '9') return NULL;
+- `smaug_datetime.c:314` — if (!str || !epoch_ms) return -1;
+- `smaug_datetime.c:320` — if (!(p = parse_digits(p, end, 4, &y)))       return -1;
+- `smaug_datetime.c:321` — if (p >= end || *p++ != '-')                   return -1;
+- `smaug_datetime.c:322` — if (!(p = parse_digits(p, end, 2, &mo)))      return -1;
+- `smaug_datetime.c:323` — if (p >= end || *p++ != '-')                   return -1;
+- `smaug_datetime.c:324` — if (!(p = parse_digits(p, end, 2, &d)))       return -1;
+- `smaug_datetime.c:325` — if (!is_valid_date(y, mo, d))                  return -1;
+- `smaug_datetime.c:330` — if (p < end && (*p == 'T' || *p == ' ')) {
+- `smaug_datetime.c:332` — if (!(p = parse_digits(p, end, 2, &h)))   return -1;
+- `smaug_datetime.c:333` — if (p >= end || *p++ != ':')               return -1;
+- `smaug_datetime.c:334` — if (!(p = parse_digits(p, end, 2, &mi)))  return -1;
+- `smaug_datetime.c:335` — if (p >= end || *p++ != ':')               return -1;
+- `smaug_datetime.c:336` — if (!(p = parse_digits(p, end, 2, &sec))) return -1;
+- `smaug_datetime.c:337` — if (h > 23 || mi > 59 || sec > 59)        return -1;
+- `smaug_datetime.c:340` — if (p < end && *p == '.') {
+- `smaug_datetime.c:345` — while (p < end && *p >= '0' && *p <= '9') {
+- `smaug_datetime.c:346` — if (cnt < 3) ms_val = ms_val * 10 + (*p - '0');
+- `smaug_datetime.c:350` — while (cnt < 3) { ms_val *= 10; cnt++; }
+- `smaug_datetime.c:355` — if (p < end) {
+- `smaug_datetime.c:356` — if (*p == 'Z') {
+- `smaug_datetime.c:358` — } else if (*p == '+' || *p == '-') {
+- `smaug_datetime.c:359` — tz_sign = (*p == '+') ? 1 : -1;
+- `smaug_datetime.c:361` — if (!(p = parse_digits(p, end, 2, &tz_h))) return -1;
+- `smaug_datetime.c:362` — if (p < end && *p == ':') p++;
+- `smaug_datetime.c:363` — if (!(p = parse_digits(p, end, 2, &tz_m))) return -1;
+- `smaug_datetime.c:364` — if (tz_h > 23 || tz_m > 59) return -1;
+- `smaug_datetime.c:370` — if (p != end) return -1;
+- `smaug_datetime.c:380` — if (tz_sign != 0) {
+- `smaug_datetime.c:390` — if (!buf || buf_size < 26) return -1;
+- `smaug_datetime.c:408` — return (written > 0 && (size_t)written < buf_size) ? 0 : -1;
+- `smaug_datetime.c:453` — if (wd < 0) wd += 7;
+- `smaug_datetime.c:484` — if (week < 1) {
+- `smaug_datetime.c:489` — if (wd_dec28 < 0) wd_dec28 += 7;
+- `smaug_datetime.c:496` — } else if (week > 52) {
+- `smaug_datetime.c:500` — if (wd_dec28 < 0) wd_dec28 += 7;
+- `smaug_datetime.c:502` — if (wd_dec28 > 3) week = 1; /* pertence à semana 1 do próximo ano */
+- `smaug_datetime.c:513` — if (!is_valid_date(year, month, day)) return DT_SENTINEL;
+- `smaug_datetime.c:514` — if (hour < 0 || hour > 23 || minute < 0 || minute > 59 ||
+- `smaug_datetime.c:515` — second < 0 || second > 59 || ms < 0 || ms > 999) return DT_SENTINEL;
+- `smaug_datetime.c:537` — if ((delta_ms > 0 && result < epoch_ms) ||
+- `smaug_datetime.c:538` — (delta_ms < 0 && result > epoch_ms)) return DT_SENTINEL;
+- `smaug_datetime.c:543` — switch (unit) {
+- `smaug_datetime.c:546` — - (epoch_ms < 0 && epoch_ms % MS_PER_SECOND != 0 ? MS_PER_SECOND : 0);
+- `smaug_datetime.c:549` — - (epoch_ms < 0 && epoch_ms % MS_PER_MINUTE != 0 ? MS_PER_MINUTE : 0);
+- `smaug_datetime.c:552` — - (epoch_ms < 0 && epoch_ms % MS_PER_HOUR != 0 ? MS_PER_HOUR : 0);
+- `smaug_datetime.c:607` — DT_CMP_IMPL(gt, > )
+- `smaug_datetime.c:608` — DT_CMP_IMPL(lt, < )
+- `smaug_datetime.c:609` — DT_CMP_IMPL(eq, ==)
+- `smaug_datetime.c:610` — DT_CMP_IMPL(ge, >=)
+- `smaug_datetime.c:611` — DT_CMP_IMPL(le, <=)
+- `smaug_datetime.c:612` — DT_CMP_IMPL(ne, !=)
+- `smaug_datetime.c:623` — if (ea->val < eb->val) return -1;
+- `smaug_datetime.c:624` — if (ea->val > eb->val) return  1;
+- `smaug_datetime.c:633` — if (!s) return NULL;
+- `smaug_datetime.c:634` — for (size_t i = 0; i < s->size; i++) {
+- `smaug_datetime.c:635` — if (INVALID_DT(s, i)) return NULL;
+- `smaug_datetime.c:639` — if (!entries) return NULL;
+- `smaug_datetime.c:641` — for (size_t i = 0; i < s->size; i++) {
+- `smaug_datetime.c:646` — qsort(entries, s->size, sizeof(dt_entry_t),
+- `smaug_datetime.c:650` — if (!indices) { free(entries); return NULL; }
+- `smaug_datetime.c:652` — for (size_t i = 0; i < s->size; i++) indices[i] = entries[i].idx;
+- `smaug_datetime.c:658` — if (!s) return NULL;
+- `smaug_datetime.c:660` — if (!indices) return NULL;
+- `smaug_datetime.c:671` — if (!s) return 0;
+- `smaug_datetime.c:673` — for (size_t i = 0; i < s->size; i++) {
+- `smaug_datetime.c:674` — if (VALID_DT(s, i)) count++;
+- `smaug_datetime.c:681` — if (!s || !idx) return NULL;
+- `smaug_datetime.c:683` — if (!result) return NULL;
+- `smaug_datetime.c:684` — for (size_t i = 0; i < len; i++) {
+- `smaug_datetime.c:685` — if (idx[i] >= s->size) {
+- `smaug_datetime.c:698` — if (!s || !mask) return NULL;
+- `smaug_datetime.c:700` — for (size_t i = 0; i < s->size; i++) if (mask[i]) count++;
+- `smaug_datetime.c:703` — if (!result) return NULL;
+- `smaug_datetime.c:706` — for (size_t i = 0; i < s->size; i++) {
+- `smaug_datetime.c:707` — if (mask[i]) {
+
 ## Ramos excluidos (`COV-EXCL-BR` -- defensivos/inalcancaveis, documentados)
 
 Fora da meta por justificativa tecnica (assert reservado a invariantes internas; estes sao guards defensivos sobre condicoes inalcancaveis na pratica):
@@ -214,3 +346,7 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_json.c:447` — name sempre não-NULL após construção
 - `smaug_json.c:464` — OOM de wbuf + NaN→null: ramo oom inalcançável sem injeção
 - `smaug_json.c:471` — dtype inferido garante exatamente um ponteiro não-NULL
+- `smaug_datetime.c:110` — overflow de capacity
+- `smaug_datetime.c:110` — overflow de capacity
+- `smaug_datetime.c:120` — realloc de shrink
+- `smaug_datetime.c:120` — realloc de shrink

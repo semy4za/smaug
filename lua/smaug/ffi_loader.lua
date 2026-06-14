@@ -347,6 +347,73 @@ ffi.cdef([[
     smaug_table_t*  smaug_read_json_mem(const char *buf, size_t len);
     int             smaug_write_json(const char *path, const smaug_table_t *t, const smaug_json_write_opts_t *opts);
     char*           smaug_write_json_mem(const smaug_table_t *t, const smaug_json_write_opts_t *opts, size_t *out_len);
+
+    /* ===================================================================
+       Datetime — dtype Tier 2 (epoch ms UTC)
+       =================================================================== */
+
+    typedef struct {
+        int64_t      *data;
+        uint8_t      *null_mask;
+        size_t        size;
+        size_t        capacity;
+        smaug_metadata_t meta;
+    } smaug_series_dt_t;
+
+    /* Lifecycle */
+    smaug_series_dt_t* smaug_dt_create(size_t size);
+    smaug_series_dt_t* smaug_dt_create_with_capacity(size_t size, size_t capacity);
+    smaug_series_dt_t* smaug_dt_create_from_array(const int64_t *array, size_t len);
+    void               smaug_dt_free(smaug_series_dt_t *s);
+    smaug_series_dt_t* smaug_dt_clone(const smaug_series_dt_t *s);
+    smaug_series_dt_t* smaug_dt_view(smaug_series_dt_t *s, size_t start, size_t len);
+
+    /* Acesso */
+    int64_t        smaug_dt_get(const smaug_series_dt_t *s, size_t idx, smaug_status_t *status);
+    smaug_status_t smaug_dt_set(smaug_series_dt_t *s, size_t idx, int64_t epoch_ms);
+    smaug_status_t smaug_dt_set_null(smaug_series_dt_t *s, size_t idx);
+    bool           smaug_dt_is_null(const smaug_series_dt_t *s, size_t idx);
+    int            smaug_dt_append(smaug_series_dt_t *s, int64_t epoch_ms);
+    int            smaug_dt_append_null(smaug_series_dt_t *s);
+
+    /* Parsing / formatação */
+    int smaug_dt_parse(const char *str, size_t len, int64_t *epoch_ms);
+    int smaug_dt_format(int64_t epoch_ms, char *buf, size_t buf_size);
+
+    /* Componentes calendário */
+    int smaug_dt_year   (int64_t epoch_ms);
+    int smaug_dt_month  (int64_t epoch_ms);
+    int smaug_dt_day    (int64_t epoch_ms);
+    int smaug_dt_hour   (int64_t epoch_ms);
+    int smaug_dt_minute (int64_t epoch_ms);
+    int smaug_dt_second (int64_t epoch_ms);
+    int smaug_dt_ms     (int64_t epoch_ms);
+    int smaug_dt_weekday(int64_t epoch_ms);
+    int smaug_dt_yearday(int64_t epoch_ms);
+    int smaug_dt_quarter(int64_t epoch_ms);
+    int smaug_dt_week   (int64_t epoch_ms);
+
+    /* Construção e aritmética */
+    int64_t smaug_dt_from_parts(int year, int month, int day,
+                                 int hour, int minute, int second, int ms);
+    int64_t smaug_dt_diff_ms  (int64_t a, int64_t b);
+    int64_t smaug_dt_add_ms   (int64_t epoch_ms, int64_t delta_ms);
+    int64_t smaug_dt_truncate (int64_t epoch_ms, char unit);
+
+    /* Comparações */
+    uint8_t* smaug_dt_gt(const smaug_series_dt_t *s, int64_t threshold, uint8_t **out_mask);
+    uint8_t* smaug_dt_lt(const smaug_series_dt_t *s, int64_t threshold, uint8_t **out_mask);
+    uint8_t* smaug_dt_eq(const smaug_series_dt_t *s, int64_t threshold, uint8_t **out_mask);
+    uint8_t* smaug_dt_ge(const smaug_series_dt_t *s, int64_t threshold, uint8_t **out_mask);
+    uint8_t* smaug_dt_le(const smaug_series_dt_t *s, int64_t threshold, uint8_t **out_mask);
+    uint8_t* smaug_dt_ne(const smaug_series_dt_t *s, int64_t threshold, uint8_t **out_mask);
+
+    /* Seleção e ordenação */
+    size_t             smaug_dt_count_nonnull(const smaug_series_dt_t *s);
+    size_t*            smaug_dt_argsort(const smaug_series_dt_t *s, bool ascending);
+    smaug_series_dt_t* smaug_dt_sort   (const smaug_series_dt_t *s, bool ascending);
+    smaug_series_dt_t* smaug_dt_take   (const smaug_series_dt_t *s, const size_t *idx, size_t len);
+    smaug_series_dt_t* smaug_dt_filter (const smaug_series_dt_t *s, const uint8_t *mask);
 ]])
 
 -- Nome do arquivo da lib conforme o SO.

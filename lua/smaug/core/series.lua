@@ -152,6 +152,63 @@ local DTYPES = {
     },
 
     -- ----------------------------------------------------------------
+    -- datetime: epoch ms UTC (int64 internamente). Dtype Tier 2.
+    -- Valores: int64 Lua (epoch_ms). Nulos via bitmask uniforme.
+    -- Parsing/formatação via C; componentes calendário via funções C.
+    -- ----------------------------------------------------------------
+    datetime = {
+        name        = "datetime",
+        free        = C.smaug_dt_free,
+        create      = C.smaug_dt_create,
+        clone       = C.smaug_dt_clone,
+        get_value   = function(c, i)
+            local st = ffi.new("smaug_status_t[1]")
+            local v  = C.smaug_dt_get(c, i, st)
+            if st[0] ~= 0 then return nil end
+            return tonumber(v)   -- epoch_ms como número Lua
+        end,
+        set = function(c, i, v)
+            -- aceita número inteiro (epoch_ms) ou string ISO 8601
+            if type(v) == "string" then
+                local ep = ffi.new("int64_t[1]")
+                if C.smaug_dt_parse(v, #v, ep) ~= 0 then
+                    error("smaug: datetime parse falhou: " .. v, 3)
+                end
+                return C.smaug_dt_set(c, i, ep[0])
+            end
+            return C.smaug_dt_set(c, i, v)
+        end,
+        set_null    = C.smaug_dt_set_null,
+        is_null     = C.smaug_dt_is_null,
+        append = function(c, v)
+            if type(v) == "string" then
+                local ep = ffi.new("int64_t[1]")
+                if C.smaug_dt_parse(v, #v, ep) ~= 0 then
+                    error("smaug: datetime parse falhou: " .. v, 3)
+                end
+                return C.smaug_dt_append(c, ep[0])
+            end
+            return C.smaug_dt_append(c, v)
+        end,
+        append_null = C.smaug_dt_append_null,
+        count_nonnull = C.smaug_dt_count_nonnull,
+        filter  = C.smaug_dt_filter,
+        take    = C.smaug_dt_take,
+        sort    = C.smaug_dt_sort,
+        argsort = C.smaug_dt_argsort,
+        cmp_gt = function(c, t, om) return C.smaug_dt_gt(c, t, om) end,
+        cmp_lt = function(c, t, om) return C.smaug_dt_lt(c, t, om) end,
+        cmp_eq = function(c, t, om) return C.smaug_dt_eq(c, t, om) end,
+        cmp_ge = function(c, t, om) return C.smaug_dt_ge(c, t, om) end,
+        cmp_le = function(c, t, om) return C.smaug_dt_le(c, t, om) end,
+        cmp_ne = function(c, t, om) return C.smaug_dt_ne(c, t, om) end,
+        is_int_sentinel = function(v)
+            -- INT64_MIN como sentinela (mesmo padrão do i64)
+            return v == -9223372036854775808
+        end,
+    },
+
+    -- ----------------------------------------------------------------
     -- bool: dtype de primeira classe. Armazenamento smaug_series_bool_t.
     -- true/false/nil (NA) são os valores Lua. Internamente 0/1 + null_mask.
     -- Comparações (gt/lt/eq/...) retornam Series<bool> — Fase 3.
@@ -246,6 +303,12 @@ local function check_value(self, v, level)
     elseif dt == "bool" then
         if type(v) ~= "boolean" then
             error("smaug: valor para bool deve ser boolean Lua (true/false); "
+                  .. "recebido " .. type(v), level or 3)
+        end
+    elseif dt == "datetime" then
+        -- aceita número (epoch_ms) ou string ISO 8601
+        if type(v) ~= "number" and type(v) ~= "string" then
+            error("smaug: valor para datetime deve ser número (epoch_ms) ou string ISO 8601; "
                   .. "recebido " .. type(v), level or 3)
         end
     else  -- float64
@@ -1677,19 +1740,7 @@ function StrProxy:split(sep, max_splits)
     return result  -- tabela Lua de Series; col = result[1], result[2], ...
 end
 
--- __index: índice numérico -> get(); "str" em série string -> proxy; senão, método.
-Series.__index = function(self, k)
-    if type(k) == "number" then return methods.get(self, k) end
-    if k == "str" then
-        if self._dtype ~= "string" then
-            error("smaug: accessor .str só se aplica a séries string; dtype é '"
-                  .. self._dtype .. "'", 2)
-        end
-        return setmetatable({ _s = self }, StrProxy)
-    end
-    return methods[k]
-end
-
+-- __index: unificado abaixo (junto com .dt)
 -- =====================================================================
 -- Enriquecimento: reduções, transformações e conveniência
 -- =====================================================================
@@ -2238,6 +2289,186 @@ end
 Series.__newindex = function(self, k, v)
     if type(k) == "number" then methods.set(self, k, v)
     else rawset(self, k, v) end
+end
+
+-- =====================================================================
+-- .dt — proxy para operações de calendário em Series<datetime>
+-- Uso: s.dt:year(), s.dt:month(), s.dt:format(), s.dt:truncate("M")
+-- =====================================================================
+
+local SeriesDT = {}
+SeriesDT.__index = SeriesDT
+
+-- Aplica uma função C de componente (int64_t → int) em cada elemento.
+-- Retorna Series<int64>.
+local function dt_component(s, fn)
+    local n    = s:len()
+    local NA   = Series.NA
+    local vals = {}
+    for i = 1, n do
+        local v = s:get(i)
+        if v == nil then
+            vals[i] = NA
+        else
+            local r = fn(v)
+            vals[i] = r >= 0 and r or NA
+        end
+    end
+    return Series.from_table(vals, "int64", s._name)
+end
+
+function SeriesDT:year()    return dt_component(self._s, C.smaug_dt_year)    end
+function SeriesDT:month()   return dt_component(self._s, C.smaug_dt_month)   end
+function SeriesDT:day()     return dt_component(self._s, C.smaug_dt_day)     end
+function SeriesDT:hour()    return dt_component(self._s, C.smaug_dt_hour)    end
+function SeriesDT:minute()  return dt_component(self._s, C.smaug_dt_minute)  end
+function SeriesDT:second()  return dt_component(self._s, C.smaug_dt_second)  end
+function SeriesDT:ms()      return dt_component(self._s, C.smaug_dt_ms)      end
+function SeriesDT:weekday() return dt_component(self._s, C.smaug_dt_weekday) end
+function SeriesDT:yearday() return dt_component(self._s, C.smaug_dt_yearday) end
+function SeriesDT:quarter() return dt_component(self._s, C.smaug_dt_quarter) end
+function SeriesDT:week()    return dt_component(self._s, C.smaug_dt_week)    end
+
+-- format(): formata cada epoch_ms como string ISO 8601 → Series<string>
+function SeriesDT:format()
+    local s    = self._s
+    local n    = s:len()
+    local NA   = Series.NA
+    local vals = {}
+    local buf  = ffi.new("char[26]")
+    for i = 1, n do
+        local v = s:get(i)
+        if v == nil then
+            vals[i] = NA
+        else
+            C.smaug_dt_format(v, buf, 26)
+            vals[i] = ffi.string(buf)
+        end
+    end
+    return Series.from_table(vals, "string", s._name)
+end
+
+-- truncate(unit): trunca cada elemento para o início do período.
+-- unit: 's' 'm' 'h' 'D' 'W' 'M' 'Q' 'Y'
+function SeriesDT:truncate(unit)
+    if type(unit) ~= "string" or #unit ~= 1 then
+        error("smaug: dt:truncate() espera uma letra de unidade ('D','M','Y',...)", 2)
+    end
+    local s    = self._s
+    local n    = s:len()
+    local NA   = Series.NA
+    local vals = {}
+    local u    = string.byte(unit)
+    for i = 1, n do
+        local v = s:get(i)
+        if v == nil then
+            vals[i] = NA
+        else
+            local r = C.smaug_dt_truncate(v, u)
+            -- DT_SENTINEL = INT64_MIN
+            vals[i] = (r == -9223372036854775808) and NA or tonumber(r)
+        end
+    end
+    return Series.from_table(vals, "datetime", s._name)
+end
+
+-- diff(): diferença em ms entre elemento i e i-1. → Series<int64>
+function SeriesDT:diff(periods)
+    periods = periods or 1
+    local s    = self._s
+    local n    = s:len()
+    local NA   = Series.NA
+    local vals = {}
+    for i = 1, n do
+        if i <= periods then
+            vals[i] = NA
+        else
+            local a = s:get(i)
+            local b = s:get(i - periods)
+            vals[i] = (a ~= nil and b ~= nil) and tonumber(C.smaug_dt_diff_ms(a, b)) or NA
+        end
+    end
+    return Series.from_table(vals, "int64", s._name)
+end
+
+-- add_ms(delta_ms): adiciona delta em ms a cada elemento → Series<datetime>
+function SeriesDT:add_ms(delta_ms)
+    if type(delta_ms) ~= "number" then
+        error("smaug: dt:add_ms() espera número", 2)
+    end
+    local s    = self._s
+    local n    = s:len()
+    local NA   = Series.NA
+    local vals = {}
+    for i = 1, n do
+        local v = s:get(i)
+        if v == nil then
+            vals[i] = NA
+        else
+            local r = C.smaug_dt_add_ms(v, delta_ms)
+            vals[i] = (r == -9223372036854775808) and NA or tonumber(r)
+        end
+    end
+    return Series.from_table(vals, "datetime", s._name)
+end
+
+-- Atalhos de add_ms para unidades comuns
+function SeriesDT:add_days(n)    return self:add_ms(n * 86400000) end
+function SeriesDT:add_hours(n)   return self:add_ms(n * 3600000)  end
+function SeriesDT:add_minutes(n) return self:add_ms(n * 60000)    end
+function SeriesDT:add_seconds(n) return self:add_ms(n * 1000)     end
+
+-- Acesso ao proxy .dt na Series
+methods.dt = nil  -- reservado; resolvido via __index abaixo
+
+-- __index unificado: índice numérico → get(); .str → StrProxy; .dt → SeriesDT; método.
+Series.__index = function(self, k)
+    if k == "dt" then
+        if self._dtype ~= "datetime" then
+            error("smaug: accessor .dt só se aplica a séries datetime; dtype é '"
+                  .. self._dtype .. "'", 2)
+        end
+        return setmetatable({ _s = self }, SeriesDT)
+    end
+    if type(k) == "number" then return methods.get(self, k) end
+    if k == "str" then
+        if self._dtype ~= "string" then
+            error("smaug: accessor .str só se aplica a séries string; dtype é '"
+                  .. self._dtype .. "'", 2)
+        end
+        return setmetatable({ _s = self }, StrProxy)
+    end
+    return methods[k]
+end
+
+-- Factory: Series.datetime(size, name)
+function Series.datetime(size, name) return Series.new("datetime", size, name) end
+
+-- Helper público: parse de string ISO 8601 → epoch_ms (número Lua)
+function Series.dt_parse(str)
+    if type(str) ~= "string" then
+        error("smaug: Series.dt_parse() espera string", 2)
+    end
+    local ep = ffi.new("int64_t[1]")
+    if C.smaug_dt_parse(str, #str, ep) ~= 0 then
+        return nil
+    end
+    return tonumber(ep[0])
+end
+
+-- Helper público: epoch_ms → string ISO 8601
+function Series.dt_format(epoch_ms)
+    local buf = ffi.new("char[26]")
+    if C.smaug_dt_format(epoch_ms, buf, 26) ~= 0 then return nil end
+    return ffi.string(buf)
+end
+
+-- Construção a partir de partes
+function Series.dt_from_parts(year, month, day, hour, minute, second, ms)
+    hour = hour or 0; minute = minute or 0; second = second or 0; ms = ms or 0
+    local r = C.smaug_dt_from_parts(year, month, day, hour, minute, second, ms)
+    if r == -9223372036854775808 then return nil end
+    return tonumber(r)
 end
 
 -- expõe o registro de dtypes para extensão futura (bool, string, ...)

@@ -3,7 +3,7 @@ CFLAGS  = -std=c11 -fPIC -Wall -Wextra -O2 -I./include
 LDFLAGS = -shared
 
 # Backend C completo (f64 + i64 + bool + string)
-SRCS = src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c src/smaug_ops_bool.c src/smaug_str.c src/smaug_ops_str.c src/smaug_csv.c src/smaug_json.c
+SRCS = src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c src/smaug_ops_bool.c src/smaug_str.c src/smaug_ops_str.c src/smaug_csv.c src/smaug_json.c src/smaug_datetime.c
 
 TARGET = build/libsmaug.so
 

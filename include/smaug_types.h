@@ -104,6 +104,19 @@ typedef struct {
     smaug_metadata_t meta;
 } smaug_series_str_t;
 
+/* Series DateTime — epoch em milissegundos UTC (int64 internamente).
+   Layout idêntico a smaug_series_i64_t; semântica distinta (calendário).
+   Valores negativos representam datas antes de 1970-01-01.
+   Fuso horário: sempre UTC no armazenamento; apresentação local é responsabilidade
+   do frontend. Null por bitmask, uniforme com os demais dtypes. */
+typedef struct {
+    int64_t      *data;        /* epoch ms                    */
+    smaug_mask_t *null_mask;   /* 0xFF = válido, 0x00 = NULL  */
+    size_t        size;
+    size_t        capacity;
+    smaug_metadata_t meta;
+} smaug_series_dt_t;
+
 /* ===================================================================
    smaug_table_t — Struct intermediária do Anel 3 (I/O)
    -------------------------------------------------------------------
