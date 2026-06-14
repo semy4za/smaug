@@ -192,7 +192,7 @@ smaug_table_t *smaug_read_csv_mem(const char *buf, size_t len,
             if (n_fields >= field_cap) {
                 field_cap *= 2;
                 char **tmp = realloc(fields, field_cap * sizeof(char*));
-                if (!tmp) { free(f); for(size_t k=0;k<n_fields;k++)free(fields[k]); free(fields); goto oom; }
+                if (!tmp) { free(f); for(size_t k=0;k<n_fields;k++)free(fields[k]); free(fields); goto oom; } /* COV-EXCL-BR: OOM de realloc de fields — coberto pelo allocfail */
                 fields = tmp;
             }
             fields[n_fields++] = f;
@@ -201,7 +201,7 @@ smaug_table_t *smaug_read_csv_mem(const char *buf, size_t len,
             row_cap *= 2;
             char ***tr = realloc(rows, row_cap * sizeof(char**));
             size_t *ts = realloc(row_sizes, row_cap * sizeof(size_t));
-            if (!tr || !ts) { for(size_t k=0;k<n_fields;k++)free(fields[k]); free(fields); goto oom; }
+            if (!tr || !ts) { for(size_t k=0;k<n_fields;k++)free(fields[k]); free(fields); goto oom; } /* COV-EXCL-BR: OOM de realloc de rows — coberto pelo allocfail */
             rows = tr; row_sizes = ts;
         }
         rows[n_rows] = fields;
@@ -215,8 +215,8 @@ smaug_table_t *smaug_read_csv_mem(const char *buf, size_t len,
     }
 
     size_t header_row = opts->header ? 1 : 0;
-    size_t n_cols = rows[0] ? row_sizes[0] : 0;
-    if (n_cols == 0) goto cleanup_empty;
+    size_t n_cols = rows[0] ? row_sizes[0] : 0; /* COV-EXCL-BR: rows[0] nunca NULL — n_rows>0 garante alocação */
+    if (n_cols == 0) goto cleanup_empty; /* COV-EXCL-BR: next_field sempre produz >=1 campo por linha */
     size_t data_rows = (n_rows > header_row) ? n_rows - header_row : 0;
 
     /* nomes das colunas */

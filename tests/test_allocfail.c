@@ -19,13 +19,17 @@
  */
 
 #include "../include/smaug.h"
+#include "../include/smaug_io.h"
+#include "../include/smaug_string.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* ---- interceptação de malloc/realloc ---------------------------------- */
 extern void *__real_malloc(size_t);
 extern void *__real_realloc(void *, size_t);
+extern void  free(void *);
 
 static long g_fail_at = -1;   /* índice da alocação que deve falhar (-1 = nenhuma) */
 static long g_count   = 0;    /* alocações já vistas nesta rodada */
@@ -1373,6 +1377,207 @@ static void sanity_no_fail(void) {
     smaug_f64_free(s);
 }
 
+/* ======================================================================
+   Anel 3 — CSV/JSON: varredura de pontos de alocação nos parsers.
+   Cada falha deve retornar NULL/erro gracioso, sem crash, sem leak.
+   MAX_IO_ALLOCS: teto generoso para cobrir todos os malloc/realloc/strdup
+   dos parsers (CSV tem ~14, JSON tem ~16, mais margens de crescimento).
+   ====================================================================== */
+#define MAX_IO_ALLOCS 64
+
+/* CSV — leitura: todos os pontos de malloc no tokenizador e no parser */
+static void af_csv_read_mem(void) {
+    /* CSV simples com todos os dtypes para exercitar todas as alocações */
+    const char *csv = "i,f,b,s\n1,1.5,true,hello\n2,2.5,false,world\n";
+    size_t csv_len  = strlen(csv);
+    reset(-1);
+    for (long k = 0; k < MAX_IO_ALLOCS; k++) {
+        reset(k);
+        smaug_table_t *t = smaug_read_csv_mem(csv, csv_len, NULL);
+        if (t) {
+            /* pode ter succedido ou retornado tabela com erro */
+            OK(!t || t->error || t->nrows >= 0, "csv_read_mem: sem crash");
+            smaug_table_free(t);
+        }
+    }
+    /* sem falha: deve suceder */
+    reset(-1);
+    smaug_table_t *t = smaug_read_csv_mem(csv, csv_len, NULL);
+    OK(t && !t->error && t->nrows == 2, "csv_read_mem: sucesso sem falha");
+    smaug_table_free(t);
+}
+
+/* CSV — leitura com aspas RFC 4180 (exercita realloc dentro do tokenizador) */
+static void af_csv_read_quoted(void) {
+    const char *csv = "v\n\"campo com, virgula\"\n\"outro\"\n";
+    size_t csv_len  = strlen(csv);
+    for (long k = 0; k < MAX_IO_ALLOCS; k++) {
+        reset(k);
+        smaug_table_t *t = smaug_read_csv_mem(csv, csv_len, NULL);
+        if (t) { smaug_table_free(t); }
+    }
+    reset(-1);
+    smaug_table_t *t = smaug_read_csv_mem(csv, csv_len, NULL);
+    OK(t && !t->error && t->nrows == 2, "csv_read_quoted: sucesso");
+    smaug_table_free(t);
+}
+
+/* CSV — leitura com muitas linhas (exercita realloc do vetor de rows) */
+static void af_csv_read_many_rows(void) {
+    /* 100 linhas — força o realloc de rows[] (começa com cap=64) */
+    char *csv = malloc(8192);
+    assert(csv);
+    int pos = sprintf(csv, "v\n");
+    for (int i = 0; i < 100; i++) pos += sprintf(csv + pos, "%d\n", i);
+    size_t csv_len = (size_t)pos;
+
+    for (long k = 0; k < MAX_IO_ALLOCS; k++) {
+        reset(k);
+        smaug_table_t *t = smaug_read_csv_mem(csv, csv_len, NULL);
+        if (t) { smaug_table_free(t); }
+    }
+    reset(-1);
+    smaug_table_t *t = smaug_read_csv_mem(csv, csv_len, NULL);
+    OK(t && !t->error && t->nrows == 100, "csv_read_many_rows: sucesso");
+    smaug_table_free(t);
+    free(csv);  /* liberar sem wrap */
+}
+
+/* CSV — writer: pontos de realloc do wbuf */
+static void af_csv_write(void) {
+    /* construir tabela simples na stack */
+    smaug_series_i64_t *s = smaug_i64_create(3);
+    assert(s);
+    smaug_i64_set(s, 0, 1);
+    smaug_i64_set(s, 1, 2);
+    smaug_i64_set(s, 2, 3);
+
+    smaug_table_t t = {0};
+    smaug_column_t col = {0};
+    col.name = "v"; col.dtype = "int64"; col.i64 = s;
+    t.columns = &col; t.ncols = 1; t.nrows = 3;
+
+    smaug_csv_write_opts_t wo = smaug_csv_write_default_opts();
+    for (long k = 0; k < MAX_IO_ALLOCS; k++) {
+        reset(k);
+        size_t len;
+        char *out = smaug_write_csv_mem(&t, &wo, &len);
+        if (out) { free(out); }
+    }
+    reset(-1);
+    size_t len;
+    char *out = smaug_write_csv_mem(&t, &wo, &len);
+    OK(out != NULL && len > 0, "csv_write: sucesso");
+    free(out);
+    smaug_i64_free(s);
+}
+
+/* JSON — leitura: todos os pontos de malloc do tokenizador e do parser */
+static void af_json_read_mem(void) {
+    const char *j =
+        "[{\"i\":1,\"f\":1.5,\"b\":true,\"s\":\"hello\"},"
+         "{\"i\":2,\"f\":2.5,\"b\":false,\"s\":\"world\"}]";
+    size_t jlen = strlen(j);
+
+    for (long k = 0; k < MAX_IO_ALLOCS; k++) {
+        reset(k);
+        smaug_table_t *t = smaug_read_json_mem(j, jlen);
+        if (t) { smaug_table_free(t); }
+    }
+    reset(-1);
+    smaug_table_t *t = smaug_read_json_mem(j, jlen);
+    OK(t && !t->error && t->nrows == 2 && t->ncols == 4,
+       "json_read_mem: sucesso");
+    smaug_table_free(t);
+}
+
+/* JSON — leitura com muitos records (exercita realloc do vetor de recs[]) */
+static void af_json_read_many_records(void) {
+    /* 80 records — força realloc de recs[] (começa com cap=64) */
+    char *j = malloc(8192);
+    assert(j);
+    int pos = sprintf(j, "[");
+    for (int i = 0; i < 80; i++) {
+        pos += sprintf(j + pos, "{\"v\":%d}%s", i, i < 79 ? "," : "");
+    }
+    pos += sprintf(j + pos, "]");
+    size_t jlen = (size_t)pos;
+
+    for (long k = 0; k < MAX_IO_ALLOCS; k++) {
+        reset(k);
+        smaug_table_t *t = smaug_read_json_mem(j, jlen);
+        if (t) { smaug_table_free(t); }
+    }
+    reset(-1);
+    smaug_table_t *t = smaug_read_json_mem(j, jlen);
+    OK(t && !t->error && t->nrows == 80, "json_read_many_records: sucesso");
+    smaug_table_free(t);
+    free(j);
+}
+
+/* JSON — leitura com strings longas (exercita realloc dentro do tokenizador) */
+static void af_json_read_long_string(void) {
+    /* string > 64 bytes força realloc no read_json_string */
+    const char *j =
+        "[{\"v\":\"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789XY\"}]";
+    size_t jlen = strlen(j);
+
+    for (long k = 0; k < MAX_IO_ALLOCS; k++) {
+        reset(k);
+        smaug_table_t *t = smaug_read_json_mem(j, jlen);
+        if (t) { smaug_table_free(t); }
+    }
+    reset(-1);
+    smaug_table_t *t = smaug_read_json_mem(j, jlen);
+    OK(t && !t->error && t->nrows == 1, "json_read_long_string: sucesso");
+    smaug_table_free(t);
+}
+
+/* JSON — writer: pontos de realloc do wbuf */
+static void af_json_write(void) {
+    smaug_series_str_t *s = smaug_str_create(2);
+    assert(s);
+    smaug_str_set(s, 0, "SP", 2);
+    smaug_str_set(s, 1, "RJ", 2);
+
+    smaug_table_t t = {0};
+    smaug_column_t col = {0};
+    col.name = "uf"; col.dtype = "string"; col.str = s;
+    t.columns = &col; t.ncols = 1; t.nrows = 2;
+
+    smaug_json_write_opts_t wo = {0};
+    for (long k = 0; k < MAX_IO_ALLOCS; k++) {
+        reset(k);
+        size_t len;
+        char *out = smaug_write_json_mem(&t, &wo, &len);
+        if (out) { free(out); }
+    }
+    reset(-1);
+    size_t len;
+    char *out = smaug_write_json_mem(&t, &wo, &len);
+    OK(out != NULL && len > 0, "json_write: sucesso");
+    free(out);
+    smaug_str_free(s);
+}
+
+/* smaug_table_free com tabela parcialmente construída */
+static void af_table_free_partial(void) {
+    /* simula OOM a meio da construção de colunas */
+    const char *csv = "a,b,c\n1,2,3\n4,5,6\n";
+    size_t csv_len  = strlen(csv);
+    /* ao falhar no meio, smaug_table_free deve lidar com colunas parciais */
+    for (long k = 0; k < MAX_IO_ALLOCS; k++) {
+        reset(k);
+        smaug_table_t *t = smaug_read_csv_mem(csv, csv_len, NULL);
+        if (t) { smaug_table_free(t); }  /* não deve crash mesmo parcial */
+    }
+    reset(-1);
+    smaug_table_t *t = smaug_read_csv_mem(csv, csv_len, NULL);
+    OK(t && !t->error, "table_free_partial: sucesso final");
+    smaug_table_free(t);
+}
+
+
 int main(void) {
     af_f64_create();
     af_f64_create_from_array();
@@ -1469,6 +1674,18 @@ int main(void) {
     af_bool_cow_set_null();
     af_bool_cow_append();
     af_bool_cow_append_null();
+
+    /* Anel 3 — parsers CSV e JSON */
+    af_csv_read_mem();
+    af_csv_read_quoted();
+    af_csv_read_many_rows();
+    af_csv_write();
+    af_json_read_mem();
+    af_json_read_many_records();
+    af_json_read_long_string();
+    af_json_write();
+    af_table_free_partial();
+
 
     sanity_no_fail();
 

@@ -279,6 +279,62 @@ static void test_csv_infer_bool_mixed_with_string(void) {
     smaug_table_free(t);
 }
 
+
+/* csv.c:143 — ramo \n no else-if do tokenizador (campo terminado por \n puro) */
+static void test_csv_lf_only_field_end(void) {
+    const char *csv = "a,b\n1,2\n";
+    smaug_table_t *t = smaug_read_csv_mem(csv, strlen(csv), NULL);
+    CHECK(t && !t->error,         "LF field end: sem erro");
+    CHECK(t->nrows == 1,          "LF field end: 1 linha");
+    CHECK(get_i64(t, 1, 0) == 2, "LF field end: b[0]=2");
+    smaug_table_free(t);
+}
+
+/* csv.c:178/179 — linha vazia com \r\n e \r no último byte (pos+1>=len) */
+static void test_csv_crlf_at_eof(void) {
+    /* \r\n final */
+    const char *csv = "v\n1\r\n";
+    smaug_table_t *t = smaug_read_csv_mem(csv, strlen(csv), NULL);
+    CHECK(t && !t->error,         "CRLF EOF: sem erro");
+    CHECK(t->nrows == 1,          "CRLF EOF: 1 linha");
+    smaug_table_free(t);
+    /* \r sem \n no último byte */
+    const char *csv2 = "v\n1\r";
+    smaug_table_t *t2 = smaug_read_csv_mem(csv2, strlen(csv2), NULL);
+    CHECK(t2 && !t2->error,       "CR EOF: sem erro");
+    CHECK(t2->nrows == 1,         "CR EOF: 1 linha");
+    smaug_table_free(t2);
+}
+
+/* csv.c:137 — PUSH em campo sem aspas > 32 bytes (força realloc no macro) */
+static void test_csv_long_unquoted_field(void) {
+    const char *csv = "v\nabcdefghijklmnopqrstuvwxyzABCDEFGH\n";
+    smaug_table_t *t = smaug_read_csv_mem(csv, strlen(csv), NULL);
+    CHECK(t && !t->error,         "long field: sem erro");
+    CHECK(t->nrows == 1,          "long field: 1 linha");
+    size_t n; const char *s = get_str(t, 0, 0, &n);
+    CHECK(n == 34,                "long field: comprimento 34");
+    smaug_table_free(t);
+}
+
+/* csv.c:192 — realloc de fields[] quando linha tem > 16 campos */
+static void test_csv_many_columns(void) {
+    char csv[512];
+    int pos = 0;
+    for (int i = 0; i < 20; i++)
+        pos += sprintf(csv + pos, "%sc%d", i ? "," : "", i);
+    pos += sprintf(csv + pos, "\n");
+    for (int i = 0; i < 20; i++)
+        pos += sprintf(csv + pos, "%s%d", i ? "," : "", i * 10);
+    pos += sprintf(csv + pos, "\n");
+    smaug_table_t *t = smaug_read_csv_mem(csv, (size_t)pos, NULL);
+    CHECK(t && !t->error,            "many cols: sem erro");
+    CHECK(t->ncols == 20,            "many cols: 20 colunas");
+    CHECK(t->nrows == 1,             "many cols: 1 linha");
+    CHECK(get_i64(t, 19, 0) == 190, "many cols: col19[0]=190");
+    smaug_table_free(t);
+}
+
 static void test_csv_short_row(void) {
     /* linha com menos campos que o header → campos faltando viram NA */
     const char *csv = "a,b,c\n1,2\n3,4,5\n";
@@ -761,6 +817,10 @@ int main(void) {
     test_csv_infer_float_with_int_row();
     test_csv_infer_all_na_column();
     test_csv_infer_bool_mixed_with_string();
+    test_csv_lf_only_field_end();
+    test_csv_crlf_at_eof();
+    test_csv_long_unquoted_field();
+    test_csv_many_columns();
     test_csv_short_row();
 
     /* CSV — writer */

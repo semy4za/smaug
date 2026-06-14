@@ -1,0 +1,158 @@
+[
+  {
+    "timestamp": "2026-06-13T09:00:00-03:00",
+    "asset": "USD_BRL",
+    "price": 5.0615,
+    "volume": 14500000
+  },
+  {
+    "timestamp": "2026-06-13T10:00:00-03:00",
+    "asset": "USD_BRL",
+    "price": 5.062,
+    "volume": 15200000
+  },
+  {
+    "timestamp": "2026-06-13T11:00:00-03:00",
+    "asset": "USD_BRL",
+    "price": 5.0655,
+    "volume": 18450000
+  },
+  {
+    "timestamp": "2026-06-13T12:00:00-03:00",
+    "asset": "USD_BRL",
+    "price": 5.064,
+    "volume": 12100000
+  },
+  {
+    "timestamp": "2026-06-13T13:00:00-03:00",
+    "asset": "USD_BRL",
+    "price": 5.061,
+    "volume": 9800000
+  },
+  {
+    "timestamp": "2026-06-13T14:00:00-03:00",
+    "asset": "USD_BRL",
+    "price": 5.0595,
+    "volume": 11300000
+  },
+  {
+    "timestamp": "2026-06-13T15:00:00-03:00",
+    "asset": "USD_BRL",
+    "price": 5.0605,
+    "volume": 16700000
+  },
+  {
+    "timestamp": "2026-06-13T16:00:00-03:00",
+    "asset": "USD_BRL",
+    "price": 5.0615,
+    "volume": 14200000
+  },
+  {
+    "timestamp": "2026-06-13T17:00:00-03:00",
+    "asset": "USD_BRL",
+    "price": 5.063,
+    "volume": 8500000
+  },
+  {
+    "timestamp": "2026-06-13T18:00:00-03:00",
+    "asset": "USD_BRL",
+    "price": 5.0625,
+    "volume": 5400000
+  },
+  {
+    "timestamp": "2026-06-13T19:00:00-03:00",
+    "asset": "USD_BRL",
+    "price": 5.0615,
+    "volume": 3200000
+  },
+  {
+    "timestamp": "2026-06-13T20:00:00-03:00",
+    "asset": "USD_BRL",
+    "price": 5.0615,
+    "volume": 2100000
+  },
+  {
+    "timestamp": "2026-06-13T21:00:00-03:00",
+    "asset": "USD_BRL",
+    "price": 5.0615,
+    "volume": 1850000
+  },
+  {
+    "timestamp": "2026-06-13T09:00:00-03:00",
+    "asset": "SHIB_BRL",
+    "price": 2.492e-05,
+    "volume": 385500000
+  },
+  {
+    "timestamp": "2026-06-13T10:00:00-03:00",
+    "asset": "SHIB_BRL",
+    "price": 2.495e-05,
+    "volume": 412000000
+  },
+  {
+    "timestamp": "2026-06-13T11:00:00-03:00",
+    "asset": "SHIB_BRL",
+    "price": 2.501e-05,
+    "volume": 520100000
+  },
+  {
+    "timestamp": "2026-06-13T12:00:00-03:00",
+    "asset": "SHIB_BRL",
+    "price": 2.507e-05,
+    "volume": 610000000
+  },
+  {
+    "timestamp": "2026-06-13T13:00:00-03:00",
+    "asset": "SHIB_BRL",
+    "price": 2.504e-05,
+    "volume": 480500000
+  },
+  {
+    "timestamp": "2026-06-13T14:00:00-03:00",
+    "asset": "SHIB_BRL",
+    "price": 2.498e-05,
+    "volume": 395000000
+  },
+  {
+    "timestamp": "2026-06-13T15:00:00-03:00",
+    "asset": "SHIB_BRL",
+    "price": 2.485e-05,
+    "volume": 410200000
+  },
+  {
+    "timestamp": "2026-06-13T16:00:00-03:00",
+    "asset": "SHIB_BRL",
+    "price": 2.47e-05,
+    "volume": 450000000
+  },
+  {
+    "timestamp": "2026-06-13T17:00:00-03:00",
+    "asset": "SHIB_BRL",
+    "price": 2.465e-05,
+    "volume": 380000000
+  },
+  {
+    "timestamp": "2026-06-13T18:00:00-03:00",
+    "asset": "SHIB_BRL",
+    "price": 2.46e-05,
+    "volume": 290500000
+  },
+  {
+    "timestamp": "2026-06-13T19:00:00-03:00",
+    "asset": "SHIB_BRL",
+    "price": 2.468e-05,
+    "volume": 210000000
+  },
+  {
+    "timestamp": "2026-06-13T20:00:00-03:00",
+    "asset": "SHIB_BRL",
+    "price": 2.48e-05,
+    "volume": 195000000
+  },
+  {
+    "timestamp": "2026-06-13T21:00:00-03:00",
+    "asset": "SHIB_BRL",
+    "price": 2.483e-05,
+    "volume": 150000000
+  }
+]
