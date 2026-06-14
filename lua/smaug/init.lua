@@ -28,10 +28,10 @@ smaug.join    = function(a, b, on, how, suffixes)
 end
 
 -- Anel 3 — I/O
-smaug.read_csv      = io_csv.read
-smaug.read_csv_mem  = io_csv.read_mem
-smaug.read_json     = io_json.read
-smaug.read_json_mem = io_json.read_mem
+smaug.read_csv       = io_csv.read
+smaug.read_csv_mem   = io_csv.read_mem
+smaug.read_json      = io_json.read
+smaug.read_json_mem  = io_json.read_mem
 
 -- to_csv / to_json como métodos do DataSet
 DataSet.methods.to_csv      = function(self, path, opts) return io_csv.write(self, path, opts)  end

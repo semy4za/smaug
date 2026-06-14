@@ -13,7 +13,7 @@ d30582244d5a639b5935eca3108e7c4c7dfd0cf9041424db71ee75e5a122f359     541  ./docs
 719e27fdaceb5d344b7d4aa8d5a29b094b121f08e4b0afa7f1cc3bc7033fc65d     278  ./docs/CHANGELOG.md
 9a5745e0953b96ecc14c62e02951b104b7e2575938630a0bde0a5cecafee14ee      98  ./docs/CODE_REVIEW.md
 d725ddfecddc5c0ce7cae857ecb7bc57edc66202b40d66e723595709e2d14044     274  ./docs/CONTRACT.md
-07ef52cb30b3324767ea4d36900fb9a225d1fe98c76964c856d72e7d0f2c412c     352  ./docs/COVERAGE.md
+31c757d0b9559a1ff326366f625fe054c2bc20bca2e6fdfc398d155d7a687e65     307  ./docs/COVERAGE.md
 0b780addfb2929a2af46aa31af0849d30b479a51a35a730f9863843cf095e910     159  ./docs/COW.md
 d33392ee73ce5a34a5a7e412ebd5eb386c13109a6f4b1ab2ff3bd6ee62f4320e     485  ./docs/README.md
 cfb6290726d7a3f7daf8daedf24c886b2d70abcfeb69af11bded4fadb30f4ba1     261  ./docs/Roadmap.md
@@ -27,13 +27,13 @@ c5728c09a86779c3f1e1d1f67f16137513ea4deb9a6c541f6a94066eedad97d3      51  ./incl
 69cbc71a7894dd9fc631c290d2bb7e551173a0d8183ce257f24cd202002adc95     106  ./include/smaug_string.h
 4cbc189fd65a5a61e33c2d5c037b789e699a3b69b823d30c41957a6e5b0b16ad     145  ./include/smaug_types.h
 4bc43a1508472d129c4d9e234bdbc5807cef6ab820084db8dbe90ae82c69fef7     298  ./lua/smaug/core/boolseries.lua
-028362424e2b19016b338db8ddb72aac9c9337784823b74d8386b2333b484756    1792  ./lua/smaug/core/dataset.lua
-c274776998fdb7b3565cf381cc4c2b35ae11163eef90b06f8d794ae3f3cbf9c2    2478  ./lua/smaug/core/series.lua
+3fdc2ae9c5ed7d79eda57cf22fdc4570a48f30d329b1144681368ae196170c82    1796  ./lua/smaug/core/dataset.lua
+19493c88386d850ffeb2d8e1e4f405d3577c472f4554a357fd9725cccfcb6834    3138  ./lua/smaug/core/series.lua
 cb09509ae2d506e10465244ac8f7db682517061860dda53ec7964ab1b904d28f     451  ./lua/smaug/ffi_loader.lua
-9153ec80518f2782cdadf5a3cc60da8584a92894a16e56531a4d2250348e6e28      52  ./lua/smaug/init.lua
+a52a907d68f23e4c00db32b7ffbad61c90cc8df9be15132ead86999c62bed8ac      52  ./lua/smaug/init.lua
 f619ba9f84e4cce97ce21eb8fae713ebf6bd5ba419c1c08cb123af44378fc255     253  ./lua/smaug/io/csv.lua
 b38d9e75340c3eddab0028994e2e83b5bd11502f3e17290076361131d675d945      65  ./lua/smaug/io/json.lua
-003c294303a7dc2dd990c64a63c6676388fa85cffedfa5a54ccfcfa6042e775a     284  ./scripts/build.sh
+0406e62bff9e476b40a5a6e720bc464586767553a65801984db6d4dc4abb4e6d     284  ./scripts/build.sh
 16a4053b2b4bb6091bbdd5fe64cd429aafe95a0a01ea8787ca1ee608f0dd48a2     218  ./scripts/make_coverage.sh
 5263600720e6fd8e0c3be46abe7d79f09ebf4362ff98ef21c5bf1caadae0d91f      64  ./scripts/make_manifest.ps1
 69322d8cf4dde498b76b4e463d02f66f355e541878e74b5fdee95aae80204805      34  ./scripts/make_manifest.sh
@@ -52,10 +52,12 @@ d9c1b2f76badcac03636969aece809fb6c764a867e37e55ff9551ed23791d082    1694  ./test
 0542967f3be7181bbab4110ba8b991c6cc4cc549c78912d9f95de2b2202dcd21     217  ./tests/test_bool.c
 06666a71c5ad3137275c6a99a3d114f14757da4977df771beb3b9b7d62700a63     152  ./tests/test_bool_dtype.lua
 f0d8bf2ec8f652f56029599d3d6061cc9617f5cee3e890642a4ebdb9f92b7c76     305  ./tests/test_bool_lifecycle.c
+05055af814781889346cd64b998d2cb4f3217cfad8937996e715cc5211c62450     556  ./tests/test_categorical.lua
 5545093033bed295f5ec4590f3acfc89dfa2d1601207aa11b0777563e78cbcd4     127  ./tests/test_concat.lua
 0d87515dd11969c713c672793f5a23ae9ab82ad0f8065e19f6b864af85a81e37     428  ./tests/test_cow.c
 512113dddb151e9a6673559d38819ba63b427e3689ebbe6157c251b5f71339ae     421  ./tests/test_dataset.lua
 c0c22603277c095eb3933e511984b957af661aed3c693feee9073054d13fc8c7     200  ./tests/test_dataset_ops.lua
+0829a705f7b5a4702e6082547cdef5a4cdffb92674b033dc70b669de2feda626     529  ./tests/test_datetime.lua
 3540f7b0294c15d3482b24d7e4d77660e95f1c03d6eeafdafb2b018493d42f82     601  ./tests/test_datetime_c.c
 5e4769c9f16c8312219225aee28edc8225c685f4def4dfe71673285d8caa0890     195  ./tests/test_edge.lua
 1760ddf3c27d7f5926e1ee850749b5827819a13bda9d4464c4d2b296768784ce     378  ./tests/test_enrich.lua
@@ -78,4 +80,4 @@ e656ea4300fba405ffbbf1da95d6a2b5e18e4efdbc589ab7e7d77432ea33a871     339  ./test
 97fdc383f086ecd5f4e9d3bf54d9e6243c0eac53a513727a5005ce33deae8360     402  ./tests/test_string.c
 1690d6ca5587b6e09d8f8954e8be4fbe25e49aac4eda76fd098f018c5adc3119     408  ./tests/test_string.lua
 #
-# total de arquivos: 75
+# total de arquivos: 77

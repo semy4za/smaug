@@ -34,6 +34,10 @@ local function is_boolseries(x)
     return type(x) == "table" and x._dtype == "bool"
 end
 
+local function is_categorical(x)
+    return type(x) == "table" and x._dtype == "categorical"
+end
+
 -- =====================================================================
 -- Construção
 -- =====================================================================
@@ -65,7 +69,7 @@ end
 -- =====================================================================
 function methods.add_column(self, name, series)
     if type(name) ~= "string" then error("smaug: nome de coluna deve ser string", 2) end
-    if not (is_series(series) or is_boolseries(series)) then
+    if not (is_series(series) or is_boolseries(series) or is_categorical(series)) then
         error("smaug: add_column espera uma Series ou Series<bool>", 2)
     end
     if self._columns[name] ~= nil then
@@ -87,7 +91,7 @@ end
 -- Valida o número de linhas. Não pode ser usada para criar colunas novas.
 function methods.update_column(self, name, series)
     if type(name) ~= "string" then error("smaug: nome de coluna deve ser string", 2) end
-    if not (is_series(series) or is_boolseries(series)) then
+    if not (is_series(series) or is_boolseries(series) or is_categorical(series)) then
         error("smaug: update_column espera uma Series ou Series<bool>", 2)
     end
     if self._columns[name] == nil then
@@ -1172,11 +1176,11 @@ function methods.assign(self, name, fn_or_series)
         error("smaug: assign — nome deve ser string", 2)
     end
     local col
-    if is_series(fn_or_series) or is_boolseries(fn_or_series) then
+    if is_series(fn_or_series) or is_boolseries(fn_or_series) or is_categorical(fn_or_series) then
         col = fn_or_series
     elseif type(fn_or_series) == "function" then
         col = fn_or_series(self)
-        if not (is_series(col) or is_boolseries(col)) then
+        if not (is_series(col) or is_boolseries(col) or is_categorical(col)) then
             error("smaug: assign — função deve retornar uma Series", 2)
         end
     else
@@ -1725,7 +1729,7 @@ DataSet.__newindex = function(self, k, v)
         return
     end
     -- converte escalar em Series via broadcast
-    if not (is_series(v) or is_boolseries(v)) then
+    if not (is_series(v) or is_boolseries(v) or is_categorical(v)) then
         local nrows = rawget(self, "_length")
         if nrows == nil then
             error("smaug: df[\""..k.."\"] = escalar requer DataSet não-vazio", 2)
@@ -1772,7 +1776,7 @@ setmetatable(DataSet, {
             local col
             if getmetatable(data) == DataSet then
                 error("smaug: coluna '"..cname.."': esperado Series, não DataSet", 2)
-            elseif is_series(data) or is_boolseries(data) then
+            elseif is_series(data) or is_boolseries(data) or is_categorical(data) then
                 col = data
             elseif type(data) == "table" then
                 dtype = dtype or infer_dtype(data)
