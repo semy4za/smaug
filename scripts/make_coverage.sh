@@ -4,7 +4,7 @@
 # Como funciona: compila cada src/*.c como um .o instrumentado (--coverage) UMA
 # vez; TODOS os executores de teste linkam contra esses MESMOS .o (mesmos .gcno),
 # entao os .gcda agregam de tres fontes:
-#   1. testes C diretos (incl. test_cow e test_stress) -- linkados contra a .so;
+#   1. testes C diretos (incl. test_cow test_io test_io_real_c e test_stress) -- linkados contra a .so;
 #   2. testes Lua (carregam a mesma .so via FFI);
 #   3. test_allocfail (--wrap malloc/realloc) -- linka contra os MESMOS .o.
 #
@@ -24,11 +24,11 @@ set -euo pipefail
 
 command -v luajit >/dev/null 2>&1 || { echo "ERRO: luajit nao encontrado (necessario para agregar os testes Lua)."; exit 1; }
 
-SRCS="smaug_core smaug_ops_f64 smaug_ops_i64 smaug_ops_bool smaug_str smaug_ops_str"
+SRCS="smaug_core smaug_ops_f64 smaug_ops_i64 smaug_ops_bool smaug_str smaug_ops_str smaug_csv smaug_json"
 # Tudo que exercita o backend. Se test_stress deixar a medicao lenta demais,
 # pode remove-lo daqui -- ele cobre majoritariamente ramos que ops ja pega.
-C_TESTS="test_alloc test_ops test_ops_edge test_bool test_bool_lifecycle test_string test_cow test_stress"
-LUA_TESTS="test_series test_dataset test_edge test_special test_fillna test_props test_i64 test_string test_bool_dtype test_groupby test_concat test_join test_series_ops test_dataset_ops test_str_tier_b test_rolling_series"
+C_TESTS="test_alloc test_ops test_ops_edge test_bool test_bool_lifecycle test_string test_cow test_io_c test_stress"
+LUA_TESTS="test_series test_dataset test_edge test_special test_fillna test_props test_i64 test_string test_bool_dtype test_groupby test_concat test_join test_series_ops test_dataset_ops test_str_tier_b test_rolling_series test_io"
 COVDIR=cov
 OUT=docs/COVERAGE.md
 
@@ -186,7 +186,7 @@ bpi=$(awk "BEGIN{printf \"%.0f\", $br_pct_alvo}")
     echo "- Commit medido: \`$commit\`  |  Data: $cdate"
     echo "- **Branch-alvo** (\"taken at least once\"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados \`COV-EXCL-BR\` -- e a que perseguimos rumo a 100%."
     echo "- **Branch-bruto** (todos os ramos): \`$cov_b/$tot_b = ${br_pct}%\` -- $tot_excl ramo(s) excluido(s) com justificativa (ver fim do arquivo)."
-    echo "- Agrega TODOS os testes: C diretos (incl. \`test_cow\` e \`test_stress\`), Lua (FFI) e \`test_allocfail\` (OOM)."
+    echo "- Agrega TODOS os testes: C diretos (incl. \`test_cow test_io_c\` e \`test_stress\`), Lua (FFI) e \`test_allocfail\` (OOM)."
     echo ""
     echo "| Arquivo | Linhas | Branch-alvo (taken) |"
     echo "| :--- | :--- | :--- |"

@@ -10,6 +10,8 @@
 
 local Series     = require("smaug.core.series")
 local DataSet    = require("smaug.core.dataset")
+local io_csv     = require("smaug.io.csv")
+local io_json    = require("smaug.io.json")
 
 local smaug = {
     _VERSION   = "1.0.0-dev",
@@ -19,11 +21,23 @@ local smaug = {
 
 -- API pública
 smaug.NA      = Series.NA
-smaug.dataset = DataSet     -- alias legado (smaug.dataset({...}))
-smaug.concat  = DataSet.concat   -- smaug.concat({ds1, ds2, ...})
-smaug.join    = function(a, b, on, how, suffixes)  -- smaug.join(a, b, ...)
+smaug.dataset = DataSet
+smaug.concat  = DataSet.concat
+smaug.join    = function(a, b, on, how, suffixes)
     return a:join(b, on, how, suffixes)
 end
+
+-- Anel 3 — I/O
+smaug.read_csv      = io_csv.read
+smaug.read_csv_mem  = io_csv.read_mem
+smaug.read_json     = io_json.read
+smaug.read_json_mem = io_json.read_mem
+
+-- to_csv / to_json como métodos do DataSet
+DataSet.methods.to_csv      = function(self, path, opts) return io_csv.write(self, path, opts)  end
+DataSet.methods.to_csv_mem  = function(self, opts)       return io_csv.write_mem(self, opts)    end
+DataSet.methods.to_json      = function(self, path, opts) return io_json.write(self, path, opts) end
+DataSet.methods.to_json_mem  = function(self, opts)       return io_json.write_mem(self, opts)   end
 
 -- I/O (Ring 2 — futuro)
 -- smaug.read_csv     = require("smaug.io.csv").read

@@ -104,4 +104,29 @@ typedef struct {
     smaug_metadata_t meta;
 } smaug_series_str_t;
 
+/* ===================================================================
+   smaug_table_t — Struct intermediária do Anel 3 (I/O)
+   -------------------------------------------------------------------
+   Contrato de fronteira entre leitores (CSV, JSON, …) e o frontend Lua.
+   Todo leitor produz uma smaug_table_t; o frontend Lua a consome e
+   monta um DataSet. Colocada aqui no final porque referencia as quatro
+   structs de série acima.
+   =================================================================== */
+
+typedef struct {
+    const char          *name;     /* nome da coluna (cópia alocada pelo leitor) */
+    const char          *dtype;    /* "float64" | "int64" | "bool" | "string"    */
+    smaug_series_f64_t  *f64;      /* não-NULL se dtype == "float64"             */
+    smaug_series_i64_t  *i64;      /* não-NULL se dtype == "int64"               */
+    smaug_series_bool_t *boolcol;  /* não-NULL se dtype == "bool"                */
+    smaug_series_str_t  *str;      /* não-NULL se dtype == "string"              */
+} smaug_column_t;
+
+typedef struct {
+    smaug_column_t *columns;   /* array de colunas                               */
+    size_t          ncols;     /* número de colunas                              */
+    size_t          nrows;     /* número de linhas (todas as colunas têm nrows)  */
+    char           *error;     /* NULL se ok; mensagem de erro se falhou         */
+} smaug_table_t;
+
 #endif /* SMAUG_TYPES_H */

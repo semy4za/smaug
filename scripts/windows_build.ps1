@@ -114,7 +114,7 @@ Write-Host "== Compilando build\smaug.dll ==" -ForegroundColor Cyan
 if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar a DLL." }
 Write-Host "OK -> build\smaug.dll" -ForegroundColor Green
 
-$cTests      = @("test_alloc", "test_ops", "test_ops_edge", "test_bool", "test_bool_lifecycle", "test_string", "test_cow")
+$cTests      = @("test_alloc", "test_ops", "test_ops_edge", "test_bool", "test_bool_lifecycle", "test_string", "test_cow", "test_io_c")
 $cTestsWrap  = @("test_allocfail")
 $cTestsStress = @("test_stress")
 $allPass = $true
@@ -166,7 +166,7 @@ if ($luajit -and -not $SkipLua) {
     Write-Host ""
     Write-Host "== Testes em Lua ==" -ForegroundColor Cyan
     $luaTests = @("test_series", "test_dataset", "test_edge", "test_special",
-                  "test_fillna", "test_props", "test_i64", "test_string", "test_bool_dtype", "test_groupby", "test_concat", "test_join", "test_series_ops", "test_dataset_ops", "test_str_tier_b", "test_rolling_series")
+                  "test_fillna", "test_props", "test_i64", "test_string", "test_bool_dtype", "test_groupby", "test_concat", "test_join", "test_series_ops", "test_dataset_ops", "test_str_tier_b", "test_rolling_series", "test_io", "test_io_real")
     foreach ($lt in $luaTests) {
         # Captura stdout e stderr separados para distinguir output normal de erros
         $psi = New-Object System.Diagnostics.ProcessStartInfo

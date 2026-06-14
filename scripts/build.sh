@@ -116,14 +116,15 @@ fi
 # Listas de teste (fonte unica — espelha o Makefile)
 # ---------------------------------------------------------------------------
 SRCS=(src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c \
-      src/smaug_ops_bool.c src/smaug_str.c src/smaug_ops_str.c)
+      src/smaug_ops_bool.c src/smaug_str.c src/smaug_ops_str.c \
+      src/smaug_csv.c src/smaug_json.c)
 
 C_TESTS_PLAIN=(test_alloc test_ops test_ops_edge test_bool
-               test_bool_lifecycle test_string test_cow)
+               test_bool_lifecycle test_string test_cow test_io_c)
 C_TESTS_WRAP=(test_allocfail)
 C_TESTS_STRESS=(test_stress)
 LUA_TESTS=(test_series test_dataset test_edge test_special
-           test_fillna test_props test_i64 test_string test_bool_dtype test_groupby test_concat test_join test_series_ops test_dataset_ops test_str_tier_b test_rolling_series)
+           test_fillna test_props test_i64 test_string test_bool_dtype test_groupby test_concat test_join test_series_ops test_dataset_ops test_str_tier_b test_rolling_series test_io test_io_real)
 
 CFLAGS=(-std=c11 -fPIC -Wall -Wextra -O2 -I./include)
 TEST_CFLAGS=(-std=c11 -g -O0 -Wall -Wextra -I./include)

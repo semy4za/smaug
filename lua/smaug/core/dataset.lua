@@ -1373,4 +1373,7 @@ setmetatable(DataSet, {
     end
 })
 
+-- Expõe a tabela methods para extensão por módulos externos (ex: I/O).
+DataSet.methods = methods
+
 return DataSet

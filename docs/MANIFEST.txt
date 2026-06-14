@@ -5,7 +5,7 @@
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
 ed7d63f5177cc7d7fbfee9c7c18ebeb4d6fd7da02680ec7778cfe23be1d15b03      31  ./.gitattributes
 1639453637a28077c77ef9609cfed9a815feaad1a77d63f4d981d20ef72e077e       7  ./.gitignore
-49f621a58458f2eef2ed89b602660b07dc9af5aecad49dd3f19b6901ce27659d      87  ./Makefile
+5d90450176dced2e2b43cacbfadb6593f1cdbe6c256f8f2e3887c8b96fa68a47      87  ./Makefile
 07f972410192dc52a996ecf13445f10049e69bc936c1c7088c29fe23324568c7     239  ./docs/API_INDEX.md
 6e9da6dd6544f53f958153813c11db8e5a5c2acb65665888f6abd36d73fc6382     466  ./docs/API_Reference.md
 55efccedb355022a493e597d9fb7161630d069ca78ec934ca56f5a9448ad0486     322  ./docs/ARCHITECTURE.md
@@ -13,27 +13,33 @@ e0573823ec9aaa68c30b3542e33b48ce65c833559065b7ffbad8720e7f4ea6ec     433  ./docs
 6915d4bb638998ba711ffa8c2f76f3298506eb18d3e0cfc76d42ce30ba202255     268  ./docs/CHANGELOG.md
 9a5745e0953b96ecc14c62e02951b104b7e2575938630a0bde0a5cecafee14ee      98  ./docs/CODE_REVIEW.md
 d725ddfecddc5c0ce7cae857ecb7bc57edc66202b40d66e723595709e2d14044     274  ./docs/CONTRACT.md
-dc86f6d741d21dae35a8ee20fe55f4b465d80c13f6510babce44ff5c3a235c64      50  ./docs/COVERAGE.md
+5ac604a711dd8d7335fe15b7dcc333cc78cb8b7590e8cc68a7c5f29f76d51930     249  ./docs/COVERAGE.md
 0b780addfb2929a2af46aa31af0849d30b479a51a35a730f9863843cf095e910     159  ./docs/COW.md
 5de7bd4f9a39cd71facbc3eb48dd426fc8339d3892a8eb04807ce071b6b47a1e     190  ./docs/README.md
 d83cc0cdcf54111772d439251ceb39805923043392b582287870fe6407abfee9     251  ./docs/Roadmap.md
 ec1ae8442e32984127948c7e126da19f84f85193023143dc36ee82b8e352544d      29  ./include/smaug.h
 963e21a0d5b9b1857da7bbe7310a4a9340057fcf7560272f062e4e83727c5da3      40  ./include/smaug_bool.h
 46a705333300b28e4e5e30039e2f6e9442d79b4a552db6d0bb3ef1dae151db83      99  ./include/smaug_core.h
+69d5d81208e2f1e3ec7456e06a027cde473f4b79a27b042102a86575f994bc17     102  ./include/smaug_io.h
+c5728c09a86779c3f1e1d1f67f16137513ea4deb9a6c541f6a94066eedad97d3      51  ./include/smaug_io_internal.h
 5576cde33a7cbaed06f615e2bb586f4eb571ec99d14e342eb8ccd0f0678e645f     119  ./include/smaug_numeric.h
 69cbc71a7894dd9fc631c290d2bb7e551173a0d8183ce257f24cd202002adc95     106  ./include/smaug_string.h
-b5761ed257045b6245efff9fd399fb576e2b69411759ae70d4c116d1fc5bfa4f     107  ./include/smaug_types.h
+253a95269bdce06178ed76c8533c08566875519b4f6249a1ce64921c994c62db     132  ./include/smaug_types.h
 4bc43a1508472d129c4d9e234bdbc5807cef6ab820084db8dbe90ae82c69fef7     298  ./lua/smaug/core/boolseries.lua
-5fe7ee69529fae810d02f7a1296c295bb68dd508303f03fbe5baa483f9f2e468    1376  ./lua/smaug/core/dataset.lua
+be8765fce1acca05dca136f38aea82ccbd534411c9468bc0564f5bb77b1a96f6    1379  ./lua/smaug/core/dataset.lua
 2871927b101d9b9a14d79a135347afb28f5db0b8de4568f2e89805250a459faf    1592  ./lua/smaug/core/series.lua
-63e9270f329d0ae525569027301abf12501e4d20a3e18bc19a00d7821a9eb9c2     329  ./lua/smaug/ffi_loader.lua
-6c4f6f877b8178fefb7ef8e749ec91b023a1ca9dee96a2174315dea4c9f916b6      38  ./lua/smaug/init.lua
-653c4356915f4dbcbb7a8f480a06ece80214dea1e22d9fe87bac09113179a1ef     283  ./scripts/build.sh
-dea8f1695eff7a59fa6d44b64a040906cd3d61bc94e019215503dcb03a0b0e68     218  ./scripts/make_coverage.sh
+e8ab0fcb283fa593c63c1ba314e87d5486bc121c73054b105adcb150ba4e9407     384  ./lua/smaug/ffi_loader.lua
+9153ec80518f2782cdadf5a3cc60da8584a92894a16e56531a4d2250348e6e28      52  ./lua/smaug/init.lua
+f619ba9f84e4cce97ce21eb8fae713ebf6bd5ba419c1c08cb123af44378fc255     253  ./lua/smaug/io/csv.lua
+b38d9e75340c3eddab0028994e2e83b5bd11502f3e17290076361131d675d945      65  ./lua/smaug/io/json.lua
+ac7a7c7631823c077efbf709d1412e2e3666e90d30b7026da45f5d40ad9c718e     284  ./scripts/build.sh
+5a9550e43612603262acf0dfecf4a0b244f97999c6730892515020fa94a31954     218  ./scripts/make_coverage.sh
 5263600720e6fd8e0c3be46abe7d79f09ebf4362ff98ef21c5bf1caadae0d91f      64  ./scripts/make_manifest.ps1
 69322d8cf4dde498b76b4e463d02f66f355e541878e74b5fdee95aae80204805      34  ./scripts/make_manifest.sh
-04dea18a1dc0a238d0f2ab249a708ee6c9bd715a781c1025d804bb048d7834bd     223  ./scripts/windows_build.ps1
+6a9ae60196e28027d33d8d9eda903714adb91585f6bc3485a87bb7a0e03f53e3     223  ./scripts/windows_build.ps1
 b655b8b2cdb754a05b7c117953e5cce9664db1ad6327f5400e59a4874c3a381f     638  ./src/smaug_core.c
+1868a5bd81d41a0921a22136e787c0837b763e55e38be0c65e7bab7c663cff49     451  ./src/smaug_csv.c
+a208f60904532684f9361b7314a906d63306eaa875f712782170ecc21ff9fa75     506  ./src/smaug_json.c
 66fec31bbeb4d360dd0ef2cacacc02a05cf59ea5e14791da47d15d399ccd9036     281  ./src/smaug_ops_bool.c
 4a1cd48f7fd47790b0cebeed178235875a050129d84a2f14e774d3214aa5d1fb     528  ./src/smaug_ops_f64.c
 4c7966913e1e4da03ebc2157a04e86db9291bbc68c3e4fbe3f1add4328e578e1     514  ./src/smaug_ops_i64.c
@@ -52,6 +58,9 @@ c0c22603277c095eb3933e511984b957af661aed3c693feee9073054d13fc8c7     200  ./test
 23950c376fb42b510f6b0fa1aad4a93610e91112260f3b13c9120d7d9b9b6a4b     113  ./tests/test_fillna.lua
 c7fb913a9241cfba1a195474f7fb8e5056941d81905ac456093525b698afadc2     184  ./tests/test_groupby.lua
 e11738d78bc62f09619980186e4ec96c74c786660ac7d9bb0814ed9c003865f0     228  ./tests/test_i64.lua
+46c8c0e7568b5d410dd41a727a313da9115bab38ea372b0885437d9b3675da24     182  ./tests/test_io.lua
+8a186c812e111b1de0fa80469d22c8ad9352e67bc644bcd093df6a03dcd7862d     812  ./tests/test_io_c.c
+db9a3ce8c15c904e0c6e11f645bb17146ce668b3750531abf859984d6cc620fa     176  ./tests/test_io_real.lua
 75e6373302e13d75a3351cfa40654a0ca567afdf317dedfa5e25160c3b4150ee     184  ./tests/test_join.lua
 649352374847c05e07fcfc10d5406d6f19d0069500090e34158ec8b2e99db490      58  ./tests/test_ops.c
 5eaddbf57166ba0de2c6c9cc6a9fdb993e89e3cf7a434d206f036c0b8cf84341    1002  ./tests/test_ops_edge.c
@@ -65,4 +74,4 @@ e656ea4300fba405ffbbf1da95d6a2b5e18e4efdbc589ab7e7d77432ea33a871     339  ./test
 97fdc383f086ecd5f4e9d3bf54d9e6243c0eac53a513727a5005ce33deae8360     402  ./tests/test_string.c
 1690d6ca5587b6e09d8f8954e8be4fbe25e49aac4eda76fd098f018c5adc3119     408  ./tests/test_string.lua
 #
-# total de arquivos: 62
+# total de arquivos: 71

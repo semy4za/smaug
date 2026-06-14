@@ -292,6 +292,61 @@ ffi.cdef([[
     /* --- Ordenação --- */
     size_t*             smaug_str_argsort(const smaug_series_str_t *s, bool ascending);
     smaug_series_str_t* smaug_str_sort(const smaug_series_str_t *s, bool ascending);
+
+    /* ===================================================================
+       Anel 3 — I/O (CSV + JSON)
+       smaug_table_t: struct intermediária entre leitores e DataSet.
+       =================================================================== */
+
+    typedef struct {
+        const char          *name;
+        const char          *dtype;
+        smaug_series_f64_t  *f64;
+        smaug_series_i64_t  *i64;
+        smaug_series_bool_t *boolcol;
+        smaug_series_str_t  *str;
+    } smaug_column_t;
+
+    typedef struct {
+        smaug_column_t *columns;
+        size_t          ncols;
+        size_t          nrows;
+        char           *error;
+    } smaug_table_t;
+
+    /* stdlib básico necessário para o frontend I/O */
+    void* malloc(size_t size);
+    void  free(void *ptr);
+
+    void           smaug_table_free(smaug_table_t *t);
+
+    typedef struct {
+        char        sep;
+        int         header;
+        const char **na_values;
+        size_t      na_count;
+        char        quote;
+    } smaug_csv_opts_t;
+
+    typedef struct {
+        char sep;
+        int  header;
+        char quote;
+    } smaug_csv_write_opts_t;
+
+    smaug_csv_opts_t        smaug_csv_default_opts(void);
+    smaug_csv_write_opts_t  smaug_csv_write_default_opts(void);
+    smaug_table_t*          smaug_read_csv(const char *path, const smaug_csv_opts_t *opts);
+    smaug_table_t*          smaug_read_csv_mem(const char *buf, size_t len, const smaug_csv_opts_t *opts);
+    int                     smaug_write_csv(const char *path, const smaug_table_t *t, const smaug_csv_write_opts_t *opts);
+    char*                   smaug_write_csv_mem(const smaug_table_t *t, const smaug_csv_write_opts_t *opts, size_t *out_len);
+
+    typedef struct { int pretty; } smaug_json_write_opts_t;
+
+    smaug_table_t*  smaug_read_json(const char *path);
+    smaug_table_t*  smaug_read_json_mem(const char *buf, size_t len);
+    int             smaug_write_json(const char *path, const smaug_table_t *t, const smaug_json_write_opts_t *opts);
+    char*           smaug_write_json_mem(const smaug_table_t *t, const smaug_json_write_opts_t *opts, size_t *out_len);
 ]])
 
 -- Nome do arquivo da lib conforme o SO.

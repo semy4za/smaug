@@ -3,10 +3,10 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `80b1959`  |  Data: 2026-06-13 16:08:18 -0300
+- Commit medido: `ef29393`  |  Data: 2026-06-13 16:26:50 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `1384/1407 = 98.37%` -- 23 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
-- Agrega TODOS os testes: C diretos (incl. `test_cow` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
+- **Branch-bruto** (todos os ramos): `1926/2215 = 86.95%` -- 62 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 | Arquivo | Linhas | Branch-alvo (taken) |
 | :--- | :--- | :--- |
@@ -16,11 +16,171 @@
 | `smaug_ops_bool.c` | `165/165 = 100.00%` `[██████████]` | `239/239 = 100.00%` `[██████████]` |
 | `smaug_str.c` | `162/164 = 98.78%` `[█████████░]` | `132/132 = 100.00%` `[██████████]` |
 | `smaug_ops_str.c` | `115/116 = 99.14%` `[█████████░]` | `115/115 = 100.00%` `[██████████]` |
-| **TOTAL** | `1418/1421 = 99.79%` `[██████████]` | `1384/1384 = 100.00%` `[██████████]` |
+| `smaug_csv.c` | `219/248 = 88.31%` `[████████░░]` | `262/349 = 75.07%` `[███████░░░]` |
+| `smaug_json.c` | `212/259 = 81.85%` `[████████░░]` | `280/420 = 66.67%` `[██████░░░░]` |
+| **TOTAL** | `1849/1928 = 95.90%` `[█████████░]` | `1926/2153 = 89.46%` `[████████░░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
-Nenhum ramo descoberto. 🎯
+Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
+
+**`smaug_csv.c`** — 55 linha(s) com ramo descoberto:
+- `smaug_csv.c:81` — if (!s || !*s) return 0;
+- `smaug_csv.c:84` — if (errno || *end != '\0') return 0;
+- `smaug_csv.c:89` — if (!s || !*s) return 0;
+- `smaug_csv.c:92` — if (errno || *end != '\0') return 0;
+- `smaug_csv.c:129` — if (i+1 < len && buf[i+1] == quote) { PUSH(quote); i += 2; }
+- `smaug_csv.c:132` — PUSH(buf[i]); i++;
+- `smaug_csv.c:137` — { PUSH(buf[i]); i++; }
+- `smaug_csv.c:143` — else if (i < len && buf[i] == '\n') { i++; *eol=1; }
+- `smaug_csv.c:178` — if (buf[pos] == '\n' || (buf[pos] == '\r' && (pos+1>=len || buf[pos+1]=='\n'))) {
+- `smaug_csv.c:179` — if (buf[pos] == '\r') pos++;
+- `smaug_csv.c:191` — if (!f) { for(size_t k=0;k<n_fields;k++)free(fields[k]); free(fields); goto oom; }
+- `smaug_csv.c:192` — if (n_fields >= field_cap) {
+- `smaug_csv.c:195` — if (!tmp) { free(f); for(size_t k=0;k<n_fields;k++)free(fields[k]); free(fields); goto oom; }
+- `smaug_csv.c:200` — if (n_rows >= row_cap) {
+- `smaug_csv.c:204` — if (!tr || !ts) { for(size_t k=0;k<n_fields;k++)free(fields[k]); free(fields); goto oom; }
+- `smaug_csv.c:218` — size_t n_cols = rows[0] ? row_sizes[0] : 0;
+- `smaug_csv.c:219` — if (n_cols == 0) goto cleanup_empty;
+- `smaug_csv.c:224` — if (!col_names) goto oom_cleanup;
+- `smaug_csv.c:237` — if (!dtypes) { free(col_names); goto oom_cleanup; }
+- `smaug_csv.c:259` — if (!t) { free(dtypes); free(col_names); goto oom_cleanup; }
+- `smaug_csv.c:261` — if (!t->columns) { free(t); free(dtypes); free(col_names); goto oom_cleanup; }
+- `smaug_csv.c:272` — if (!s) { smaug_table_free(t); t=NULL; goto done; }
+- `smaug_csv.c:285` — if (!s) { smaug_table_free(t); t=NULL; goto done; }
+- `smaug_csv.c:288` — const char *v = (c < rsz) ? row[c] : "";
+- `smaug_csv.c:299` — if (!s) { smaug_table_free(t); t=NULL; goto done; }
+- `smaug_csv.c:302` — const char *v = (c < rsz) ? row[c] : "";
+- `smaug_csv.c:304` — if (is_na(v,nav,nc)) smaug_bool_set_null(s,r);
+- `smaug_csv.c:312` — if (!s) { smaug_table_free(t); t=NULL; goto done; }
+- `smaug_csv.c:315` — const char *v = (c < rsz) ? row[c] : "";
+- `smaug_csv.c:337` — for (size_t r = 0; r < n_rows; r++) {
+- `smaug_csv.c:338` — for (size_t c = 0; c < row_sizes[r]; c++) free(rows[r][c]);
+- `smaug_csv.c:344` — for (size_t r = 0; r < n_rows; r++) {
+- `smaug_csv.c:345` — if (rows[r]) { for(size_t c=0;c<row_sizes[r];c++) free(rows[r][c]); free(rows[r]); }
+- `smaug_csv.c:369` — size_t ncap = b->cap ? b->cap * 2 : 4096;
+- `smaug_csv.c:370` — while (ncap <= b->len + n) ncap *= 2;
+- `smaug_csv.c:372` — if (!tmp) return -1;
+- `smaug_csv.c:382` — if (s[i]==sep||s[i]=='\n'||s[i]=='\r'||s[i]==quote) { needs_quote=1; break; }
+- `smaug_csv.c:384` — if (wbuf_pushc(b, quote)) return -1;
+- `smaug_csv.c:386` — if (s[i] == quote && wbuf_pushc(b, quote)) return -1;
+- `smaug_csv.c:387` — if (wbuf_pushc(b, s[i])) return -1;
+- `smaug_csv.c:394` — if (!t || !out_len) return NULL;
+- `smaug_csv.c:396` — if (!opts) opts = &def;
+- `smaug_csv.c:403` — if (c > 0 && wbuf_pushc(&b, sep)) goto oom;
+- `smaug_csv.c:405` — if (write_field(&b, n, strlen(n), sep, quote)) goto oom;
+- `smaug_csv.c:407` — if (wbuf_pushc(&b, '\n')) goto oom;
+- `smaug_csv.c:412` — if (c > 0 && wbuf_pushc(&b, sep)) goto oom;
+- `smaug_csv.c:417` — if (st==SMG_NULL_VALUE||st!=SMG_OK) { s=""; n=0; }
+- `smaug_csv.c:421` — if (st==SMG_NULL_VALUE||st!=SMG_OK) { s=""; n=0; }
+- `smaug_csv.c:426` — if (st==SMG_NULL_VALUE||st!=SMG_OK) { s=""; n=0; }
+- `smaug_csv.c:428` — } else if (col->str) {
+- `smaug_csv.c:432` — if (write_field(&b, s, n, sep, quote)) goto oom;
+- `smaug_csv.c:434` — if (wbuf_pushc(&b, '\n')) goto oom;
+- `smaug_csv.c:437` — if (wbuf_pushc(&b, '\0')) goto oom;
+- `smaug_csv.c:446` — if (!buf) return -1;
+- `smaug_csv.c:450` — return (w==len) ? 0 : -1;
+
+**`smaug_json.c`** — 98 linha(s) com ramo descoberto:
+- `smaug_json.c:43` — while (l->pos < l->len) {
+- `smaug_json.c:45` — if (c == ' ' || c == '\t' || c == '\n' || c == '\r') l->pos++;
+- `smaug_json.c:52` — if (l->pos >= l->len || l->buf[l->pos] != '"') return NULL;
+- `smaug_json.c:55` — if (!out) return NULL;
+- `smaug_json.c:57` — while (l->pos < l->len) {
+- `smaug_json.c:64` — switch (esc) {
+- `smaug_json.c:73` — if (l->pos + 4 <= l->len) l->pos += 4;
+- `smaug_json.c:79` — if (n + 1 >= cap) {
+- `smaug_json.c:92` — if (l->pos >= l->len) return TOK_EOF;
+- `smaug_json.c:104` — return l->str_val ? TOK_STRING : TOK_ERROR;
+- `smaug_json.c:106` — if (l->pos + 4 <= l->len && strncmp(l->buf+l->pos,"true",4)==0)
+- `smaug_json.c:110` — if (l->pos + 5 <= l->len && strncmp(l->buf+l->pos,"false",5)==0)
+- `smaug_json.c:114` — if (l->pos + 4 <= l->len && strncmp(l->buf+l->pos,"null",4)==0)
+- `smaug_json.c:118` — if (c == '-' || (c >= '0' && c <= '9')) {
+- `smaug_json.c:122` — while (l->pos < l->len && l->buf[l->pos] >= '0' && l->buf[l->pos] <= '9') l->pos++;
+- `smaug_json.c:123` — if (l->pos < l->len && l->buf[l->pos] == '.') { l->is_int = 0; l->pos++; while (l->pos<l->len && l->buf[l->pos]>='0' && l->buf[l->pos]<='9') l->pos++; }
+- `smaug_json.c:124` — if (l->pos < l->len && (l->buf[l->pos]=='e' || l->buf[l->pos]=='E')) { l->is_int=0; l->pos++; if (l->pos<l->len && (l->buf[l->pos]=='+'||l->buf[l->pos]=='-')) l->pos++; while(l->pos<l->len && l->buf[l->pos]>='0' && l->buf[l->pos]<='9') l->pos++; }
+- `smaug_json.c:126` — if (numlen >= sizeof(tmp)) numlen = sizeof(tmp)-1;
+- `smaug_json.c:128` — if (l->is_int) { char *e; errno=0; l->int_val=strtoll(tmp,&e,10); if (*e) l->is_int=0; }
+- `smaug_json.c:129` — if (!l->is_int) { char *e; errno=0; l->num_val=strtod(tmp,&e); if (*e||errno) return TOK_ERROR; }
+- `smaug_json.c:165` — switch (tok) {
+- `smaug_json.c:185` — if (!rec->keys || !rec->vals) return 0;
+- `smaug_json.c:188` — if (t == TOK_RBRACE) return 1;  /* objeto vazio */
+- `smaug_json.c:191` — if (t != TOK_STRING) return 0;
+- `smaug_json.c:193` — if (next_token(l) != TOK_COLON) { free(key); return 0; }
+- `smaug_json.c:196` — if (!parse_value(l, &val, vt)) { free(key); return 0; }
+- `smaug_json.c:198` — if (rec->count >= cap) {
+- `smaug_json.c:202` — if (!nk || !nv) { free(key); if (val.type==4) free(val.s); return 0; }
+- `smaug_json.c:211` — if (t != TOK_COMMA)  return 0;
+- `smaug_json.c:227` — if (!recs) return make_error("smaug_read_json: OOM");
+- `smaug_json.c:231` — while (t != TOK_RBRACKET && t != TOK_EOF && t != TOK_ERROR) {
+- `smaug_json.c:232` — if (t != TOK_LBRACE) {
+- `smaug_json.c:233` — for (size_t i = 0; i < n_recs; i++) free_record(&recs[i]);
+- `smaug_json.c:237` — if (n_recs >= rec_cap) {
+- `smaug_json.c:240` — if (!tmp) {
+- `smaug_json.c:241` — for (size_t i = 0; i < n_recs; i++) free_record(&recs[i]);
+- `smaug_json.c:248` — if (!parse_record(&l, &recs[n_recs])) {
+- `smaug_json.c:249` — for (size_t i = 0; i <= n_recs; i++) free_record(&recs[i]);
+- `smaug_json.c:262` — return empty ? empty : make_error("smaug_read_json: OOM");
+- `smaug_json.c:268` — if (!col_names) goto oom_recs;
+- `smaug_json.c:274` — if (!dtypes) { free(col_names); goto oom_recs; }
+- `smaug_json.c:277` — for (size_t c = 0; c < n_cols && c < recs[r].count; c++) {
+- `smaug_json.c:291` — if (dtypes[c] == DT_UNKNOWN) dtypes[c] = DT_STR;
+- `smaug_json.c:295` — if (!tbl) { free(dtypes); free(col_names); goto oom_recs; }
+- `smaug_json.c:297` — if (!tbl->columns) { free(tbl); free(dtypes); free(col_names); goto oom_recs; }
+- `smaug_json.c:308` — if (!s) { smaug_table_free(tbl); tbl=NULL; goto oom_recs; }
+- `smaug_json.c:310` — json_val_t *v = (c < recs[r].count) ? &recs[r].vals[c] : NULL;
+- `smaug_json.c:312` — else if (v->type == 1)  smaug_i64_set(s, r, v->i);
+- `smaug_json.c:313` — else if (v->type == 2)  smaug_i64_set(s, r, (int64_t)v->d);
+- `smaug_json.c:320` — if (!s) { smaug_table_free(tbl); tbl=NULL; goto oom_recs; }
+- `smaug_json.c:322` — json_val_t *v = (c < recs[r].count) ? &recs[r].vals[c] : NULL;
+- `smaug_json.c:325` — else if (v->type == 1)  smaug_f64_set(s, r, (double)v->i);
+- `smaug_json.c:332` — if (!s) { smaug_table_free(tbl); tbl=NULL; goto oom_recs; }
+- `smaug_json.c:334` — json_val_t *v = (c < recs[r].count) ? &recs[r].vals[c] : NULL;
+- `smaug_json.c:336` — else if (v->type == 3)  smaug_bool_set(s, r, v->b);
+- `smaug_json.c:343` — if (!s) { smaug_table_free(tbl); tbl=NULL; goto oom_recs; }
+- `smaug_json.c:345` — json_val_t *v = (c < recs[r].count) ? &recs[r].vals[c] : NULL;
+- `smaug_json.c:347` — else if (v->type == 4 && v->s) smaug_str_set(s, r, v->s, strlen(v->s));
+- `smaug_json.c:349` — if (v->type==1) n=snprintf(tmp,sizeof(tmp),"%lld",(long long)v->i);
+- `smaug_json.c:350` — else if (v->type==2) n=snprintf(tmp,sizeof(tmp),"%.17g",v->d);
+- `smaug_json.c:351` — else if (v->type==3) { strcpy(tmp,v->b?"true":"false"); n=strlen(tmp); }
+- `smaug_json.c:365` — for (size_t r = 0; r < n_recs; r++) free_record(&recs[r]);
+- `smaug_json.c:374` — if (sz < 0) { fclose(f); return NULL; }
+- `smaug_json.c:376` — if (!buf) { fclose(f); return NULL; }
+- `smaug_json.c:400` — size_t ncap = b->cap ? b->cap * 2 : 4096;
+- `smaug_json.c:401` — while (ncap <= b->len + n) ncap *= 2;
+- `smaug_json.c:403` — if (!tmp) return -1;
+- `smaug_json.c:412` — if (wbj_pushc(b, '"')) return -1;
+- `smaug_json.c:429` — if (!t || !out_len) return NULL;
+- `smaug_json.c:436` — if (wbj_pushc(&b, '[')) goto oom;
+- `smaug_json.c:437` — if (wbj_pushz(&b, nl)) goto oom;
+- `smaug_json.c:440` — if (wbj_pushz(&b, ind)) goto oom;
+- `smaug_json.c:441` — if (wbj_pushc(&b, '{')) goto oom;
+- `smaug_json.c:442` — if (wbj_pushz(&b, nl)) goto oom;
+- `smaug_json.c:445` — if (wbj_pushz(&b, ind2)) goto oom;
+- `smaug_json.c:448` — if (write_json_string(&b, n, strlen(n))) goto oom;
+- `smaug_json.c:449` — if (wbj_pushc(&b, ':')) goto oom;
+- `smaug_json.c:450` — if (pretty && wbj_pushc(&b, ' ')) goto oom;
+- `smaug_json.c:458` — if (st == SMG_NULL_VALUE || st != SMG_OK) { if (wbj_pushz(&b,"null")) goto oom; }
+- `smaug_json.c:459` — else { snprintf(tmp,sizeof(tmp),"%lld",(long long)v); if (wbj_pushz(&b,tmp)) goto oom; }
+- `smaug_json.c:463` — if (st == SMG_NULL_VALUE || st != SMG_OK) { if (wbj_pushz(&b,"null")) goto oom; }
+- `smaug_json.c:465` — else { snprintf(tmp,sizeof(tmp),"%.17g",v); if (wbj_pushz(&b,tmp)) goto oom; }
+- `smaug_json.c:469` — if (st == SMG_NULL_VALUE || st != SMG_OK) { if (wbj_pushz(&b,"null")) goto oom; }
+- `smaug_json.c:470` — else { if (wbj_pushz(&b, v ? "true" : "false")) goto oom; }
+- `smaug_json.c:474` — if (!sv) { if (wbj_pushz(&b,"null")) goto oom; }
+- `smaug_json.c:475` — else { if (write_json_string(&b, sv, slen)) goto oom; }
+- `smaug_json.c:476` — } else { if (wbj_pushz(&b,"null")) goto oom; }
+- `smaug_json.c:478` — if (c + 1 < t->ncols) { if (wbj_pushc(&b,',')) goto oom; }
+- `smaug_json.c:479` — if (wbj_pushz(&b, nl)) goto oom;
+- `smaug_json.c:482` — if (wbj_pushz(&b, ind)) goto oom;
+- `smaug_json.c:483` — if (wbj_pushc(&b, '}')) goto oom;
+- `smaug_json.c:484` — if (r + 1 < t->nrows) { if (wbj_pushc(&b,',')) goto oom; }
+- `smaug_json.c:485` — if (wbj_pushz(&b, nl)) goto oom;
+- `smaug_json.c:488` — if (wbj_pushc(&b, ']')) goto oom;
+- `smaug_json.c:489` — if (wbj_pushc(&b, '\n')) goto oom;
+- `smaug_json.c:490` — if (wbj_pushc(&b, '\0')) goto oom;
+- `smaug_json.c:501` — if (!buf) return -1;
+- `smaug_json.c:505` — return (w == len) ? 0 : -1;
+
 ## Ramos excluidos (`COV-EXCL-BR` -- defensivos/inalcancaveis, documentados)
 
 Fora da meta por justificativa tecnica (assert reservado a invariantes internas; estes sao guards defensivos sobre condicoes inalcancaveis na pratica):
@@ -48,3 +208,42 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_str.c:290` — rc sempre SMG_OK neste ponto (validacao acima ja garante)
 - `smaug_ops_str.c:80` — mode e enum interno (LT/GT/LE/GE aqui); case default inalcancavel
 - `smaug_ops_str.c:221` — ia==ib inalcancavel (indices sempre unicos no argsort)
+- `smaug_csv.c:37` — falha de syscall não simulável sem mock
+- `smaug_csv.c:39` — ftell negativo só em fd inválido
+- `smaug_csv.c:42` — OOM de malloc no read_file
+- `smaug_csv.c:110` — loop externo garante pos < len antes de chamar
+- `smaug_csv.c:147` — só falha se PUSH falhou por OOM
+- `smaug_csv.c:160` — default_opts garante sep!=0
+- `smaug_csv.c:161` — default_opts garante quote!=0
+- `smaug_csv.c:172` — OOM de malloc inicial
+- `smaug_csv.c:172` — OOM de malloc inicial
+- `smaug_csv.c:186` — OOM de malloc de fields
+- `smaug_csv.c:227` — c<n_cols<=row_sizes[0] por construção
+- `smaug_csv.c:278` — dtype inferido garante try_i64=1
+- `smaug_csv.c:291` — dtype inferido garante try_f64=1
+- `smaug_csv.c:292` — idem para inteiros em coluna float
+- `smaug_csv.c:292` — idem para inteiros em coluna float
+- `smaug_csv.c:305` — dtype inferido garante try_bool=1
+- `smaug_csv.c:397` — write_default_opts garante sep!=0
+- `smaug_csv.c:398` — write_default_opts garante quote!=0
+- `smaug_csv.c:404` — name sempre não-NULL após construção
+- `smaug_json.c:61` — string não fechada — parser tolera, mas o EOL interno break é inalcançável em JSON bem-formado
+- `smaug_json.c:81` — OOM de realloc em string JSON
+- `smaug_json.c:81` — OOM de realloc em string JSON
+- `smaug_json.c:311` — !v só quando record tem menos campos que esperado
+- `smaug_json.c:323` — !v só quando record tem menos campos
+- `smaug_json.c:335` — !v só quando record tem menos campos
+- `smaug_json.c:346` — !v só quando record tem menos campos
+- `smaug_json.c:415` — OOM de wbuf sem injeção
+- `smaug_json.c:416` — OOM de wbuf sem injeção
+- `smaug_json.c:417` — OOM de wbuf sem injeção
+- `smaug_json.c:418` — OOM de wbuf sem injeção
+- `smaug_json.c:418` — OOM de wbuf sem injeção
+- `smaug_json.c:418` — OOM de wbuf sem injeção
+- `smaug_json.c:419` — OOM de wbuf sem injeção
+- `smaug_json.c:420` — OOM de wbuf sem injeção
+- `smaug_json.c:421` — OOM de wbuf sem injeção
+- `smaug_json.c:430` — NULL opts usa default 0; opts não-NULL cobre ambos
+- `smaug_json.c:447` — name sempre não-NULL após construção
+- `smaug_json.c:464` — OOM de wbuf + NaN→null: ramo oom inalcançável sem injeção
+- `smaug_json.c:471` — dtype inferido garante exatamente um ponteiro não-NULL
