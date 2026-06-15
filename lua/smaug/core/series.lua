@@ -2130,6 +2130,185 @@ function StrProxy:split(sep, max_splits)
     return result  -- tabela Lua de Series; col = result[1], result[2], ...
 end
 
+-- =====================================================================
+-- .str Tier C — contagem, predicados ASCII, remoção de afixos, caixas.
+-- Tudo semântica de bytes/ASCII (sem regex, sem Unicode), consistente
+-- com o restante do accessor .str.
+-- =====================================================================
+
+-- count(sub): nº de ocorrências literais NÃO-sobrepostas de `sub` por string.
+-- Null -> null. sub vazio -> erro (contagem indefinida / loop). → Series<int64>
+function StrProxy:count(sub)
+    if type(sub) ~= "string" then
+        error("smaug: str:count espera uma string; recebido " .. type(sub), 2)
+    end
+    if #sub == 0 then
+        error("smaug: str:count espera substring não-vazia", 2)
+    end
+    local sub_len = #sub
+    local n   = self._s:len()
+    local out = Series.new("int64", n, self._s._name)
+    for i = 1, n do
+        local v = self._s:get(i)
+        if v == nil then
+            out:set_null(i)
+        else
+            local c, start = 0, 1
+            while true do
+                local found = v:find(sub, start, true)
+                if not found then break end
+                c = c + 1
+                start = found + sub_len   -- não-sobreposto
+            end
+            out:set(i, c)
+        end
+    end
+    return out
+end
+
+-- ---- Predicados ASCII → Series<bool>. String vazia → false (semântica Python).
+-- Null → NA. Todos operam byte a byte sobre o intervalo ASCII.
+
+-- Helper: true se todos os bytes satisfazem `pred` E a string é não-vazia.
+local function all_bytes(v, pred)
+    if #v == 0 then return false end
+    for k = 1, #v do
+        if not pred(v:byte(k)) then return false end
+    end
+    return true
+end
+
+local function b_is_digit(b) return b >= 48 and b <= 57 end
+local function b_is_lower(b) return b >= 97 and b <= 122 end
+local function b_is_upper(b) return b >= 65 and b <= 90 end
+local function b_is_alpha(b) return b_is_lower(b) or b_is_upper(b) end
+local function b_is_alnum(b) return b_is_alpha(b) or b_is_digit(b) end
+local function b_is_space(b)
+    -- ASCII whitespace: espaço(32) \t(9) \n(10) \v(11) \f(12) \r(13)
+    return b == 32 or (b >= 9 and b <= 13)
+end
+
+function StrProxy:isdigit()
+    return bool_map(self._s, function(v) return all_bytes(v, b_is_digit) end)
+end
+function StrProxy:isalpha()
+    return bool_map(self._s, function(v) return all_bytes(v, b_is_alpha) end)
+end
+function StrProxy:isalnum()
+    return bool_map(self._s, function(v) return all_bytes(v, b_is_alnum) end)
+end
+function StrProxy:isspace()
+    return bool_map(self._s, function(v) return all_bytes(v, b_is_space) end)
+end
+
+-- islower(): há ao menos uma letra ASCII e nenhuma maiúscula (semântica Python).
+function StrProxy:islower()
+    return bool_map(self._s, function(v)
+        local has_alpha = false
+        for k = 1, #v do
+            local b = v:byte(k)
+            if b_is_upper(b) then return false end
+            if b_is_lower(b) then has_alpha = true end
+        end
+        return has_alpha
+    end)
+end
+
+-- isupper(): há ao menos uma letra ASCII e nenhuma minúscula.
+function StrProxy:isupper()
+    return bool_map(self._s, function(v)
+        local has_alpha = false
+        for k = 1, #v do
+            local b = v:byte(k)
+            if b_is_lower(b) then return false end
+            if b_is_upper(b) then has_alpha = true end
+        end
+        return has_alpha
+    end)
+end
+
+-- ---- Remoção de afixos (literal, no máximo uma vez, idempotente) ----
+
+-- removeprefix(p): remove `p` do início, se presente. → Series<string>
+function StrProxy:removeprefix(p)
+    if type(p) ~= "string" then
+        error("smaug: str:removeprefix espera uma string; recebido " .. type(p), 2)
+    end
+    local np = #p
+    if np == 0 then return str_map(self._s, function(v) return v end) end
+    return str_map(self._s, function(v)
+        if v:sub(1, np) == p then return v:sub(np + 1) end
+        return v
+    end)
+end
+
+-- removesuffix(s): remove `s` do fim, se presente. → Series<string>
+function StrProxy:removesuffix(suf)
+    if type(suf) ~= "string" then
+        error("smaug: str:removesuffix espera uma string; recebido " .. type(suf), 2)
+    end
+    local ns = #suf
+    if ns == 0 then return str_map(self._s, function(v) return v end) end
+    return str_map(self._s, function(v)
+        if v:sub(-ns) == suf then return v:sub(1, #v - ns) end
+        return v
+    end)
+end
+
+-- ---- Caixas adicionais (ASCII) ----
+
+-- capitalize(): primeira letra maiúscula, restante minúsculo. → Series<string>
+function StrProxy:capitalize()
+    return str_map(self._s, function(v)
+        if #v == 0 then return v end
+        return v:sub(1, 1):upper() .. v:sub(2):lower()
+    end)
+end
+
+-- title(): primeira letra de cada palavra maiúscula, resto minúsculo.
+-- Palavra = sequência de letras ASCII; qualquer não-letra é separador.
+function StrProxy:title()
+    return str_map(self._s, function(v)
+        local out = {}
+        local prev_alpha = false
+        for k = 1, #v do
+            local b = v:byte(k)
+            local is_alpha = b_is_alpha(b)
+            if is_alpha then
+                if prev_alpha then
+                    out[k] = string.char(b_is_upper(b) and b + 32 or b)  -- minúscula
+                else
+                    out[k] = string.char(b_is_lower(b) and b - 32 or b)  -- maiúscula
+                end
+            else
+                out[k] = string.char(b)
+            end
+            prev_alpha = is_alpha
+        end
+        return table.concat(out)
+    end)
+end
+
+-- swapcase(): inverte a caixa de cada letra ASCII. → Series<string>
+function StrProxy:swapcase()
+    return str_map(self._s, function(v)
+        local out = {}
+        for k = 1, #v do
+            local b = v:byte(k)
+            if b_is_lower(b)     then out[k] = string.char(b - 32)
+            elseif b_is_upper(b) then out[k] = string.char(b + 32)
+            else                      out[k] = string.char(b) end
+        end
+        return table.concat(out)
+    end)
+end
+
+-- join(sep): atalho de :cat — concatena os não-nulos numa string Lua única.
+-- Mantido por compatibilidade de nome (pandas/Python); idêntico a :cat(sep).
+function StrProxy:join(sep)
+    return self:cat(sep)
+end
+
 -- __index: unificado abaixo (junto com .dt)
 -- =====================================================================
 -- Enriquecimento: reduções, transformações e conveniência
@@ -2808,8 +2987,272 @@ function SeriesDT:add_hours(n)   return self:add_ms(n * 3600000)  end
 function SeriesDT:add_minutes(n) return self:add_ms(n * 60000)    end
 function SeriesDT:add_seconds(n) return self:add_ms(n * 1000)     end
 
+-- =====================================================================
+-- F.3 — .dt estendido
+-- Predicados de calendário, nomes, e arredondamento de período.
+-- Tudo derivado das primitivas C (year/month/day/.../from_parts/truncate).
+-- =====================================================================
+
+local DT_SENTINEL = -9223372036854775808LL   -- INT64_MIN (data inválida)
+
+-- Tabelas de nomes (inglês, alinhado a pandas). weekday do C: 0=seg..6=dom.
+local MONTH_NAMES = {
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+}
+local DAY_NAMES = {
+    [0] = "Monday", [1] = "Tuesday", [2] = "Wednesday", [3] = "Thursday",
+    [4] = "Friday", [5] = "Saturday", [6] = "Sunday",
+}
+
+-- Bissexto pela regra gregoriana.
+local function leap(y)
+    return (y % 4 == 0 and y % 100 ~= 0) or (y % 400 == 0)
+end
+
+-- Dias no mês (1-12) de um dado ano.
+local MDAYS = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+local function days_in(y, m)
+    if m == 2 and leap(y) then return 29 end
+    return MDAYS[m]
+end
+
+-- Helper: aplica fn(epoch_ms) → valor por elemento, montando Series<dtype>.
+-- Nulos propagam. fn pode retornar nil para sinalizar null.
+local function dt_map(self, fn, out_dtype)
+    local s    = self._s
+    local n    = s:len()
+    local NA   = Series.NA
+    local vals = {}
+    for i = 1, n do
+        local v = s:get(i)
+        if v == nil then
+            vals[i] = NA
+        else
+            local r = fn(v)
+            vals[i] = (r == nil) and NA or r
+        end
+    end
+    return Series.from_table(vals, out_dtype, s._name)
+end
+
+-- ---- Predicados de início/fim de período → Series<bool> ----
+
+-- is_month_start: dia == 1
+function SeriesDT:is_month_start()
+    return dt_map(self, function(v) return C.smaug_dt_day(v) == 1 end, "bool")
+end
+
+-- is_month_end: dia == dias_no_mês(ano, mês)
+function SeriesDT:is_month_end()
+    return dt_map(self, function(v)
+        local y, m, d = C.smaug_dt_year(v), C.smaug_dt_month(v), C.smaug_dt_day(v)
+        return d == days_in(y, m)
+    end, "bool")
+end
+
+-- is_quarter_start: mês ∈ {1,4,7,10} e dia == 1
+function SeriesDT:is_quarter_start()
+    return dt_map(self, function(v)
+        local m, d = C.smaug_dt_month(v), C.smaug_dt_day(v)
+        return d == 1 and (m == 1 or m == 4 or m == 7 or m == 10)
+    end, "bool")
+end
+
+-- is_quarter_end: mês ∈ {3,6,9,12} e dia == último dia do mês
+function SeriesDT:is_quarter_end()
+    return dt_map(self, function(v)
+        local y, m, d = C.smaug_dt_year(v), C.smaug_dt_month(v), C.smaug_dt_day(v)
+        return d == days_in(y, m) and (m == 3 or m == 6 or m == 9 or m == 12)
+    end, "bool")
+end
+
+-- is_year_start: mês == 1 e dia == 1
+function SeriesDT:is_year_start()
+    return dt_map(self, function(v)
+        return C.smaug_dt_month(v) == 1 and C.smaug_dt_day(v) == 1
+    end, "bool")
+end
+
+-- is_year_end: mês == 12 e dia == 31
+function SeriesDT:is_year_end()
+    return dt_map(self, function(v)
+        return C.smaug_dt_month(v) == 12 and C.smaug_dt_day(v) == 31
+    end, "bool")
+end
+
+-- is_leap_year: ano é bissexto → Series<bool>
+function SeriesDT:is_leap_year()
+    return dt_map(self, function(v) return leap(C.smaug_dt_year(v)) end, "bool")
+end
+
+-- days_in_month: número de dias do mês de cada elemento → Series<int64>
+function SeriesDT:days_in_month()
+    return dt_map(self, function(v)
+        return days_in(C.smaug_dt_year(v), C.smaug_dt_month(v))
+    end, "int64")
+end
+
+-- ---- Nomes ----
+
+-- month_name: nome do mês em inglês → Series<string>
+function SeriesDT:month_name()
+    return dt_map(self, function(v) return MONTH_NAMES[C.smaug_dt_month(v)] end, "string")
+end
+
+-- day_name: nome do dia da semana em inglês → Series<string>
+function SeriesDT:day_name()
+    return dt_map(self, function(v) return DAY_NAMES[C.smaug_dt_weekday(v)] end, "string")
+end
+
+-- ---- normalize: zera a hora (= truncate("D")) → Series<datetime> ----
+function SeriesDT:normalize()
+    return self:truncate("D")
+end
+
+-- ---- round / ceil de período (complementam truncate = floor) ----
+
+-- Avança um epoch_ms truncado por exatamente uma unidade `unit`, retornando
+-- o início do PRÓXIMO período. Usa from_parts para unidades de calendário
+-- (M/Q/Y, comprimento variável) e add_ms para as de comprimento fixo.
+local function next_period(floor_ms, unit)
+    if unit == "Y" then
+        local y = C.smaug_dt_year(floor_ms)
+        return C.smaug_dt_from_parts(y + 1, 1, 1, 0, 0, 0, 0)
+    elseif unit == "Q" then
+        local y, m = C.smaug_dt_year(floor_ms), C.smaug_dt_month(floor_ms)
+        -- floor de Q tem mês ∈ {1,4,7,10}; próximo trimestre = +3 meses
+        local nm = m + 3
+        if nm > 12 then nm = nm - 12; y = y + 1 end
+        return C.smaug_dt_from_parts(y, nm, 1, 0, 0, 0, 0)
+    elseif unit == "M" then
+        local y, m = C.smaug_dt_year(floor_ms), C.smaug_dt_month(floor_ms)
+        local nm = m + 1
+        if nm > 12 then nm = 1; y = y + 1 end
+        return C.smaug_dt_from_parts(y, nm, 1, 0, 0, 0, 0)
+    elseif unit == "W" then
+        return C.smaug_dt_add_ms(floor_ms, 7 * 86400000)
+    elseif unit == "D" then
+        return C.smaug_dt_add_ms(floor_ms, 86400000)
+    elseif unit == "h" then
+        return C.smaug_dt_add_ms(floor_ms, 3600000)
+    elseif unit == "m" then
+        return C.smaug_dt_add_ms(floor_ms, 60000)
+    elseif unit == "s" then
+        return C.smaug_dt_add_ms(floor_ms, 1000)
+    end
+    return DT_SENTINEL
+end
+
+local VALID_UNITS = { s=true, m=true, h=true, D=true, W=true, M=true, Q=true, Y=true }
+
+-- ceil(unit): menor início-de-período >= v. Se v já está no limite, retorna v.
+function SeriesDT:ceil(unit)
+    if type(unit) ~= "string" or not VALID_UNITS[unit] then
+        error("smaug: dt:ceil() unidade inválida (use s/m/h/D/W/M/Q/Y)", 2)
+    end
+    local u = string.byte(unit)
+    return dt_map(self, function(v)
+        local floor = C.smaug_dt_truncate(v, u)
+        if floor == DT_SENTINEL then return nil end
+        if floor == v then return tonumber(v) end   -- já alinhado
+        local nxt = next_period(floor, unit)
+        if nxt == DT_SENTINEL then return nil end
+        return tonumber(nxt)
+    end, "datetime")
+end
+
+-- round(unit): início-de-período mais próximo. Empate (exatamente no meio)
+-- arredonda para cima (half-up), consistente com pandas.
+function SeriesDT:round(unit)
+    if type(unit) ~= "string" or not VALID_UNITS[unit] then
+        error("smaug: dt:round() unidade inválida (use s/m/h/D/W/M/Q/Y)", 2)
+    end
+    local u = string.byte(unit)
+    return dt_map(self, function(v)
+        local floor = C.smaug_dt_truncate(v, u)
+        if floor == DT_SENTINEL then return nil end
+        local nxt = next_period(floor, unit)
+        if nxt == DT_SENTINEL then return nil end
+        -- distâncias (em ms) ao floor e ao próximo período
+        local to_floor = tonumber(C.smaug_dt_diff_ms(v, floor))       -- v - floor >= 0
+        local to_next  = tonumber(C.smaug_dt_diff_ms(nxt, v))         -- next - v >= 0
+        if to_floor < to_next then
+            return tonumber(floor)
+        else
+            return tonumber(nxt)   -- half-up no empate
+        end
+    end, "datetime")
+end
+
+-- ---- strftime: formatação por tokens estilo C → Series<string> ----
+-- Tokens suportados: %Y %y %m %d %H %M %S %j %B %b %A %a %p %% .
+-- Tokens desconhecidos são mantidos literais (com o %).
+local ABBR_MONTH = {
+    "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec",
+}
+local ABBR_DAY = {
+    [0]="Mon",[1]="Tue",[2]="Wed",[3]="Thu",[4]="Fri",[5]="Sat",[6]="Sun",
+}
+
+function SeriesDT:strftime(fmt)
+    if type(fmt) ~= "string" then
+        error("smaug: dt:strftime() espera string de formato", 2)
+    end
+    return dt_map(self, function(v)
+        local Y = C.smaug_dt_year(v)
+        local mo = C.smaug_dt_month(v)
+        local d = C.smaug_dt_day(v)
+        local H = C.smaug_dt_hour(v)
+        local Mi = C.smaug_dt_minute(v)
+        local Se = C.smaug_dt_second(v)
+        local j = C.smaug_dt_yearday(v)
+        local wd = C.smaug_dt_weekday(v)
+        local h12 = H % 12; if h12 == 0 then h12 = 12 end
+        local subst = {
+            Y = string.format("%04d", Y),
+            y = string.format("%02d", Y % 100),
+            m = string.format("%02d", mo),
+            d = string.format("%02d", d),
+            H = string.format("%02d", H),
+            M = string.format("%02d", Mi),
+            S = string.format("%02d", Se),
+            j = string.format("%03d", j),
+            I = string.format("%02d", h12),
+            p = (H < 12) and "AM" or "PM",
+            B = MONTH_NAMES[mo],
+            b = ABBR_MONTH[mo],
+            A = DAY_NAMES[wd],
+            a = ABBR_DAY[wd],
+            ["%"] = "%",
+        }
+        -- substitui %X; token desconhecido fica literal (mantém o %X)
+        return (fmt:gsub("%%(.)", function(c)
+            local r = subst[c]
+            if r ~= nil then return r end
+            return "%" .. c
+        end))
+    end, "string")
+end
+
+-- =====================================================================
+
 -- Acesso ao proxy .dt na Series
 methods.dt = nil  -- reservado; resolvido via __index abaixo
+
+-- SeriesAt: proxy de acesso escalar para s.at / s.iat.
+-- Suporta indexação (s.at[i]) e chamada (s.at(i)); ambos delegam a get().
+local SeriesAt = {
+    __index = function(self, i)
+        if type(i) ~= "number" then
+            error("smaug: at/iat espera índice numérico (1-based)", 2)
+        end
+        return methods.get(self._s, i)
+    end,
+    __call = function(self, i)
+        return methods.get(self._s, i)
+    end,
+}
 
 -- __index unificado: índice numérico → get(); .str → StrProxy; .dt → SeriesDT; método.
 Series.__index = function(self, k)
@@ -2827,6 +3270,11 @@ Series.__index = function(self, k)
                   .. self._dtype .. "'", 2)
         end
         return setmetatable({ _s = self }, StrProxy)
+    end
+    -- at / iat: acesso escalar posicional. Suporta s.at[i] e s.at(i).
+    -- Em uma Series 1-D, at e iat são equivalentes (índice = posição).
+    if k == "at" or k == "iat" then
+        return setmetatable({ _s = self }, SeriesAt)
     end
     return methods[k]
 end

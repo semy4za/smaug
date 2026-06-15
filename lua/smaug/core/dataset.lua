@@ -1791,6 +1791,145 @@ function methods.to_table(self, na_value)
 end
 
 -- =====================================================================
+-- F.5 — Acesso e ergonomia
+-- =====================================================================
+
+-- at(i, col): célula única por nome de coluna. col deve existir; i 1-based.
+function methods.at(self, i, col)
+    if type(col) ~= "string" then
+        error("smaug: df:at(i, col) — col deve ser nome de coluna (string)", 2)
+    end
+    local c = self._columns[col]
+    if c == nil then error("smaug: coluna '"..tostring(col).."' não existe", 2) end
+    return c:get(i)
+end
+
+-- iat(i, ci): célula única por índice posicional de coluna (1-based).
+function methods.iat(self, i, ci)
+    if type(ci) ~= "number" or ci < 1 or ci > #self._col_names then
+        error("smaug: df:iat(i, ci) — ci fora dos limites [1, "..#self._col_names.."]", 2)
+    end
+    return self._columns[self._col_names[ci]]:get(i)
+end
+
+-- insert(loc, name, series): insere uma coluna na posição `loc` (1-based).
+-- loc ∈ [1, ncols+1]. Desloca as colunas seguintes. Valida nrows e nome único.
+function methods.insert(self, loc, name, series)
+    if type(loc) ~= "number" or loc < 1 or loc > #self._col_names + 1 then
+        error("smaug: df:insert — loc fora dos limites [1, "..(#self._col_names+1).."]", 2)
+    end
+    if type(name) ~= "string" then
+        error("smaug: df:insert — name deve ser string", 2)
+    end
+    if self._columns[name] ~= nil then
+        error("smaug: coluna '"..name.."' já existe", 2)
+    end
+    if not (is_series(series) or is_boolseries(series) or is_categorical(series)) then
+        error("smaug: df:insert espera uma Series", 2)
+    end
+    local n = series:len()
+    if self._length == nil then
+        self._length = n
+    elseif n ~= self._length then
+        error("smaug: coluna '"..name.."' tem "..n.." linhas; esperado "..self._length, 2)
+    end
+    self._columns[name] = series
+    table.insert(self._col_names, loc, name)
+    return self
+end
+
+-- to_dict([orient]): converte para tabela Lua.
+--   "columns" (default): { coluna = {v1, v2, ...}, ... }
+--   "records": { {col=v, ...}, {col=v, ...}, ... } (lista de linhas)
+-- Nulos viram nil nas tabelas (chaves ausentes em records).
+function methods.to_dict(self, orient)
+    orient = orient or "columns"
+    if orient == "columns" then
+        return self:to_table()
+    elseif orient == "records" then
+        local out = {}
+        for i = 1, self:nrows() do
+            out[i] = self:row(i)   -- {coluna = valor}; nil para nulos
+        end
+        return out
+    end
+    error("smaug: to_dict orient ∈ {columns, records}", 2)
+end
+
+-- from_dict(t, [orient]): constrói DataSet a partir de tabela Lua.
+--   "columns" (default): { coluna = {v1,...}, ... } — ordem indefinida em Lua,
+--      então aceita ordem explícita via t._order (lista de nomes), opcional.
+--   "records": { {col=v,...}, ... } — infere colunas da união das chaves.
+-- dtype é inferido por coluna (int64 se todos inteiros, float64 se números,
+-- bool, senão string). Nil/ausente → NA.
+function DataSet.from_dict(t, orient)
+    orient = orient or "columns"
+    if type(t) ~= "table" then error("smaug: from_dict espera tabela", 2) end
+
+    local function infer_and_build(name, values, n)
+        -- infere dtype varrendo os não-nulos
+        local seen_num, seen_float, seen_bool, seen_str = false, false, false, false
+        for i = 1, n do
+            local v = values[i]
+            if v ~= nil and v ~= Series.NA then
+                local tv = type(v)
+                if tv == "boolean" then seen_bool = true
+                elseif tv == "number" then
+                    seen_num = true
+                    if v % 1 ~= 0 then seen_float = true end
+                elseif tv == "string" then seen_str = true end
+            end
+        end
+        local dtype
+        if seen_str then dtype = "string"
+        elseif seen_bool and not seen_num then dtype = "bool"
+        elseif seen_float then dtype = "float64"
+        elseif seen_num then dtype = "int64"
+        else dtype = "string" end   -- coluna toda nula → string por convenção
+        -- normaliza nil → NA
+        local vals = {}
+        for i = 1, n do
+            local v = values[i]
+            vals[i] = (v == nil) and Series.NA or v
+        end
+        return Series.from_table(vals, dtype, name)
+    end
+
+    local df = DataSet.new("from_dict")
+    if orient == "columns" then
+        local order = t._order   -- lista opcional de nomes para ordem determinística
+        if order == nil then
+            order = {}
+            for k in pairs(t) do
+                if k ~= "_order" then order[#order + 1] = k end
+            end
+            table.sort(order)   -- ordem estável (alfabética) na ausência de _order
+        end
+        for _, name in ipairs(order) do
+            local values = t[name]
+            df:add_column(name, infer_and_build(name, values, #values))
+        end
+        return df
+    elseif orient == "records" then
+        -- coleta nomes de coluna na ordem de 1ª aparição
+        local order, seen = {}, {}
+        for _, rec in ipairs(t) do
+            for k in pairs(rec) do
+                if not seen[k] then seen[k] = true; order[#order + 1] = k end
+            end
+        end
+        local nrows = #t
+        for _, name in ipairs(order) do
+            local values = {}
+            for i = 1, nrows do values[i] = t[i][name] end
+            df:add_column(name, infer_and_build(name, values, nrows))
+        end
+        return df
+    end
+    error("smaug: from_dict orient ∈ {columns, records}", 2)
+end
+
+-- =====================================================================
 -- Pretty-print tabular
 -- =====================================================================
 local function cell_str(v)
@@ -1839,6 +1978,80 @@ DataSet.__tostring = function(self)
 
     return string.format("DataSet '%s' [%d linhas x %d colunas]\n%s",
         self._name, nrows, #names, table.concat(out, "\n"))
+end
+
+-- to_markdown(): tabela em formato Markdown (GitHub-flavored).
+-- Inclui todas as linhas (sem limite de 10 do __tostring). Útil para
+-- READMEs, issues e PRs. Nulos → "NA".
+function methods.to_markdown(self)
+    local names = self._col_names
+    if #names == 0 then return "" end
+    local nrows = self:nrows()
+    -- larguras: max entre nome e qualquer célula
+    local widths = {}
+    for _, n in ipairs(names) do widths[n] = #n end
+    local cells = {}
+    for i = 1, nrows do
+        cells[i] = {}
+        for _, n in ipairs(names) do
+            local s = cell_str(self._columns[n]:get(i))
+            cells[i][n] = s
+            if #s > widths[n] then widths[n] = #s end
+        end
+    end
+    local function pad(s, w) return s .. string.rep(" ", w - #s) end
+    local out = {}
+    -- cabeçalho
+    local header = {}
+    for _, n in ipairs(names) do header[#header + 1] = pad(n, widths[n]) end
+    out[#out + 1] = "| " .. table.concat(header, " | ") .. " |"
+    -- separador
+    local sep = {}
+    for _, n in ipairs(names) do sep[#sep + 1] = string.rep("-", widths[n]) end
+    out[#out + 1] = "| " .. table.concat(sep, " | ") .. " |"
+    -- linhas
+    for i = 1, nrows do
+        local line = {}
+        for _, n in ipairs(names) do line[#line + 1] = pad(cells[i][n], widths[n]) end
+        out[#out + 1] = "| " .. table.concat(line, " | ") .. " |"
+    end
+    return table.concat(out, "\n")
+end
+
+-- to_string([opts]): render tabular em texto plano. opts.max_rows limita
+-- linhas (default: todas). Formaliza o que __tostring faz, sem truncar em 10.
+function methods.to_string(self, opts)
+    opts = opts or {}
+    local names = self._col_names
+    local nrows = self:nrows()
+    if #names == 0 then return "DataSet '"..self._name.."' (vazio)" end
+    local limit = opts.max_rows and math.min(nrows, opts.max_rows) or nrows
+
+    local widths = {}
+    for _, n in ipairs(names) do widths[n] = #n end
+    local idxw = math.max(#tostring(limit), 1)
+    local rows = {}
+    for i = 1, limit do
+        local row = {}
+        for _, n in ipairs(names) do
+            local s = cell_str(self._columns[n]:get(i))
+            row[n] = s
+            if #s > widths[n] then widths[n] = #s end
+        end
+        rows[i] = row
+    end
+    local function pad(s, w) return s .. string.rep(" ", w - #s) end
+    local out = {}
+    local header = { string.rep(" ", idxw) }
+    for _, n in ipairs(names) do header[#header + 1] = pad(n, widths[n]) end
+    out[#out + 1] = table.concat(header, "  ")
+    for i = 1, limit do
+        local line = { pad(tostring(i), idxw) }
+        for _, n in ipairs(names) do line[#line + 1] = pad(rows[i][n], widths[n]) end
+        out[#out + 1] = table.concat(line, "  ")
+    end
+    if nrows > limit then out[#out + 1] = "... ("..(nrows - limit).." linhas a mais)" end
+    return table.concat(out, "\n")
 end
 
 -- __index: df["coluna"] OU df:metodo() OU df[bool_series].

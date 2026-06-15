@@ -133,6 +133,7 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | Método | O que faz |
 |--------|-----------|
 | `:get(i)` / `:set(i, v)` | acesso 1-based; nil↔NA |
+| `s[i]` / `s.at[i]` / `s.at(i)` / `s.iat[i]` | acesso escalar (alias de `:get`); at e iat equivalem em Series 1-D |
 | `:is_null(i)` / `:set_null(i)` | nulos |
 | `:append(v)` | adiciona ao fim (chainable) |
 | `:len()` / `:size()` | tamanho |
@@ -277,6 +278,19 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `.str:cat([sep])` | concatena todos os não-nulos → string Lua |
 | `.str:split(sep, [max])` | divide pelo separador → tabela de Series |
 
+**Tier C** (ASCII, sem regex/Unicode):
+
+| Método | O que faz |
+|--------|-----------|
+| `.str:count(sub)` | nº de ocorrências literais não-sobrepostas (sub vazio → erro) → `Series<int64>` |
+| `.str:isalnum()` / `:isalpha()` / `:isdigit()` / `:isspace()` | predicados ASCII; vazia → false → `Series<bool>` |
+| `.str:islower()` / `:isupper()` | há letra e nenhuma da caixa oposta → `Series<bool>` |
+| `.str:removeprefix(p)` / `:removesuffix(s)` | remove afixo literal uma vez (idempotente) |
+| `.str:capitalize()` | 1ª letra maiúscula, resto minúsculo |
+| `.str:title()` | inicial de cada palavra maiúscula (palavra = letras ASCII) |
+| `.str:swapcase()` | inverte a caixa de cada letra ASCII |
+| `.str:join([sep])` | atalho de `:cat` — concatena não-nulos → string Lua |
+
 ### `.dt` — proxy de operações de calendário sobre Series datetime
 
 Disponível quando `s._dtype == "datetime"`. Erro claro em qualquer outro dtype.
@@ -305,6 +319,27 @@ Disponível quando `s._dtype == "datetime"`. Erro claro em qualquer outro dtype.
 | `.dt:truncate(unit)` | trunca para início do período: `'s'`/`'m'`/`'h'`/`'D'`/`'W'`/`'M'`/`'Q'`/`'Y'` |
 | `.dt:diff([periods])` | diferença em ms entre elemento i e i-periods (default 1) |
 | `.dt:add_ms(delta)` / `:add_days(n)` / `:add_hours(n)` / `:add_minutes(n)` / `:add_seconds(n)` | aritmética temporal → novo `Series<datetime>` |
+| `.dt:round(unit)` | período mais próximo (half-up no empate); mesmas unidades de truncate → `Series<datetime>` |
+| `.dt:ceil(unit)` | menor início-de-período ≥ valor; já-alinhado retorna o próprio → `Series<datetime>` |
+| `.dt:normalize()` | zera a hora (= `truncate("D")`) → `Series<datetime>` |
+| `.dt:strftime(fmt)` | formata por tokens `%Y %y %m %d %H %M %S %I %p %j %B %b %A %a %%`; desconhecido fica literal → `Series<string>` |
+
+**Predicados de calendário** (→ `Series<bool>`; null propaga):
+
+| Método | O que faz |
+|--------|-----------|
+| `.dt:is_month_start()` / `:is_month_end()` | primeiro / último dia do mês |
+| `.dt:is_quarter_start()` / `:is_quarter_end()` | primeiro / último dia do trimestre |
+| `.dt:is_year_start()` / `:is_year_end()` | 1º de janeiro / 31 de dezembro |
+| `.dt:is_leap_year()` | ano bissexto (regra gregoriana, incl. ÷400) |
+
+**Atributos de calendário:**
+
+| Método | O que faz |
+|--------|-----------|
+| `.dt:days_in_month()` | nº de dias do mês (28/29/30/31) → `Series<int64>` |
+| `.dt:month_name()` | nome do mês em inglês (January…December) → `Series<string>` |
+| `.dt:day_name()` | nome do dia em inglês (Monday…Sunday) → `Series<string>` |
 
 **Helpers estáticos** (não passam pelo proxy):
 
@@ -410,6 +445,12 @@ com `nil` no meio (limitação do `#` do Lua).
 | `:equals(other)` | igualdade estrutural (colunas, ordem, dtypes, valores) → bool |
 | `:compare(other)` | diferenças célula a célula → DataSet `{linha, coluna, self, other}` |
 | `:rename(mapping)` | renomeia colunas em lote: `{old=new, ...}` → novo DataSet |
+| `:at(i, col)` / `:iat(i, ci)` | célula única por nome / por índice posicional de coluna |
+| `:insert(loc, nome, series)` | insere coluna na posição `loc` (1-based) |
+| `:to_dict([orient])` | → tabela Lua; `"columns"` (default) ou `"records"` |
+| `DataSet.from_dict(t, [orient])` | constrói a partir de tabela Lua; infere dtype por coluna |
+| `:to_markdown()` | tabela em Markdown (GitHub-flavored), todas as linhas |
+| `:to_string([opts])` | render texto plano; `opts.max_rows` limita linhas |
 | `:describe()` / `:to_table([na])` | inspeção |
 
 **Operações relacionais (Anel 2):**

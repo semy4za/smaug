@@ -14,6 +14,16 @@ local function check(cond, msg)
 end
 local function approx(a, b) return math.abs(a - b) < 1e-9 end
 
+-- Diretório temporário portátil: respeita TMPDIR/TMP/TEMP (Windows usa TEMP),
+-- fallback "/tmp". Separador "/" é aceito pela CRT no Windows e no POSIX.
+-- Trata var vazia ("") como ausente (os.getenv devolve "" e não nil nesse caso).
+local function tmp_path(name)
+    local function nz(v) return (v ~= nil and v ~= "") and v or nil end
+    local dir = nz(os.getenv("TMPDIR")) or nz(os.getenv("TMP"))
+             or nz(os.getenv("TEMP")) or "/tmp"
+    return dir .. "/" .. name
+end
+
 -- ================================================================
 -- CSV — read_csv_mem
 -- ================================================================
@@ -106,7 +116,7 @@ check(approx(fds2:col("v"):get(2), 2.7),    "float roundtrip: 2.7")
 -- ================================================================
 -- CSV — to_csv / read_csv (arquivo)
 -- ================================================================
-local tmp = "/tmp/smaug_test_io.csv"
+local tmp = tmp_path("smaug_test_io.csv")
 ds:to_csv(tmp)
 local ds_f = smaug.read_csv(tmp)
 check(ds_f:nrows() == 3,                    "arquivo: 3 linhas")
@@ -163,7 +173,7 @@ check(jpretty:find("\n") ~= nil,            "json pretty: tem newlines")
 -- ================================================================
 -- JSON — to_json / read_json (arquivo)
 -- ================================================================
-local jtmp = "/tmp/smaug_test_io.json"
+local jtmp = tmp_path("smaug_test_io.json")
 dsj:to_json(jtmp)
 local dsj3 = smaug.read_json(jtmp)
 check(dsj3:nrows() == 3,                    "json arquivo: 3 linhas")

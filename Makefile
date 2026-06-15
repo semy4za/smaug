@@ -21,11 +21,11 @@ C_TESTS_PLAIN = test_alloc test_ops test_ops_edge test_bool test_bool_lifecycle 
 C_TEST_WRAP   = test_allocfail
 C_TEST_STRESS = test_stress
 LUA_TESTS     = test_series test_i64 test_bool_dtype test_edge test_special test_fillna \
-                test_string test_str_tier_b test_props \
-                test_datetime test_categorical test_completeness \
+                test_string test_str_tier_b test_str_tier_c test_props \
+                test_datetime test_categorical test_completeness test_dt_extended \
                 test_dataset test_dataset_ops test_series_ops \
                 test_groupby test_concat test_join \
-                test_rolling_series test_enrich test_stats test_predicates \
+                test_rolling_series test_enrich test_stats test_predicates test_access \
                 test_io test_io_real
 WRAP_FLAGS    = -Wl,--wrap=malloc -Wl,--wrap=realloc
 

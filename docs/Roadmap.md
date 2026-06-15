@@ -270,7 +270,7 @@ e revisão de cobertura antes do próximo.
 | `idxmin` / `idxmax` | `Series` | aliases de `argmin`/`argmax` |
 | `first_valid_index` / `last_valid_index` | `Series` | índice 1-based do 1º / último não-null |
 
-#### F.3 — Pacote `.dt` estendido
+#### F.3 — Pacote `.dt` estendido `[Done]`
 
 | Item | Notas |
 |---|---|
@@ -284,7 +284,7 @@ e revisão de cobertura antes do próximo.
 | `.dt:normalize()` | alias de `:truncate("D")` |
 | `.dt:month_name()` / `:day_name()` | inglês fixo (português pode ser feito via `.cat` + `rename_categories`) |
 
-#### F.4 — Pacote `.str` Tier C (sem regex, sem Unicode)
+#### F.4 — Pacote `.str` Tier C (sem regex, sem Unicode) `[Done]`
 
 | Item | Notas |
 |---|---|
@@ -297,7 +297,7 @@ e revisão de cobertura antes do próximo.
 Regex (`extract`/`findall`/`match`/`fullmatch`) e normalização Unicode-aware
 permanecem em v1.5 como `.str` Tier D.
 
-#### F.5 — Pacote de acesso e ergonomia
+#### F.5 — Pacote de acesso e ergonomia `[Done]`
 
 | Item | Onde | Notas |
 |---|---|---|
@@ -330,9 +330,9 @@ permanecem em v1.5 como `.str` Tier D.
 - [x] Auditoria de docs concluída.
 - [x] Bloco F.1 — Pacote estatístico.
 - [x] Bloco F.2 — Pacote de predicados.
-- [ ] Bloco F.3 — Pacote `.dt` estendido.
-- [ ] Bloco F.4 — Pacote `.str` Tier C (sem regex/Unicode).
-- [ ] Bloco F.5 — Pacote de acesso e ergonomia.
+- [x] Bloco F.3 — Pacote `.dt` estendido.
+- [x] Bloco F.4 — Pacote `.str` Tier C (sem regex/Unicode).
+- [x] Bloco F.5 — Pacote de acesso e ergonomia.
 - [ ] Bloco F.6 — Pacote de duplicatas e operações binárias.
 - [ ] Hardening global (cobertura ≥ 95% branch-alvo nos arquivos restantes).
 - [ ] Docstrings nos métodos públicos de `Series` e `DataSet`.

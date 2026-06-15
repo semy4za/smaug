@@ -15,6 +15,15 @@ local function check(cond, msg)
     n_ok = n_ok + 1
 end
 
+-- Diretório temporário portátil (ver test_io.lua): TMPDIR/TMP/TEMP, fallback /tmp.
+-- Trata var vazia como ausente.
+local function tmp_path(name)
+    local function nz(v) return (v ~= nil and v ~= "") and v or nil end
+    local dir = nz(os.getenv("TMPDIR")) or nz(os.getenv("TMP"))
+             or nz(os.getenv("TEMP")) or "/tmp"
+    return dir .. "/" .. name
+end
+
 -- ================================================================
 -- Leitura com separador customizado
 -- ================================================================
@@ -155,7 +164,7 @@ check(joined:col("regiao"):get(1) == "SP", "join: regiao[1] = SP")
 -- ================================================================
 -- Roundtrip CSV: escrever e ler de volta
 -- ================================================================
-local tmp = "/tmp/smaug_pedidos_rt.csv"
+local tmp = tmp_path("smaug_pedidos_rt.csv")
 ds:to_csv(tmp, { sep = ";" })
 local ds2 = smaug.read_csv(tmp, { sep = ";" })
 check(ds2:nrows() == 916,               "roundtrip: 916 linhas")
@@ -166,7 +175,7 @@ check(ds2:col("(R$)"):get(1) == "34,12",           "roundtrip: (R$)[1] preservad
 -- ================================================================
 -- Roundtrip JSON
 -- ================================================================
-local tmpj = "/tmp/smaug_pedidos_rt.json"
+local tmpj = tmp_path("smaug_pedidos_rt.json")
 ds:to_json(tmpj)
 local ds3 = smaug.read_json(tmpj)
 check(ds3:nrows() == 916,              "json roundtrip: 916 linhas")

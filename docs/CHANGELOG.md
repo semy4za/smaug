@@ -6,6 +6,117 @@ decisões, achados, motivações.
 
 ---
 
+## 2026-06-15 — Bloco F.5 (acesso e ergonomia)
+
+### Adicionado
+
+- **Series:** `at`/`iat` — acesso escalar posicional. Implementado via proxy no
+  `__index` que suporta tanto indexação (`s.at[i]`) quanto chamada (`s.at(i)`),
+  cobrindo a sintaxe pandas-like e a forma idiomática Lua. Em Series 1-D, `at` e
+  `iat` são equivalentes (índice = posição). Ambos delegam a `get`, herdando o
+  guard de bounds.
+- **DataSet:** `at(i, col)` (célula por nome) e `iat(i, ci)` (célula por índice
+  posicional de coluna); `insert(loc, name, series)` (insere em posição 1-based,
+  desloca as seguintes); `to_dict([orient])` (`"columns"` default ou `"records"`);
+  `from_dict(t, [orient])` (construtor com inferência de dtype por coluna);
+  `to_markdown()` (GitHub-flavored, sem o limite de 10 linhas do `__tostring`);
+  `to_string([opts])` (texto plano com `max_rows` opcional).
+
+**Decisões de contrato:**
+- `at`/`iat` no DataSet são métodos chamáveis (`df:at(i, col)`), não indexers de
+  duplo subscrito — Lua não tem `tbl[i, col]`. A forma de chamada é a tradução
+  fiel e sem ambiguidade.
+- `from_dict` orient `"columns"`: ordem das colunas é indefinida em Lua (chaves
+  de tabela), então aceita `t._order` (lista de nomes) para ordem determinística;
+  sem ele, ordena alfabeticamente. Orient `"records"`: colunas pela união das
+  chaves (1ª aparição); chave ausente em um registro → NA naquela linha.
+- `from_dict` infere dtype por coluna: string domina; senão bool puro; senão
+  float se houver não-inteiro; senão int64; coluna toda-nula → string.
+
+`test_access.lua` (54 checks), incluindo roundtrip `to_dict→from_dict`, bordas de
+`insert` e erros de acesso.
+
+### Docs
+
+`API_INDEX.md` — Eixo 12 mantém 100%: `DataSet.methods` 40→46 (`from_dict` é
+função de classe, documentada à parte como `from_columns`). Roadmap marca F.5
+`[Done]`.
+
+---
+
+## 2026-06-15 — Portabilidade de I/O + Blocos F.3 e F.4 + sync de builds
+
+### Corrigido — testes de I/O com path hardcoded (Windows)
+
+`windows_build.ps1` falhou em `test_io_c`, `test_io` e `test_io_real`: os testes
+escreviam em `/tmp/...`, que não existe no Windows/UCRT64. Não era regressão da
+biblioteca — `to_csv`/`smaug_write_csv` reportaram fielmente a falha de escrita.
+Introduzido helper `tmp_path` (um em C, um em Lua) que resolve o diretório
+temporário via `TMPDIR`→`TMP`→`TEMP`→`/tmp`, montando o caminho com separador
+`/` (aceito pela CRT do Windows e pelo POSIX). Detalhe que exigiu cuidado:
+`os.getenv` devolve `""` (truthy em Lua), não `nil`, para variável vazia — o
+helper trata string vazia como ausente, espelhando o `!dir || !*dir` do C.
+Validado em três cenários: fallback `/tmp`, `TEMP` setado, e variável vazia.
+
+### Adicionado — Bloco F.3: accessor `.dt` estendido
+
+Toda a lógica de calendário derivada vive no Ring 1 (Lua), reaproveitando as
+primitivas C (`year`/`month`/`day`/.../`from_parts`/`truncate`/`add_ms`). Nenhuma
+mudança no Ring 0 — funções de calendário derivadas são responsabilidade do
+frontend.
+
+- **Predicados** (→ `Series<bool>`): `is_month_start`/`is_month_end`,
+  `is_quarter_start`/`is_quarter_end`, `is_year_start`/`is_year_end`,
+  `is_leap_year` (regra gregoriana completa, incluindo a exceção secular ÷400).
+- **Atributos:** `days_in_month` (→ int64), `month_name`/`day_name` (inglês fixo).
+- **Período:** `round(unit)`/`ceil(unit)` complementam o `truncate` (= floor) já
+  existente. `ceil` retorna o próprio valor quando já alinhado; `round` usa
+  half-up no empate (consistente com pandas). `next_period` usa `from_parts`
+  para unidades de calendário (M/Q/Y, comprimento variável) e `add_ms` para as
+  de comprimento fixo.
+- **`normalize()`:** zera a hora (= `truncate("D")`), nome herdado do pandas.
+- **`strftime(fmt)`:** tokens `%Y %y %m %d %H %M %S %I %p %j %B %b %A %a %%`;
+  token desconhecido é mantido literal (com o `%`).
+
+`test_dt_extended.lua` (65 checks), com casos seculares (1900 não-bissexto, 2000
+bissexto), empates de round e meia-noite/meio-dia para `%I`/`%p`.
+
+### Adicionado — Bloco F.4: accessor `.str` Tier C
+
+ASCII puro, sem regex, sem Unicode — consistente com Tier A/B. Reaproveita os
+helpers `str_map` (→ Series<string>) e `bool_map` (→ Series<bool>) existentes.
+
+- **count(sub):** ocorrências literais não-sobrepostas → int64. `sub` vazio é
+  erro (contagem indefinida / risco de loop).
+- **Predicados** (→ Series<bool>): `isalnum`/`isalpha`/`isdigit`/`isspace`/
+  `islower`/`isupper`. Semântica Python: string vazia → false; `islower`/
+  `isupper` exigem ao menos uma letra e nenhuma da caixa oposta.
+- **removeprefix/removesuffix:** remoção literal de afixo, no máximo uma vez,
+  idempotente quando não casa.
+- **capitalize/title/swapcase:** caixas ASCII. `title` trata qualquer não-letra
+  como separador de palavra.
+- **join(sep):** atalho de `:cat` (mesma saída: string Lua única). Mantido pelo
+  nome familiar de pandas/Python.
+
+`test_str_tier_c.lua` (61 checks), incluindo vazias, nulos, não-ASCII em `title`
+(não quebra), e contagem não-sobreposta.
+
+### Sincronização das três fontes de build
+
+`windows_build.ps1` estava atrás em duas dimensões: faltava `test_datetime_c`
+(C) e seis suítes Lua (`test_datetime`, `test_categorical`, `test_completeness`,
+`test_dt_extended`, `test_stats`, `test_predicates`). Alinhado ao Makefile
+canônico — as três fontes (`Makefile`, `build.sh`, `windows_build.ps1`) agora
+rodam o conjunto idêntico, verificado por diff: 9 binários C plain + allocfail +
+stress, e 26 suítes Lua.
+
+### Docs
+
+`API_INDEX.md` — Eixo 12 mantém 100%: `SeriesDT:*` 19→33, `StrProxy:*` 15→28.
+Roadmap marca F.3 e F.4 `[Done]`.
+
+---
+
 ## 2026-06-15 — Completude de paridade + Blocos F.1 e F.2
 
 Sessão de fechamento de lacunas antes de avançar o enriquecimento dos núcleos.

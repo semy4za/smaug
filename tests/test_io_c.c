@@ -29,6 +29,18 @@ static int g_fail = 0;
 #define CHECK_STR(s, expected, msg) \
     CHECK((s) && strncmp((s), (expected), strlen(expected)) == 0, msg)
 
+/* Diretório temporário portátil: respeita TMPDIR/TMP/TEMP (Windows usa TEMP),
+ * com fallback "/tmp". Monta "<dir>/<name>" em buf. Usa '/' como separador,
+ * aceito tanto pela CRT do Windows quanto pelo POSIX. */
+static const char *tmp_path(char *buf, size_t size, const char *name) {
+    const char *dir = getenv("TMPDIR");
+    if (!dir || !*dir) dir = getenv("TMP");
+    if (!dir || !*dir) dir = getenv("TEMP");
+    if (!dir || !*dir) dir = "/tmp";
+    snprintf(buf, size, "%s/%s", dir, name);
+    return buf;
+}
+
 /* ===================================================================
    Helpers
    =================================================================== */
@@ -459,11 +471,13 @@ static void test_csv_write_file(void) {
     t.nrows   = 2;
 
     smaug_csv_write_opts_t wo = smaug_csv_write_default_opts();
-    int rc = smaug_write_csv("/tmp/smaug_test_c.csv", &t, &wo);
+    char path[1024];
+    tmp_path(path, sizeof(path), "smaug_test_c.csv");
+    int rc = smaug_write_csv(path, &t, &wo);
     CHECK(rc == 0, "write file: sucesso");
 
     /* ler de volta e verificar */
-    smaug_table_t *t2 = smaug_read_csv("/tmp/smaug_test_c.csv", NULL);
+    smaug_table_t *t2 = smaug_read_csv(path, NULL);
     CHECK(t2 && !t2->error,       "write file roundtrip: sem erro");
     CHECK(t2->nrows == 2,         "write file roundtrip: 2 linhas");
     CHECK(get_i64(t2, 0, 1) == 2,"write file roundtrip: v[1]=2");
@@ -626,10 +640,12 @@ static void test_json_write_file(void) {
     const char *j = "[{\"a\":1,\"b\":\"x\"}]";
     smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
     smaug_json_write_opts_t wo = {0};
-    int rc = smaug_write_json("/tmp/smaug_test_c.json", t, &wo);
+    char path[1024];
+    tmp_path(path, sizeof(path), "smaug_test_c.json");
+    int rc = smaug_write_json(path, t, &wo);
     CHECK(rc == 0, "JSON write file: sucesso");
 
-    smaug_table_t *t2 = smaug_read_json("/tmp/smaug_test_c.json");
+    smaug_table_t *t2 = smaug_read_json(path);
     CHECK(t2 && !t2->error,       "JSON file roundtrip: sem erro");
     CHECK(t2->nrows == 1,         "JSON file roundtrip: 1 linha");
     CHECK(get_i64(t2, 0, 0) == 1,"JSON file roundtrip: a[0]=1");
