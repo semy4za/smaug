@@ -200,6 +200,16 @@ if ($luajit -and -not $SkipLua) {
     Write-Host "(Lua pulado: luajit nao encontrado. Rode com -Setup.)" -ForegroundColor Yellow
 }
 
+# Paridade da API (indicador permanente, nunca quebra build)
+if ($luajit -and (Test-Path "scripts\parity\parity.ps1")) {
+    Write-Host ""
+    Write-Host "== Paridade da API ==" -ForegroundColor Cyan
+    & powershell -ExecutionPolicy Bypass -File "scripts\parity\parity.ps1"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Aviso: parity.ps1 reportou problemas (nao bloqueia o build)." -ForegroundColor Yellow
+    }
+}
+
 # Regenera o MANIFEST.txt para refletir o estado atual do repo.
 if (-not $SkipManifest) {
     Write-Host ""

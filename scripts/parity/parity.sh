@@ -100,5 +100,6 @@ echo
 echo "Relatório: $OUT"
 if [ ${#FAILED[@]} -gt 0 ]; then
     echo "Eixos que falharam: ${FAILED[*]}"
-    exit 1
 fi
+# Indicador, não veredito: NUNCA quebra build, mesmo se algum eixo falhar.
+exit 0

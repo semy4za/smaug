@@ -11,7 +11,9 @@
 #   4. Roda os testes Lua com luajit
 #   5. (se --valgrind)  roda cada binario de teste sob Valgrind
 #   6. (se --coverage)  gera docs/COVERAGE.md via gcov
-#   7. Regenera docs/MANIFEST.txt
+#   7. Roda scripts/parity/parity.sh — gera docs/PARITY_REPORT.md
+#      (indicador, nunca quebra o build)
+#   8. Regenera docs/MANIFEST.txt
 #
 # Uso:
 #   bash scripts/build.sh                  # tudo (sem Valgrind/coverage)
@@ -259,7 +261,16 @@ if [[ $DO_COVERAGE -eq 1 && $HAS_GCOV -eq 1 ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 7. Manifest
+# 7. Paridade da API (indicador permanente, nunca quebra build)
+# ---------------------------------------------------------------------------
+if [[ -f scripts/parity/parity.sh && $SKIP_LUA -eq 0 ]]; then
+    echo ""
+    info "== Paridade da API =="
+    bash scripts/parity/parity.sh || warn "  (parity reportou problemas — ver docs/PARITY_REPORT.md)"
+fi
+
+# ---------------------------------------------------------------------------
+# 8. Manifest
 # ---------------------------------------------------------------------------
 if [[ $SKIP_MANIFEST -eq 0 ]]; then
     echo ""
