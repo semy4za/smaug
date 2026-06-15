@@ -38,6 +38,23 @@ local function is_categorical(x)
     return type(x) == "table" and x._dtype == "categorical"
 end
 
+-- Igualdade estrutural de duas colunas (Series, Series<bool> ou Categorical).
+-- Para Series usa o :equals nativo (NaN estrutural). Para os demais, compara
+-- dtype, tamanho e valores posição a posição (nulls incluídos).
+local function column_equals(a, b)
+    if type(a) ~= "table" or type(b) ~= "table" then return false end
+    if a._dtype ~= b._dtype then return false end
+    if is_series(a) and is_series(b) then return a:equals(b) end
+    -- bool / categorical: comparação elemento a elemento
+    if a:len() ~= b:len() then return false end
+    for i = 1, a:len() do
+        local va, vb = a:get(i), b:get(i)
+        if (va == nil) ~= (vb == nil) then return false end
+        if va ~= nil and va ~= vb then return false end
+    end
+    return true
+end
+
 -- =====================================================================
 -- Construção
 -- =====================================================================
@@ -1221,6 +1238,127 @@ function methods.nunique(self)
         t[name] = self:column(name):nunique()
     end
     return t
+end
+
+-- =====================================================================
+-- F.1 — Pacote estatístico (DataSet): corr / cov
+-- Matriz N×N entre as colunas numéricas, retornada como DataSet.
+-- Coluna identificadora "__index__" (string) + uma coluna float64 por
+-- variável numérica. Célula [i][j] = corr/cov(col_i, col_j).
+-- Colunas não-numéricas são ignoradas. Diagonal de corr = 1 (exceto
+-- variância zero → NaN, herdado de Series:corr).
+-- =====================================================================
+
+-- Helper: nomes das colunas numéricas (float64/int64), na ordem original.
+local function numeric_col_names(self)
+    local names = {}
+    for _, n in ipairs(self._col_names) do
+        local dt = self._columns[n]._dtype
+        if dt == "float64" or dt == "int64" then
+            names[#names + 1] = n
+        end
+    end
+    return names
+end
+
+-- Helper comum a corr/cov: monta a matriz aplicando `pair_fn` (Series, Series)→número.
+local function _stat_matrix(self, pair_fn, suffix)
+    local names = numeric_col_names(self)
+    if #names == 0 then
+        error("smaug: "..suffix.."() requer ao menos uma coluna numérica", 3)
+    end
+    local result = DataSet.new(self._name .. "_" .. suffix)
+    -- coluna identificadora: nome de cada variável (linhas da matriz)
+    result:add_column("__index__", Series.from_table(names, "string", "__index__"))
+    -- uma coluna por variável: valores da estatística contra cada linha
+    for _, cj in ipairs(names) do
+        local col_j = self._columns[cj]
+        local vals  = {}
+        for i, ci in ipairs(names) do
+            vals[i] = pair_fn(self._columns[ci], col_j)
+        end
+        result:add_column(cj, Series.from_table(vals, "float64", cj))
+    end
+    return result
+end
+
+-- corr(): matriz de correlação de Pearson entre colunas numéricas.
+function methods.corr(self)
+    return _stat_matrix(self, function(a, b) return a:corr(b) end, "corr")
+end
+
+-- cov(): matriz de covariância amostral entre colunas numéricas.
+function methods.cov(self)
+    return _stat_matrix(self, function(a, b) return a:cov(b) end, "cov")
+end
+
+-- =====================================================================
+-- F.2 — Predicados (DataSet): equals / compare
+-- =====================================================================
+
+-- equals(other): igualdade estrutural entre DataSets — mesmas colunas (nomes e
+-- ordem), mesmos dtypes, mesmo número de linhas, e todas as colunas equals.
+function methods.equals(self, other)
+    if getmetatable(other) ~= DataSet then return false end
+    if self:ncols() ~= other:ncols() then return false end
+    if self:nrows() ~= other:nrows() then return false end
+    local sn, on = self._col_names, other._col_names
+    for i = 1, #sn do
+        if sn[i] ~= on[i] then return false end   -- nomes e ordem
+    end
+    for _, n in ipairs(sn) do
+        local a, b = self._columns[n], other._columns[n]
+        -- delega ao equals da coluna; categorical tem seu próprio equals abaixo
+        if not column_equals(a, b) then return false end
+    end
+    return true
+end
+
+-- compare(other): diferenças célula a célula → DataSet {linha, coluna, self, other}.
+-- Só inclui células que diferem. DataSet vazio se idênticos.
+-- Exige mesma estrutura de colunas (nomes, ordem) e nrows.
+function methods.compare(self, other)
+    if getmetatable(other) ~= DataSet then
+        error("smaug: compare() espera outro DataSet", 2)
+    end
+    if self:ncols() ~= other:ncols() or self:nrows() ~= other:nrows() then
+        error("smaug: compare() — DataSets de formas diferentes", 2)
+    end
+    local sn, on = self._col_names, other._col_names
+    for i = 1, #sn do
+        if sn[i] ~= on[i] then
+            error("smaug: compare() — colunas diferentes ('"..sn[i].."' vs '"..on[i].."')", 2)
+        end
+    end
+    local NA = Series.NA
+    local rows, cols, self_vals, other_vals = {}, {}, {}, {}
+    for _, name in ipairs(sn) do
+        local a, b = self._columns[name], other._columns[name]
+        for i = 1, self:nrows() do
+            local va, vb = a:get(i), b:get(i)
+            local differ
+            if (va == nil) ~= (vb == nil) then
+                differ = true
+            elseif va == nil then
+                differ = false
+            else
+                differ = (va ~= vb) and not (va ~= va and vb ~= vb)  -- NaN estrutural
+            end
+            if differ then
+                local m = #rows + 1
+                rows[m]       = i
+                cols[m]       = name
+                self_vals[m]  = (va == nil) and NA or tostring(va)
+                other_vals[m] = (vb == nil) and NA or tostring(vb)
+            end
+        end
+    end
+    return DataSet.from_columns({
+        {"linha",  rows,       "int64"},
+        {"coluna", cols,       "string"},
+        {"self",   self_vals,  "string"},
+        {"other",  other_vals, "string"},
+    }, self._name .. "_compare")
 end
 
 -- =====================================================================

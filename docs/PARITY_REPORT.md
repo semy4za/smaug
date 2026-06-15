@@ -10,7 +10,7 @@ Convenção de status:
 - ⚠️ ausência sem registro — suspeita, requer revisão humana
 - ❌ inconsistência clara — gap real
 
-Gerado em: 2026-06-15 03:18:42 UTC
+Gerado em: 2026-06-15 04:20:31 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -22,25 +22,29 @@ Cada linha = um método rastreado em `Series.methods` ou `CategoricalSeries`. Co
 | `all` | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ |
 | `any` | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ |
 | `append` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `argmax` | ✅ | ✅ | ⚪ | ⚪ | ⚠️ | ⚪ |
-| `argmin` | ✅ | ✅ | ⚪ | ⚪ | ⚠️ | ⚪ |
+| `argmax` | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ |
+| `argmin` | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ |
 | `argsort` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `astype` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `bfill` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `autocorr` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
+| `bfill` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `clip` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | `clone` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `corr` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
 | `count_nonnull` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `count_true` | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ |
-| `cummax` | ✅ | ✅ | ⚪ | ⚪ | ⚠️ | ⚪ |
-| `cummin` | ✅ | ✅ | ⚪ | ⚪ | ⚠️ | ⚪ |
+| `cov` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
+| `cummax` | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ |
+| `cummin` | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ |
 | `cumprod` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | `cumsum` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | `describe` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `diff` | ✅ | ✅ | ⚪ | ⚪ | ⚠️ | ⚪ |
+| `diff` | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ |
+| `dot` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
 | `dropna` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `eq` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `expanding` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
-| `ffill` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `ffill` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `fillna` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `filter` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ge` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -48,7 +52,7 @@ Cada linha = um método rastreado em `Series.methods` ou `CategoricalSeries`. Co
 | `gt` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `head` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `is_null` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `isna` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `isna` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `kurtosis` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | `land` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚪ |
 | `le` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -58,28 +62,29 @@ Cada linha = um método rastreado em `Series.methods` ou `CategoricalSeries`. Co
 | `lt` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `lxor` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚪ |
 | `mad` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
-| `map` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
-| `mask` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
-| `max` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `map` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `mask` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `max` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `mean` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚪ |
-| `median` | ✅ | ✅ | ⚪ | ⚪ | ⚠️ | ⚪ |
-| `min` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `median` | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ |
+| `min` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `mode` | ✅ | ✅ | ⚪ | ✅ | ✅ | ⚪ |
 | `ne` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `nlargest` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
-| `notna` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `notna` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `nsmallest` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | `nunique` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `pct_change` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
 | `pct_rank` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚪ |
 | `prod` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
-| `quantile` | ✅ | ✅ | ⚪ | ⚪ | ⚠️ | ⚪ |
+| `quantile` | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ |
 | `rank` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | `rolling` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | `round` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | `sem` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | `set` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `set_null` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `shift` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `shift` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `size` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `skew` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | `sort` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -92,9 +97,9 @@ Cada linha = um método rastreado em `Series.methods` ou `CategoricalSeries`. Co
 | `value_counts` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `var` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚪ |
 | `view` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚪ |
-| `where` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `where` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
-**Sumário Eixo 1:** 75 métodos × 6 dtypes = 450 células · ✅ 321 (71.3%) · ⚪ 112 (24.9%) · ⚠️ 17 (3.8%)
+**Sumário Eixo 1:** 80 métodos × 6 dtypes = 480 células · ✅ 348 (72.5%) · ⚪ 112 (23.3%) · ⚠️ 20 (4.2%)
 
 ## Eixo 2 — Paridade Series ↔ DataSet
 
@@ -112,20 +117,24 @@ Métodos que existem em cada lado. Algumas assimetrias são intencionais (ex: `S
 | `argsort` | ✅ | — | só em Series |
 | `assign` | — | ✅ | só em DataSet |
 | `astype` | ✅ | — | só em Series |
+| `autocorr` | ✅ | — | só em Series |
 | `bfill` | ✅ | — | só em Series |
 | `clip` | ✅ | — | só em Series |
 | `clone` | ✅ | — | só em Series |
 | `column` | — | ✅ | só em DataSet |
 | `columns` | — | ✅ | só em DataSet |
 | `concat` | — | ✅ | só em DataSet |
+| `corr` | ✅ | ✅ |  |
 | `count_nonnull` | ✅ | — | só em Series |
 | `count_true` | ✅ | — | só em Series |
+| `cov` | ✅ | ✅ |  |
 | `cummax` | ✅ | — | só em Series |
 | `cummin` | ✅ | — | só em Series |
 | `cumprod` | ✅ | — | só em Series |
 | `cumsum` | ✅ | — | só em Series |
 | `describe` | ✅ | ✅ |  |
 | `diff` | ✅ | — | só em Series |
+| `dot` | ✅ | — | só em Series |
 | `drop_column` | — | ✅ | só em DataSet |
 | `dropna` | ✅ | ✅ |  |
 | `dtypes` | — | ✅ | só em DataSet |
@@ -169,6 +178,7 @@ Métodos que existem em cada lado. Algumas assimetrias são intencionais (ex: `S
 | `nrows` | — | ✅ | só em DataSet |
 | `nsmallest` | ✅ | — | só em Series |
 | `nunique` | ✅ | ✅ |  |
+| `pct_change` | ✅ | — | só em Series |
 | `pct_rank` | ✅ | — | só em Series |
 | `pivot` | — | ✅ | só em DataSet |
 | `pivot_table` | — | ✅ | só em DataSet |
@@ -203,7 +213,7 @@ Métodos que existem em cada lado. Algumas assimetrias são intencionais (ex: `S
 | `view` | ✅ | — | só em Series |
 | `where` | ✅ | — | só em Series |
 
-**Sumário Eixo 2:** 10 métodos em ambos · 64 só em Series · 26 só em DataSet
+**Sumário Eixo 2:** 12 métodos em ambos · 67 só em Series · 26 só em DataSet
 
 ## Eixo 3 — Espelhamento C ↔ Lua
 
@@ -574,8 +584,8 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 147/147 erros com prefixo `smaug:` (100.0%)
-- `dataset.lua`: 70/70 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 162/162 erros com prefixo `smaug:` (100.0%)
+- `dataset.lua`: 71/71 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
 
@@ -648,10 +658,10 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 | categoria | total | documentados | faltam | % | detalhe |
 | :--- | :-: | :-: | :-: | :-: | :-: |
-| `Series.methods` | 74 | 65 | 9 | 88% | ⚠️ faltam: eq, ge, gt, le, lt, ne, std, sum, var |
-| `DataSet.methods` | 36 | 35 | 1 | 97% | ⚠️ faltam: concat |
-| `GroupBy:*` | 15 | 9 | 6 | 60% | ⚠️ faltam: count, first, last, std, sum, var |
-| `CategoricalSeries:*` | 31 | 24 | 7 | 77% | ⚠️ faltam: eq, from_table, ge, gt, le, lt, ne |
+| `Series.methods` | 79 | 79 | 0 | 100% | ✅ completo |
+| `DataSet.methods` | 38 | 38 | 0 | 100% | ✅ completo |
+| `GroupBy:*` | 15 | 15 | 0 | 100% | ✅ completo |
+| `CategoricalSeries:*` | 41 | 41 | 0 | 100% | ✅ completo |
 | `CatProxy:*` (.cat) | 6 | 6 | 0 | 100% | ✅ completo |
 | `StrProxy:*` (.str) | 15 | 15 | 0 | 100% | ✅ completo |
 | `SeriesDT:*` (.dt) | 19 | 19 | 0 | 100% | ✅ completo |
@@ -663,9 +673,9 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 **Contagem global de status no relatório:**
 
-- ✅ paridade: 716
+- ✅ paridade: 754
 - ⚪ exceção registrada: 115
-- ⚠️ suspeita (revisar): 98
+- ⚠️ suspeita (revisar): 82
 - ❌ inconsistência clara: 16
 
 

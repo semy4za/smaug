@@ -247,27 +247,27 @@ filtrada pelos princípios do Smaug:
 Os pacotes abaixo entram um por sessão, com teste dedicado, entrada no CHANGELOG
 e revisão de cobertura antes do próximo.
 
-#### F.1 — Pacote estatístico
+#### F.1 — Pacote estatístico `[Done]`
 
 | Item | Onde | Notas |
 |---|---|---|
-| `corr(other)` / `cov(other)` | `Series` | Pearson; NA pula par; vazio → NaN |
-| `corr()` / `cov()` | `DataSet` | Matriz N×N retornada como DataSet |
+| `corr(other)` / `cov(other)` | `Series` | Pearson; NA pula par; <2 pares ou var zero → NaN |
+| `corr()` / `cov()` | `DataSet` | Matriz N×N retornada como DataSet (coluna `__index__` + uma por variável) |
 | `autocorr([lag])` | `Series` | `:corr(:shift(lag))`; default lag=1 |
-| `dot(other)` | `Series` | Produto interno; null propaga |
-| `pct_change([periods])` | `Series` | `:diff()` normalizado pelo valor anterior |
+| `dot(other)` | `Series` | Produto interno; null propaga (resultado null) |
+| `pct_change([periods])` | `Series` | `:diff()` normalizado pelo valor anterior; divisor zero → null |
 
-#### F.2 — Pacote de predicados
+#### F.2 — Pacote de predicados `[Done]`
 
 | Item | Onde | Notas |
 |---|---|---|
-| `between(lo, hi, [inclusive])` | `Series` | `inclusive` ∈ {"both","left","right","neither"} |
-| `isin(values)` | `Series` | values = tabela Lua; retorna `Series<bool>` |
-| `is_unique` | `Series` | propriedade booleana (computa lazy ou direto) |
-| `is_monotonic_increasing` / `is_monotonic_decreasing` | `Series` | inclui strict e non-strict |
-| `equals(other)` | `Series` + `DataSet` | igualdade estrutural (tipos + tamanhos + valores + nulls) |
-| `compare(other)` | `Series` + `DataSet` | diff estruturado: DataSet `{i, self, other}` para diferenças |
-| `idxmin` / `idxmax` | `Series` | aliases de `argmin`/`argmax` (compatibilidade) |
+| `between(lo, hi, [inclusive])` | `Series` | `inclusive` ∈ {"both","left","right","neither"}; null propaga |
+| `isin(values)` | `Series` | values = tabela Lua; retorna `Series<bool>`; null propaga |
+| `is_unique` | `Series` | true se valores não-nulos distintos; nulos ignorados |
+| `is_monotonic_increasing` / `is_monotonic_decreasing` | `Series` | `[strict]` opcional; null quebra a ordem |
+| `equals(other)` | `Series` + `DataSet` | igualdade estrutural (tipos + tamanhos + valores + nulls); NaN==NaN |
+| `compare(other)` | `Series` + `DataSet` | diff estruturado: Series `{i,self,other}`, DataSet `{linha,coluna,self,other}` |
+| `idxmin` / `idxmax` | `Series` | aliases de `argmin`/`argmax` |
 | `first_valid_index` / `last_valid_index` | `Series` | índice 1-based do 1º / último não-null |
 
 #### F.3 — Pacote `.dt` estendido
@@ -328,8 +328,8 @@ permanecem em v1.5 como `.str` Tier D.
 - [x] `test_io_real.lua` para cotações (float64 alta precisão, SHIB).
 - [x] Bugs Valgrind dos parsers I/O corrigidos.
 - [x] Auditoria de docs concluída.
-- [ ] Bloco F.1 — Pacote estatístico.
-- [ ] Bloco F.2 — Pacote de predicados.
+- [x] Bloco F.1 — Pacote estatístico.
+- [x] Bloco F.2 — Pacote de predicados.
 - [ ] Bloco F.3 — Pacote `.dt` estendido.
 - [ ] Bloco F.4 — Pacote `.str` Tier C (sem regex/Unicode).
 - [ ] Bloco F.5 — Pacote de acesso e ergonomia.

@@ -6,6 +6,87 @@ decisões, achados, motivações.
 
 ---
 
+## 2026-06-15 — Completude de paridade + Blocos F.1 e F.2
+
+Sessão de fechamento de lacunas antes de avançar o enriquecimento dos núcleos.
+
+### Corrigido — checkup de build e oráculos de teste
+
+Auditoria do `Makefile` e do `build.sh` expôs que `make test`/`make valgrind`
+não exercitavam `test_io_c` nem `test_datetime_c` (375 checks C fora do CI), e
+que `LUA_TESTS` cobria 8 de 21 suítes (362k+ checks ignorados pelo `make`). As
+duas listas foram completadas e sincronizadas entre `Makefile` e `build.sh`.
+Removido um warning `-Wunused-variable` em `test_io_c.c:315` (`s` capturada e
+nunca usada). Build agora zero-warning também nos binários de teste.
+
+### Adicionado — completude de métodos em datetime e categorical
+
+Auditoria do `PARITY_REPORT.md` (Eixo 1) apontou 17 ausências sem registro.
+Decisão: nesta fase de completude, **implementar**, não registrar exceção.
+
+- **datetime (7):** `argmin`/`argmax`/`cummin`/`cummax`/`median`/`quantile`
+  passam a aceitar datetime — operam sobre epoch_ms (já numérico), guard
+  estendido. `diff` em datetime retorna `Series<int64>` (duração em ms, não
+  timestamp — diferença de dois instantes é uma duração).
+- **categorical (10):** `isna`/`notna` (aliases), `min`/`max` (lexicográfico
+  sobre labels), `ffill`/`bfill` (opera ao nível de codes), `shift`, `map`
+  (retorna Series do dtype inferido), `where`/`mask` (seleção condicional,
+  retornam novo CategoricalSeries).
+
+`test_completeness.lua` (93 checks) pina cada comportamento, incluindo nulos e
+erros de bounds.
+
+### Adicionado — Bloco F.1: pacote estatístico
+
+- **Series:** `corr(other)` (Pearson ∈ [-1,1]), `cov(other)` (covariância
+  amostral ÷ n-1), `autocorr([lag])` = `:corr(:shift(lag))`, `dot(other)`
+  (produto interno), `pct_change([periods])`.
+- **DataSet:** `corr()` / `cov()` retornam matriz N×N como DataSet (coluna
+  identificadora `__index__` + uma coluna float64 por variável numérica;
+  colunas não-numéricas ignoradas).
+
+**Decisões de contrato:**
+- `corr`/`cov` **pulam** pares onde qualquer operando é null (semântica pandas);
+  menos de 2 pares válidos ou variância zero → NaN.
+- `dot` **propaga** null (qualquer par com null → resultado null) — diferente de
+  corr/cov, porque produto interno não tem semântica de "ignorar" sem mudar o
+  significado do resultado.
+- `pct_change` com divisor zero → null (não Inf), por previsibilidade.
+
+`test_stats.lua` (60 checks) com valores de referência calculados à mão.
+
+### Adicionado — Bloco F.2: pacote de predicados
+
+- **Series:** `between(lo, hi, [inclusive])` (inclusive ∈ {both,left,right,
+  neither}), `isin(values)`, `is_unique()`, `is_monotonic_increasing/
+  decreasing([strict])`, `equals(other)` (igualdade estrutural com NaN==NaN),
+  `compare(other)` (diferenças → DataSet `{i,self,other}`), `idxmin`/`idxmax`
+  (aliases de argmin/argmax), `first_valid_index`/`last_valid_index`.
+- **DataSet:** `equals(other)` (colunas+ordem+dtypes+valores), `compare(other)`
+  (diferenças célula a célula → DataSet `{linha,coluna,self,other}`).
+
+**Decisões de contrato:**
+- `between`/`isin` propagam null (resultado null naquela posição).
+- `is_monotonic_*`: qualquer null quebra a monotonicidade (sem ordem definida
+  com o vizinho). Série vazia/de 1 elemento é monotônica (vacuamente).
+- `equals`/`compare` tratam NaN como estruturalmente igual a NaN (diferente de
+  IEEE 754) — a pergunta é "são a mesma série", não "são numericamente iguais".
+- `compare` (Series) retorna só as posições que diferem; DataSet vazio se
+  idênticas. `compare` (DataSet) normaliza `self`/`other` para string porque as
+  colunas têm dtypes heterogêneos.
+
+`test_predicates.lua` (78 checks).
+
+### Docs
+
+`API_INDEX.md` atualizado — Eixo 12 (sincronização docs↔código) de 88/97/60/77%
+para **100% nas 7 categorias** (206 métodos documentados). Reduções e
+comparações antes agrupadas em uma linha (`:sum/mean/...`) foram separadas em
+entradas individuais para o checker detectar por nome exato. Roadmap marca F.1
+como `[Done]`.
+
+---
+
 ## 2026-06-14 — Decisão: enriquecimento dos núcleos entra na v1.0
 
 Após auditoria comparativa contra a API pública do pandas (Series + DataFrame),

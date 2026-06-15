@@ -136,7 +136,12 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `:is_null(i)` / `:set_null(i)` | nulos |
 | `:append(v)` | adiciona ao fim (chainable) |
 | `:len()` / `:size()` | tamanho |
-| `:sum/mean/min/max/var/std([ignore_na])` | reduções (default ignore_na=true) |
+| `:sum([ignore_na])` | soma; ignore_na=true por padrão |
+| `:mean([ignore_na])` | média |
+| `:min([ignore_na])` | mínimo |
+| `:max([ignore_na])` | máximo |
+| `:var([ignore_na])` | variância populacional (÷N) |
+| `:std([ignore_na])` | desvio padrão populacional (÷N) |
 | `:count_nonnull()` | nº de não-nulos |
 | `:clone()` | cópia independente |
 | `:sort(asc)` / `:argsort(asc)` | ordenar / permutação |
@@ -147,7 +152,9 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `:fillna(value)` | nova Series com NULLs→value; NaN intacto |
 | `:to_table([na])` | → tabela Lua |
 | `:describe()` | resumo estatístico |
-| `:gt/lt/eq/ge/le/ne(k)` | comparação → `Series<bool>` |
+| `:gt(k)` / `:lt(k)` | maior / menor que k → `Series<bool>` |
+| `:eq(k)` / `:ne(k)` | igual / diferente de k → `Series<bool>` |
+| `:ge(k)` / `:le(k)` | maior-igual / menor-igual → `Series<bool>` |
 | `:filter(mask)` | `Series<bool>` como máscara → nova Series filtrada |
 | `:map(fn, [dtype])` | transforma elemento a elemento |
 
@@ -171,8 +178,8 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 
 | Método | O que faz |
 |--------|-----------|
-| `:median([ignore_na])` | mediana |
-| `:quantile(q, [ignore_na])` | percentil q ∈ [0, 1] (interpolação linear) |
+| `:median([ignore_na])` | mediana; suporta f64, i64 e datetime (retorna epoch_ms) |
+| `:quantile(q, [ignore_na])` | percentil q ∈ [0, 1] (interpolação linear); suporta f64, i64 e datetime |
 | `:mode()` | valor mais frequente; primeira aparição em empates |
 | `:prod([ignore_na])` | produto |
 | `:rank([method])` | rank (`average`/`min`/`max`/`dense`); default `average` |
@@ -181,6 +188,30 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `:mad()` | desvio absoluto mediano |
 | `:sem()` | erro padrão da média = std / √n |
 | `:isna(i)` / `:notna(i)` | alias de `:is_null(i)` / não-null |
+
+**Estatística bivariada e variação:**
+
+| Método | O que faz |
+|--------|-----------|
+| `:corr(other)` | correlação de Pearson ∈ [-1,1]; pares com null pulados; <2 pares ou var zero → NaN |
+| `:cov(other)` | covariância amostral (÷ n-1); pares com null pulados; <2 pares → NaN |
+| `:autocorr([lag])` | autocorrelação = `:corr(:shift(lag))`; default lag=1 |
+| `:dot(other)` | produto interno Σ xᵢ·yᵢ; qualquer par com null → resultado null (propaga) |
+| `:pct_change([periods])` | variação percentual `(xᵢ-xᵢ₋ₚ)/xᵢ₋ₚ`; divisor zero → null; float64 |
+
+**Predicados e índices:**
+
+| Método | O que faz |
+|--------|-----------|
+| `:between(lo, hi, [inclusive])` | máscara lo ≤ x ≤ hi; inclusive ∈ {both,left,right,neither} → `Series<bool>` |
+| `:isin(values)` | true onde x ∈ values (tabela Lua) → `Series<bool>`; null propaga |
+| `:is_unique()` | true se valores não-nulos são todos distintos |
+| `:is_monotonic_increasing([strict])` | não-decrescente (ou estritamente crescente); null quebra |
+| `:is_monotonic_decreasing([strict])` | não-crescente (ou estritamente decrescente); null quebra |
+| `:equals(other)` | igualdade estrutural (dtype+tamanho+valores+nulls; NaN==NaN) → bool |
+| `:compare(other)` | diferenças posicionais → DataSet `{i, self, other}` |
+| `:idxmin()` / `:idxmax()` | alias de `:argmin()` / `:argmax()` |
+| `:first_valid_index()` / `:last_valid_index()` | índice 1-based do 1º / último não-nulo; nil se toda nula |
 
 **Valores ausentes:**
 
@@ -198,7 +229,7 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `Series.ifelse(cond, a, b)` | vetorizado: a onde cond=true, b senão |
 | `:nlargest(n)` | n maiores valores |
 | `:nsmallest(n)` | n menores valores |
-| `:argmin()` / `:argmax()` | índice (1-based) do mínimo/máximo |
+| `:argmin()` / `:argmax()` | índice (1-based) do mínimo/máximo; suporta f64, i64 e datetime |
 
 **Janela temporal:**
 
@@ -206,8 +237,8 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 |--------|-----------|
 | `:cumsum()` | soma cumulativa (nulos propagam) |
 | `:cumprod()` | produto cumulativo (nulos propagam) |
-| `:cummin()` / `:cummax()` | mínimo/máximo cumulativo |
-| `:diff([periods])` | diferença entre elemento i e i-periods |
+| `:cummin()` / `:cummax()` | mínimo/máximo cumulativo; suporta f64, i64 e datetime |
+| `:diff([periods])` | diferença entre elemento i e i-periods; em datetime retorna `Series<int64>` (ms) |
 | `:shift([periods])` | desloca valores |
 | `:rolling(w):sum/mean/min/max/std/var/count/median/quantile/min_periods()` | agregação em janela |
 | `:expanding([min_periods]):sum/mean/min/max/std/var/count/median()` | janela crescente |
@@ -309,19 +340,34 @@ Series.Categorical.from_codes(codes_arr, levels_arr, [name], [n])
 `from_codes` aceita `NA` como marcador de null e `n` explícito para arrays
 com `nil` no meio (limitação do `#` do Lua).
 
+| Factory | O que faz |
+|---------|-----------|
+| `:from_table(arr, [name])` | `CategoricalSeries.from_table` — constrói a partir de tabela Lua |
+| `:from_codes(codes_arr, levels_arr, [name], [n])` | `CategoricalSeries.from_codes` — constrói via codes explícitos |
+
 **Métodos** (espelham `Series` quando faz sentido):
 
 | Método | O que faz |
 |--------|-----------|
 | `:get(i)` / `:set(i, v)` / `:set_null(i)` / `:is_null(i)` | acesso 1-based |
+| `:isna(i)` / `:notna(i)` | alias de `is_null` / `not is_null` |
 | `:append(v)` | adiciona ao fim (cria level se valor é novo) |
 | `:len()` / `:size()` / `:count_nonnull()` | dimensões |
 | `:clone()` / `:head(n)` / `:tail(n)` / `:take(idx)` | seleção (clone profundo de levels) |
 | `:filter(mask)` | `Series<bool>` → novo `CategoricalSeries` |
 | `:dropna()` / `:fillna(value)` | valores ausentes |
+| `:ffill()` | forward fill — propaga último label não-nulo anterior |
+| `:bfill()` | backward fill — propaga próximo label não-nulo seguinte |
+| `:shift([periods])` | desloca valores (default 1); posições descobertas → null |
 | `:sort(asc)` / `:argsort(asc)` | ordenação lexicográfica por label |
-| `:eq/ne/lt/le/gt/ge(target)` | comparação → `Series<bool>` |
+| `:eq(target)` / `:ne(target)` | igual / diferente → `Series<bool>` |
+| `:lt(target)` / `:le(target)` | menor / menor-igual → `Series<bool>` |
+| `:gt(target)` / `:ge(target)` | maior / maior-igual → `Series<bool>` |
+| `:min()` / `:max()` | menor / maior label lexicográfico entre não-nulos |
 | `:unique()` / `:nunique()` / `:value_counts()` | distintos |
+| `:map(fn, [dtype], [name])` | aplica fn a cada label; retorna `Series` do dtype inferido |
+| `:where(cond, other)` | mantém self onde cond=true; usa other senão → novo `CategoricalSeries` |
+| `:mask(cond, other)` | inverso de where |
 | `:describe()` | `{dtype, count, nulls, unique, levels, top, freq}` |
 | `:astype(dtype)` | → `string`, `int64`, `float64` (parseia labels), ou clone categorical |
 | `:to_table([na])` | → tabela Lua |
@@ -359,6 +405,10 @@ com `nil` no meio (limitação do `#` do Lua).
 | `:update_column(nome, series)` | substitui coluna existente |
 | `:assign(nome, fn_ou_series)` | adiciona/substitui coluna calculada |
 | `:nunique()` | `{coluna → nº distintos não-nulos}` |
+| `:corr()` | matriz N×N de correlação de Pearson entre colunas numéricas → DataSet |
+| `:cov()` | matriz N×N de covariância amostral entre colunas numéricas → DataSet |
+| `:equals(other)` | igualdade estrutural (colunas, ordem, dtypes, valores) → bool |
+| `:compare(other)` | diferenças célula a célula → DataSet `{linha, coluna, self, other}` |
 | `:rename(mapping)` | renomeia colunas em lote: `{old=new, ...}` → novo DataSet |
 | `:describe()` / `:to_table([na])` | inspeção |
 
@@ -366,13 +416,24 @@ com `nil` no meio (limitação do `#` do Lua).
 
 | Método | O que faz |
 |--------|-----------|
-| `:groupby(key):sum/mean/min/max/count(col)` | agrupamento; chave simples ou composta |
-| `:groupby(key):std/var/median/quantile(col)` | reduções estatísticas por grupo |
-| `:groupby(key):first/last/prod/nunique(col)` | seleções e agregações adicionais |
+| `:concat(other)` | empilha outro DataSet verticalmente (mesmo schema) |
+| `:groupby(key):sum(col)` | soma por grupo; chave simples ou composta |
+| `:groupby(key):mean(col)` | média por grupo |
+| `:groupby(key):min(col)` | mínimo por grupo |
+| `:groupby(key):max(col)` | máximo por grupo |
+| `:groupby(key):count()` | contagem de não-nulos por grupo |
+| `:groupby(key):std(col)` | desvio padrão por grupo |
+| `:groupby(key):var(col)` | variância por grupo |
+| `:groupby(key):median(col)` | mediana por grupo |
+| `:groupby(key):quantile(q, col)` | percentil por grupo |
+| `:groupby(key):first(col)` | primeiro valor por grupo |
+| `:groupby(key):last(col)` | último valor por grupo |
+| `:groupby(key):prod(col)` | produto por grupo |
+| `:groupby(key):nunique(col)` | distintos por grupo |
 | `:groupby(key):agg({col = fn \| {fn1, ...}})` | múltiplas agregações de uma vez |
 | `:groupby(key):transform(fn_name, col)` | broadcast do resultado de volta ao tamanho original |
 | `:join(other, on, [how], [suffixes])` | inner/left/right/outer; chave simples ou composta |
-| `smaug.concat({ds1, ds2, ...})` | empilha DataSets verticalmente |
+| `smaug.concat({ds1, ds2, ...})` | empilha lista de DataSets verticalmente |
 | `:pivot(index, columns, values)` | long → wide |
 | `:pivot_table(index, columns, values, [aggfunc])` | pivot com agregação (default `mean`) |
 | `:melt(id_vars, [value_vars], [var_name], [value_name])` | wide → long |

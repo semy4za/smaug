@@ -622,8 +622,8 @@ end
 -- diff(periods): diferença entre elemento i e elemento i-periods.
 -- Primeiros `periods` elementos são NA. Nulos propagam.
 function methods.diff(self, periods)
-    if self._dtype ~= "float64" and self._dtype ~= "int64" then
-        error("smaug: diff() requer dtype numérico, não '"..self._dtype.."'", 2)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" and self._dtype ~= "datetime" then
+        error("smaug: diff() requer dtype numérico ou datetime, não '"..self._dtype.."'", 2)
     end
     periods = periods or 1
     if periods < 1 then error("smaug: diff() requer periods >= 1", 2) end
@@ -639,7 +639,9 @@ function methods.diff(self, periods)
             vals[i] = (cur == nil or prev == nil) and NA or (cur - prev)
         end
     end
-    return Series.from_table(vals, self._dtype, self._name)
+    -- datetime: diferença de epochs → int64 (duração em ms, não timestamp)
+    local result_dtype = (self._dtype == "datetime") and "int64" or self._dtype
+    return Series.from_table(vals, result_dtype, self._name)
 end
 
 -- shift(periods): desloca os valores `periods` posições para frente (> 0) ou
@@ -659,6 +661,326 @@ function methods.shift(self, periods)
         end
     end
     return Series.from_table(vals, self._dtype, self._name)
+end
+
+-- =====================================================================
+-- F.1 — Pacote estatístico (Series)
+-- corr, cov, autocorr, dot, pct_change.
+-- Pearson para corr/cov; pares com qualquer null são ignorados.
+-- =====================================================================
+
+-- Helper: coleta os pares (x_i, y_i) onde AMBOS são não-nulos.
+-- Exige mesmo comprimento. Retorna duas tabelas paralelas xs, ys e o n efetivo.
+local function paired_nonnull(a, b)
+    if getmetatable(b) ~= Series then
+        error("smaug: esperado outra Series como argumento", 3)
+    end
+    if a:len() ~= b:len() then
+        error("smaug: séries de tamanhos diferentes ("..a:len().." vs "..b:len()..")", 3)
+    end
+    local xs, ys, m = {}, {}, 0
+    for i = 1, a:len() do
+        local x, y = a:get(i), b:get(i)
+        if x ~= nil and y ~= nil then
+            m = m + 1
+            xs[m] = x; ys[m] = y
+        end
+    end
+    return xs, ys, m
+end
+
+-- cov(other): covariância amostral de Pearson (divide por n-1).
+-- Pares com qualquer null são pulados. Menos de 2 pares válidos → NaN.
+function methods.cov(self, other)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: cov() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    local xs, ys, m = paired_nonnull(self, other)
+    if m < 2 then return 0/0 end   -- NaN: variância amostral indefinida
+    local mx, my = 0, 0
+    for i = 1, m do mx = mx + xs[i]; my = my + ys[i] end
+    mx = mx / m; my = my / m
+    local acc = 0
+    for i = 1, m do acc = acc + (xs[i] - mx) * (ys[i] - my) end
+    return acc / (m - 1)
+end
+
+-- corr(other): correlação de Pearson ∈ [-1, 1].
+-- Pares com null pulados. Menos de 2 pares ou variância zero → NaN.
+function methods.corr(self, other)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: corr() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    local xs, ys, m = paired_nonnull(self, other)
+    if m < 2 then return 0/0 end
+    local mx, my = 0, 0
+    for i = 1, m do mx = mx + xs[i]; my = my + ys[i] end
+    mx = mx / m; my = my / m
+    local sxy, sxx, syy = 0, 0, 0
+    for i = 1, m do
+        local dx, dy = xs[i] - mx, ys[i] - my
+        sxy = sxy + dx * dy
+        sxx = sxx + dx * dx
+        syy = syy + dy * dy
+    end
+    local denom = math.sqrt(sxx * syy)
+    if denom == 0 then return 0/0 end   -- variância zero: correlação indefinida
+    return sxy / denom
+end
+
+-- autocorr([lag]): correlação da série com ela mesma deslocada `lag` (default 1).
+-- = self:corr(self:shift(lag)). Pares descobertos pelo shift são null → pulados.
+function methods.autocorr(self, lag)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: autocorr() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    lag = lag or 1
+    return self:corr(self:shift(lag))
+end
+
+-- dot(other): produto interno Σ xᵢ·yᵢ. Qualquer par com null → resultado null (nil).
+-- Diferente de cov/corr: dot propaga null em vez de pular o par.
+function methods.dot(self, other)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: dot() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    if getmetatable(other) ~= Series then
+        error("smaug: dot() espera outra Series como argumento", 2)
+    end
+    if self:len() ~= other:len() then
+        error("smaug: dot() — tamanhos diferentes ("..self:len().." vs "..other:len()..")", 2)
+    end
+    local acc = 0
+    for i = 1, self:len() do
+        local x, y = self:get(i), other:get(i)
+        if x == nil or y == nil then return nil end   -- null propaga
+        acc = acc + x * y
+    end
+    return acc
+end
+
+-- pct_change([periods]): variação percentual = (xᵢ - xᵢ₋ₚ) / xᵢ₋ₚ.
+-- Primeiros `periods` elementos são NA. Null em qualquer operando → NA.
+-- Divisor zero → NA (não Inf), por previsibilidade. Resultado sempre float64.
+function methods.pct_change(self, periods)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: pct_change() requer dtype numérico, não '"..self._dtype.."'", 2)
+    end
+    periods = periods or 1
+    if periods < 1 then error("smaug: pct_change() requer periods >= 1", 2) end
+    local NA   = Series.NA
+    local n    = self:len()
+    local vals = {}
+    for i = 1, n do
+        if i <= periods then
+            vals[i] = NA
+        else
+            local cur  = self:get(i)
+            local prev = self:get(i - periods)
+            if cur == nil or prev == nil or prev == 0 then
+                vals[i] = NA
+            else
+                vals[i] = (cur - prev) / prev
+            end
+        end
+    end
+    return Series.from_table(vals, "float64", self._name)
+end
+
+-- =====================================================================
+-- F.2 — Pacote de predicados (Series)
+-- between, isin, is_unique, is_monotonic_*, equals, compare,
+-- idxmin/idxmax, first_valid_index/last_valid_index.
+-- =====================================================================
+
+-- between(lo, hi, [inclusive]): máscara booleana lo ≤ x ≤ hi.
+-- inclusive ∈ {"both" (default), "left", "right", "neither"}.
+-- Null propaga (resultado null naquela posição).
+function methods.between(self, lo, hi, inclusive)
+    if self._dtype ~= "float64" and self._dtype ~= "int64"
+       and self._dtype ~= "datetime" and self._dtype ~= "string" then
+        error("smaug: between() requer dtype ordenável (numérico, datetime ou string), não '"
+              ..self._dtype.."'", 2)
+    end
+    inclusive = inclusive or "both"
+    if inclusive ~= "both" and inclusive ~= "left"
+       and inclusive ~= "right" and inclusive ~= "neither" then
+        error("smaug: between() inclusive ∈ {both, left, right, neither}", 2)
+    end
+    local inc_lo = (inclusive == "both" or inclusive == "left")
+    local inc_hi = (inclusive == "both" or inclusive == "right")
+    local NA   = Series.NA
+    local n    = self:len()
+    local vals = {}
+    for i = 1, n do
+        local v = self:get(i)
+        if v == nil then
+            vals[i] = NA
+        else
+            local ge_lo = inc_lo and (v >= lo) or (v > lo)
+            local le_hi = inc_hi and (v <= hi) or (v < hi)
+            vals[i] = (ge_lo and le_hi)
+        end
+    end
+    return Series.from_table(vals, "bool", self._name)
+end
+
+-- isin(values): máscara booleana — true onde o valor está em `values`.
+-- values: tabela Lua (lista). Null na série → resultado null.
+-- Comparação por igualdade direta (tostring para uniformizar chaves).
+function methods.isin(self, values)
+    if type(values) ~= "table" then
+        error("smaug: isin() espera uma tabela de valores", 2)
+    end
+    -- conjunto de busca (chaves por tostring para casar tipos numéricos/string)
+    local set = {}
+    for _, val in ipairs(values) do
+        set[tostring(val)] = true
+    end
+    local NA   = Series.NA
+    local n    = self:len()
+    local vals = {}
+    for i = 1, n do
+        local v = self:get(i)
+        if v == nil then
+            vals[i] = NA
+        else
+            vals[i] = set[tostring(v)] == true
+        end
+    end
+    return Series.from_table(vals, "bool", self._name)
+end
+
+-- is_unique(): true se todos os valores não-nulos são distintos.
+-- Nulos são ignorados na verificação.
+function methods.is_unique(self)
+    local seen = {}
+    for i = 1, self:len() do
+        local v = self:get(i)
+        if v ~= nil then
+            local k = tostring(v)
+            if seen[k] then return false end
+            seen[k] = true
+        end
+    end
+    return true
+end
+
+-- Helper de monotonicidade. dir = "inc" ou "dec"; strict = true/false.
+-- Nulos: a presença de qualquer null torna a série não-monotônica (sem ordem
+-- definida com o vizinho). Série vazia ou de 1 elemento é monotônica (vacuamente).
+local function is_monotonic(self, dir, strict)
+    if self._dtype ~= "float64" and self._dtype ~= "int64"
+       and self._dtype ~= "datetime" and self._dtype ~= "string" then
+        error("smaug: is_monotonic requer dtype ordenável, não '"..self._dtype.."'", 3)
+    end
+    local n = self:len()
+    local prev = nil
+    for i = 1, n do
+        local v = self:get(i)
+        if v == nil then return false end   -- null quebra a ordem
+        if prev ~= nil then
+            if dir == "inc" then
+                if strict then if not (v > prev) then return false end
+                else if not (v >= prev) then return false end end
+            else  -- dec
+                if strict then if not (v < prev) then return false end
+                else if not (v <= prev) then return false end end
+            end
+        end
+        prev = v
+    end
+    return true
+end
+
+-- is_monotonic_increasing([strict]): não-decrescente (strict=false, default)
+-- ou estritamente crescente (strict=true).
+function methods.is_monotonic_increasing(self, strict)
+    return is_monotonic(self, "inc", strict == true)
+end
+
+-- is_monotonic_decreasing([strict]): não-crescente ou estritamente decrescente.
+function methods.is_monotonic_decreasing(self, strict)
+    return is_monotonic(self, "dec", strict == true)
+end
+
+-- equals(other): igualdade estrutural — mesmo dtype, tamanho, valores e nulls.
+-- NaN == NaN nesta comparação (igualdade estrutural, não IEEE 754).
+function methods.equals(self, other)
+    if getmetatable(other) ~= Series then return false end
+    if self._dtype ~= other._dtype then return false end
+    if self:len() ~= other:len() then return false end
+    for i = 1, self:len() do
+        local a, b = self:get(i), other:get(i)
+        if (a == nil) ~= (b == nil) then return false end   -- null vs não-null
+        if a ~= nil then
+            -- NaN estrutural: dois NaN são "iguais" aqui
+            if a ~= b and not (a ~= a and b ~= b) then return false end
+        end
+    end
+    return true
+end
+
+-- compare(other): diferenças posicionais → DataSet {i, self, other}.
+-- Só inclui as posições onde os valores diferem (semântica equals).
+-- DataSet vazio se idênticas. Erro se dtype/tamanho incompatíveis.
+function methods.compare(self, other)
+    if getmetatable(other) ~= Series then
+        error("smaug: compare() espera outra Series", 2)
+    end
+    if self._dtype ~= other._dtype then
+        error("smaug: compare() — dtypes diferentes ('"..self._dtype.."' vs '"
+              ..other._dtype.."')", 2)
+    end
+    if self:len() ~= other:len() then
+        error("smaug: compare() — tamanhos diferentes ("..self:len().." vs "
+              ..other:len()..")", 2)
+    end
+    local NA = Series.NA
+    local idx, self_vals, other_vals = {}, {}, {}
+    for i = 1, self:len() do
+        local a, b = self:get(i), other:get(i)
+        local differ
+        if (a == nil) ~= (b == nil) then
+            differ = true
+        elseif a == nil then
+            differ = false   -- ambos null
+        else
+            differ = (a ~= b) and not (a ~= a and b ~= b)  -- NaN estrutural igual
+        end
+        if differ then
+            local m = #idx + 1
+            idx[m]       = i
+            self_vals[m] = (a == nil) and NA or a
+            other_vals[m]= (b == nil) and NA or b
+        end
+    end
+    local DataSet = require("smaug.core.dataset")
+    return DataSet.from_columns({
+        {"i",     idx,        "int64"},
+        {"self",  self_vals,  self._dtype},
+        {"other", other_vals, self._dtype},
+    }, (self._name or "series") .. "_compare")
+end
+
+-- idxmin/idxmax: aliases de argmin/argmax (compatibilidade pandas).
+function methods.idxmin(self) return self:argmin() end
+function methods.idxmax(self) return self:argmax() end
+
+-- first_valid_index(): índice 1-based do 1º valor não-nulo; nil se toda nula.
+function methods.first_valid_index(self)
+    for i = 1, self:len() do
+        if self:get(i) ~= nil then return i end
+    end
+    return nil
+end
+
+-- last_valid_index(): índice 1-based do último valor não-nulo; nil se toda nula.
+function methods.last_valid_index(self)
+    for i = self:len(), 1, -1 do
+        if self:get(i) ~= nil then return i end
+    end
+    return nil
 end
 
 -- =====================================================================
@@ -1865,8 +2187,8 @@ end
 
 -- median([ignore_na]): mediana (ignora nulos por padrão). float64.
 function methods.median(self, ignore_na)
-    if self._dtype ~= "float64" and self._dtype ~= "int64" then
-        error("smaug: median() requer dtype numérico, não '"..self._dtype.."'", 2)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" and self._dtype ~= "datetime" then
+        error("smaug: median() requer dtype numérico ou datetime, não '"..self._dtype.."'", 2)
     end
     ignore_na = (ignore_na == nil) and true or ignore_na
     if not ignore_na then
@@ -1879,8 +2201,8 @@ end
 
 -- quantile(q, [ignore_na]): percentil 0 ≤ q ≤ 1. Interpolação linear. float64.
 function methods.quantile(self, q, ignore_na)
-    if self._dtype ~= "float64" and self._dtype ~= "int64" then
-        error("smaug: quantile() requer dtype numérico, não '"..self._dtype.."'", 2)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" and self._dtype ~= "datetime" then
+        error("smaug: quantile() requer dtype numérico ou datetime, não '"..self._dtype.."'", 2)
     end
     if type(q) ~= "number" or q < 0 or q > 1 then
         error("smaug: quantile() espera 0 ≤ q ≤ 1", 2)
@@ -1948,8 +2270,8 @@ end
 
 -- cummin(): mínimo cumulativo. Nulos propagam.
 function methods.cummin(self)
-    if self._dtype ~= "float64" and self._dtype ~= "int64" then
-        error("smaug: cummin() requer dtype numérico, não '"..self._dtype.."'", 2)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" and self._dtype ~= "datetime" then
+        error("smaug: cummin() requer dtype numérico ou datetime, não '"..self._dtype.."'", 2)
     end
     local NA, n, vals = Series.NA, self:len(), {}
     local cur = nil
@@ -1967,8 +2289,8 @@ end
 
 -- cummax(): máximo cumulativo. Nulos propagam.
 function methods.cummax(self)
-    if self._dtype ~= "float64" and self._dtype ~= "int64" then
-        error("smaug: cummax() requer dtype numérico, não '"..self._dtype.."'", 2)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" and self._dtype ~= "datetime" then
+        error("smaug: cummax() requer dtype numérico ou datetime, não '"..self._dtype.."'", 2)
     end
     local NA, n, vals = Series.NA, self:len(), {}
     local cur = nil
@@ -1986,8 +2308,8 @@ end
 
 -- argmin(): índice 1-based do mínimo (ignora nulos). nil se vazia ou toda nula.
 function methods.argmin(self)
-    if self._dtype ~= "float64" and self._dtype ~= "int64" then
-        error("smaug: argmin() requer dtype numérico, não '"..self._dtype.."'", 2)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" and self._dtype ~= "datetime" then
+        error("smaug: argmin() requer dtype numérico ou datetime, não '"..self._dtype.."'", 2)
     end
     local best_v, best_i = nil, nil
     for i = 1, self:len() do
@@ -2001,8 +2323,8 @@ end
 
 -- argmax(): índice 1-based do máximo (ignora nulos).
 function methods.argmax(self)
-    if self._dtype ~= "float64" and self._dtype ~= "int64" then
-        error("smaug: argmax() requer dtype numérico, não '"..self._dtype.."'", 2)
+    if self._dtype ~= "float64" and self._dtype ~= "int64" and self._dtype ~= "datetime" then
+        error("smaug: argmax() requer dtype numérico ou datetime, não '"..self._dtype.."'", 2)
     end
     local best_v, best_i = nil, nil
     for i = 1, self:len() do
@@ -2935,6 +3257,167 @@ function CategoricalSeries:value_counts()
     -- retorna DataSet (mesmo contrato de Series:value_counts)
     -- importado via upvalue DataSet (ainda não disponível aqui — retorna tabelas)
     return { value = vals, count = counts }
+end
+
+-- ----------------------------------------------------------------
+-- Predicados de nulidade
+-- ----------------------------------------------------------------
+
+-- isna(i) / notna(i): aliases de is_null / not is_null.
+function CategoricalSeries:isna(i)  return self:is_null(i) end
+function CategoricalSeries:notna(i) return not self:is_null(i) end
+
+-- ----------------------------------------------------------------
+-- Reduções de ordem (lexicográfica sobre labels)
+-- ----------------------------------------------------------------
+
+-- min(): menor label lexicográfico entre não-nulos. nil se vazia ou toda nula.
+function CategoricalSeries:min()
+    local best = nil
+    for i = 1, self._size do
+        local v = self:get(i)
+        if v ~= nil and (best == nil or v < best) then best = v end
+    end
+    return best
+end
+
+-- max(): maior label lexicográfico entre não-nulos. nil se vazia ou toda nula.
+function CategoricalSeries:max()
+    local best = nil
+    for i = 1, self._size do
+        local v = self:get(i)
+        if v ~= nil and (best == nil or v > best) then best = v end
+    end
+    return best
+end
+
+-- ----------------------------------------------------------------
+-- Valores ausentes — preenchimento temporal
+-- ----------------------------------------------------------------
+
+-- ffill(): preenche nulos com o último label não-nulo anterior.
+-- Opera ao nível de codes para eficiência; preserva levels existentes.
+function CategoricalSeries:ffill()
+    local codes = {}
+    local last  = nil
+    for i = 1, self._size do
+        if self._codes[i] ~= nil then last = self._codes[i] end
+        codes[i] = last   -- nil se ainda não encontrou nenhum não-nulo
+    end
+    local levels, lmap = {}, {}
+    for i, v in ipairs(self._levels) do levels[i] = v; lmap[v] = i end
+    return cat_new(codes, levels, lmap, self._size, self._name)
+end
+
+-- bfill(): preenche nulos com o próximo label não-nulo seguinte.
+function CategoricalSeries:bfill()
+    local codes     = {}
+    local next_code = nil
+    for i = self._size, 1, -1 do
+        if self._codes[i] ~= nil then next_code = self._codes[i] end
+        codes[i] = next_code   -- nil se nenhum não-nulo à direita
+    end
+    local levels, lmap = {}, {}
+    for i, v in ipairs(self._levels) do levels[i] = v; lmap[v] = i end
+    return cat_new(codes, levels, lmap, self._size, self._name)
+end
+
+-- ----------------------------------------------------------------
+-- Janela temporal
+-- ----------------------------------------------------------------
+
+-- shift(periods): desloca valores `periods` posições (default 1). Posições
+-- descobertas tornam-se null. Opera ao nível de codes.
+function CategoricalSeries:shift(periods)
+    periods = periods or 1
+    local codes = {}
+    for i = 1, self._size do
+        local src = i - periods
+        codes[i] = (src >= 1 and src <= self._size) and self._codes[src] or nil
+    end
+    local levels, lmap = {}, {}
+    for i, v in ipairs(self._levels) do levels[i] = v; lmap[v] = i end
+    return cat_new(codes, levels, lmap, self._size, self._name)
+end
+
+-- ----------------------------------------------------------------
+-- Transformação elemento a elemento
+-- ----------------------------------------------------------------
+
+-- map(fn, [dtype], [name]): aplica fn a cada label (nil para null).
+-- nil retornado por fn → null. dtype do resultado inferido do 1º retorno não-null.
+-- Retorna Series do dtype inferido (não CategoricalSeries).
+function CategoricalSeries:map(fn, dtype, name)
+    if type(fn) ~= "function" then
+        error("smaug: map() espera uma função", 2)
+    end
+    local vals     = {}
+    local inferred = dtype
+    for i = 1, self._size do
+        local v   = self:get(i)
+        local out = fn(v)
+        if out == nil or out == NA then
+            vals[i] = NA
+        else
+            if inferred == nil then
+                if     type(out) == "boolean" then inferred = "bool"
+                elseif type(out) == "string"  then inferred = "string"
+                elseif type(out) == "number" and out % 1 == 0 then inferred = "int64"
+                else   inferred = "float64"
+                end
+            end
+            vals[i] = out
+        end
+    end
+    return Series.from_table(vals, inferred or "string", name or self._name)
+end
+
+-- ----------------------------------------------------------------
+-- Seleção condicional
+-- ----------------------------------------------------------------
+
+-- where(cond, other): mantém self onde cond=true; usa other onde false/NA.
+-- other: string escalar, nil (→ null) ou Series/CategoricalSeries alinhada.
+-- Retorna novo CategoricalSeries reconstruído via from_table.
+function CategoricalSeries:where(cond, other)
+    if type(cond) ~= "table" or cond._dtype ~= "bool" then
+        error("smaug: where() espera Series<bool> como primeiro argumento", 2)
+    end
+    if cond:len() ~= self._size then
+        error("smaug: where() — tamanhos diferentes ("..cond:len().." vs "..self._size..")", 2)
+    end
+    local has_other = type(other) == "table" and other._dtype ~= nil
+    local vals = {}
+    for i = 1, self._size do
+        local c = cond:get(i)
+        if c == true then
+            vals[i] = self:get(i)
+        else
+            vals[i] = has_other and other:get(i) or (other == nil and NA or other)
+        end
+    end
+    return CategoricalSeries.from_table(vals, self._name)
+end
+
+-- mask(cond, other): inverso de where — substitui onde cond=true.
+function CategoricalSeries:mask(cond, other)
+    if type(cond) ~= "table" or cond._dtype ~= "bool" then
+        error("smaug: mask() espera Series<bool> como primeiro argumento", 2)
+    end
+    if cond:len() ~= self._size then
+        error("smaug: mask() — tamanhos diferentes ("..cond:len().." vs "..self._size..")", 2)
+    end
+    local has_other = type(other) == "table" and other._dtype ~= nil
+    local vals = {}
+    for i = 1, self._size do
+        local c = cond:get(i)
+        if c == true then
+            vals[i] = has_other and other:get(i) or (other == nil and NA or other)
+        else
+            vals[i] = self:get(i)
+        end
+    end
+    return CategoricalSeries.from_table(vals, self._name)
 end
 
 -- describe

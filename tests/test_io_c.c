@@ -312,7 +312,7 @@ static void test_csv_long_unquoted_field(void) {
     smaug_table_t *t = smaug_read_csv_mem(csv, strlen(csv), NULL);
     CHECK(t && !t->error,         "long field: sem erro");
     CHECK(t->nrows == 1,          "long field: 1 linha");
-    size_t n; const char *s = get_str(t, 0, 0, &n);
+    size_t n; get_str(t, 0, 0, &n);
     CHECK(n == 34,                "long field: comprimento 34");
     smaug_table_free(t);
 }
