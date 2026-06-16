@@ -6,6 +6,45 @@ decisões, achados, motivações.
 
 ---
 
+## 2026-06-15 — Bloco F.6 (duplicatas e binárias) — Bloco F completo
+
+Último sub-bloco do enriquecimento dos núcleos. Com ele, **o Bloco F inteiro
+(F.1–F.6) está fechado**.
+
+### Adicionado
+
+- **Series:** `duplicated([keep])` (keep ∈ {first,last,none}; null conta como
+  valor — dois nulos são duplicatas entre si, semântica pandas);
+  `drop_duplicates([keep])`; `combine_first(other)` (preenche nulls de self com
+  other); `searchsorted(value, [side])` (busca binária, exige série ordenada
+  crescente verificada via `is_monotonic_increasing`; side ∈ {left,right});
+  `rep_each(n)` (repete cada elemento n vezes; n escalar ≥0 ou `Series<int64>`).
+- **DataSet:** `duplicated([subset], [keep])` (subset = nome/lista/nil) e
+  `drop_duplicates([subset], [keep])` (multi-coluna).
+
+**Decisões de contrato:**
+- O nome do método de repetição é `rep_each`, não `repeat`: `repeat` é palavra
+  reservada em Lua e impediria tanto a definição (`function methods.repeat`)
+  quanto a chamada (`s:repeat(n)`) — ambas falham no parse. `rep_each` deixa a
+  intenção explícita (repete cada elemento) e segue o espírito do `:rep` já
+  existente no `.str`.
+- `duplicated` reaproveita o mesmo esquema de chave de `unique`/`nunique`
+  (`type:tostring`, mais sentinela própria para null), garantindo semântica
+  consistente de igualdade em todo o frontend.
+- `combine_first` exige dtype e tamanho iguais — não faz coerção implícita.
+- `searchsorted` exige ordenação crescente e rejeita séries com nulos (não há
+  ordem definida com null), com erro claro em vez de resultado silenciosamente
+  errado.
+
+`test_duplicates.lua` (74 checks).
+
+### Docs
+
+`API_INDEX.md` — Eixo 12 mantém 100%: `Series.methods` 90→95, `DataSet.methods`
+46→48. Roadmap marca F.6 e o **Bloco F** inteiro como `[Done]`.
+
+---
+
 ## 2026-06-15 — Bloco F.5 (acesso e ergonomia)
 
 ### Adicionado

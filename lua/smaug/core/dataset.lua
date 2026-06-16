@@ -1362,6 +1362,80 @@ function methods.compare(self, other)
 end
 
 -- =====================================================================
+-- F.6 — Duplicatas (DataSet)
+-- =====================================================================
+
+-- Chave de linha consistente: concatena as chaves por coluna do subset.
+-- subset: lista de nomes de coluna (default: todas, na ordem original).
+local function row_dup_key(self, i, subset)
+    local parts = {}
+    for j, name in ipairs(subset) do
+        local v = self._columns[name]:get(i)
+        parts[j] = (v == nil) and "\0NULL\0" or (type(v)..":"..tostring(v))
+    end
+    return table.concat(parts, "\1")   -- separador improvável nos dados
+end
+
+-- duplicated([subset], [keep]): Series<bool> marcando linhas duplicadas.
+-- subset: nome de coluna, lista de nomes, ou nil (todas). keep como na Series.
+function methods.duplicated(self, subset, keep)
+    keep = keep or "first"
+    if keep ~= "first" and keep ~= "last" and keep ~= "none" then
+        error("smaug: duplicated() keep ∈ {first, last, none}", 2)
+    end
+    -- normaliza subset
+    if subset == nil then
+        subset = self._col_names
+    elseif type(subset) == "string" then
+        subset = { subset }
+    elseif type(subset) ~= "table" then
+        error("smaug: duplicated() subset deve ser nome, lista de nomes ou nil", 2)
+    end
+    for _, name in ipairs(subset) do
+        if self._columns[name] == nil then
+            error("smaug: duplicated() coluna '"..tostring(name).."' não existe", 2)
+        end
+    end
+
+    local n    = self:nrows()
+    local vals = {}
+    if keep == "first" then
+        local seen = {}
+        for i = 1, n do
+            local k = row_dup_key(self, i, subset)
+            if seen[k] then vals[i] = true else seen[k] = true; vals[i] = false end
+        end
+    elseif keep == "last" then
+        local seen = {}
+        for i = n, 1, -1 do
+            local k = row_dup_key(self, i, subset)
+            if seen[k] then vals[i] = true else seen[k] = true; vals[i] = false end
+        end
+    else  -- none
+        local count = {}
+        for i = 1, n do
+            local k = row_dup_key(self, i, subset)
+            count[k] = (count[k] or 0) + 1
+        end
+        for i = 1, n do
+            vals[i] = count[row_dup_key(self, i, subset)] > 1
+        end
+    end
+    return Series.from_table(vals, "bool", "duplicated")
+end
+
+-- drop_duplicates([subset], [keep]): novo DataSet sem as linhas marcadas.
+function methods.drop_duplicates(self, subset, keep)
+    local mask = self:duplicated(subset, keep)   -- valida subset/keep
+    -- índices a manter (onde mask == false)
+    local keep_idx = {}
+    for i = 1, self:nrows() do
+        if mask:get(i) == false then keep_idx[#keep_idx + 1] = i end
+    end
+    return self:take(keep_idx)
+end
+
+-- =====================================================================
 -- Window / Rolling (Anel 2)
 --
 -- ds:rolling(window):sum/mean/min/max(col)

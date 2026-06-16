@@ -11,7 +11,7 @@ ConvenÃ§Ã£o de status:
 - âš ï¸ ausÃªncia sem registro â€” suspeita, requer revisÃ£o humana
 - âŒ inconsistÃªncia clara â€” gap real
 
-Gerado em: 2026-06-15 14:02:05 UTC
+Gerado em: 2026-06-15 17:32:25 UTC
 
 ## Eixo 1 ÔÇö Paridade de m├®todos entre dtypes
 
@@ -32,6 +32,7 @@ Cada linha = um m├®todo rastreado em `Series.methods` ou `CategoricalSeries`.
 | `bfill` | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à |
 | `clip` | Ô£à | Ô£à | ÔÜ¬ | ÔÜ¬ | ÔÜ¬ | ÔÜ¬ |
 | `clone` | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à |
+| `combine_first` | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à | ÔÜá´©Å |
 | `compare` | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à | ÔÜá´©Å |
 | `corr` | Ô£à | Ô£à | ÔÜá´©Å | ÔÜá´©Å | ÔÜá´©Å | ÔÜá´©Å |
 | `count_nonnull` | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à |
@@ -44,7 +45,9 @@ Cada linha = um m├®todo rastreado em `Series.methods` ou `CategoricalSeries`.
 | `describe` | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à |
 | `diff` | Ô£à | Ô£à | ÔÜ¬ | ÔÜ¬ | Ô£à | ÔÜ¬ |
 | `dot` | Ô£à | Ô£à | ÔÜá´©Å | ÔÜá´©Å | ÔÜá´©Å | ÔÜá´©Å |
+| `drop_duplicates` | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à | ÔÜá´©Å |
 | `dropna` | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à |
+| `duplicated` | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à | ÔÜá´©Å |
 | `eq` | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à |
 | `equals` | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à | ÔÜá´©Å |
 | `expanding` | Ô£à | Ô£à | ÔÜ¬ | ÔÜ¬ | ÔÜ¬ | ÔÜ¬ |
@@ -91,8 +94,10 @@ Cada linha = um m├®todo rastreado em `Series.methods` ou `CategoricalSeries`.
 | `prod` | Ô£à | Ô£à | ÔÜ¬ | ÔÜ¬ | ÔÜ¬ | ÔÜ¬ |
 | `quantile` | Ô£à | Ô£à | ÔÜ¬ | ÔÜ¬ | Ô£à | ÔÜ¬ |
 | `rank` | Ô£à | Ô£à | ÔÜ¬ | ÔÜ¬ | ÔÜ¬ | ÔÜ¬ |
+| `rep_each` | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à | ÔÜá´©Å |
 | `rolling` | Ô£à | Ô£à | ÔÜ¬ | ÔÜ¬ | ÔÜ¬ | ÔÜ¬ |
 | `round` | Ô£à | Ô£à | ÔÜ¬ | ÔÜ¬ | ÔÜ¬ | ÔÜ¬ |
+| `searchsorted` | Ô£à | Ô£à | ÔÜá´©Å | Ô£à | Ô£à | ÔÜá´©Å |
 | `sem` | Ô£à | Ô£à | ÔÜ¬ | ÔÜ¬ | ÔÜ¬ | ÔÜ¬ |
 | `set` | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à |
 | `set_null` | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à |
@@ -111,7 +116,7 @@ Cada linha = um m├®todo rastreado em `Series.methods` ou `CategoricalSeries`.
 | `view` | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à | ÔÜ¬ |
 | `where` | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à | Ô£à |
 
-**Sum├írio Eixo 1:** 91 m├®todos ├ù 6 dtypes = 546 c├®lulas ┬À Ô£à 401 (73.4%) ┬À ÔÜ¬ 112 (20.5%) ┬À ÔÜá´©Å 33 (6.0%)
+**Sum├írio Eixo 1:** 96 m├®todos ├ù 6 dtypes = 576 c├®lulas ┬À Ô£à 425 (73.8%) ┬À ÔÜ¬ 112 (19.4%) ┬À ÔÜá´©Å 39 (6.8%)
 
 ## Eixo 2 ÔÇö Paridade Series Ôåö DataSet
 
@@ -137,6 +142,7 @@ M├®todos que existem em cada lado. Algumas assimetrias s├úo intencionais (
 | `clone` | Ô£à | ÔÇö | s├│ em Series |
 | `column` | ÔÇö | Ô£à | s├│ em DataSet |
 | `columns` | ÔÇö | Ô£à | s├│ em DataSet |
+| `combine_first` | Ô£à | ÔÇö | s├│ em Series |
 | `compare` | Ô£à | Ô£à |  |
 | `concat` | ÔÇö | Ô£à | s├│ em DataSet |
 | `corr` | Ô£à | Ô£à |  |
@@ -151,8 +157,10 @@ M├®todos que existem em cada lado. Algumas assimetrias s├úo intencionais (
 | `diff` | Ô£à | ÔÇö | s├│ em Series |
 | `dot` | Ô£à | ÔÇö | s├│ em Series |
 | `drop_column` | ÔÇö | Ô£à | s├│ em DataSet |
+| `drop_duplicates` | Ô£à | Ô£à |  |
 | `dropna` | Ô£à | Ô£à |  |
 | `dtypes` | ÔÇö | Ô£à | s├│ em DataSet |
+| `duplicated` | Ô£à | Ô£à |  |
 | `eq` | Ô£à | ÔÇö | s├│ em Series |
 | `equals` | Ô£à | Ô£à |  |
 | `expanding` | Ô£à | ÔÇö | s├│ em Series |
@@ -213,10 +221,12 @@ M├®todos que existem em cada lado. Algumas assimetrias s├úo intencionais (
 | `rank` | Ô£à | ÔÇö | s├│ em Series |
 | `rename` | ÔÇö | Ô£à | s├│ em DataSet |
 | `rename_column` | ÔÇö | Ô£à | s├│ em DataSet |
+| `rep_each` | Ô£à | ÔÇö | s├│ em Series |
 | `rolling` | Ô£à | Ô£à |  |
 | `round` | Ô£à | ÔÇö | s├│ em Series |
 | `row` | ÔÇö | Ô£à | s├│ em DataSet |
 | `sample` | ÔÇö | Ô£à | s├│ em DataSet |
+| `searchsorted` | Ô£à | ÔÇö | s├│ em Series |
 | `select` | ÔÇö | Ô£à | s├│ em DataSet |
 | `sem` | Ô£à | ÔÇö | s├│ em Series |
 | `set` | Ô£à | ÔÇö | s├│ em Series |
@@ -242,7 +252,7 @@ M├®todos que existem em cada lado. Algumas assimetrias s├úo intencionais (
 | `view` | Ô£à | ÔÇö | s├│ em Series |
 | `where` | Ô£à | ÔÇö | s├│ em Series |
 
-**Sum├írio Eixo 2:** 14 m├®todos em ambos ┬À 76 s├│ em Series ┬À 32 s├│ em DataSet
+**Sum├írio Eixo 2:** 16 m├®todos em ambos ┬À 79 s├│ em Series ┬À 32 s├│ em DataSet
 
 ## Eixo 3 ÔÇö Espelhamento C Ôåö Lua
 
@@ -613,8 +623,8 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 177/177 erros com prefixo `smaug:` (100.0%)
-- `dataset.lua`: 85/85 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 189/189 erros com prefixo `smaug:` (100.0%)
+- `dataset.lua`: 88/88 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 ÔÇö Paridade de lifecycle
 
@@ -687,8 +697,8 @@ Cada m├®todo p├║blico do c├│digo deveria aparecer em `API_INDEX.md`. 
 
 | categoria | total | documentados | faltam | % | detalhe |
 | :--- | :-: | :-: | :-: | :-: | :-: |
-| `Series.methods` | 90 | 90 | 0 | 100% | Ô£à completo |
-| `DataSet.methods` | 46 | 46 | 0 | 100% | Ô£à completo |
+| `Series.methods` | 95 | 95 | 0 | 100% | Ô£à completo |
+| `DataSet.methods` | 48 | 48 | 0 | 100% | Ô£à completo |
 | `GroupBy:*` | 15 | 15 | 0 | 100% | Ô£à completo |
 | `CategoricalSeries:*` | 41 | 41 | 0 | 100% | Ô£à completo |
 | `CatProxy:*` (.cat) | 6 | 6 | 0 | 100% | Ô£à completo |

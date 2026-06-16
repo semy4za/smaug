@@ -126,7 +126,7 @@ C_TESTS_PLAIN=(test_alloc test_ops test_ops_edge test_bool \
 C_TESTS_WRAP=(test_allocfail)
 C_TESTS_STRESS=(test_stress)
 LUA_TESTS=(test_series test_dataset test_edge test_special
-           test_fillna test_props test_i64 test_string test_bool_dtype test_groupby test_concat test_join test_series_ops test_dataset_ops test_str_tier_b test_rolling_series test_io test_io_real test_enrich test_datetime test_categorical test_completeness test_stats test_predicates test_dt_extended test_str_tier_c test_access)
+           test_fillna test_props test_i64 test_string test_bool_dtype test_groupby test_concat test_join test_series_ops test_dataset_ops test_str_tier_b test_rolling_series test_io test_io_real test_enrich test_datetime test_categorical test_completeness test_stats test_predicates test_dt_extended test_str_tier_c test_access test_duplicates)
 
 CFLAGS=(-std=c11 -fPIC -Wall -Wextra -O2 -I./include)
 TEST_CFLAGS=(-std=c11 -g -O0 -Wall -Wextra -I./include)

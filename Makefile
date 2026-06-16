@@ -25,7 +25,7 @@ LUA_TESTS     = test_series test_i64 test_bool_dtype test_edge test_special test
                 test_datetime test_categorical test_completeness test_dt_extended \
                 test_dataset test_dataset_ops test_series_ops \
                 test_groupby test_concat test_join \
-                test_rolling_series test_enrich test_stats test_predicates test_access \
+                test_rolling_series test_enrich test_stats test_predicates test_access test_duplicates \
                 test_io test_io_real
 WRAP_FLAGS    = -Wl,--wrap=malloc -Wl,--wrap=realloc
 

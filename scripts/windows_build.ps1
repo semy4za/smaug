@@ -166,7 +166,7 @@ if ($luajit -and -not $SkipLua) {
     Write-Host ""
     Write-Host "== Testes em Lua ==" -ForegroundColor Cyan
     $luaTests = @("test_series", "test_dataset", "test_edge", "test_special",
-                  "test_fillna", "test_props", "test_i64", "test_string", "test_bool_dtype", "test_groupby", "test_concat", "test_join", "test_series_ops", "test_dataset_ops", "test_str_tier_b", "test_rolling_series", "test_io", "test_io_real", "test_enrich", "test_datetime", "test_categorical", "test_completeness", "test_dt_extended", "test_stats", "test_predicates", "test_str_tier_c", "test_access")
+                  "test_fillna", "test_props", "test_i64", "test_string", "test_bool_dtype", "test_groupby", "test_concat", "test_join", "test_series_ops", "test_dataset_ops", "test_str_tier_b", "test_rolling_series", "test_io", "test_io_real", "test_enrich", "test_datetime", "test_categorical", "test_completeness", "test_dt_extended", "test_stats", "test_predicates", "test_str_tier_c", "test_access", "test_duplicates")
     foreach ($lt in $luaTests) {
         # Captura stdout e stderr separados para distinguir output normal de erros
         $psi = New-Object System.Diagnostics.ProcessStartInfo

@@ -984,6 +984,176 @@ function methods.last_valid_index(self)
 end
 
 -- =====================================================================
+-- F.6 — Duplicatas e operações binárias (Series)
+-- duplicated, drop_duplicates, combine_first, searchsorted, rep_each.
+-- =====================================================================
+
+-- Chave de igualdade consistente com unique/nunique. Null tem chave própria.
+local function dup_key(v)
+    if v == nil then return "\0NULL\0" end
+    return type(v) .. ":" .. tostring(v)
+end
+
+-- duplicated([keep]): Series<bool> marcando posições duplicadas.
+-- keep="first" (default): primeira ocorrência = false, demais = true.
+-- keep="last": última ocorrência = false, demais = true.
+-- keep="none": TODAS as ocorrências de um valor repetido = true.
+-- Nulos contam como valor (dois nulos são duplicatas entre si — semântica pandas).
+function methods.duplicated(self, keep)
+    keep = keep or "first"
+    if keep ~= "first" and keep ~= "last" and keep ~= "none" then
+        error("smaug: duplicated() keep ∈ {first, last, none}", 2)
+    end
+    local n    = self:len()
+    local vals = {}
+
+    if keep == "first" then
+        local seen = {}
+        for i = 1, n do
+            local k = dup_key(self:get(i))
+            if seen[k] then vals[i] = true else seen[k] = true; vals[i] = false end
+        end
+    elseif keep == "last" then
+        local seen = {}
+        for i = n, 1, -1 do
+            local k = dup_key(self:get(i))
+            if seen[k] then vals[i] = true else seen[k] = true; vals[i] = false end
+        end
+    else  -- none: marca tudo que aparece mais de uma vez
+        local count = {}
+        for i = 1, n do
+            local k = dup_key(self:get(i))
+            count[k] = (count[k] or 0) + 1
+        end
+        for i = 1, n do
+            vals[i] = count[dup_key(self:get(i))] > 1
+        end
+    end
+    return Series.from_table(vals, "bool", self._name)
+end
+
+-- drop_duplicates([keep]): nova Series sem as posições marcadas por duplicated.
+-- keep como em duplicated. Preserva a ordem original das mantidas.
+function methods.drop_duplicates(self, keep)
+    local mask = self:duplicated(keep)   -- valida keep
+    local NA   = Series.NA
+    local vals = {}
+    for i = 1, self:len() do
+        if mask:get(i) == false then
+            local v = self:get(i)
+            vals[#vals + 1] = (v == nil) and NA or v
+        end
+    end
+    return Series.from_table(vals, self._dtype, self._name)
+end
+
+-- combine_first(other): onde self é null, usa o valor de other na mesma posição.
+-- Exige mesmo tamanho e dtype compatível. → nova Series do dtype de self.
+function methods.combine_first(self, other)
+    if getmetatable(other) ~= Series then
+        error("smaug: combine_first() espera outra Series", 2)
+    end
+    if self._dtype ~= other._dtype then
+        error("smaug: combine_first() — dtypes diferentes ('"..self._dtype
+              .."' vs '"..other._dtype.."')", 2)
+    end
+    if self:len() ~= other:len() then
+        error("smaug: combine_first() — tamanhos diferentes ("..self:len()
+              .." vs "..other:len()..")", 2)
+    end
+    local NA   = Series.NA
+    local vals = {}
+    for i = 1, self:len() do
+        local v = self:get(i)
+        if v == nil then
+            local o = other:get(i)
+            vals[i] = (o == nil) and NA or o
+        else
+            vals[i] = v
+        end
+    end
+    return Series.from_table(vals, self._dtype, self._name)
+end
+
+-- searchsorted(value, [side]): posição de inserção (1-based) que mantém a ordem.
+-- Exige série ordenada crescente (verifica via is_monotonic_increasing).
+-- side="left" (default): primeira posição onde value caberia (antes dos iguais).
+-- side="right": após os iguais. Nulos não são permitidos (série deve ser ordenável).
+function methods.searchsorted(self, value, side)
+    if self._dtype ~= "float64" and self._dtype ~= "int64"
+       and self._dtype ~= "datetime" and self._dtype ~= "string" then
+        error("smaug: searchsorted() requer dtype ordenável, não '"..self._dtype.."'", 2)
+    end
+    side = side or "left"
+    if side ~= "left" and side ~= "right" then
+        error("smaug: searchsorted() side ∈ {left, right}", 2)
+    end
+    if not self:is_monotonic_increasing() then
+        error("smaug: searchsorted() requer série ordenada crescente (sem nulos)", 2)
+    end
+    local lo, hi = 1, self:len() + 1   -- busca em [lo, hi)
+    while lo < hi do
+        local mid = math.floor((lo + hi) / 2)
+        local v   = self:get(mid)
+        local go_right
+        if side == "left" then
+            go_right = (v < value)
+        else
+            go_right = (v <= value)
+        end
+        if go_right then lo = mid + 1 else hi = mid end
+    end
+    return lo
+end
+
+-- rep_each(n): repete cada elemento `n` vezes, em ordem.
+-- n: inteiro escalar >= 0, OU Series<int64> com contagem por elemento.
+-- Nulos são repetidos como nulos. n=0 (escalar) → série vazia.
+-- Nota: nome é rep_each (não "repeat") porque `repeat` é palavra reservada
+-- em Lua e impediria a sintaxe de chamada s:repeat(...).
+function methods.rep_each(self, n)
+    local NA   = Series.NA
+    local len  = self:len()
+    local vals = {}
+    local counts
+
+    if type(n) == "number" then
+        if n < 0 or n ~= math.floor(n) then
+            error("smaug: rep_each(n) — n deve ser inteiro >= 0", 2)
+        end
+        counts = nil   -- escalar
+    elseif getmetatable(n) == Series then
+        if n._dtype ~= "int64" then
+            error("smaug: rep_each(Series) requer Series<int64>", 2)
+        end
+        if n:len() ~= len then
+            error("smaug: rep_each(Series) — tamanho diferente ("..n:len()
+                  .." vs "..len..")", 2)
+        end
+        counts = n
+    else
+        error("smaug: rep_each(n) — n deve ser inteiro ou Series<int64>", 2)
+    end
+
+    for i = 1, len do
+        local times
+        if counts == nil then
+            times = n
+        else
+            times = counts:get(i)
+            if times == nil or times < 0 then
+                error("smaug: rep_each — contagem inválida na posição "..i, 2)
+            end
+        end
+        local v = self:get(i)
+        for _ = 1, times do
+            vals[#vals + 1] = (v == nil) and NA or v
+        end
+    end
+    return Series.from_table(vals, self._dtype, self._name)
+end
+
+-- =====================================================================
 -- Rolling (janela deslizante) na Series
 -- Uso: s:rolling(3):sum() / s:rolling(3):mean() / etc.
 -- Primeiras (window-1) posições são NA. Nulos dentro da janela são ignorados.
