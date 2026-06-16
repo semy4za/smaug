@@ -34,33 +34,37 @@ Camadas externas podem mudar rapidamente. O núcleo muda com cautela.
 
 ## Modelo de anéis
 
+A partir do Anel 3 o crescimento segue **duas trilhas paralelas** que compartilham
+os anéis internos (0–2) e se reencontram no ML:
+
+- **Trilha Analítica** (linha matemática): Matrix → Tensor → ML.
+- **Trilha de Projeto** (linha de construção de aplicações): Persistence → Models.
+
+Conectividade (Anel 3) e os anéis externos de ferramentas/interação servem às duas.
+
 ```
-┌──────────────────────────────────────────────────────────┐
-│  Anel 7  Interação — TUI, Studio, Web, Notebooks         │
-│  ┌──────────────────────────────────────────────────┐    │
-│  │  Anel 6  Ferramentas — Console, Debug, Profiling │    │
-│  │  ┌────────────────────────────────────────────┐  │    │
-│  │  │  Anel 5  Analytics e Machine Learning      │  │    │
-│  │  │  ┌──────────────────────────────────────┐  │  │    │
-│  │  │  │  Anel 4  Persistência — ORM, Schema  │  │  │    │
-│  │  │  │  ┌────────────────────────────────┐  │  │  │    │
-│  │  │  │  │  Anel 3  Conectividade — I/O   │  │  │  │    │
-│  │  │  │  │  ┌──────────────────────────┐  │  │  │  │    │
-│  │  │  │  │  │  Anel 2  Op. Relacionais │  │  │  │  │    │
-│  │  │  │  │  │  ┌────────────────────┐  │  │  │  │  │    │
-│  │  │  │  │  │  │  Anel 1  Abstrações│  │  │  │  │  │    │
-│  │  │  │  │  │  │  ┌──────────────┐  │  │  │  │  │  │    │
-│  │  │  │  │  │  │  │  Anel 0     │  │  │  │  │  │  │    │
-│  │  │  │  │  │  │  │  Núcleo C   │  │  │  │  │  │  │    │
-│  │  │  │  │  │  │  └──────────────┘  │  │  │  │  │  │    │
-│  │  │  │  │  │  └────────────────────┘  │  │  │  │  │    │
-│  │  │  │  │  └──────────────────────────┘  │  │  │  │    │
-│  │  │  │  └────────────────────────────────┘  │  │  │    │
-│  │  │  └──────────────────────────────────────┘  │  │    │
-│  │  └────────────────────────────────────────────┘  │    │
-│  └──────────────────────────────────────────────────┘    │
-└──────────────────────────────────────────────────────────┘
+Anel 0  Núcleo C           buffers, memória, tipos, primitivas, engine
+Anel 1  Abstrações          Series, BoolSeries, operações vetorizadas
+Anel 2  Op. Relacionais     DataSet, join, groupby, reshape
+Anel 3  Conectividade / I/O CSV, JSON, + conectores externos (SQL, Excel, Parquet)
+
+        ── Trilha de Projeto ──        ── Trilha Analítica ──
+Anel 4  Persistência                 Anel 6  Matrix
+        .smg, save/load, snapshots            layout 2D denso, álgebra linear
+Anel 5  Models                        Anel 7  Tensor
+        schema, validação, CRUD local         N-dimensional, broadcasting axis-aware
+                                       Anel 8  Machine Learning
+                                               pipelines, treino/inferência
+
+Anel 9  Interação — TUI, Studio, Web, Notebooks   (serve a todas as trilhas)
 ```
+
+**Ponto de encontro:** o ML (Anel 8) consome o schema dos Models (Anel 5) e os
+buffers contíguos do Núcleo (Anel 0). As duas trilhas convergem ali.
+
+**Dependências (P2):** cada anel pode depender de anéis internos; nunca o inverso.
+As duas trilhas dependem de 0–3; não dependem uma da outra (Matrix não conhece
+Persistence, e vice-versa).
 
 ---
 
@@ -151,64 +155,112 @@ DataSet → Conectividade → Destino         (exportar)
 
 ---
 
-## Anel 4 — Persistência `[Concept — v2.0]`
+## Anel 4 — Persistência `[Concept]`
 
-Gerencia estruturas persistidas e sua evolução ao longo do tempo.
+Trilha de Projeto. Faz dados sobreviverem ao fim do processo. **Não é um banco
+de dados nem um ORM** — é serialização de estruturas Smaug.
 
 **Responsabilidades:**
-- ORM e Query Builder
-- Registro de metadados e schema formal
-- Engine de migração (estilo Alembic)
-- Versionamento de schema
+- Formato binário próprio (`.smg`): header (magic, versão, schema) + buffers por
+  coluna + máscara de nulos
+- `df:save("vendas.smg")` / `smaug.load("vendas.smg")`
+- Snapshots
+- Reader defensivo: arquivo truncado/corrompido/versão futura → erro claro, nunca
+  crash (o engine não confia no arquivo, como não confia no caller)
+
+**O que NÃO é (Fronteira encerrada):** ORM relacional, query builder, engine de
+migração estilo Alembic. Quem precisa de banco relacional usa SQLite via Anel 3.
+Persistência aqui responde *"como meu DataSet sobrevive ao processo?"* — não
+*"como modelo estruturas relacionais que evoluem?"*.
 
 **Distinção fundamental:**
 - Conectividade (Anel 3) responde: *como os dados entram e saem?*
-- Persistência (Anel 4) responde: *como estruturas persistidas são organizadas e evoluem?*
+- Persistência (Anel 4) responde: *como um DataSet é serializado e recarregado idêntico?*
+
+**Reuso:** aproveita os buffers contíguos do Anel 0 — salvar é, no essencial,
+dump do buffer + cabeçalho de schema.
 
 **Dependência:** Anel 4 → Anel 3 → Anel 2 → Anel 1 → Anel 0.
 
 ---
 
-## Anel 5 — Analytics e Machine Learning `[Concept]`
+## Anel 5 — Models `[Concept]`
 
-Transforma dados em conhecimento, métricas ou modelos preditivos.
+Trilha de Projeto. Camada de schema sobre os dados do próprio Smaug. **Não é ORM
+relacional e não é persistência** — é uma camada própria que responde *"qual é a
+forma e o contrato do meu dado?"*.
 
 **Responsabilidades:**
-- Análise exploratória, profiling, estatísticas descritivas avançadas
+- Schema nomeado: `smaug.Model("Pedido", { id="int64", valor="float64", uf="string" })`
+- Validação, constraints, defaults, documentação do dado
+- CRUD sobre DataSet **em memória** (create/update/delete/filter)
+- Persistência delegada ao Anel 4 (`model:save()` / `Model.load(...)`)
+
+**O que NÃO é (Fronteira encerrada):** sem transação, sem índice, sem
+concorrência. Quem precisa disso usa SQLite via Anel 3. O Model opera sobre
+DataSets em memória e persiste via serialização — não é um engine transacional.
+
+**Papel na arquitetura:** é o contrato entre "os dados" e "o pipeline". Quando o
+ML (Anel 8) precisa saber o que é feature, target, tipo de cada coluna e política
+de nulo, essa informação mora no Model — não em convenção solta. Por isso Models
+é fundação da Trilha Analítica também: **é onde as duas trilhas se encontram.**
+
+**Dependência:** Anel 5 → Anel 4 → ... → Anel 0.
+
+---
+
+## Anel 6 — Matrix `[Concept]`
+
+Trilha Analítica. Tipo matricial 2D denso, distinto do `DataSet` heterogêneo.
+
+**Responsabilidades:**
+- Layout 2D denso sobre buffer contíguo (a porta que o Bloco G mantém aberta)
+- Álgebra linear básica, reduções por eixo, normalização
+
+**Regra arquitetural:** Matrix consome buffers do Núcleo. O DataSet não conhece
+Matrix.
+
+---
+
+## Anel 7 — Tensor `[Concept]`
+
+Trilha Analítica. Generalização N-dimensional do Matrix.
+
+**Responsabilidades:**
+- Tensores N-dimensionais
+- Broadcasting axis-aware (pertence aqui, **não** ao Anel 1 — Fronteira encerrada)
+
+---
+
+## Anel 8 — Machine Learning `[Concept]`
+
+Trilha Analítica. Transforma dados em modelos preditivos. **Ponto de encontro das
+duas trilhas:** consome o schema dos Models (Anel 5) e os buffers do Núcleo.
+
+**Responsabilidades:**
+- Pipelines de preparação (imputação, encoding, normalização) reusando primitivas
+  do Anel 0
+- Treinamento e inferência
 - Engenharia de atributos
-- Pipelines de treinamento e inferência
-- Tipo `Matrix`/`Tensor2D` (distinto do `DataSet` heterogêneo)
-- Broadcasting axis-aware (pertence aqui, não ao Anel 1)
+- Análise exploratória, profiling, estatísticas descritivas avançadas
 
-**Regra arquitetural:** ML consome DataSets. DataSets não conhecem ML.
+**Regra arquitetural:** ML consome DataSets e Models. DataSets e Models não
+conhecem ML.
 
-**Lazy evaluation:** vem junto com ou depois do SQL (Anel 3 v1.5), porque o
-maior ganho é o predicate pushdown sobre fontes externas.
-
-**Dependência:** Anel 5 → anéis internos conforme necessário.
+**Lazy evaluation:** vem junto com ou depois do SQL (Anel 3 v1.5), porque o maior
+ganho é o predicate pushdown sobre fontes externas.
 
 ---
 
-## Anel 6 — Ferramentas `[Concept]`
+## Anel 9 — Interação e Ferramentas `[Concept]`
 
-Observabilidade e produtividade. Ferramentas observam — não definem semântica.
-
-**Responsabilidades:**
-- Rich console: `describe`, `explain`, inspeção de schema
-- Relatórios de profiling
-- Ferramentas de debug e exploração de dados
-
----
-
-## Anel 7 — Interação `[Concept]`
-
-Mecanismos de interação humana. Interfaces consomem serviços — não definem
-lógica de negócio nem semântica de dados.
+Mecanismos de interação humana e observabilidade. Interfaces e ferramentas
+consomem serviços — não definem lógica de negócio nem semântica de dados.
 
 **Responsabilidades:**
 - TUI, Studio (Smaug|Vialactea Studio)
-- Dashboards, integrações com notebooks
-- Interfaces web, exploradores visuais
+- Rich console: `describe`, `explain`, inspeção de schema; profiling; debug
+- Dashboards, integrações com notebooks, exploradores visuais
 
 ---
 
@@ -217,9 +269,13 @@ lógica de negócio nem semântica de dados.
 | Versão | Marco | Critério |
 |---|---|---|
 | **1.0** | DataFrame library completa | Anéis 0+1+2+3 + estatística robusta + dtypes `datetime`/`categorical` + transformações vetorizadas. Zero dependências externas. |
-| **1.5** | Conectividade avançada + Lazy | SQLite, Excel, Parquet/Arrow, `lazy execution`, `groupby.agg/transform`. Primeira dependência externa (libsqlite3, zlib). |
-| **2.0** | Persistência/ORM | Schema, migrations, audit trail. Anel 4 completo. |
-| **2.x** | ML e Analytics | `Matrix`/`Tensor2D`, broadcasting, pipelines. Anel 5. |
+| **1.5** | Conectividade avançada + Lazy + Persistência | SQLite, Excel, Parquet/Arrow, `lazy execution`, driver de banco (`connect`/`query`/`execute`). Serialização `.smg` (Anel 4). Primeira dependência externa (libsqlite3/libpq, zlib). |
+| **2.0** | Models | Schema, validação, CRUD local, save/load via Anel 4. Anel 5. |
+| **2.x+** | Trilha Analítica | `Matrix` (Anel 6), `Tensor` + broadcasting axis-aware (Anel 7), ML e pipelines (Anel 8). |
+
+*A numeração de versões não espelha 1:1 a de anéis — a v1.5 entrega tanto
+conectividade (Anel 3 estendido) quanto serialização (Anel 4), porque ambas são
+da Trilha de Projeto e dependem de infra externa.*
 
 ---
 
@@ -257,6 +313,11 @@ A implementação ocorre nesse anel — nunca mais profundamente do que o necess
 | Extensibilidade para novos formatos I/O | ✅ Forte — fronteira `smaug_table_t` plugável |
 
 ### Validação e evidências
+
+> **Nota:** os números abaixo refletem a medição anterior ao fechamento do Bloco F.
+> As contagens atuais são maiores (28 suítes Lua, 10+ binários C). Os percentuais
+> de cobertura serão **regenerados a partir do gcov real no hardening global**
+> (Fase 5 do Roadmap) — não são atualizados de memória, por princípio.
 
 | Área | Estado |
 |---|---|
