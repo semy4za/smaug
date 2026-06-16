@@ -24,6 +24,8 @@
 -- independentes, portanto DataSets derivados são sempre seguros.
 
 local Series     = require("smaug.core.series")
+local ffi        = require("ffi")
+local C          = require("smaug.ffi_loader")
 
 local DataSet = {}
 local methods = {}
@@ -697,36 +699,69 @@ local function keys_eq(a, b)
     return true
 end
 
--- Ordena por múltiplas chaves: argsort pela primeira, depois estabiliza pelas
--- demais com insertion sort (N grupos pequenos — custo real é baixo).
+-- Mapeia dtype Smaug → código de kind para smaug_multi_argsort_ffi.
+local SORT_COL_KIND = {
+    float64  = 0,   -- SMAUG_COL_F64
+    int64    = 1,   -- SMAUG_COL_I64
+    string   = 2,   -- SMAUG_COL_STR
+    datetime = 3,   -- SMAUG_COL_DT
+    bool     = 4,   -- SMAUG_COL_BOOL
+}
+
+-- multi_argsort: sort estável multi-coluna via C (Grupo C Fase 3).
+-- Retorna tabela Lua 1-based de índices ordenados.
+-- Fallback Lua para dtypes não cobertos (categorical).
 local function multi_argsort(ds, key_names)
-    if #key_names == 1 then
-        local p = ds:column(key_names[1]):argsort(true)
-        if p == nil then
-            error("smaug: groupby — coluna '"..key_names[1].."' tem nulos"
-                  .." (use dropna primeiro)", 4)
-        end
-        return p
-    end
-    -- chave composta: ordena pelo índice de linha com comparação lexicográfica
     local n = ds:nrows()
-    local cols = {}
+
+    -- DataSet vazio: sem linhas para ordenar
+    if n == 0 then return {} end
+
+    -- Validar nulos e coletar colunas
+    local cols_lua = {}
     for _, name in ipairs(key_names) do
         local col = ds:column(name)
-        -- validar ausência de nulos em cada chave
         for i = 1, n do
             if col:is_null(i) then
                 error("smaug: groupby — coluna '"..name.."' tem nulos"
                       .." (use dropna primeiro)", 4)
             end
         end
-        cols[#cols+1] = col
+        cols_lua[#cols_lua+1] = col
     end
-    -- índices 1-based
+
+    -- Verificar se todos os dtypes têm suporte C
+    local all_c = true
+    for _, col in ipairs(cols_lua) do
+        if not SORT_COL_KIND[col._dtype] then
+            all_c = false; break
+        end
+    end
+
+    if all_c and #key_names > 0 then
+        -- Caminho C: monta array de smaug_sort_col_ffi_t
+        local ffi_cols = ffi.new("smaug_sort_col_ffi_t[?]", #cols_lua)
+        for k, col in ipairs(cols_lua) do
+            ffi_cols[k-1].kind = SORT_COL_KIND[col._dtype]
+            ffi_cols[k-1].ptr  = ffi.cast("void*", col._c)
+        end
+        local perm_ptr = C.smaug_multi_argsort_ffi(ffi_cols, #cols_lua, n)
+        -- NULL aqui é OOM real (n>0 já verificado acima)
+        if perm_ptr == nil then
+            error("smaug: multi_argsort — OOM", 4)
+        end
+        -- Converter 0-based C → 1-based Lua
+        local idx = {}
+        for i = 0, n - 1 do idx[i+1] = tonumber(perm_ptr[i]) + 1 end
+        C.smaug_free(perm_ptr)
+        return idx
+    end
+
+    -- Fallback Lua: dtypes sem suporte C (categorical, etc.)
     local idx = {}
     for i = 1, n do idx[i] = i end
     table.sort(idx, function(a, b)
-        for _, col in ipairs(cols) do
+        for _, col in ipairs(cols_lua) do
             local va, vb = col:get(a), col:get(b)
             if type(va) == "boolean" then va = va and 1 or 0 end
             if type(vb) == "boolean" then vb = vb and 1 or 0 end

@@ -86,6 +86,11 @@ local DTYPES = {
         bfill   = C.smaug_f64_bfill,
         argmin  = C.smaug_f64_argmin,
         argmax  = C.smaug_f64_argmax,
+        -- Grupo C (Fase 3 Ring 0): rolling ops
+        rolling_sum  = C.smaug_f64_rolling_sum,
+        rolling_mean = C.smaug_f64_rolling_mean,
+        rolling_min  = C.smaug_f64_rolling_min,
+        rolling_max  = C.smaug_f64_rolling_max,
     },
     int64 = {
         name        = "int64",
@@ -132,6 +137,11 @@ local DTYPES = {
         bfill   = C.smaug_i64_bfill,
         argmin  = C.smaug_i64_argmin,
         argmax  = C.smaug_i64_argmax,
+        -- Grupo C (Fase 3 Ring 0): rolling ops
+        rolling_sum  = C.smaug_i64_rolling_sum,
+        rolling_mean = C.smaug_i64_rolling_mean,
+        rolling_min  = C.smaug_i64_rolling_min,
+        rolling_max  = C.smaug_i64_rolling_max,
     },
     string = {
         name        = "string",
@@ -1200,11 +1210,23 @@ function SeriesRolling:_agg(fn)
 end
 
 function SeriesRolling:sum()
+    if self._s._d.rolling_sum then
+        local r = self._s._d.rolling_sum(self._s._c, self._window)
+        if r == nil then error("smaug: rolling:sum falhou (OOM)", 2) end
+        return wrap(r, self._s._dtype, self._s._name)
+    end
     return self:_agg(function(vs)
         local s = 0; for _, v in ipairs(vs) do s = s + v end; return s
     end)
 end
+
 function SeriesRolling:mean()
+    if self._s._d.rolling_mean then
+        local r = self._s._d.rolling_mean(self._s._c, self._window)
+        if r == nil then error("smaug: rolling:mean falhou (OOM)", 2) end
+        -- mean sempre retorna f64 (mesmo para i64)
+        return wrap(r, "float64", self._s._name)
+    end
     local col  = self._s
     local n    = col:len()
     local w    = self._window
@@ -1228,14 +1250,26 @@ function SeriesRolling:mean()
     end
     return Series.from_table(vals, "float64", col._name)
 end
+
 function SeriesRolling:min()
+    if self._s._d.rolling_min then
+        local r = self._s._d.rolling_min(self._s._c, self._window)
+        if r == nil then error("smaug: rolling:min falhou (OOM)", 2) end
+        return wrap(r, self._s._dtype, self._s._name)
+    end
     return self:_agg(function(vs)
         if #vs == 0 then return nil end
         local m = vs[1]; for _, v in ipairs(vs) do if v < m then m = v end end
         return m
     end)
 end
+
 function SeriesRolling:max()
+    if self._s._d.rolling_max then
+        local r = self._s._d.rolling_max(self._s._c, self._window)
+        if r == nil then error("smaug: rolling:max falhou (OOM)", 2) end
+        return wrap(r, self._s._dtype, self._s._name)
+    end
     return self:_agg(function(vs)
         if #vs == 0 then return nil end
         local m = vs[1]; for _, v in ipairs(vs) do if v > m then m = v end end

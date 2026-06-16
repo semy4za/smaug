@@ -1,13 +1,13 @@
 /* tests/test_ops_window.c
  *
- * Testes C para as primitivas do Grupo A (Fase 3 Ring 0):
- * cumsum, cumprod, cummin, cummax, diff, shift, ffill, bfill, argmin, argmax
- * para smaug_series_f64_t e smaug_series_i64_t.
- *
- * Padrão de teste: valor correto + propagação de null + série vazia + OOM guard.
+ * Testes C para as primitivas do Grupo A, B e C (Fase 3 Ring 0):
+ * cumsum, cumprod, cummin, cummax, diff, shift, ffill, bfill, argmin, argmax,
+ * sorted_nonnull, rank (Grupos A+B) e multi_argsort, rolling_* (Grupo C).
  */
 
 #include "../include/smaug_numeric.h"
+#include "../include/smaug_ops_window.h"
+#include "../include/smaug_string.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -557,6 +557,221 @@ static void test_i64_rank(void) {
 }
 
 /* =====================================================================
+   multi_argsort
+   ===================================================================== */
+
+/* Helper: cria smaug_series_str_t com strings simples */
+static smaug_series_str_t *str_from(const char **strs, size_t n) {
+    smaug_series_str_t *s = smaug_str_create(n);
+    if (!s) return NULL;
+    for (size_t i = 0; i < n; i++) {
+        if (strs[i] == NULL) smaug_str_set_null(s, i);
+        else smaug_str_set(s, i, strs[i], strlen(strs[i]));
+    }
+    return s;
+}
+
+static void test_multi_argsort_single_f64(void) {
+    /* Coluna única f64: [3, 1, 2] → perm [1, 2, 0] */
+    double arr[] = {3.0, 1.0, 2.0};
+    smaug_series_f64_t *col = f64_from(arr, 3);
+    smaug_sort_col_t cols[1] = {{ SMAUG_COL_F64, .f64 = col }};
+    size_t *perm = smaug_multi_argsort(cols, 1, 3);
+    CHECK(perm && perm[0] == 1, "multi_argsort f64 single: perm[0]=1");
+    CHECK(perm && perm[1] == 2, "multi_argsort f64 single: perm[1]=2");
+    CHECK(perm && perm[2] == 0, "multi_argsort f64 single: perm[2]=0");
+    free(perm); smaug_f64_free(col);
+}
+
+static void test_multi_argsort_single_i64(void) {
+    int64_t arr[] = {10, 30, 20};
+    smaug_series_i64_t *col = i64_from(arr, 3);
+    smaug_sort_col_t cols[1] = {{ SMAUG_COL_I64, .i64 = col }};
+    size_t *perm = smaug_multi_argsort(cols, 1, 3);
+    CHECK(perm && perm[0] == 0, "multi_argsort i64 single: perm[0]=0");
+    CHECK(perm && perm[1] == 2, "multi_argsort i64 single: perm[1]=2");
+    CHECK(perm && perm[2] == 1, "multi_argsort i64 single: perm[2]=1");
+    free(perm); smaug_i64_free(col);
+}
+
+static void test_multi_argsort_str(void) {
+    /* ["banana", "abacate", "caju"] → perm [1, 0, 2] */
+    const char *strs[] = {"banana", "abacate", "caju"};
+    smaug_series_str_t *col = str_from(strs, 3);
+    smaug_sort_col_t cols[1] = {{ SMAUG_COL_STR, .str = col }};
+    size_t *perm = smaug_multi_argsort(cols, 1, 3);
+    CHECK(perm && perm[0] == 1, "multi_argsort str: perm[0]=1 (abacate)");
+    CHECK(perm && perm[1] == 0, "multi_argsort str: perm[1]=0 (banana)");
+    CHECK(perm && perm[2] == 2, "multi_argsort str: perm[2]=2 (caju)");
+    free(perm); smaug_str_free(col);
+}
+
+static void test_multi_argsort_bool(void) {
+    /* [true, false, true] → perm [1, 0, 2] (false < true) */
+    uint8_t arr[] = {1, 0, 1};
+    smaug_series_bool_t *col = smaug_bool_create(3);
+    for (int i = 0; i < 3; i++) { smaug_bool_set(col, i, arr[i]); }
+    smaug_sort_col_t cols[1] = {{ SMAUG_COL_BOOL, .boo = col }};
+    size_t *perm = smaug_multi_argsort(cols, 1, 3);
+    CHECK(perm && perm[0] == 1, "multi_argsort bool: perm[0]=1 (false primeiro)");
+    free(perm); smaug_bool_free(col);
+}
+
+static void test_multi_argsort_composite(void) {
+    /* chave composta: col1=[SP, SP, RJ], col2=[2, 1, 3]
+       ordem: RJ/3=idx2, SP/1=idx1, SP/2=idx0
+       perm = [2, 1, 0] */
+    const char *cities[] = {"SP", "SP", "RJ"};
+    int64_t years[] = {2, 1, 3};
+    smaug_series_str_t *col_city = str_from(cities, 3);
+    smaug_series_i64_t *col_year = i64_from(years, 3);
+
+    smaug_sort_col_t cols[2] = {
+        { SMAUG_COL_STR, .str = col_city },
+        { SMAUG_COL_I64, .i64 = col_year }
+    };
+    size_t *perm = smaug_multi_argsort(cols, 2, 3);
+    CHECK(perm && perm[0] == 2, "multi_argsort composite: perm[0]=2 (RJ/3)");
+    CHECK(perm && perm[1] == 1, "multi_argsort composite: perm[1]=1 (SP/1)");
+    CHECK(perm && perm[2] == 0, "multi_argsort composite: perm[2]=0 (SP/2)");
+    free(perm);
+    smaug_str_free(col_city); smaug_i64_free(col_year);
+}
+
+static void test_multi_argsort_stable(void) {
+    /* Estabilidade: empates preservam ordem original.
+       col1=[1,1,1] col2=[2,2,2]: perm deve ser [0,1,2] */
+    double arr[] = {1.0, 1.0, 1.0};
+    smaug_series_f64_t *col = f64_from(arr, 3);
+    smaug_sort_col_t cols[1] = {{ SMAUG_COL_F64, .f64 = col }};
+    size_t *perm = smaug_multi_argsort(cols, 1, 3);
+    CHECK(perm && perm[0] == 0, "multi_argsort stable: empates preservados [0]");
+    CHECK(perm && perm[1] == 1, "multi_argsort stable: empates preservados [1]");
+    CHECK(perm && perm[2] == 2, "multi_argsort stable: empates preservados [2]");
+    free(perm); smaug_f64_free(col);
+}
+
+static void test_multi_argsort_edge(void) {
+    /* NULL/zero */
+    CHECK(smaug_multi_argsort(NULL, 1, 3) == NULL, "multi_argsort NULL cols");
+    double arr[] = {1.0};
+    smaug_series_f64_t *col = f64_from(arr, 1);
+    smaug_sort_col_t cols[1] = {{ SMAUG_COL_F64, .f64 = col }};
+    CHECK(smaug_multi_argsort(cols, 0, 1) == NULL, "multi_argsort ncols=0");
+    CHECK(smaug_multi_argsort(cols, 1, 0) == NULL, "multi_argsort nrows=0");
+    smaug_f64_free(col);
+}
+
+/* =====================================================================
+   rolling ops f64
+   ===================================================================== */
+
+static void test_f64_rolling_sum(void) {
+    /* [1,2,3,4,5] window=3 → [NA,NA,6,9,12] */
+    double arr[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    smaug_series_f64_t *s = f64_from(arr, 5);
+    smaug_series_f64_t *r = smaug_f64_rolling_sum(s, 3);
+    CHECK(r && f64_null(r, 0), "f64 rolling_sum [0]=NA");
+    CHECK(r && f64_null(r, 1), "f64 rolling_sum [1]=NA");
+    CHECK(r && APPROX(f64_get(r, 2), 6.0),  "f64 rolling_sum [2]=6");
+    CHECK(r && APPROX(f64_get(r, 3), 9.0),  "f64 rolling_sum [3]=9");
+    CHECK(r && APPROX(f64_get(r, 4), 12.0), "f64 rolling_sum [4]=12");
+    smaug_f64_free(r); smaug_f64_free(s);
+
+    /* com null: [1, null, 3, 4] window=2 → [NA, 1, 3, 7] */
+    double arr2[] = {1.0, -9999.0, 3.0, 4.0};
+    smaug_series_f64_t *s2 = f64_from(arr2, 4);
+    smaug_series_f64_t *r2 = smaug_f64_rolling_sum(s2, 2);
+    CHECK(r2 && f64_null(r2, 0),              "f64 rolling_sum null [0]=NA");
+    CHECK(r2 && APPROX(f64_get(r2, 1), 1.0), "f64 rolling_sum null [1]=1 (null ignorado, soma de [1,null]=1)");
+    CHECK(r2 && APPROX(f64_get(r2, 2), 3.0), "f64 rolling_sum null [2]=3 (null+3=3)");
+    CHECK(r2 && APPROX(f64_get(r2, 3), 7.0), "f64 rolling_sum null [3]=7");
+    smaug_f64_free(r2); smaug_f64_free(s2);
+
+    CHECK(smaug_f64_rolling_sum(NULL, 3) == NULL, "f64 rolling_sum NULL");
+}
+
+static void test_f64_rolling_mean(void) {
+    double arr[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    smaug_series_f64_t *s = f64_from(arr, 5);
+    smaug_series_f64_t *r = smaug_f64_rolling_mean(s, 3);
+    CHECK(r && f64_null(r, 0), "f64 rolling_mean [0]=NA");
+    CHECK(r && APPROX(f64_get(r, 2), 2.0), "f64 rolling_mean [2]=2");
+    CHECK(r && APPROX(f64_get(r, 4), 4.0), "f64 rolling_mean [4]=4");
+    smaug_f64_free(r); smaug_f64_free(s);
+    CHECK(smaug_f64_rolling_mean(NULL, 3) == NULL, "f64 rolling_mean NULL");
+}
+
+static void test_f64_rolling_min(void) {
+    /* [3,1,4,1,5] window=3 → [NA,NA,1,1,1] */
+    double arr[] = {3.0, 1.0, 4.0, 1.0, 5.0};
+    smaug_series_f64_t *s = f64_from(arr, 5);
+    smaug_series_f64_t *r = smaug_f64_rolling_min(s, 3);
+    CHECK(r && f64_null(r, 0), "f64 rolling_min [0]=NA");
+    CHECK(r && APPROX(f64_get(r, 2), 1.0), "f64 rolling_min [2]=1");
+    CHECK(r && APPROX(f64_get(r, 3), 1.0), "f64 rolling_min [3]=1");
+    CHECK(r && APPROX(f64_get(r, 4), 1.0), "f64 rolling_min [4]=1");
+    smaug_f64_free(r); smaug_f64_free(s);
+    CHECK(smaug_f64_rolling_min(NULL, 3) == NULL, "f64 rolling_min NULL");
+}
+
+static void test_f64_rolling_max(void) {
+    double arr[] = {3.0, 1.0, 4.0, 1.0, 5.0};
+    smaug_series_f64_t *s = f64_from(arr, 5);
+    smaug_series_f64_t *r = smaug_f64_rolling_max(s, 3);
+    CHECK(r && f64_null(r, 0), "f64 rolling_max [0]=NA");
+    CHECK(r && APPROX(f64_get(r, 2), 4.0), "f64 rolling_max [2]=4");
+    CHECK(r && APPROX(f64_get(r, 3), 4.0), "f64 rolling_max [3]=4");
+    CHECK(r && APPROX(f64_get(r, 4), 5.0), "f64 rolling_max [4]=5");
+    smaug_f64_free(r); smaug_f64_free(s);
+    CHECK(smaug_f64_rolling_max(NULL, 3) == NULL, "f64 rolling_max NULL");
+}
+
+/* =====================================================================
+   rolling ops i64
+   ===================================================================== */
+
+static void test_i64_rolling_sum(void) {
+    int64_t arr[] = {1, 2, 3, 4, 5};
+    smaug_series_i64_t *s = i64_from(arr, 5);
+    smaug_series_i64_t *r = smaug_i64_rolling_sum(s, 3);
+    CHECK(r && i64_null(r, 0), "i64 rolling_sum [0]=NA");
+    CHECK(r && i64_get(r, 2) == 6,  "i64 rolling_sum [2]=6");
+    CHECK(r && i64_get(r, 4) == 12, "i64 rolling_sum [4]=12");
+    smaug_i64_free(r); smaug_i64_free(s);
+    CHECK(smaug_i64_rolling_sum(NULL, 3) == NULL, "i64 rolling_sum NULL");
+}
+
+static void test_i64_rolling_mean(void) {
+    int64_t arr[] = {1, 2, 3, 4, 5};
+    smaug_series_i64_t *s = i64_from(arr, 5);
+    smaug_series_f64_t *r = smaug_i64_rolling_mean(s, 3);
+    CHECK(r && f64_null(r, 0), "i64 rolling_mean [0]=NA");
+    CHECK(r && APPROX(f64_get(r, 2), 2.0), "i64 rolling_mean [2]=2.0");
+    CHECK(r && APPROX(f64_get(r, 4), 4.0), "i64 rolling_mean [4]=4.0");
+    smaug_f64_free(r); smaug_i64_free(s);
+    CHECK(smaug_i64_rolling_mean(NULL, 3) == NULL, "i64 rolling_mean NULL");
+}
+
+static void test_i64_rolling_min_max(void) {
+    int64_t arr[] = {3, 1, 4, 1, 5};
+    smaug_series_i64_t *s = i64_from(arr, 5);
+    smaug_series_i64_t *rmin = smaug_i64_rolling_min(s, 3);
+    CHECK(rmin && i64_null(rmin, 0),       "i64 rolling_min [0]=NA");
+    CHECK(rmin && i64_get(rmin, 2) == 1,   "i64 rolling_min [2]=1");
+    CHECK(rmin && i64_get(rmin, 4) == 1,   "i64 rolling_min [4]=1");
+    smaug_i64_free(rmin);
+
+    smaug_series_i64_t *rmax = smaug_i64_rolling_max(s, 3);
+    CHECK(rmax && i64_null(rmax, 0),       "i64 rolling_max [0]=NA");
+    CHECK(rmax && i64_get(rmax, 2) == 4,   "i64 rolling_max [2]=4");
+    CHECK(rmax && i64_get(rmax, 4) == 5,   "i64 rolling_max [4]=5");
+    smaug_i64_free(rmax);
+
+    smaug_i64_free(s);
+}
+
+/* =====================================================================
    main
    ===================================================================== */
 
@@ -583,6 +798,21 @@ int main(void) {
     test_i64_sorted_nonnull();
     test_f64_rank();
     test_i64_rank();
+    /* Grupo C */
+    test_multi_argsort_single_f64();
+    test_multi_argsort_single_i64();
+    test_multi_argsort_str();
+    test_multi_argsort_bool();
+    test_multi_argsort_composite();
+    test_multi_argsort_stable();
+    test_multi_argsort_edge();
+    test_f64_rolling_sum();
+    test_f64_rolling_mean();
+    test_f64_rolling_min();
+    test_f64_rolling_max();
+    test_i64_rolling_sum();
+    test_i64_rolling_mean();
+    test_i64_rolling_min_max();
 
     if (g_fails == 0) {
         printf("PASS: test_ops_window (%d checks)\n", g_checks);

@@ -11,7 +11,7 @@ ConvenÃ§Ã£o de status:
 - âš ï¸ ausÃªncia sem registro â€” suspeita, requer revisÃ£o humana
 - âŒ inconsistÃªncia clara â€” gap real
 
-Gerado em: 2026-06-16 17:28:53 UTC
+Gerado em: 2026-06-16 18:28:23 UTC
 
 ## Eixo 1 ÔÇö Paridade de m├®todos entre dtypes
 
@@ -647,7 +647,7 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 200/200 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 204/204 erros com prefixo `smaug:` (100.0%)
 - `dataset.lua`: 88/88 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 ÔÇö Paridade de lifecycle

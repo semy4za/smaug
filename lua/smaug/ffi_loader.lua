@@ -447,6 +447,45 @@ ffi.cdef([[
     smaug_series_dt_t* smaug_dt_sort   (const smaug_series_dt_t *s, bool ascending);
     smaug_series_dt_t* smaug_dt_take   (const smaug_series_dt_t *s, const size_t *idx, size_t len);
     smaug_series_dt_t* smaug_dt_filter (const smaug_series_dt_t *s, const uint8_t *mask);
+
+    /* ===================================================================
+       Grupo C (Fase 3 Ring 0): multi_argsort e rolling ops
+       =================================================================== */
+
+    /* --- smaug_multi_argsort ---
+       Tipos de coluna para o sort (espelho de smaug_col_kind_t em C). */
+    typedef enum {
+        SMAUG_COL_F64  = 0,
+        SMAUG_COL_I64  = 1,
+        SMAUG_COL_STR  = 2,
+        SMAUG_COL_DT   = 3,
+        SMAUG_COL_BOOL = 4
+    } smaug_col_kind_t;
+
+    /* Descritor de coluna de chave (union em C → maior membro define tamanho).
+       No FFI do LuaJIT declaramos como void* para evitar union; o wrapper Lua
+       popula o campo correto. */
+    typedef struct {
+        int      kind;   /* smaug_col_kind_t como int */
+        void    *ptr;    /* ponteiro para a struct da série */
+    } smaug_sort_col_ffi_t;
+
+    /* Wrapper FFI: recebe array de smaug_sort_col_ffi_t montados pelo Lua.
+       Definido em smaug_ops_window.c como função pública de fronteira. */
+    size_t* smaug_multi_argsort_ffi(const smaug_sort_col_ffi_t *cols,
+                                    size_t ncols, size_t nrows);
+
+    /* --- Rolling ops f64 --- */
+    smaug_series_f64_t* smaug_f64_rolling_sum (const smaug_series_f64_t *s, size_t window);
+    smaug_series_f64_t* smaug_f64_rolling_mean(const smaug_series_f64_t *s, size_t window);
+    smaug_series_f64_t* smaug_f64_rolling_min (const smaug_series_f64_t *s, size_t window);
+    smaug_series_f64_t* smaug_f64_rolling_max (const smaug_series_f64_t *s, size_t window);
+
+    /* --- Rolling ops i64 (mean retorna f64) --- */
+    smaug_series_i64_t* smaug_i64_rolling_sum (const smaug_series_i64_t *s, size_t window);
+    smaug_series_f64_t* smaug_i64_rolling_mean(const smaug_series_i64_t *s, size_t window);
+    smaug_series_i64_t* smaug_i64_rolling_min (const smaug_series_i64_t *s, size_t window);
+    smaug_series_i64_t* smaug_i64_rolling_max (const smaug_series_i64_t *s, size_t window);
 ]])
 
 -- Nome do arquivo da lib conforme o SO.

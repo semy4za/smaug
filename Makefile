@@ -3,7 +3,7 @@ CFLAGS  = -std=c11 -fPIC -Wall -Wextra -O2 -I./include
 LDFLAGS = -shared
 
 # Backend C completo (f64 + i64 + bool + string)
-SRCS = src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c src/smaug_ops_bool.c src/smaug_str.c src/smaug_ops_str.c src/smaug_csv.c src/smaug_json.c src/smaug_datetime.c
+SRCS = src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c src/smaug_ops_bool.c src/smaug_str.c src/smaug_ops_str.c src/smaug_csv.c src/smaug_json.c src/smaug_datetime.c src/smaug_ops_window.c
 
 TARGET = build/libsmaug.so
 
@@ -17,7 +17,7 @@ TEST_CFLAGS = -std=c11 -g -O0 -Wall -Wextra -I./include
 #   C_TEST_WRAP   : teste(s) que exigem -Wl,--wrap (falha de alocação).
 #   LUA_TESTS     : suítes do frontend Lua.
 C_TESTS_PLAIN = test_alloc test_ops test_ops_edge test_bool test_bool_lifecycle test_string test_cow \
-                test_io_c test_datetime_c
+                test_io_c test_datetime_c test_ops_window
 C_TEST_WRAP   = test_allocfail
 C_TEST_STRESS = test_stress
 LUA_TESTS     = test_series test_i64 test_bool_dtype test_edge test_special test_fillna \
