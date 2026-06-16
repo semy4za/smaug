@@ -11,7 +11,7 @@ ConvenÃ§Ã£o de status:
 - âš ï¸ ausÃªncia sem registro â€” suspeita, requer revisÃ£o humana
 - âŒ inconsistÃªncia clara â€” gap real
 
-Gerado em: 2026-06-16 18:28:23 UTC
+Gerado em: 2026-06-16 18:31:35 UTC
 
 ## Eixo 1 ÔÇö Paridade de m├®todos entre dtypes
 
