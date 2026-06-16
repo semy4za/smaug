@@ -6,7 +6,94 @@ decisões, achados, motivações.
 
 ---
 
-## 2026-06-15 — Bloco F.6 (duplicatas e binárias) — Bloco F completo
+## 2026-06-16 — Fase 3 Grupos A+B (Ring 0) + G.1 UTF-8 JSON
+
+Início da Fase 3: migração de primitivas Lua puro para Ring 0 (C), guiada
+pelo Bloco G. Duas frentes paralelas nesta sessão: G.1 (bloqueante de release)
+e Grupos A+B do inventário de primitivas.
+
+### G.1 — Decodificação UTF-8 no reader JSON
+
+Eliminada a degradação silenciosa `\uXXXX → '?'` que existia em
+`smaug_json.c`. Implementação completa em `read_json_string`:
+
+- `read_hex4`: lê 4 dígitos hex → codepoint; retorna -1 se hex inválido.
+- `encode_utf8`: codepoint → 1–4 bytes UTF-8 (cobre U+0000–U+10FFFF).
+- BMP (U+0000–U+FFFF): decodificado diretamente.
+- Surrogate pairs (`\uD800–\uDBFF` + `\uDC00–\uDFFF`): montados em
+  codepoint suplementar (U+10000–U+10FFFF) e codificados em 4 bytes UTF-8.
+- Surrogate isolado ou hex inválido → `TOK_ERROR` → `make_error` com
+  mensagem clara. Nunca silencioso.
+
+`.str` permanece byte-oriented — contrato inalterado. `str:len()` retorna
+bytes, não codepoints. `test_io_c`: 174 → 190 checks (+16, 8 casos unicode).
+
+**Motivação:** `json.dumps` Python com `ensure_ascii=True` (default) serializa
+qualquer não-ASCII como `\uXXXX`. Dados brasileiros reais (nomes, cidades com
+acento) produzem escapes rotineiramente. O `'?'` silencioso era bug de
+integridade indetectável em produção.
+
+### Grupo A — 10 primitivas O(N) para Ring 0
+
+Migradas de Lua puro para C em `smaug_ops_f64.c` e `smaug_ops_i64.c`,
+declaradas em `smaug_numeric.h`, registradas no `DTYPES` de `series.lua`
+e no `ffi_loader.lua`:
+
+`cumsum`, `cumprod`, `cummin`, `cummax`, `diff`, `shift`, `ffill`, `bfill`,
+`argmin`, `argmax` — para `smaug_series_f64_t` e `smaug_series_i64_t`.
+
+**Contratos relevantes:**
+- `cummin`/`cummax`: nulos não propagam para frente (posição nula fica nula,
+  mas as seguintes continuam recebendo o acumulado). Contrato mais útil que o
+  `cumsum`/`cumprod` onde null contamina o restante.
+- `diff` datetime: permanece Lua (usa `smaug_dt_diff_ms`).
+- `shift` negativo (periods < 0): permanece Lua (C usa `size_t`).
+- `argmin`/`argmax`: retornam `SIZE_MAX` se série vazia ou toda-null; Lua
+  converte `SIZE_MAX → nil` e ajusta 0-based → 1-based.
+- `cummin`/`cummax`/`ffill`/`bfill` datetime: fallback Lua via nil-check em
+  `self._d.xxx`.
+
+Regra de migração aplicada: todas as funções C registradas nos descritores
+`DTYPES` (`float64` e `int64`) e acessadas via `self._d.fn(self._c)` — nunca
+`C.smaug_f64_fn` diretamente no corpo do método.
+
+### Grupo B — sorted_nonnull e rank para Ring 0
+
+Migradas de Lua puro para C:
+
+- `smaug_f64_sorted_nonnull` / `smaug_i64_sorted_nonnull`: coleta não-nulos
+  em `double*` / `int64_t*` ordenado crescente. Série toda-null retorna
+  `NULL` com `*out_n = 0` (não é erro). Caller libera com `smaug_free`.
+- `smaug_f64_rank` / `smaug_i64_rank`: rank 1-based com 4 methods
+  (0=average, 1=min, 2=max, 3=first). Nulos → `NAN` no resultado.
+  Caller libera com `smaug_free`.
+
+Comparadores (`cmp_double`, `cmp_rank_pair`, `cmp_i64`, `cmp_i64_rank_pair`)
+definidos como `static` no escopo do arquivo — C11 padrão, sem extensões GCC.
+
+**Consumidores Lua reescritos:** `median`, `quantile`, `nlargest`, `nsmallest`,
+`skew`, `kurtosis`, `mad`, `sem`, `rank`, `pct_rank` — todos delegam para C
+via `c_sorted_nonnull` (helper Lua que chama a primitiva C e devolve
+`ffi.new double[]` uniforme). `datetime` e `mad` (segundo passe sobre desvios)
+permanecem com fallback Lua.
+
+Grupo B não usa `DTYPES`: as funções retornam ponteiros brutos (`double*`,
+`int64_t*`), não `smaug_series_*_t` — são primitivas de buffer chamadas
+diretamente pelos métodos, não via descritor de dtype.
+
+### Testes
+
+`test_ops_window.c` — novo, cobre Grupos A e B: 150 checks.
+ASan+UBSan limpos. `test_allocfail` estável em 1158 verificações.
+
+### Próximo
+
+Fase 3 Grupo C: `multi_argsort` composto (DataSet) e `SeriesRolling:_agg`,
+após medição de performance no Windows.
+
+---
+
+
 
 Último sub-bloco do enriquecimento dos núcleos. Com ele, **o Bloco F inteiro
 (F.1–F.6) está fechado**.

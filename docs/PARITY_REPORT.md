@@ -11,7 +11,7 @@ ConvenÃ§Ã£o de status:
 - âš ï¸ ausÃªncia sem registro â€” suspeita, requer revisÃ£o humana
 - âŒ inconsistÃªncia clara â€” gap real
 
-Gerado em: 2026-06-15 17:32:25 UTC
+Gerado em: 2026-06-16 17:28:53 UTC
 
 ## Eixo 1 ÔÇö Paridade de m├®todos entre dtypes
 
@@ -259,7 +259,7 @@ M├®todos que existem em cada lado. Algumas assimetrias s├úo intencionais (
 Cada fun├º├úo p├║blica do backend C deveria ter caminho no frontend Lua (direto via FFI ou exposto via m├®todo Series). ÔÜá´©Å = fun├º├úo C que n├úo aparece em `lua/smaug/core/series.lua` (pode ser ├│rf├ú ou exposta indiretamente via outro nome).
 
 
-### f64 ÔÇö 37 fun├º├Áes C
+### f64 ÔÇö 49 fun├º├Áes C
 
 | fun├º├úo C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -267,15 +267,24 @@ Cada fun├º├úo p├║blica do backend C deveria ter caminho no frontend Lu
 | `add_scalar` | Ô£à |  |
 | `append` | Ô£à |  |
 | `append_null` | Ô£à |  |
+| `argmax` | Ô£à |  |
+| `argmin` | Ô£à |  |
 | `argsort` | Ô£à |  |
+| `bfill` | Ô£à |  |
 | `clone` | Ô£à |  |
 | `count_nonnull` | Ô£à |  |
 | `create` | Ô£à |  |
 | `create_from_array` | ÔÜá´©Å |  |
 | `create_with_capacity` | ÔÜá´©Å |  |
+| `cummax` | Ô£à |  |
+| `cummin` | Ô£à |  |
+| `cumprod` | Ô£à |  |
+| `cumsum` | Ô£à |  |
+| `diff` | Ô£à |  |
 | `div` | Ô£à |  |
 | `div_scalar` | Ô£à |  |
 | `eq` | Ô£à |  |
+| `ffill` | Ô£à |  |
 | `filter` | Ô£à |  |
 | `free` | Ô£à |  |
 | `ge` | Ô£à |  |
@@ -290,9 +299,12 @@ Cada fun├º├úo p├║blica do backend C deveria ter caminho no frontend Lu
 | `mul` | Ô£à |  |
 | `mul_scalar` | Ô£à |  |
 | `ne` | Ô£à |  |
+| `rank` | Ô£à |  |
 | `set` | Ô£à |  |
 | `set_null` | Ô£à |  |
+| `shift` | Ô£à |  |
 | `sort` | Ô£à |  |
+| `sorted_nonnull` | Ô£à |  |
 | `std` | Ô£à |  |
 | `sub` | Ô£à |  |
 | `sub_scalar` | Ô£à |  |
@@ -302,7 +314,7 @@ Cada fun├º├úo p├║blica do backend C deveria ter caminho no frontend Lu
 | `view` | Ô£à |  |
 
 
-### i64 ÔÇö 37 fun├º├Áes C
+### i64 ÔÇö 49 fun├º├Áes C
 
 | fun├º├úo C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -310,15 +322,24 @@ Cada fun├º├úo p├║blica do backend C deveria ter caminho no frontend Lu
 | `add_scalar` | Ô£à |  |
 | `append` | Ô£à |  |
 | `append_null` | Ô£à |  |
+| `argmax` | Ô£à |  |
+| `argmin` | Ô£à |  |
 | `argsort` | Ô£à |  |
+| `bfill` | Ô£à |  |
 | `clone` | Ô£à |  |
 | `count_nonnull` | Ô£à |  |
 | `create` | Ô£à |  |
 | `create_from_array` | ÔÜá´©Å |  |
 | `create_with_capacity` | ÔÜá´©Å |  |
+| `cummax` | Ô£à |  |
+| `cummin` | Ô£à |  |
+| `cumprod` | Ô£à |  |
+| `cumsum` | Ô£à |  |
+| `diff` | Ô£à |  |
 | `div` | Ô£à |  |
 | `div_scalar` | Ô£à |  |
 | `eq` | Ô£à |  |
+| `ffill` | Ô£à |  |
 | `filter` | Ô£à |  |
 | `free` | Ô£à |  |
 | `ge` | Ô£à |  |
@@ -333,9 +354,12 @@ Cada fun├º├úo p├║blica do backend C deveria ter caminho no frontend Lu
 | `mul` | Ô£à |  |
 | `mul_scalar` | Ô£à |  |
 | `ne` | Ô£à |  |
+| `rank` | Ô£à |  |
 | `set` | Ô£à |  |
 | `set_null` | Ô£à |  |
+| `shift` | Ô£à |  |
 | `sort` | Ô£à |  |
+| `sorted_nonnull` | Ô£à |  |
 | `std` | Ô£à |  |
 | `sub` | Ô£à |  |
 | `sub_scalar` | Ô£à |  |
@@ -526,8 +550,8 @@ M├®todos cr├¡ticos: o tipo de retorno est├í conforme o esperado e sim�
 | `sort` | Series | outro (wrap(r, self._dtype, self._name)) | ÔÜá´©Å |
 | `argsort` | tabela de ├¡ndices | nil/valor | ÔÜá´©Å |
 | `to_table` | tabela Lua | outro (t) | ÔÜá´©Å |
-| `cumsum` | Series | Series | Ô£à |
-| `cumprod` | Series | Series | Ô£à |
+| `cumsum` | Series | outro (wrap(r, self._dtype, self._name)) | ÔÜá´©Å |
+| `cumprod` | Series | outro (wrap(r, self._dtype, self._name)) | ÔÜá´©Å |
 | `cummax` | Series | Series | Ô£à |
 | `cummin` | Series | Series | Ô£à |
 | `diff` | Series | Series | Ô£à |
@@ -623,7 +647,7 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 189/189 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 200/200 erros com prefixo `smaug:` (100.0%)
 - `dataset.lua`: 88/88 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 ÔÇö Paridade de lifecycle

@@ -75,6 +75,17 @@ local DTYPES = {
         -- Uma redução int (sum/min/max) devolveu o sentinela de erro?
         -- No f64 isso é detectado por NaN no próprio valor.
         is_int_sentinel = function(_) return false end,
+        -- Grupo A (Fase 3 Ring 0): janela e redução posicional
+        cumsum  = C.smaug_f64_cumsum,
+        cumprod = C.smaug_f64_cumprod,
+        cummin  = C.smaug_f64_cummin,
+        cummax  = C.smaug_f64_cummax,
+        diff    = C.smaug_f64_diff,
+        shift   = C.smaug_f64_shift,
+        ffill   = C.smaug_f64_ffill,
+        bfill   = C.smaug_f64_bfill,
+        argmin  = C.smaug_f64_argmin,
+        argmax  = C.smaug_f64_argmax,
     },
     int64 = {
         name        = "int64",
@@ -110,6 +121,17 @@ local DTYPES = {
         argsort = C.smaug_i64_argsort,
         -- sum/min/max do i64 retornam INT64_MIN quando há nulo + !ignore_na.
         is_int_sentinel = function(v) return v == I64_MIN end,
+        -- Grupo A (Fase 3 Ring 0): janela e redução posicional
+        cumsum  = C.smaug_i64_cumsum,
+        cumprod = C.smaug_i64_cumprod,
+        cummin  = C.smaug_i64_cummin,
+        cummax  = C.smaug_i64_cummax,
+        diff    = C.smaug_i64_diff,
+        shift   = C.smaug_i64_shift,
+        ffill   = C.smaug_i64_ffill,
+        bfill   = C.smaug_i64_bfill,
+        argmin  = C.smaug_i64_argmin,
+        argmax  = C.smaug_i64_argmax,
     },
     string = {
         name        = "string",
@@ -577,77 +599,72 @@ end
 -- Operações de janela temporal (retornam nova Series alinhada)
 -- =====================================================================
 
--- cumsum(): soma cumulativa. Nulos propagam (resultado é NA a partir do 1º nulo).
+-- cumsum(): soma cumulativa. Null na posição i → null em [i, n-1].
 function methods.cumsum(self)
     if self._dtype ~= "float64" and self._dtype ~= "int64" then
         error("smaug: cumsum() requer dtype numérico, não '"..self._dtype.."'", 2)
     end
-    local NA   = Series.NA
-    local n    = self:len()
-    local vals = {}
-    local acc  = 0
-    local null = false
-    for i = 1, n do
-        local v = self:get(i)
-        if v == nil or null then
-            null = true; vals[i] = NA
-        else
-            acc = acc + v; vals[i] = acc
-        end
-    end
-    return Series.from_table(vals, self._dtype, self._name)
+    local r = self._d.cumsum(self._c)
+    if r == nil then error("smaug: cumsum falhou (OOM)", 2) end
+    return wrap(r, self._dtype, self._name)
 end
 
--- cumprod(): produto cumulativo. Nulos propagam.
+-- cumprod(): produto cumulativo. Null propaga igual ao cumsum.
 function methods.cumprod(self)
     if self._dtype ~= "float64" and self._dtype ~= "int64" then
         error("smaug: cumprod() requer dtype numérico, não '"..self._dtype.."'", 2)
     end
-    local NA   = Series.NA
-    local n    = self:len()
-    local vals = {}
-    local acc  = 1
-    local null = false
-    for i = 1, n do
-        local v = self:get(i)
-        if v == nil or null then
-            null = true; vals[i] = NA
-        else
-            acc = acc * v; vals[i] = acc
-        end
-    end
-    return Series.from_table(vals, self._dtype, self._name)
+    local r = self._d.cumprod(self._c)
+    if r == nil then error("smaug: cumprod falhou (OOM)", 2) end
+    return wrap(r, self._dtype, self._name)
 end
 
 -- diff(periods): diferença entre elemento i e elemento i-periods.
 -- Primeiros `periods` elementos são NA. Nulos propagam.
+-- Numérico (f64/i64): delega para C. Datetime: permanece em Lua (usa smaug_dt_diff_ms).
 function methods.diff(self, periods)
     if self._dtype ~= "float64" and self._dtype ~= "int64" and self._dtype ~= "datetime" then
         error("smaug: diff() requer dtype numérico ou datetime, não '"..self._dtype.."'", 2)
     end
     periods = periods or 1
     if periods < 1 then error("smaug: diff() requer periods >= 1", 2) end
-    local NA   = Series.NA
-    local n    = self:len()
-    local vals = {}
-    for i = 1, n do
-        if i <= periods then
-            vals[i] = NA
-        else
-            local cur  = self:get(i)
-            local prev = self:get(i - periods)
-            vals[i] = (cur == nil or prev == nil) and NA or (cur - prev)
+    -- datetime: diferença de epochs via smaug_dt_diff_ms → int64 (ms)
+    if self._dtype == "datetime" then
+        local NA   = Series.NA
+        local n    = self:len()
+        local vals = {}
+        for i = 1, n do
+            if i <= periods then
+                vals[i] = NA
+            else
+                local a = self:get(i)
+                local b = self:get(i - periods)
+                vals[i] = (a ~= nil and b ~= nil) and tonumber(C.smaug_dt_diff_ms(a, b)) or NA
+            end
         end
+        return Series.from_table(vals, "int64", self._name)
     end
-    -- datetime: diferença de epochs → int64 (duração em ms, não timestamp)
-    local result_dtype = (self._dtype == "datetime") and "int64" or self._dtype
-    return Series.from_table(vals, result_dtype, self._name)
+    -- numérico: C
+    local r = self._d.diff(self._c, periods)
+    if r == nil then error("smaug: diff falhou (OOM)", 2) end
+    return wrap(r, self._dtype, self._name)
 end
 
 -- shift(periods): desloca os valores `periods` posições para frente (> 0) ou
 -- para trás (< 0). Posições descobertas viram NA.
+-- periods > 0: C (size_t, caso comum). periods <= 0: Lua.
 function methods.shift(self, periods)
     periods = periods or 1
+    if type(periods) ~= "number" or periods % 1 ~= 0 then
+        error("smaug: shift() requer periods inteiro", 2)
+    end
+    if periods > 0 and self._d.shift then
+        -- caminho rápido C: deslocamento positivo
+        local r = self._d.shift(self._c, periods)
+        if r == nil then error("smaug: shift falhou (OOM)", 2) end
+        return wrap(r, self._dtype, self._name)
+    end
+    -- Lua: periods <= 0 ou dtype sem C (datetime/string/bool)
     local NA   = Series.NA
     local n    = self:len()
     local vals = {}
@@ -2484,7 +2501,62 @@ end
 -- Enriquecimento: reduções, transformações e conveniência
 -- =====================================================================
 
--- Helper: coleta valores não-nulos da série em tabela Lua ordenada.
+-- =====================================================================
+-- Grupo B — sorted_nonnull e rank migrados para C (Fase 3 Ring 0)
+-- Helpers Lua para operar sobre o double* ordenado devolvido pelo C.
+-- =====================================================================
+
+-- Chama sorted_nonnull C conforme o dtype. Devolve (double_array, n) onde
+-- double_array é um ffi double[] gerenciado pelo GC (ffi.new) para ambos os
+-- tipos — uniforme para os helpers de mediana/quantil abaixo.
+-- Para f64: os dados vêm direto do C (malloc); libera com smaug_free.
+-- Para i64: aloca ffi.new double[] e copia convertendo.
+local function c_sorted_nonnull(self)
+    local out_n = ffi.new("size_t[1]")
+    if self._dtype == "float64" then
+        local ptr = C.smaug_f64_sorted_nonnull(self._c, out_n)
+        local n = tonumber(out_n[0])
+        if ptr == nil or n == 0 then return nil, 0 end
+        -- copiar para ffi.new para uniformizar lifecycle (GC vs smaug_free)
+        local arr = ffi.new("double[?]", n)
+        ffi.copy(arr, ptr, n * ffi.sizeof("double"))
+        C.smaug_free(ptr)
+        return arr, n
+    else  -- int64
+        local iptr = C.smaug_i64_sorted_nonnull(self._c, out_n)
+        local n = tonumber(out_n[0])
+        if iptr == nil or n == 0 then
+            if iptr ~= nil then C.smaug_free(iptr) end
+            return nil, 0
+        end
+        local arr = ffi.new("double[?]", n)
+        for i = 0, n - 1 do arr[i] = tonumber(iptr[i]) end
+        C.smaug_free(iptr)
+        return arr, n
+    end
+end
+
+-- Mediana de double* ordenado com n elementos (interpolação linear).
+local function median_of_sorted(ptr, n)
+    if n == 0 then return nil end
+    local m = math.floor(n / 2)
+    if n % 2 == 1 then return tonumber(ptr[m]) end
+    return (tonumber(ptr[m - 1]) + tonumber(ptr[m])) / 2
+end
+
+-- Quantil de double* ordenado (0 ≤ q ≤ 1, interpolação linear).
+local function quantile_of_sorted(ptr, n, q)
+    if n == 0 then return nil end
+    if n == 1 then return tonumber(ptr[0]) end
+    local pos  = q * (n - 1)
+    local lo   = math.floor(pos)
+    local frac = pos - lo
+    local hi   = lo + 1
+    if hi >= n then return tonumber(ptr[n - 1]) end
+    return tonumber(ptr[lo]) + frac * (tonumber(ptr[hi]) - tonumber(ptr[lo]))
+end
+
+-- collect_sorted: mantido como fallback Lua para dtypes sem C (datetime, string).
 local function collect_sorted(self)
     local n, vals = self:len(), {}
     for i = 1, n do
@@ -2495,7 +2567,7 @@ local function collect_sorted(self)
     return vals
 end
 
--- Helper: mediana de uma tabela Lua já ordenada (pode estar vazia).
+-- median_sorted: mantido para uso em mad() que opera sobre tabela Lua.
 local function median_sorted(vals)
     local n = #vals
     if n == 0 then return nil end
@@ -2503,16 +2575,16 @@ local function median_sorted(vals)
     return (n % 2 == 1) and vals[m+1] or (vals[m] + vals[m+1]) / 2
 end
 
--- Helper: quantil de tabela Lua ordenada, 0 ≤ q ≤ 1 (interpolação linear).
+-- quantile_sorted: mantido para compatibilidade interna.
 local function quantile_sorted(vals, q)
     local n = #vals
     if n == 0 then return nil end
     if n == 1 then return vals[1] end
-    local pos  = q * (n - 1)          -- posição 0-based
+    local pos  = q * (n - 1)
     local lo   = math.floor(pos)
     local frac = pos - lo
     local hi   = lo + 1
-    if hi >= n then return vals[n] end -- evita out-of-bounds
+    if hi >= n then return vals[n] end
     return vals[lo+1] + frac * (vals[hi+1] - vals[lo+1])
 end
 
@@ -2545,7 +2617,12 @@ function methods.median(self, ignore_na)
             if self:get(i) == nil then return nil end
         end
     end
-    return median_sorted(collect_sorted(self))
+    -- datetime: usa tabela Lua (sem primitiva C sorted_nonnull para datetime)
+    if self._dtype == "datetime" then
+        return median_sorted(collect_sorted(self))
+    end
+    local arr, n = c_sorted_nonnull(self)
+    return median_of_sorted(arr, n)
 end
 
 -- quantile(q, [ignore_na]): percentil 0 ≤ q ≤ 1. Interpolação linear. float64.
@@ -2562,7 +2639,11 @@ function methods.quantile(self, q, ignore_na)
             if self:get(i) == nil then return nil end
         end
     end
-    return quantile_sorted(collect_sorted(self), q)
+    if self._dtype == "datetime" then
+        return quantile_sorted(collect_sorted(self), q)
+    end
+    local arr, n = c_sorted_nonnull(self)
+    return quantile_of_sorted(arr, n, q)
 end
 
 -- mode(): valor mais frequente (ignora nulos). Empate: primeiro em ordem de valor.
@@ -2591,6 +2672,12 @@ end
 
 -- ffill(): preenche nulos com o último valor válido anterior.
 function methods.ffill(self)
+    if self._d.ffill then
+        local r = self._d.ffill(self._c)
+        if r == nil then error("smaug: ffill falhou (OOM)", 2) end
+        return wrap(r, self._dtype, self._name)
+    end
+    -- fallback Lua para dtypes sem C (datetime, string, bool, categorical)
     local NA   = Series.NA
     local n    = self:len()
     local vals = {}
@@ -2605,6 +2692,11 @@ end
 
 -- bfill(): preenche nulos com o próximo valor válido seguinte.
 function methods.bfill(self)
+    if self._d.bfill then
+        local r = self._d.bfill(self._c)
+        if r == nil then error("smaug: bfill falhou (OOM)", 2) end
+        return wrap(r, self._dtype, self._name)
+    end
     local NA   = Series.NA
     local n    = self:len()
     local vals = {}
@@ -2617,11 +2709,18 @@ function methods.bfill(self)
     return Series.from_table(vals, self._dtype, self._name)
 end
 
--- cummin(): mínimo cumulativo. Nulos propagam.
+-- cummin(): mínimo cumulativo. Nulos na posição i ficam nulos mas não propagam.
+-- Numérico → C. Datetime → Lua (sem primitiva C para datetime cummin).
 function methods.cummin(self)
     if self._dtype ~= "float64" and self._dtype ~= "int64" and self._dtype ~= "datetime" then
         error("smaug: cummin() requer dtype numérico ou datetime, não '"..self._dtype.."'", 2)
     end
+    if self._d.cummin then
+        local r = self._d.cummin(self._c)
+        if r == nil then error("smaug: cummin falhou (OOM)", 2) end
+        return wrap(r, self._dtype, self._name)
+    end
+    -- Lua: datetime (e qualquer dtype sem C)
     local NA, n, vals = Series.NA, self:len(), {}
     local cur = nil
     for i = 1, n do
@@ -2636,10 +2735,15 @@ function methods.cummin(self)
     return Series.from_table(vals, self._dtype, self._name)
 end
 
--- cummax(): máximo cumulativo. Nulos propagam.
+-- cummax(): máximo cumulativo. Mesmo contrato de cummin.
 function methods.cummax(self)
     if self._dtype ~= "float64" and self._dtype ~= "int64" and self._dtype ~= "datetime" then
         error("smaug: cummax() requer dtype numérico ou datetime, não '"..self._dtype.."'", 2)
+    end
+    if self._d.cummax then
+        local r = self._d.cummax(self._c)
+        if r == nil then error("smaug: cummax falhou (OOM)", 2) end
+        return wrap(r, self._dtype, self._name)
     end
     local NA, n, vals = Series.NA, self:len(), {}
     local cur = nil
@@ -2656,10 +2760,19 @@ function methods.cummax(self)
 end
 
 -- argmin(): índice 1-based do mínimo (ignora nulos). nil se vazia ou toda nula.
+-- f64/i64: C (SIZE_MAX → nil, 0-based → 1-based). datetime: Lua.
 function methods.argmin(self)
     if self._dtype ~= "float64" and self._dtype ~= "int64" and self._dtype ~= "datetime" then
         error("smaug: argmin() requer dtype numérico ou datetime, não '"..self._dtype.."'", 2)
     end
+    if self._d.argmin then
+        local idx = self._d.argmin(self._c)
+        -- SIZE_MAX em C = valor máximo de size_t; em LuaJIT é número grande
+        local n = tonumber(idx)
+        if n == nil or n >= tonumber(self._c.size) then return nil end
+        return n + 1   -- 0-based → 1-based
+    end
+    -- Lua: datetime
     local best_v, best_i = nil, nil
     for i = 1, self:len() do
         local v = self:get(i)
@@ -2675,6 +2788,12 @@ function methods.argmax(self)
     if self._dtype ~= "float64" and self._dtype ~= "int64" and self._dtype ~= "datetime" then
         error("smaug: argmax() requer dtype numérico ou datetime, não '"..self._dtype.."'", 2)
     end
+    if self._d.argmax then
+        local idx = self._d.argmax(self._c)
+        local n = tonumber(idx)
+        if n == nil or n >= tonumber(self._c.size) then return nil end
+        return n + 1
+    end
     local best_v, best_i = nil, nil
     for i = 1, self:len() do
         local v = self:get(i)
@@ -2687,46 +2806,41 @@ end
 
 -- rank([method]): posição de cada valor no ranking (1-based, ignora nulos → NA).
 -- method: "average" (default), "min", "max", "first".
+-- Delega para C (smaug_f64_rank / smaug_i64_rank). Retorna float64.
 function methods.rank(self, method)
     if self._dtype ~= "float64" and self._dtype ~= "int64" then
         error("smaug: rank() requer dtype numérico, não '"..self._dtype.."'", 2)
     end
     method = method or "average"
-    local n    = self:len()
-    local NA   = Series.NA
-    -- coleta pares (valor, índice_original) não-nulos
-    local pairs_list = {}
-    for i = 1, n do
-        local v = self:get(i)
-        if v ~= nil then pairs_list[#pairs_list+1] = {v=v, i=i} end
+    local method_int
+    if     method == "average" then method_int = 0
+    elseif method == "min"     then method_int = 1
+    elseif method == "max"     then method_int = 2
+    elseif method == "first"   then method_int = 3
+    else error("smaug: rank() method ∈ {average, min, max, first}", 2) end
+
+    local raw
+    if self._dtype == "float64" then
+        raw = C.smaug_f64_rank(self._c, method_int)
+    else
+        raw = C.smaug_i64_rank(self._c, method_int)
     end
-    table.sort(pairs_list, function(a, b)
-        return a.v < b.v or (a.v == b.v and a.i < b.i)
-    end)
-    -- atribui ranks
-    local ranks = {}  -- ranks[índice_original] = rank
-    local m = #pairs_list
-    local p = 1
-    while p <= m do
-        local q = p
-        while q < m and pairs_list[q+1].v == pairs_list[p].v do q = q + 1 end
-        local r_min, r_max = p, q
-        for k = p, q do
-            local idx = pairs_list[k].i
-            if     method == "min"     then ranks[idx] = r_min
-            elseif method == "max"     then ranks[idx] = r_max
-            elseif method == "first"   then ranks[idx] = k
-            else   -- average
-                ranks[idx] = (r_min + r_max) / 2
-            end
+    if raw == nil then error("smaug: rank falhou (OOM)", 2) end
+
+    -- Converter double* → Series<float64>: NAN → NA
+    local NA  = Series.NA
+    local n   = self:len()
+    local out = Series.new("float64", n, self._name)
+    for i = 0, n - 1 do
+        local v = tonumber(raw[i])
+        if v ~= v then  -- NAN → null
+            out:set_null(i + 1)
+        else
+            out:set(i + 1, v)
         end
-        p = q + 1
     end
-    local vals = {}
-    for i = 1, n do
-        vals[i] = ranks[i] ~= nil and ranks[i] or NA
-    end
-    return Series.from_table(vals, "float64", self._name)
+    C.smaug_free(raw)
+    return out
 end
 
 -- pct_rank(): rank normalizado para [0, 1]. Atalho sobre rank("average") / n.
@@ -2742,21 +2856,19 @@ function methods.skew(self)
     if self._dtype ~= "float64" and self._dtype ~= "int64" then
         error("smaug: skew() requer dtype numérico, não '"..self._dtype.."'", 2)
     end
-    local vals = collect_sorted(self)  -- sorted não importa, só precisamos dos valores
-    local n = #vals
+    local arr, n = c_sorted_nonnull(self)  -- sorted não importa; só precisamos dos valores
     if n < 3 then return nil end
     local mean = 0
-    for _, v in ipairs(vals) do mean = mean + v end
+    for i = 0, n - 1 do mean = mean + tonumber(arr[i]) end
     mean = mean / n
     local m2, m3 = 0, 0
-    for _, v in ipairs(vals) do
-        local d = v - mean
+    for i = 0, n - 1 do
+        local d = tonumber(arr[i]) - mean
         m2 = m2 + d*d
         m3 = m3 + d*d*d
     end
     m2 = m2 / n; m3 = m3 / n
     if m2 == 0 then return 0 end
-    -- ajuste amostral: G1 = (n / ((n-1)*(n-2))) * (m3 / m2^1.5)
     local g1 = (m3 / (m2 ^ 1.5)) * (math.sqrt(n*(n-1)) / (n-2))
     return g1
 end
@@ -2766,22 +2878,20 @@ function methods.kurtosis(self)
     if self._dtype ~= "float64" and self._dtype ~= "int64" then
         error("smaug: kurtosis() requer dtype numérico, não '"..self._dtype.."'", 2)
     end
-    local vals = collect_sorted(self)
-    local n = #vals
+    local arr, n = c_sorted_nonnull(self)
     if n < 4 then return nil end
     local mean = 0
-    for _, v in ipairs(vals) do mean = mean + v end
+    for i = 0, n - 1 do mean = mean + tonumber(arr[i]) end
     mean = mean / n
     local m2, m4 = 0, 0
-    for _, v in ipairs(vals) do
-        local d = v - mean
+    for i = 0, n - 1 do
+        local d = tonumber(arr[i]) - mean
         local d2 = d * d
         m2 = m2 + d2
         m4 = m4 + d2 * d2
     end
     m2 = m2 / n; m4 = m4 / n
     if m2 == 0 then return 0 end
-    -- ajuste amostral de Fisher
     local kurt = (n*(n+1) / ((n-1)*(n-2)*(n-3))) * (m4/(m2*m2)) - 3*(n-1)^2/((n-2)*(n-3))
     return kurt
 end
@@ -2791,11 +2901,12 @@ function methods.mad(self)
     if self._dtype ~= "float64" and self._dtype ~= "int64" then
         error("smaug: mad() requer dtype numérico, não '"..self._dtype.."'", 2)
     end
-    local vals = collect_sorted(self)
-    if #vals == 0 then return nil end
-    local med = median_sorted(vals)
+    local arr, n = c_sorted_nonnull(self)
+    if n == 0 then return nil end
+    local med = median_of_sorted(arr, n)
+    -- desvios absolutos em tabela Lua (depois mediana deles)
     local devs = {}
-    for _, v in ipairs(vals) do devs[#devs+1] = math.abs(v - med) end
+    for i = 0, n - 1 do devs[i + 1] = math.abs(tonumber(arr[i]) - med) end
     table.sort(devs)
     return median_sorted(devs)
 end
@@ -2805,15 +2916,14 @@ function methods.sem(self)
     if self._dtype ~= "float64" and self._dtype ~= "int64" then
         error("smaug: sem() requer dtype numérico, não '"..self._dtype.."'", 2)
     end
-    local vals = collect_sorted(self)
-    local n = #vals
+    local arr, n = c_sorted_nonnull(self)
     if n < 2 then return nil end
     local mean = 0
-    for _, v in ipairs(vals) do mean = mean + v end
+    for i = 0, n - 1 do mean = mean + tonumber(arr[i]) end
     mean = mean / n
     local s2 = 0
-    for _, v in ipairs(vals) do local d = v - mean; s2 = s2 + d*d end
-    local std = math.sqrt(s2 / (n - 1))   -- desvio padrão amostral
+    for i = 0, n - 1 do local d = tonumber(arr[i]) - mean; s2 = s2 + d*d end
+    local std = math.sqrt(s2 / (n - 1))
     return std / math.sqrt(n)
 end
 
@@ -2907,11 +3017,13 @@ function methods.nlargest(self, n)
     if type(n) ~= "number" or n < 1 then
         error("smaug: nlargest() espera n >= 1", 2)
     end
-    local vals = collect_sorted(self)
+    local arr, m = c_sorted_nonnull(self)
     local result = {}
-    local m = #vals
-    for i = m, math.max(m - n + 1, 1), -1 do
-        result[#result+1] = vals[i]
+    local take = math.min(n, m)
+    for i = 0, take - 1 do
+        -- arr está ordenado asc; os n maiores estão no fim
+        local v = tonumber(arr[m - 1 - i])
+        result[i + 1] = (self._dtype == "int64") and math.floor(v) or v
     end
     return Series.from_table(result, self._dtype, self._name)
 end
@@ -2924,9 +3036,13 @@ function methods.nsmallest(self, n)
     if type(n) ~= "number" or n < 1 then
         error("smaug: nsmallest() espera n >= 1", 2)
     end
-    local vals = collect_sorted(self)
+    local arr, m = c_sorted_nonnull(self)
     local result = {}
-    for i = 1, math.min(n, #vals) do result[i] = vals[i] end
+    local take = math.min(n, m)
+    for i = 0, take - 1 do
+        local v = tonumber(arr[i])
+        result[i + 1] = (self._dtype == "int64") and math.floor(v) or v
+    end
     return Series.from_table(result, self._dtype, self._name)
 end
 

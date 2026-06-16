@@ -102,6 +102,23 @@ ffi.cdef([[
     smaug_series_f64_t* smaug_f64_take  (const smaug_series_f64_t *s, const size_t *idx, size_t len);
     smaug_series_f64_t* smaug_f64_filter(const smaug_series_f64_t *s, const uint8_t *mask);
 
+    /* --- Grupo A: janela e reducao posicional (Fase 3 Ring 0) --- */
+    smaug_series_f64_t* smaug_f64_cumsum (const smaug_series_f64_t *s);
+    smaug_series_f64_t* smaug_f64_cumprod(const smaug_series_f64_t *s);
+    smaug_series_f64_t* smaug_f64_cummin (const smaug_series_f64_t *s);
+    smaug_series_f64_t* smaug_f64_cummax (const smaug_series_f64_t *s);
+    smaug_series_f64_t* smaug_f64_diff   (const smaug_series_f64_t *s, size_t periods);
+    smaug_series_f64_t* smaug_f64_shift  (const smaug_series_f64_t *s, size_t periods);
+    smaug_series_f64_t* smaug_f64_ffill  (const smaug_series_f64_t *s);
+    smaug_series_f64_t* smaug_f64_bfill  (const smaug_series_f64_t *s);
+    size_t              smaug_f64_argmin  (const smaug_series_f64_t *s);
+    size_t              smaug_f64_argmax  (const smaug_series_f64_t *s);
+
+    /* --- Grupo B: sorted_nonnull e rank (Fase 3 Ring 0) --- */
+    /* Retornam ponteiros brutos; caller libera com smaug_free. */
+    double* smaug_f64_sorted_nonnull(const smaug_series_f64_t *s, size_t *out_n);
+    double* smaug_f64_rank          (const smaug_series_f64_t *s, int method);
+
     /* ===================================================================
        Series Int64
        =================================================================== */
@@ -168,6 +185,22 @@ ffi.cdef([[
     size_t              smaug_i64_count_nonnull(const smaug_series_i64_t *s);
     smaug_series_i64_t* smaug_i64_take  (const smaug_series_i64_t *s, const size_t *idx, size_t len);
     smaug_series_i64_t* smaug_i64_filter(const smaug_series_i64_t *s, const uint8_t *mask);
+
+    /* --- Grupo A: janela e reducao posicional (Fase 3 Ring 0) --- */
+    smaug_series_i64_t* smaug_i64_cumsum (const smaug_series_i64_t *s);
+    smaug_series_i64_t* smaug_i64_cumprod(const smaug_series_i64_t *s);
+    smaug_series_i64_t* smaug_i64_cummin (const smaug_series_i64_t *s);
+    smaug_series_i64_t* smaug_i64_cummax (const smaug_series_i64_t *s);
+    smaug_series_i64_t* smaug_i64_diff   (const smaug_series_i64_t *s, size_t periods);
+    smaug_series_i64_t* smaug_i64_shift  (const smaug_series_i64_t *s, size_t periods);
+    smaug_series_i64_t* smaug_i64_ffill  (const smaug_series_i64_t *s);
+    smaug_series_i64_t* smaug_i64_bfill  (const smaug_series_i64_t *s);
+    size_t              smaug_i64_argmin  (const smaug_series_i64_t *s);
+    size_t              smaug_i64_argmax  (const smaug_series_i64_t *s);
+
+    /* --- Grupo B: sorted_nonnull e rank (Fase 3 Ring 0) --- */
+    int64_t* smaug_i64_sorted_nonnull(const smaug_series_i64_t *s, size_t *out_n);
+    double*  smaug_i64_rank          (const smaug_series_i64_t *s, int method);
 
     /* --- liberação dos arrays brutos devolvidos por compare/argsort/bool ops.
        Exportada pela própria lib Smaug (não a free() da libc), para liberar no

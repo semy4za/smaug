@@ -47,7 +47,59 @@ static void skip_ws(json_lex_t *l) {
     }
 }
 
-/* Lê string JSON (com escape). Retorna malloc'd string ou NULL em erro. */
+/* Lê 4 dígitos hex de l->buf[l->pos..] e devolve o codepoint (0–0xFFFF).
+   Avança l->pos em 4. Retorna -1 se os 4 caracteres não forem hex válidos. */
+static int read_hex4(json_lex_t *l) {
+    if (l->pos + 4 > l->len) return -1;
+    unsigned int cp = 0;
+    for (int i = 0; i < 4; i++) {
+        unsigned char h = (unsigned char)l->buf[l->pos + i];
+        unsigned int digit;
+        if      (h >= '0' && h <= '9') digit = h - '0';
+        else if (h >= 'a' && h <= 'f') digit = h - 'a' + 10;
+        else if (h >= 'A' && h <= 'F') digit = h - 'A' + 10;
+        else return -1;
+        cp = (cp << 4) | digit;
+    }
+    l->pos += 4;
+    return (int)cp;
+}
+
+/* Codifica codepoint Unicode (U+0000–U+10FFFF, exceto surrogates) em UTF-8.
+   Escreve 1–4 bytes em dst. Retorna o número de bytes escritos, ou 0 em erro. */
+static int encode_utf8(unsigned int cp, char *dst) {
+    if (cp <= 0x7F) {
+        dst[0] = (char)cp;
+        return 1;
+    } else if (cp <= 0x7FF) {
+        dst[0] = (char)(0xC0 | (cp >> 6));
+        dst[1] = (char)(0x80 | (cp & 0x3F));
+        return 2;
+    } else if (cp <= 0xFFFF) {
+        dst[0] = (char)(0xE0 | (cp >> 12));
+        dst[1] = (char)(0x80 | ((cp >> 6) & 0x3F));
+        dst[2] = (char)(0x80 | (cp & 0x3F));
+        return 3;
+    } else if (cp <= 0x10FFFF) {
+        dst[0] = (char)(0xF0 | (cp >> 18));
+        dst[1] = (char)(0x80 | ((cp >> 12) & 0x3F));
+        dst[2] = (char)(0x80 | ((cp >> 6)  & 0x3F));
+        dst[3] = (char)(0x80 | (cp & 0x3F));
+        return 4;
+    }
+    return 0; /* codepoint inválido */
+}
+
+/* Lê string JSON (com escape). Retorna malloc'd string ou NULL em erro.
+ *
+ * Escapes suportados: \" \\ \/ \n \r \t \b \f
+ * Escapes Unicode: \uXXXX decodificado para UTF-8.
+ *   - BMP (U+0000–U+FFFF, exceto surrogates): decodificado diretamente.
+ *   - Pares surrogate (\uD800–\uDBFF seguido de \uDC00–\uDFFF): decodificados
+ *     para o codepoint suplementar correspondente (U+10000–U+10FFFF).
+ *   - Surrogate isolado ou par inválido: erro (retorna NULL → TOK_ERROR).
+ * Hex inválido em \uXXXX: erro (retorna NULL → TOK_ERROR).
+ */
 static char *read_json_string(json_lex_t *l) {
     if (l->pos >= l->len || l->buf[l->pos] != '"') return NULL;
     l->pos++;
@@ -58,8 +110,48 @@ static char *read_json_string(json_lex_t *l) {
         char c = l->buf[l->pos++];
         if (c == '"') { out[n] = '\0'; return out; }
         if (c == '\\') {
-            if (l->pos >= l->len) break; /* COV-EXCL-BR: string não fechada — parser tolera, mas o EOL interno break é inalcançável em JSON bem-formado */
+            if (l->pos >= l->len) break; /* COV-EXCL-BR: string não fechada — break inalcançável em JSON bem-formado */
             char esc = l->buf[l->pos++];
+            if (esc == 'u') {
+                /* Decodifica \uXXXX para UTF-8. */
+                int cp = read_hex4(l);
+                if (cp < 0) { free(out); return NULL; }   /* hex inválido */
+
+                unsigned int ucp = (unsigned int)cp;
+
+                if (ucp >= 0xD800 && ucp <= 0xDBFF) {
+                    /* High surrogate: esperado \uDC00–\uDFFF a seguir. */
+                    if (l->pos + 6 > l->len ||
+                        l->buf[l->pos] != '\\' || l->buf[l->pos+1] != 'u') {
+                        free(out); return NULL;   /* surrogate isolado */
+                    }
+                    l->pos += 2;   /* consume \u */
+                    int cp2 = read_hex4(l);
+                    if (cp2 < 0) { free(out); return NULL; }
+                    unsigned int ucp2 = (unsigned int)cp2;
+                    if (ucp2 < 0xDC00 || ucp2 > 0xDFFF) {
+                        free(out); return NULL;   /* par inválido */
+                    }
+                    ucp = 0x10000 + ((ucp - 0xD800) << 10) + (ucp2 - 0xDC00);
+                } else if (ucp >= 0xDC00 && ucp <= 0xDFFF) {
+                    free(out); return NULL;   /* low surrogate isolado */
+                }
+
+                char utf8[4];
+                int bytes = encode_utf8(ucp, utf8);
+                if (bytes == 0) { free(out); return NULL; }
+
+                /* garantir espaço para até 4 bytes + terminador */
+                if (n + bytes >= cap) {
+                    while (n + bytes >= cap) cap *= 2;
+                    char *tmp = realloc(out, cap);
+                    if (!tmp) { free(out); return NULL; } /* COV-EXCL-BR: OOM de realloc em string JSON */
+                    out = tmp;
+                }
+                for (int i = 0; i < bytes; i++) out[n++] = utf8[i];
+                continue;
+            }
+            /* escapes de 1 caractere */
             char mapped;
             switch (esc) {
                 case '"': case '\\': case '/': mapped = esc; break;
@@ -68,11 +160,7 @@ static char *read_json_string(json_lex_t *l) {
                 case 't': mapped = '\t'; break;
                 case 'b': mapped = '\b'; break;
                 case 'f': mapped = '\f'; break;
-                case 'u':
-                    /* \uXXXX: pula os 4 hex e insere '?' como placeholder */
-                    if (l->pos + 4 <= l->len) l->pos += 4;
-                    mapped = '?'; break;
-                default: mapped = esc; break;
+                default:  mapped = esc; break;
             }
             c = mapped;
         }

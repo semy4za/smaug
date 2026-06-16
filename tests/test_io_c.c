@@ -764,14 +764,89 @@ static void test_json_negative_exponent(void) {
 }
 
 static void test_json_unicode_escape(void) {
-    /* \uXXXX → '?' (placeholder documentado) */
-    const char *j = "[{\"v\":\"\\u0041\"}]";
-    smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
-    CHECK(t && !t->error, "JSON unicode: sem erro");
-    size_t n; const char *s = get_str(t, 0, 0, &n);
-    CHECK(s && n == 1,    "JSON unicode: 1 char");
-    CHECK(s[0] == '?',    "JSON unicode: mapeado para '?'");
-    smaug_table_free(t);
+    /* --- BMP: ASCII (U+0041 = 'A') --- */
+    {
+        const char *j = "[{\"v\":\"\\u0041\"}]";
+        smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+        CHECK(t && !t->error, "JSON unicode ASCII: sem erro");
+        size_t n; const char *s = get_str(t, 0, 0, &n);
+        CHECK(s && n == 1,    "JSON unicode ASCII: 1 byte");
+        CHECK(s[0] == 'A',    "JSON unicode ASCII: U+0041 = 'A'");
+        smaug_table_free(t);
+    }
+    /* --- BMP: 2-byte UTF-8 (U+00E9 = 'e' com acento agudo) --- */
+    {
+        const char *j = "[{\"v\":\"caf\\u00e9\"}]";
+        smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+        CHECK(t && !t->error, "JSON unicode 2-byte: sem erro");
+        size_t n; const char *s = get_str(t, 0, 0, &n);
+        /* UTF-8 de e-agudo = 0xC3 0xA9; "caf" + 2 bytes = 5 bytes total */
+        CHECK(s && n == 5,    "JSON unicode 2-byte: 5 bytes");
+        CHECK((unsigned char)s[3] == 0xC3 && (unsigned char)s[4] == 0xA9,
+              "JSON unicode 2-byte: UTF-8 correto para U+00E9");
+        smaug_table_free(t);
+    }
+    /* --- BMP: 3-byte UTF-8 (U+4E2D = caractere CJK) --- */
+    {
+        const char *j = "[{\"v\":\"\\u4e2d\"}]";
+        smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+        CHECK(t && !t->error, "JSON unicode 3-byte: sem erro");
+        size_t n; const char *s = get_str(t, 0, 0, &n);
+        /* UTF-8 de U+4E2D = 0xE4 0xB8 0xAD */
+        CHECK(s && n == 3,                         "JSON unicode 3-byte: 3 bytes");
+        CHECK((unsigned char)s[0] == 0xE4 &&
+              (unsigned char)s[1] == 0xB8 &&
+              (unsigned char)s[2] == 0xAD,         "JSON unicode 3-byte: UTF-8 correto para U+4E2D");
+        smaug_table_free(t);
+    }
+    /* --- Surrogate pair (U+1F600) → 4-byte UTF-8 --- */
+    {
+        /* \uD83D\uDE00 = U+1F600 → UTF-8: 0xF0 0x9F 0x98 0x80 */
+        const char *j = "[{\"v\":\"\\uD83D\\uDE00\"}]";
+        smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+        CHECK(t && !t->error, "JSON unicode surrogate pair: sem erro");
+        size_t n; const char *s = get_str(t, 0, 0, &n);
+        CHECK(s && n == 4,                         "JSON unicode surrogate pair: 4 bytes");
+        CHECK((unsigned char)s[0] == 0xF0 &&
+              (unsigned char)s[1] == 0x9F &&
+              (unsigned char)s[2] == 0x98 &&
+              (unsigned char)s[3] == 0x80,         "JSON unicode surrogate pair: UTF-8 correto para U+1F600");
+        smaug_table_free(t);
+    }
+    /* --- Surrogate isolado (high) → erro --- */
+    {
+        const char *j = "[{\"v\":\"\\uD83D\"}]";
+        smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+        CHECK(t && t->error,  "JSON unicode high surrogate isolado: erro");
+        smaug_table_free(t);
+    }
+    /* --- Surrogate isolado (low) → erro --- */
+    {
+        const char *j = "[{\"v\":\"\\uDE00\"}]";
+        smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+        CHECK(t && t->error,  "JSON unicode low surrogate isolado: erro");
+        smaug_table_free(t);
+    }
+    /* --- Hex inválido em \uXXXX → erro --- */
+    {
+        const char *j = "[{\"v\":\"\\uXXXX\"}]";
+        smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+        CHECK(t && t->error,  "JSON unicode hex invalido: erro");
+        smaug_table_free(t);
+    }
+    /* --- \uXXXX dentro de string mista --- */
+    {
+        /* "ol\u00e1 mundo" = "ol" + a-agudo (2 bytes) + " mundo" = 10 bytes */
+        const char *j = "[{\"v\":\"ol\\u00e1 mundo\"}]";
+        smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+        CHECK(t && !t->error, "JSON unicode misto: sem erro");
+        size_t n; const char *s = get_str(t, 0, 0, &n);
+        CHECK(s && n == 10,   "JSON unicode misto: 10 bytes");
+        CHECK(s[0]=='o' && s[1]=='l', "JSON unicode misto: prefixo correto");
+        CHECK((unsigned char)s[2]==0xC3 && (unsigned char)s[3]==0xA1,
+              "JSON unicode misto: a-agudo U+00E1 correto");
+        smaug_table_free(t);
+    }
 }
 
 static void test_json_whitespace_variants(void) {

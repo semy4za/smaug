@@ -50,6 +50,22 @@ size_t              smaug_f64_count_nonnull(const smaug_series_f64_t *s);
 smaug_series_f64_t* smaug_f64_take  (const smaug_series_f64_t *s, const size_t *idx, size_t len);
 smaug_series_f64_t* smaug_f64_filter(const smaug_series_f64_t *s, const uint8_t *mask);
 
+/* Janela e redução posicional (Grupo A — Fase 3 Ring 0) */
+smaug_series_f64_t* smaug_f64_cumsum (const smaug_series_f64_t *s);
+smaug_series_f64_t* smaug_f64_cumprod(const smaug_series_f64_t *s);
+smaug_series_f64_t* smaug_f64_cummin (const smaug_series_f64_t *s);
+smaug_series_f64_t* smaug_f64_cummax (const smaug_series_f64_t *s);
+smaug_series_f64_t* smaug_f64_diff   (const smaug_series_f64_t *s, size_t periods);
+smaug_series_f64_t* smaug_f64_shift  (const smaug_series_f64_t *s, size_t periods);
+smaug_series_f64_t* smaug_f64_ffill  (const smaug_series_f64_t *s);
+smaug_series_f64_t* smaug_f64_bfill  (const smaug_series_f64_t *s);
+size_t              smaug_f64_argmin  (const smaug_series_f64_t *s);  /* 0-based; SIZE_MAX se vazia/toda-null */
+size_t              smaug_f64_argmax  (const smaug_series_f64_t *s);
+
+/* Ordenação e rank (Grupo B — Fase 3 Ring 0) */
+double* smaug_f64_sorted_nonnull(const smaug_series_f64_t *s, size_t *out_n);  /* caller libera com smaug_free */
+double* smaug_f64_rank          (const smaug_series_f64_t *s, int method);     /* 0=avg 1=min 2=max 3=first; NAN=null; caller libera */
+
 /* ===================== INT64 ===================== */
 
 /* Aritméticas série × série */
@@ -88,6 +104,22 @@ smaug_series_i64_t* smaug_i64_sort   (const smaug_series_i64_t *s, bool ascendin
 size_t              smaug_i64_count_nonnull(const smaug_series_i64_t *s);
 smaug_series_i64_t* smaug_i64_take  (const smaug_series_i64_t *s, const size_t *idx, size_t len);
 smaug_series_i64_t* smaug_i64_filter(const smaug_series_i64_t *s, const uint8_t *mask);
+
+/* Janela e redução posicional (Grupo A — Fase 3 Ring 0) */
+smaug_series_i64_t* smaug_i64_cumsum (const smaug_series_i64_t *s);
+smaug_series_i64_t* smaug_i64_cumprod(const smaug_series_i64_t *s);
+smaug_series_i64_t* smaug_i64_cummin (const smaug_series_i64_t *s);
+smaug_series_i64_t* smaug_i64_cummax (const smaug_series_i64_t *s);
+smaug_series_i64_t* smaug_i64_diff   (const smaug_series_i64_t *s, size_t periods);
+smaug_series_i64_t* smaug_i64_shift  (const smaug_series_i64_t *s, size_t periods);
+smaug_series_i64_t* smaug_i64_ffill  (const smaug_series_i64_t *s);
+smaug_series_i64_t* smaug_i64_bfill  (const smaug_series_i64_t *s);
+size_t              smaug_i64_argmin  (const smaug_series_i64_t *s);  /* 0-based; SIZE_MAX se vazia/toda-null */
+size_t              smaug_i64_argmax  (const smaug_series_i64_t *s);
+
+/* Ordenação e rank (Grupo B — Fase 3 Ring 0) */
+int64_t* smaug_i64_sorted_nonnull(const smaug_series_i64_t *s, size_t *out_n);  /* caller libera com smaug_free */
+double*  smaug_i64_rank          (const smaug_series_i64_t *s, int method);     /* mesmo contrato do f64 */
 
 /* ===================== BOOL — seleção, agregação, lógica Kleene =====================
    Operações struct-based sobre smaug_series_bool_t (dtype `bool` de primeira
