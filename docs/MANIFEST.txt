@@ -9,14 +9,14 @@ f786eefb3d538de12efee909628040b148b45c00cc0381d629e08a2f22d2b9e4     543  .\docs
 2474b56d98c34b61eda52cf81f19de4018e00c4fbbaa5e1d38686f7de3539b5b     630  .\docs\API_Reference.md
 9cacec6a3590acc37c3f918a981f78eb4f13e9628c71a385b77bbcba0d206641     333  .\docs\ARCHITECTURE.md
 0782525ac5c584d2ac1cf9313e32c92f94ef26e85582b57d7417e4a39f168be4     187  .\docs\Build_and_Testing.md
-44cce782f6d7b60e70eb5d291e7b8b2055619ca6f9d898feeb965804cac75e10    1532  .\docs\CHANGELOG.md
+58cbc78002fb67ba4575d995cbb50ce0d7ed6152afb5d4b328e527f020c3a593    1614  .\docs\CHANGELOG.md
 9a5745e0953b96ecc14c62e02951b104b7e2575938630a0bde0a5cecafee14ee      98  .\docs\CODE_REVIEW.md
 d725ddfecddc5c0ce7cae857ecb7bc57edc66202b40d66e723595709e2d14044     274  .\docs\CONTRACT.md
 5261f0e3c8163b3f0913541c4d968d605fd3b8bccca1f0874dce2080917479de     320  .\docs\COVERAGE.md
 0b780addfb2929a2af46aa31af0849d30b479a51a35a730f9863843cf095e910     159  .\docs\COW.md
-c9d9b631233602e285cc44135399f3c43ab25216c0e7ce042b13e6b15d64e574     509  .\docs\PARITY_REPORT.md
+6a6ed05d2d99eff653fa283f5128689d75540add33c8a0bd6ce8d936ecf8e97c     509  .\docs\PARITY_REPORT.md
 d98404f72a202c8dcf4556760badc878a72c73bbead1d5d129f2ab09a2786422     537  .\docs\README.md
-7d781d547a38ac133076ff218fdb9f5f1a5448e957f58a246b9b159f46b52d96     570  .\docs\Roadmap.md
+22cda2ebc41c6cfec9b77d54d9ae92e0dcc44324b0d739ed295142cd113a22df     592  .\docs\Roadmap.md
 ec1ae8442e32984127948c7e126da19f84f85193023143dc36ee82b8e352544d      29  .\include\smaug.h
 963e21a0d5b9b1857da7bbe7310a4a9340057fcf7560272f062e4e83727c5da3      40  .\include\smaug_bool.h
 46a705333300b28e4e5e30039e2f6e9442d79b4a552db6d0bb3ef1dae151db83      99  .\include\smaug_core.h
@@ -57,7 +57,7 @@ b38d9e75340c3eddab0028994e2e83b5bd11502f3e17290076361131d675d945      65  .\lua\
 444376295a8bd748dc1c19980140e36e1c57f482e72d59ee320424a65b88b8f6      94  .\Makefile
 1c9403435418c36ab10340af76817dcd38d3aade75cc7ba41d8acb377e769265     301  .\scripts\build.sh
 01e62a30402448c66675d6c2c8c1098a6bf42a8ee8bfee00c400544f9540e4c6     218  .\scripts\make_coverage.sh
-ab62e2b7e4e545059419f9847988cc2bbc8c171a3a7f84048c02251dc9200487      65  .\scripts\make_manifest.ps1
+5263600720e6fd8e0c3be46abe7d79f09ebf4362ff98ef21c5bf1caadae0d91f      65  .\scripts\make_manifest.ps1
 69322d8cf4dde498b76b4e463d02f66f355e541878e74b5fdee95aae80204805      34  .\scripts\make_manifest.sh
 5cc166c9f709d098991f4d7a5ef93bf4e3a3866b2ce98415b9fba7cae43ab01c     224  .\scripts\parity\01_dtypes.lua
 ad9b4b0d9e5a7b8728a92f279d12194cf1278175452be1dd7145c56f61c1e140      70  .\scripts\parity\02_series_dataset.lua
@@ -72,7 +72,7 @@ ad9b4b0d9e5a7b8728a92f279d12194cf1278175452be1dd7145c56f61c1e140      70  .\scri
 97c542e8ca8eaf15a7e798ce23d48741e20ec41dd1f2ccfbd85d7856a2d2fddc      88  .\scripts\parity\11_test_coverage.lua
 f70cb8c5435ce5ff09bb73f0e7583d607955afc477fbd46e0246f79fb7dc34c6      75  .\scripts\parity\12_docs_sync.lua
 9b9f92826b0983444d78b1bc17bfc2e824cdc3a512ec122e8d5d76b7186b2c93     191  .\scripts\parity\common.lua
-acedb867526e97a3b3cb01158c8bdbfaf7215de17619eed713cd66502ad23d0d     115  .\scripts\parity\parity.ps1
+6cf8d9a5f82f326907b2fe03607d86593883a0ee9aeb86696ade7b62f840041e     132  .\scripts\parity\parity.ps1
 ccf35eb82f540cea04441564b5d134cf303c3708f3dcf27c3cfd7070ecd0909a     105  .\scripts\parity\parity.sh
 3970ccccf0bcaa7e15732dfdee2a81a7759b7e1d2cc5b391713d4b7f3f8b5978     238  .\scripts\windows_build.ps1
 b655b8b2cdb754a05b7c117953e5cce9664db1ad6327f5400e59a4874c3a381f     638  .\src\smaug_core.c
