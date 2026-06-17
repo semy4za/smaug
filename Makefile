@@ -20,13 +20,14 @@ C_TESTS_PLAIN = test_alloc test_ops test_ops_edge test_bool test_bool_lifecycle 
                 test_io_c test_datetime_c test_ops_window
 C_TEST_WRAP   = test_allocfail
 C_TEST_STRESS = test_stress
-LUA_TESTS     = test_series test_i64 test_bool_dtype test_edge test_special test_fillna \
-                test_string test_str_tier_b test_str_tier_c test_props \
-                test_datetime test_categorical test_completeness test_dt_extended \
-                test_dataset test_dataset_ops test_series_ops \
-                test_groupby test_concat test_join \
-                test_rolling_series test_enrich test_stats test_predicates test_access test_duplicates \
-                test_io test_io_real
+LUA_TESTS_SERIES  = series/test_constructors series/test_access series/test_reduce \
+                    series/test_stat series/test_window series/test_predicates \
+                    series/test_selection series/test_str series/test_dt series/test_categorical
+LUA_TESTS_DATASET = dataset/test_core dataset/test_relational dataset/test_stat \
+                    dataset/test_io_support
+LUA_TESTS_IO      = io/test_csv io/test_json
+LUA_TESTS_PROPS   = props/test_props props/test_integration
+LUA_TESTS         = $(LUA_TESTS_SERIES) $(LUA_TESTS_DATASET) $(LUA_TESTS_IO) $(LUA_TESTS_PROPS)
 WRAP_FLAGS    = -Wl,--wrap=malloc -Wl,--wrap=realloc
 
 $(TARGET): $(SRCS) | build
