@@ -15,7 +15,7 @@ local hdr_bool  = C.read_file("include/smaug_bool.h") or ""
 local hdr_core  = C.read_file("include/smaug_core.h") or ""
 
 -- Lua frontend
-local series  = C.read_file("lua/smaug/core/series.lua")
+local series  = C.read_series_lua()
 
 -- Para cada dtype, extrai funções C públicas
 local headers = {

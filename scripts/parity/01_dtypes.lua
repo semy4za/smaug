@@ -10,7 +10,7 @@ local C = dofile("scripts/parity/common.lua")
 -- ----------------------------------------------------------------
 -- Universo de métodos rastreáveis no frontend Lua (de Series.methods e CategoricalSeries)
 -- ----------------------------------------------------------------
-local series_content = C.read_file("lua/smaug/core/series.lua")
+local series_content = C.read_series_lua()
         or error("não foi possível ler lua/smaug/core/series.lua")
 
 -- Series.methods (compartilhado por f64, i64, bool, string, datetime via DTYPES dispatch)
