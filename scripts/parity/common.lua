@@ -21,11 +21,9 @@ end
 -- Usado pelos scripts de paridade que fazem análise estática do fonte.
 -- ===================================================================
 function M.read_series_lua()
-    -- Tenta o arquivo monolítico primeiro (compatibilidade)
     local mono = M.read_file("lua/smaug/core/series.lua")
     if mono then return mono end
 
-    -- Pasta split: coleta todos os .lua recursivamente
     local files = {}
     local function collect(dir)
         local p = io.popen("find " .. dir .. " -name '*.lua' | sort")
@@ -34,6 +32,33 @@ function M.read_series_lua()
         p:close()
     end
     collect("lua/smaug/core/series")
+
+    local parts = {}
+    for _, path in ipairs(files) do
+        local c = M.read_file(path)
+        if c then
+            parts[#parts+1] = "-- === " .. path .. " ===\n" .. c
+        end
+    end
+    return table.concat(parts, "\n")
+end
+
+-- ===================================================================
+-- Lê lua/smaug/core/dataset.lua (monolítico) ou, se não existir,
+-- concatena todos os submódulos da pasta dataset/ em ordem.
+-- ===================================================================
+function M.read_dataset_lua()
+    local mono = M.read_file("lua/smaug/core/dataset.lua")
+    if mono then return mono end
+
+    local files = {}
+    local function collect(dir)
+        local p = io.popen("find " .. dir .. " -name '*.lua' | sort")
+        if not p then return end
+        for line in p:lines() do files[#files+1] = line end
+        p:close()
+    end
+    collect("lua/smaug/core/dataset")
 
     local parts = {}
     for _, path in ipairs(files) do

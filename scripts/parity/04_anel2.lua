@@ -7,7 +7,7 @@
 
 local C = dofile("scripts/parity/common.lua")
 
-local ds = C.read_file("lua/smaug/core/dataset.lua")
+local ds = C.read_dataset_lua()
 
 -- Extração de funções GroupBy
 local gb_methods = C.extract_lua_methods(ds, "function GroupBy:([%w_]+)")

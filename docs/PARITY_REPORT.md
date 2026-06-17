@@ -10,7 +10,7 @@ Convenção de status:
 - ⚠️ ausência sem registro — suspeita, requer revisão humana
 - ❌ inconsistência clara — gap real
 
-Gerado em: 2026-06-16 23:55:26 UTC
+Gerado em: 2026-06-17 00:21:14 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -475,38 +475,38 @@ Heurística conservadora: verifica menção explícita do dtype no corpo da fun�
 
 | operação | f64 | i64 | bool | string | datetime | categorical |
 | :--- | :-: | :-: | :-: | :-: | :-: | :-: |
-| `groupby` | ⚠️ | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ |
-| `join` | ✅ | ✅ | ⚠️ | ✅ | ⚠️ | ⚠️ |
-| `concat` | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
-| `pivot` | ⚠️ | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ |
-| `pivot_table` | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
-| `melt` | ⚠️ | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ |
-| `stack` | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
-| `unstack` | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
+| `groupby` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `join` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `concat` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `pivot` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `pivot_table` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `melt` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `stack` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `unstack` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
 | `explode` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
 | `rolling` | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
-| `sort_by` | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
-| `filter` | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
+| `sort_by` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `filter` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
 
 ### GroupBy — agregações
 
 | operação | f64 | i64 | bool | string | datetime | categorical |
 | :--- | :-: | :-: | :-: | :-: | :-: | :-: |
-| `groupby.agg` | ✅ | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ |
-| `groupby.count` | ⚠️ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
-| `groupby.first` | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
-| `groupby.last` | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
-| `groupby.max` | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
-| `groupby.mean` | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
-| `groupby.median` | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
-| `groupby.min` | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
-| `groupby.nunique` | ⚠️ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
-| `groupby.prod` | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
-| `groupby.quantile` | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
-| `groupby.std` | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
-| `groupby.sum` | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
-| `groupby.transform` | ✅ | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ |
-| `groupby.var` | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
+| `groupby.agg` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `groupby.count` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `groupby.first` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `groupby.last` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `groupby.max` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `groupby.mean` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `groupby.median` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `groupby.min` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `groupby.nunique` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `groupby.prod` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `groupby.quantile` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `groupby.std` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `groupby.sum` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `groupby.transform` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| `groupby.var` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
 
 ## Eixo 5 — Paridade I/O por dtype
 
@@ -604,7 +604,7 @@ Grupos de nomes que devem seguir convenções claras. Aliases declarados via `me
 
 | grupo | método | Series | DataSet | nota |
 | :--- | :-: | :-: | :-: | :-: |
-| **Tamanho** | `len` | — | — | DataSet: alias de `nrows` |
+| **Tamanho** | `len` | — | — |  |
 | **Tamanho** | `size` | — | — |  |
 | **Nulidade — predicados** | `is_null` | — | — |  |
 | **Nulidade — predicados** | `isna` | — | — |  |
@@ -615,11 +615,11 @@ Grupos de nomes que devem seguir convenções claras. Aliases declarados via `me
 | **Lógica Kleene** | `lor` | — | — |  |
 | **Lógica Kleene** | `lxor` | — | — |  |
 | **Lógica Kleene** | `lnot` | — | — |  |
-| **Seleção posicional** | `head` | — | ✅ |  |
-| **Seleção posicional** | `tail` | — | ✅ |  |
-| **Seleção posicional** | `take` | — | ✅ |  |
+| **Seleção posicional** | `head` | — | — |  |
+| **Seleção posicional** | `tail` | — | — |  |
+| **Seleção posicional** | `take` | — | — |  |
 | **Seleção posicional** | `view` | — | — |  |
-| **Seleção posicional** | `iloc` | — | ✅ |  |
+| **Seleção posicional** | `iloc` | — | — |  |
 
 ### Convenções
 
@@ -647,7 +647,7 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 ### Mensagens de erro Lua
 
 - `series.lua`: 0/0 erros com prefixo `smaug:` (0.0%)
-- `dataset.lua`: 88/88 erros com prefixo `smaug:` (100.0%)
+- `dataset.lua`: 0/0 erros com prefixo `smaug:` (0.0%)
 
 ## Eixo 10 — Paridade de lifecycle
 
@@ -721,8 +721,8 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 | categoria | total | documentados | faltam | % | detalhe |
 | :--- | :-: | :-: | :-: | :-: | :-: |
 | `Series.methods` | 0 | 0 | 0 | 0% | ✅ completo |
-| `DataSet.methods` | 48 | 48 | 0 | 100% | ✅ completo |
-| `GroupBy:*` | 15 | 15 | 0 | 100% | ✅ completo |
+| `DataSet.methods` | 0 | 0 | 0 | 0% | ✅ completo |
+| `GroupBy:*` | 0 | 0 | 0 | 0% | ✅ completo |
 | `CategoricalSeries:*` | 0 | 0 | 0 | 0% | ✅ completo |
 | `CatProxy:*` (.cat) | 0 | 0 | 0 | 0% | ✅ completo |
 | `StrProxy:*` (.str) | 0 | 0 | 0 | 0% | ✅ completo |
@@ -735,7 +735,7 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 **Contagem global de status no relatório:**
 
-- ✅ paridade: 669
+- ✅ paridade: 754
 - ⚪ exceção registrada: 146
 - ⚠️ suspeita (revisar): 121
 - ❌ inconsistência clara: 62
