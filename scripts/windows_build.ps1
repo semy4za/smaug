@@ -6,11 +6,11 @@
 #   1. (opcional, com -Setup) instala MSYS2 + gcc + luajit.
 #   2. Compila o backend C em build\smaug.dll (nome que o ffi_loader
 #      procura no Windows).
-#   3. Compila e roda os testes em C (test_alloc, test_ops, test_ops_edge,
-#      test_bool, test_string, test_cow, test_allocfail com -Wl,--wrap,
-#      e test_stress com N grande).
-#   4. Roda as 8 suites Lua com luajit (series, dataset, edge, special, fillna,
-#      props, i64, string).
+#   3. Compila e roda os testes em C de tests\c\ (test_alloc, test_ops,
+#      test_ops_edge, test_bool, test_bool_lifecycle, test_string, test_cow,
+#      test_io_c, test_datetime_c, test_ops_window; test_allocfail com
+#      -Wl,--wrap; e test_stress com N grande).
+#   4. Roda as 18 suites Lua com luajit (series/, dataset/, io/, props/).
 #   5. Regenera o MANIFEST.txt (make manifest equivalente).
 #
 # Uso (a partir da raiz do projeto):
@@ -123,7 +123,7 @@ Write-Host ""
 Write-Host "== Testes em C ==" -ForegroundColor Cyan
 foreach ($t in $cTests) {
     $exe = "build\$t.exe"
-    & $gcc -std=c11 -g -O0 -Wall -Wextra -I".\include" "tests\$t.c" @sources -lm -o $exe
+    & $gcc -std=c11 -g -O0 -Wall -Wextra -I".\include" "tests\c\$t.c" @sources -lm -o $exe
     if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar $t." }
 
     $out = (& ".\$exe") | Out-String
@@ -137,7 +137,7 @@ foreach ($t in $cTestsWrap) {
     $cargs = @(
         "-std=c11", "-g", "-O0", "-Wall", "-Wextra", "-I.\include",
         "-Wl,--wrap=malloc", "-Wl,--wrap=realloc",
-        "tests\$t.c"
+        "tests\c\$t.c"
     ) + $sources + @("-lm", "-o", $exe)
     & $gcc @cargs
     if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar $t." }
@@ -152,7 +152,7 @@ Write-Host ""
 Write-Host "== Testes de Stress ==" -ForegroundColor Cyan
 foreach ($t in $cTestsStress) {
     $exe = "build\$t.exe"
-    & $gcc -std=c11 -g -O0 -Wall -Wextra -I".\include" "tests\$t.c" @sources -lm -o $exe
+    & $gcc -std=c11 -g -O0 -Wall -Wextra -I".\include" "tests\c\$t.c" @sources -lm -o $exe
     if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar $t." }
 
     $out = (& ".\$exe") | Out-String
@@ -165,13 +165,18 @@ foreach ($t in $cTestsStress) {
 if ($luajit -and -not $SkipLua) {
     Write-Host ""
     Write-Host "== Testes em Lua ==" -ForegroundColor Cyan
-    $luaTests = @("test_series", "test_dataset", "test_edge", "test_special",
-                  "test_fillna", "test_props", "test_i64", "test_string", "test_bool_dtype", "test_groupby", "test_concat", "test_join", "test_series_ops", "test_dataset_ops", "test_str_tier_b", "test_rolling_series", "test_io", "test_io_real", "test_enrich", "test_datetime", "test_categorical", "test_completeness", "test_dt_extended", "test_stats", "test_predicates", "test_str_tier_c", "test_access", "test_duplicates")
+    $luaTests = @("series/test_constructors", "series/test_access", "series/test_reduce",
+                  "series/test_stat", "series/test_window", "series/test_predicates",
+                  "series/test_selection", "series/test_str", "series/test_dt", "series/test_categorical",
+                  "dataset/test_core", "dataset/test_relational", "dataset/test_stat", "dataset/test_io_support",
+                  "io/test_csv", "io/test_json",
+                  "props/test_props", "props/test_integration")
     foreach ($lt in $luaTests) {
         # Captura stdout e stderr separados para distinguir output normal de erros
+        $ltPath = $lt -replace "/", "\"
         $psi = New-Object System.Diagnostics.ProcessStartInfo
         $psi.FileName = $luajit
-        $psi.Arguments = "tests\$lt.lua"
+        $psi.Arguments = "tests\$ltPath.lua"
         $psi.RedirectStandardOutput = $true
         $psi.RedirectStandardError  = $true
         $psi.UseShellExecute = $false

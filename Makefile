@@ -41,11 +41,11 @@ build:
 test: build
 	@for t in $(C_TESTS_PLAIN); do \
 		echo "  CC    $$t"; \
-		$(CC) $(TEST_CFLAGS) tests/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
+		$(CC) $(TEST_CFLAGS) tests/c/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
 	done
 	@for t in $(C_TEST_WRAP); do \
 		echo "  CC    $$t (--wrap)"; \
-		$(CC) $(TEST_CFLAGS) $(WRAP_FLAGS) tests/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
+		$(CC) $(TEST_CFLAGS) $(WRAP_FLAGS) tests/c/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
 	done
 	@for t in $(C_TESTS_PLAIN) $(C_TEST_WRAP); do \
 		echo "  RUN   $$t"; ./build/$$t || exit 1; \
@@ -55,7 +55,7 @@ test: build
 test-stress: build
 	@for t in $(C_TEST_STRESS); do \
 		echo "  CC    $$t"; \
-		$(CC) $(TEST_CFLAGS) tests/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
+		$(CC) $(TEST_CFLAGS) tests/c/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
 	done
 	@for t in $(C_TEST_STRESS); do \
 		echo "  RUN   $$t"; ./build/$$t || exit 1; \

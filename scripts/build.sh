@@ -119,14 +119,20 @@ fi
 # ---------------------------------------------------------------------------
 SRCS=(src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c \
       src/smaug_ops_bool.c src/smaug_str.c src/smaug_ops_str.c \
-      src/smaug_csv.c src/smaug_json.c src/smaug_datetime.c)
+      src/smaug_csv.c src/smaug_json.c src/smaug_datetime.c \
+      src/smaug_ops_window.c)
 
 C_TESTS_PLAIN=(test_alloc test_ops test_ops_edge test_bool \
-               test_bool_lifecycle test_string test_cow test_io_c test_datetime_c)
+               test_bool_lifecycle test_string test_cow test_io_c test_datetime_c \
+               test_ops_window)
 C_TESTS_WRAP=(test_allocfail)
 C_TESTS_STRESS=(test_stress)
-LUA_TESTS=(test_series test_dataset test_edge test_special
-           test_fillna test_props test_i64 test_string test_bool_dtype test_groupby test_concat test_join test_series_ops test_dataset_ops test_str_tier_b test_rolling_series test_io test_io_real test_enrich test_datetime test_categorical test_completeness test_stats test_predicates test_dt_extended test_str_tier_c test_access test_duplicates)
+LUA_TESTS=(series/test_constructors series/test_access series/test_reduce \
+           series/test_stat series/test_window series/test_predicates \
+           series/test_selection series/test_str series/test_dt series/test_categorical \
+           dataset/test_core dataset/test_relational dataset/test_stat dataset/test_io_support \
+           io/test_csv io/test_json \
+           props/test_props props/test_integration)
 
 CFLAGS=(-std=c11 -fPIC -Wall -Wextra -O2 -I./include)
 TEST_CFLAGS=(-std=c11 -g -O0 -Wall -Wextra -I./include)
@@ -163,7 +169,7 @@ info "== Testes em C =="
 
 for t in "${C_TESTS_PLAIN[@]}"; do
     printf "  CC    %-20s" "$t"
-    gcc "${TEST_CFLAGS[@]}" "tests/$t.c" "${SRCS[@]}" -lm -o "build/$t" 2>/tmp/cc_err
+    gcc "${TEST_CFLAGS[@]}" "tests/c/$t.c" "${SRCS[@]}" -lm -o "build/$t" 2>/tmp/cc_err
     if [[ $? -ne 0 ]]; then
         fail "FALHOU (compilacao)"; cat /tmp/cc_err; ALL_PASS=0; continue
     fi
@@ -175,7 +181,7 @@ done
 
 for t in "${C_TESTS_WRAP[@]}"; do
     printf "  CC    %-20s" "$t (--wrap)"
-    gcc "${TEST_CFLAGS[@]}" "${WRAP_FLAGS[@]}" "tests/$t.c" "${SRCS[@]}" -lm -o "build/$t" 2>/tmp/cc_err
+    gcc "${TEST_CFLAGS[@]}" "${WRAP_FLAGS[@]}" "tests/c/$t.c" "${SRCS[@]}" -lm -o "build/$t" 2>/tmp/cc_err
     if [[ $? -ne 0 ]]; then
         fail "FALHOU (compilacao)"; cat /tmp/cc_err; ALL_PASS=0; continue
     fi
@@ -193,7 +199,7 @@ if [[ $SKIP_STRESS -eq 0 ]]; then
     info "== Testes de Stress =="
     for t in "${C_TESTS_STRESS[@]}"; do
         printf "  CC    %-20s" "$t"
-        gcc "${TEST_CFLAGS[@]}" "tests/$t.c" "${SRCS[@]}" -lm -o "build/$t" 2>/tmp/cc_err
+        gcc "${TEST_CFLAGS[@]}" "tests/c/$t.c" "${SRCS[@]}" -lm -o "build/$t" 2>/tmp/cc_err
         if [[ $? -ne 0 ]]; then
             fail "FALHOU (compilacao)"; cat /tmp/cc_err; ALL_PASS=0; continue
         fi

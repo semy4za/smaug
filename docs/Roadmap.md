@@ -40,14 +40,18 @@ diagrama, regra de decisão e régua de versões.
 Memória, tipos, operações primitivas. API estável. O engine não confia no
 caller — toda fronteira pública valida e comunica o resultado.
 
-**Métricas (após sessão de bugfix dos parsers I/O):** linha 95.99% (2248/2342),
-branch-alvo 88.12% (2270/2576, 90 exclusões `COV-EXCL-BR` documentadas).
-Valgrind-clean em todos os 9 binários (incluindo `test_allocfail` com 15330
-allocs/15330 frees e `test_stress` com 90751/90751). Zero warnings `-Wall -Wextra`.
+**Métricas de cobertura:** medição anterior (antes da Fase 3) — linha 95.99%
+(2248/2342), branch-alvo 88.12% (2270/2576, 90 exclusões `COV-EXCL-BR`
+documentadas). **A remedir no Fedora:** a Fase 3 acrescentou `smaug_ops_window.c`
+ao backend e `make_coverage.sh` só passou a instrumentá-lo nesta sessão — os
+números de cobertura serão regenerados na próxima medição autoritativa.
+Valgrind-clean em todos os 12 binários. Zero warnings `-Wall -Wextra`.
 
-**Testes C:** `test_alloc`, `test_ops`, `test_ops_edge` (269 checks),
-`test_bool`, `test_bool_lifecycle` (154 checks), `test_string` (118 checks),
-`test_cow` (15 checks), `test_io_c` (174 checks), `test_datetime_c` (201 checks),
+**Testes C (12 binários, em `tests/c/`):** `test_alloc`, `test_ops`,
+`test_ops_edge` (269 checks), `test_bool`, `test_bool_lifecycle` (154 checks),
+`test_string` (118 checks), `test_cow` (15 checks), `test_io_c` (190 checks),
+`test_datetime_c` (201 checks), `test_ops_window` (207 checks — primitivas Ring 0
+da Fase 3: cumulativas, rank, sorted_nonnull, multi_argsort, rolling),
 `test_allocfail` (1158 verificações via `--wrap`), `test_stress` (51 851 checks).
 
 | Componente | Status |
@@ -92,7 +96,9 @@ explícita via `astype` (suporta os pares entre os 6 dtypes).
 
 Series, DataSet, ergonomia. A API Lua é a linguagem principal do Smaug.
 
-**Testes Lua:** 21 suítes, 360k+ checks (incluindo property-based com 360 862 verificações).
+**Testes Lua:** 18 suítes em subpastas por domínio (`tests/series/`,
+`tests/dataset/`, `tests/io/`, `tests/props/`), ~2300 checks diretos +
+property-based com 360 862 verificações.
 
 | Componente | Status |
 |---|---|
@@ -127,9 +133,10 @@ só disparam entre objetos do mesmo metatype (Lua 5.1/LuaJIT). A sintaxe
 
 GroupBy, Join, Concat, Pivot, Melt, Rolling — implementados e testados.
 
-**Testes Lua:** `test_groupby` (46), `test_concat` (35), `test_join` (52),
-`test_dataset_ops` (61), `test_rolling_series` (37), `test_series_ops` (73),
-`test_enrich` (151) — agregados, transformações, rolling estendido, expanding.
+**Testes Lua:** cobertos em `tests/dataset/test_relational.lua` (groupby,
+concat, join — 164 checks) e `tests/series/test_window.lua` (rolling, expanding —
+64 checks); agregados, transformações e rolling estendido também exercitados em
+`tests/dataset/test_core.lua` e `tests/series/test_stat.lua`.
 
 | Componente | Status |
 |---|---|
@@ -155,9 +162,10 @@ GroupBy, Join, Concat, Pivot, Melt, Rolling — implementados e testados.
 
 Parsers próprios, zero dependências externas. Fronteira `smaug_table_t` plugável.
 
-**Testes:** `test_io_c` (174 checks C), `test_io.lua` (70 checks),
-`test_io_real.lua` (55 checks com dados reais: `pedidos_digitados.csv`,
-916 linhas, sep `;`).
+**Testes:** `tests/c/test_io_c.c` (190 checks C, inclui casos UTF-8 do G.1),
+`tests/io/test_csv.lua` (101 checks, inclui dados reais: `pedidos_digitados.csv`
+em `tests/fixtures/`, sep `;`), `tests/io/test_json.lua` (28 checks, inclui
+unicode).
 
 | Componente | Status |
 |---|---|
@@ -218,7 +226,7 @@ foram concluídos nas sessões de junho/2026.
 | Item | Status |
 |---|---|
 | Bugs Valgrind dos parsers I/O (CSV+JSON, paths de OOM) | `[Done]` |
-| Suite completo Valgrind-clean em 9 binários | `[Done]` |
+| Suite completo Valgrind-clean em 12 binários | `[Done]` |
 | Auditoria de docs (Roadmap, API_INDEX, README, etc.) | `[Done]` |
 | Hardening global de cobertura (`smaug_csv` 85%, `smaug_json` 72%, `smaug_datetime` 70%) | `[Planned]` |
 | Docstrings nos métodos públicos de `Series` e `DataSet` | `[Planned]` |
@@ -346,8 +354,11 @@ Cada fase só começa quando a anterior entrega o dado que ela consome. ML e a
 Trilha de Projeto entram aqui apenas como **lente** (teste de negação), nunca como
 implementação.
 
-### Fase 1 — Inventário arquitetural `[Planned]`
-*Leitura, não escrita. Produz o mapa que alimenta o Bloco G.*
+### Fase 1 — Inventário arquitetural `[Done]`
+*Leitura, não escrita. Produziu o mapa que alimentou o Bloco G. Entregável é um
+documento de trabalho interno (mapa de `series.lua`/`dataset.lua` por blocos,
+mapa de upvalues, débitos técnicos D1–D4, candidatos a Ring 0) — mantido fora do
+repositório por escolha consciente: guia de sessão, não artefato versionável.*
 - Mapear `series.lua` e `dataset.lua` por blocos de responsabilidade (linhas, eixo).
 - Mapear accessors (`.str`, `.dt`, `.cat`) e `CategoricalSeries`.
 - Três dimensões por bloco: (A) responsabilidade certa Lua ou C? (B) coeso ou
@@ -357,67 +368,73 @@ implementação.
 - Marcar candidatos a primitiva Ring 0 (loop denso + aritmética mecânica).
 - Entregável: documento de inventário, sem alterar código.
 
-### Fase 2 — Bloco G: decisões de fundação `[Planned]`
-*Consome o inventário. Decide, não implementa. Cada item: critério explícito
-(contrato OU performance medida OU porta-de-fundação). Esperado para G.6–G.9:
-majoritariamente "porta aberta, registrar".*
-- **G.1 — UTF-8 / strings:** byte-oriented permanece ou vira codepoint-aware?
-  Afeta `.str` inteiro. **Âncora concreta:** decide o que acontece com `"caf\u00e9"`
-  no parser JSON — hoje vira `caf?` (degradação silenciosa). A decisão define se a
-  implementação (Fase 5) vai *decodificar* `\uXXXX` para UTF-8 ou *rejeitar* com
-  erro claro. Invariante: sair da degradação silenciosa antes da v1.0.
-- **G.2 — Datetime:** confirmar epoch_ms int64 como definitivo; listar helpers de
-  calendário candidatos a C; decidir a simplificação da semana ISO
-  (`smaug_datetime.c:494` retorna 53 quando pertence ao ano anterior).
-- **G.3 — Boundary audit:** GroupBy, Join, Rank, Unique, Factorize, Rolling — "se
-  começasse hoje, Lua ou C?".
-- **G.4 — Engine candidates (Ring 0):** lista final de primitivas que descem
-  (`multi_argsort`, `group_runs`, `factorize`, `rank`, helpers UTF-8/datetime).
-- **G.5 — Lições do Bloco F:** restrições de linguagem (`repeat`→`rep_each`), APIs
-  desconfortáveis, decisões boas.
-- **G.6 — Buffer/matriz:** o Ring 0 expõe (ou pode expor sem quebra) ponteiro de
-  buffer contíguo? (porta da Trilha Analítica — Matrix/Tensor).
-- **G.7 — Construção defensiva de DataSet:** o caminho de construção comporta fonte
-  externa não-confiável (banco, API, driver, formato binário) com coerção de tipos,
-  sem reescrita? (porta da Trilha de Projeto).
-- **G.8 — Persistência e Model Layer:** dtypes, schema e metadata atuais permitem
-  construir Persistence (Anel 4) e Models (Anel 5) por cima sem alterar Series/DataSet?
-- **G.9 — Conectividade futura** (mesmo nível de importância de G.6): DataSet
-  construível de fonte externa? dtypes comportam mapeamento SQL? datetime epoch_ms
-  comporta drivers? categorical faz roundtrip? Verificação barata agora, caríssima
-  depois.
-- Entregável: documento de decisões do Bloco G.
+### Fase 2 — Bloco G: decisões de fundação `[Done]`
+*Consumiu o inventário. Decidiu (não implementou). Documento de decisões mantido
+fora do repositório, junto ao inventário. Resultado consolidado: G.1
+**implementado** (UTF-8 no JSON); G.2 **confirmado** (epoch_ms int64 definitivo;
+semana ISO 53 é simplificação documentada, não bug); G.3 **boundary audit
+fechado** (multi_argsort/rank/rolling → C; GroupBy/Join/Expanding → Lua); G.4
+**todas as primitivas implementadas** (Grupos A+B+C, ver Fase 3); G.5 checklist
+permanente de lições do Bloco F; G.6–G.9 **portas confirmadas abertas, sem ação
+pré-v1.0** (buffer contíguo já exposto, from_dict+astype cobrem construção
+defensiva, dtypes mapeiam SQL, formato `.smg` é pós-v1.0).*
+- **G.1 — UTF-8 / strings:** `[IMPLEMENTADO]` `.str` permanece byte-oriented; o
+  reader JSON decodifica `\uXXXX` para UTF-8 (antes degradava silenciosamente para
+  `?`). Surrogate isolado ou hex inválido → erro claro. Ver Fase 3 / CHANGELOG.
+- **G.2 — Datetime:** `[CONFIRMADO]` epoch_ms int64 UTC definitivo. Semana ISO
+  retorna 53 para dias pertencentes ao ano anterior — simplificação consciente,
+  documentada na API, não é bug.
+- **G.3 — Boundary audit:** `[FECHADO]` `multi_argsort`, `rank`, rolling
+  `sum/mean/min/max` → C. GroupBy (orquestração + agg), Join (hash) e Expanding →
+  permanecem Lua.
+- **G.4 — Engine candidates (Ring 0):** `[IMPLEMENTADO]` Grupo A (10 cumulativas/
+  shift/fill/argmin/argmax), Grupo B (sorted_nonnull, rank, pct_rank), Grupo C
+  (multi_argsort 5 dtypes + rolling com deque monotônica). Ver Fase 3.
+- **G.5 — Lições do Bloco F:** `[CHECKLIST PERMANENTE]` palavras reservadas Lua
+  (`repeat`→`rep_each`), `#table` com nil → sentinela `NA`, sem `tbl[i,j]` (usar
+  `df:at`), `__lt`/`__le` só entre mesmos metatypes, função C nova sempre via
+  descritor `DTYPES`.
+- **G.6 — Buffer/matriz:** `[PORTA ABERTA]` `smaug_series_f64_t.data` já expõe
+  `double*` contíguo; layout de N séries independentes é o caminho natural
+  pós-v1.0 (Trilha Analítica).
+- **G.7 — Construção defensiva de DataSet:** `[PORTA ABERTA]` `from_dict` + `astype`
+  cobrem o caso v1.0; validação de schema externa fica no Anel 3 (Trilha de Projeto).
+- **G.8 — Persistência e Model Layer:** `[PORTA ABERTA]` dtypes/schema atuais
+  comportam Persistence (Anel 4) e Models (Anel 5) por cima; formato `.smg` com
+  magic bytes + versionamento é pós-v1.0.
+- **G.9 — Conectividade futura:** `[PORTA ABERTA]` os 6 dtypes têm mapeamento SQL
+  direto; roundtrip categorical via dois `astype` explícitos. Verificado barato
+  agora; nenhuma ação pré-v1.0.
 
-### Fase 3 — Migração de primitivas para Ring 0 `[Planned]`
-*Só o que o Bloco G decidiu. Uma por vez, validar antes da próxima. Vem antes do
-split para não fatiar duas vezes.*
+### Fase 3 — Migração de primitivas para Ring 0 `[Done]`
+*Só o que o Bloco G decidiu. Grupos A+B+C migrados e validados por
+`tests/c/test_ops_window.c` (207 checks). Consumidores Lua reescritos; suíte Lua
+permanece verde. Cada migração registrada no CHANGELOG.*
 - Por primitiva aprovada: implementar em C com guards → teste C dedicado (+allocfail
   se aloca) → reescrever o consumidor Lua → suíte Lua permanece verde → Valgrind +
   cobertura.
 - Atualizar paridade (eixo C↔Lua mirror) se aplicável. Cada migração: CHANGELOG.
 
-### Fase 4 — Reorganização estrutural (split dos arquivos-deus) `[Planned]`
-*Guiada pelo formato final que a Fase 3 deixou. Comportamento idêntico, zero
-mudança de API.*
-- Decidir mecanismo de cruzamento de upvalue (`core/internal` exporta helpers vs
-  setup por parâmetro).
-- Extrair accessors (mais seguros primeiro): `.str`, `.dt`, `.cat`/`CategoricalSeries`.
-- Extrair blocos coesos de Series (estatística, predicados, duplicatas, rolling).
-- Extrair orquestração de DataSet (groupby, join, reshape).
-- Reorganizar testes espelhando a estrutura (`tests/series/`, `tests/dataset/`, …).
-- Rede de segurança: suítes verdes a cada extração; nunca misturar "mover" com "mudar".
-- Atualizar as três fontes de build e o Eixo 12.
+### Fase 4 — Reorganização estrutural (split dos arquivos-deus) `[Done]`
+*Comportamento idêntico, zero mudança de API. `series.lua` (4389 linhas) → 16
+submódulos em `series/`; `dataset.lua` (2256 linhas) → 4 submódulos em `dataset/`;
+testes em subpastas por domínio (`tests/c/`, `tests/series/`, `tests/dataset/`,
+`tests/io/`, `tests/props/`). Mecanismo de injeção via `I` (sem `require`
+cruzado). As três fontes de build e o Eixo 12 atualizados (este último na sessão
+de sincronização de scripts, 2026-06-17). Ver CHANGELOG.*
 
 ### Fase 5 — Hardening global `[In progress]`
 *Estrutura congelada; cada teste mira o lugar definitivo. Esta fase IMPLEMENTA
 decisões já tomadas (não delibera contrato).*
 - Medição de cobertura no Fedora (gcov autoritativo) → `COVERAGE.md` real.
+  **Nota:** `smaug_ops_window.c` (Fase 3) entra na medição pela primeira vez —
+  `make_coverage.sh` só passou a instrumentá-lo na sessão de 2026-06-17.
 - **Fechar cobertura dos parsers** (números reais): `smaug_datetime.c` 70.33% ·
   `smaug_json.c` 72.27% · `smaug_csv.c` 85.13% → ≥95% branch-alvo.
 - `test_allocfail` estendido à camada de ops (Frente B: ~33 branches em
   f64/i64/bool/str/ops_str + ~25 residuais) e aos cleanup paths de OOM dos parsers.
-- **Implementar a decisão de G.1 sobre `\uXXXX`** (decodificar OU rejeitar). Sair
-  da degradação silenciosa. **Bloqueia release.**
+- ~~Implementar a decisão de G.1 sobre `\uXXXX`~~ **`[Done]`** — JSON decodifica
+  para UTF-8; degradação silenciosa eliminada (Fase 3). Era bloqueante de release.
 - Property-based tests adicionais; avaliar fuzzing dos parsers (lacuna registrada).
 - Valgrind clean em todos os binários. `COVERAGE.md` + `MANIFEST.txt` regenerados.
 
@@ -496,6 +513,11 @@ Rege o Princípio de governança no topo.*
   - Validação, constraints, defaults, documentação do dado.
   - CRUD sobre DataSet **em memória**; persistência via Anel 4.
   - Sem transação/índice/concorrência — quem precisa disso usa SQLite via driver.
+  - **Diretriz de design (forma, não cronograma):** Models não deve ser um catálogo
+    de tipos — isso só duplicaria o que o DataSet já infere. O valor está no schema
+    como *contrato executável* (`nullable`, `unique`, `enum`, `default`, constraints).
+    Esse é o critério que separa um Anel 5 que agrega de um que é redundante. Decisão
+    de forma; não antecipa a implementação nem altera a fila pré-v1.0.
 
 ### Features futuras (não são dívida; v1.5+)
 *Adicionam capacidade. Entram quando houver demanda.*

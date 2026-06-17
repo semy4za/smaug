@@ -6,6 +6,88 @@ decisões, achados, motivações.
 
 ---
 
+## 2026-06-17 — Sincronização dos scripts de build com a estrutura da Fase 4
+
+Auditoria completa de `scripts/` (a pedido), motivada pela revisão do Roadmap.
+A Fase 4 reorganizou os testes em subpastas (`tests/c/`, `tests/series/`,
+`tests/dataset/`, `tests/io/`, `tests/props/`), mas os scripts de build não
+acompanharam — continuavam apontando para os arquivos legado na raiz de
+`tests/`. A auditoria revelou dois bugs reais (não apenas cosméticos), além da
+divergência estrutural.
+
+### Bug 1 — `.so` incompleta no `build.sh` (corrigido)
+
+`build.sh` montava `build/libsmaug.so` a partir de 9 fontes, **sem**
+`src/smaug_ops_window.c`. Esse arquivo define `smaug_multi_argsort_ffi` e toda
+a família `smaug_{f64,i64}_rolling_*` — símbolos que o `ffi_loader.lua` declara
+e consome. A `.so` gerada pelo `build.sh` ficava sem eles: qualquer uso de
+rolling ou sort multi-coluna pelo frontend Lua quebraria em runtime com símbolo
+indefinido. Confirmado por `nm -D` (0 símbolos antes, 10 depois). O Makefile e
+o `windows_build.ps1` (que descobre `src/*.c` por glob) já estavam corretos —
+o bug era exclusivo do `build.sh`.
+
+### Bug 2 — cobertura cega em `make_coverage.sh` (corrigido)
+
+`make_coverage.sh` não incluía `smaug_ops_window` nos `SRCS` instrumentados nem
+`test_ops_window` na lista de testes C. Resultado: as primitivas migradas para
+Ring 0 na Fase 3 (cumsum, cumprod, cummin, cummax, diff, shift, ffill, bfill,
+argmin, argmax, sorted_nonnull, rank, multi_argsort, rolling) ficavam **fora da
+medição inteira de cobertura** — invisíveis ao gcov. Agora entram na medição do
+Fedora pela primeira vez.
+
+### Divergência estrutural — scripts realinhados à Fase 4
+
+Três fontes de build apontavam para o legado da raiz; agora todas usam a
+estrutura por domínio:
+
+- **`build.sh`** — `SRCS` += `smaug_ops_window.c`; `C_TESTS_PLAIN` += `test_ops_window`;
+  testes C compilam de `tests/c/`; `LUA_TESTS` passou a listar as 18 suítes em
+  subpasta (`series/…`, `dataset/…`, `io/…`, `props/…`).
+- **`windows_build.ps1`** — testes C de `tests\c\`; lista Lua atualizada para as
+  18 suítes; normalização de separador (`/`→`\`) no caminho do luajit; cabeçalho
+  corrigido (era "8 suites Lua").
+- **`make_coverage.sh`** — `SRCS` e `C_TESTS` corrigidos (ver Bug 2); testes C e
+  `test_allocfail` de `tests/c/`; `LUA_TESTS` para as 18 suítes; comentário do
+  cabeçalho citava `test_enrich_c` (inexistente) — corrigido.
+- **`Makefile`** — embora fora de `scripts/`, é a "fonte única" que os scripts
+  espelham. Compilava os testes C da raiz (`tests/$t.c`); realinhado a
+  `tests/c/$t.c` nos três alvos (`test`, `test-stress`, wrap). Sem isso,
+  `make test` quebraria ao remover o legado.
+- **`scripts/parity/11_test_coverage.lua`** (Eixo 11) — lia 5 arquivos
+  inexistentes na raiz (que retornariam 0 checks); reapontado para as 18 suítes
+  reais. Os demais eixos (01–10, 12) e `common.lua` já tinham fallback
+  mono↔pasta e não precisaram de mudança.
+
+### Lixo removido
+
+`scripts/parity/PARITY_REPORT.md` — relatório de paridade órfão (gerado em
+14/jun). Os scripts `parity.sh`/`parity.ps1` escrevem em `docs/PARITY_REPORT.md`;
+essa cópia em `scripts/parity/` nunca era regravada e entrava no MANIFEST
+indevidamente. Removida.
+
+### Legado da raiz removido
+
+Após o realinhamento, os 28 `.lua` + 12 `.c` + 5 fixtures (`.csv`/`.json`) na
+raiz de `tests/` tornaram-se órfãos — nenhum script ativo os referenciava.
+Removidos. Teste de fogo antes da remoção: mover todo o legado para fora e rodar
+`build.sh` + `make test` + `make test-stress` — tudo passou apenas com a
+estrutura nova, confirmando zero dependência residual.
+
+### Validação
+
+`windows_build.ps1` verde no Windows (MSYS2-UCRT64): DLL com 10 fontes, 12
+testes C (incl. `test_ops_window` 207 checks, `test_io_c` 190 checks), 18 suítes
+Lua, 12 eixos de paridade OK, property-based 360 862 checks. MANIFEST: 113
+arquivos (era 154 antes da limpeza). Valgrind + cobertura no Fedora pendentes
+(autoritativos; gcov não é confiável no Windows).
+
+**Métricas de doc desatualizadas (a corrigir na revisão do Roadmap):** o Anel 0
+no Roadmap ainda cita `test_io_c` com 174 checks (real: 190), não menciona
+`test_ops_window`, e diz "9 binários" (real: 12). Essas e outras inconsistências
+ficam para a sessão de revisão do Roadmap.
+
+---
+
 ## 2026-06-16 — Fase 4: reorganização estrutural (series/, dataset/, tests/)
 
 Reorganização dos monolíticos do Ring 1 em módulos coesos e da suíte de testes
