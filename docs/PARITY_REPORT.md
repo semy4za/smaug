@@ -11,7 +11,7 @@ Convenção de status:
 - ⚠️ ausência sem registro — suspeita, requer revisão humana
 - ❌ inconsistência clara — gap real
 
-Gerado em: 2026-06-17 17:45:08 UTC
+Gerado em: 2026-06-17 19:38:16 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -19,8 +19,104 @@ Cada linha = um método rastreado em `Series.methods` ou `CategoricalSeries`. Co
 
 | método | f64 | i64 | bool | string | datetime | categorical |
 | :--- | :-: | :-: | :-: | :-: | :-: | :-: |
+| `abs` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `all` | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ |
+| `any` | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ |
+| `append` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `argmax` | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ |
+| `argmin` | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ |
+| `argsort` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `astype` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `autocorr` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
+| `between` | ✅ | ✅ | ⚠️ | ✅ | ✅ | ⚠️ |
+| `bfill` | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ✅ |
+| `clip` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `clone` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `combine_first` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `compare` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `corr` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
+| `count_nonnull` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `count_true` | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ |
+| `cov` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
+| `cummax` | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ |
+| `cummin` | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ |
+| `cumprod` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `cumsum` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `describe` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `diff` | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ |
+| `dot` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
+| `drop_duplicates` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `dropna` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `duplicated` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `eq` | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ | ✅ |
+| `equals` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `expanding` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `ffill` | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ✅ |
+| `fillna` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `filter` | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ | ✅ |
+| `first_valid_index` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `ge` | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ | ✅ |
+| `get` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `gt` | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ | ✅ |
+| `head` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `idxmax` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `idxmin` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `is_monotonic_decreasing` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `is_monotonic_increasing` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `is_null` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `is_unique` | ✅ | ✅ | ⚠️ | ✅ | ✅ | ⚠️ |
+| `isin` | ✅ | ✅ | ⚠️ | ✅ | ✅ | ⚠️ |
+| `isna` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `kurtosis` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `land` | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ |
+| `last_valid_index` | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `le` | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ | ✅ |
+| `len` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `lnot` | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ |
+| `lor` | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ |
+| `lt` | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ | ✅ |
+| `lxor` | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ |
+| `mad` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `map` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `mask` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `max` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `mean` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `median` | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ |
+| `min` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `mode` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `ne` | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ | ✅ |
+| `nlargest` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `notna` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `nsmallest` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `nunique` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `pct_change` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
+| `pct_rank` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `prod` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `quantile` | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ |
+| `rank` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `rep_each` | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ | ⚠️ |
+| `rolling` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `round` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `searchsorted` | ✅ | ✅ | ⚠️ | ✅ | ✅ | ⚠️ |
+| `sem` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `set` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `set_null` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `shift` | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ✅ |
+| `size` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `skew` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `sort` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `std` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `sum` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `tail` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `take` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `to_table` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `unique` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `value_counts` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| `var` | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| `view` | ✅ | ✅ | ⚪ | ⚪ | ⚠️ | ⚪ |
+| `where` | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
 
-**Sumário Eixo 1:** 0 métodos × 6 dtypes = 0 células · ✅ 0 (nan%) · ⚪ 0 (nan%) · ⚠️ 0 (nan%)
+**Sumário Eixo 1:** 96 métodos × 6 dtypes = 576 células · ✅ 267 (46.4%) · ⚪ 143 (24.8%) · ⚠️ 166 (28.8%)
 
 ## Eixo 2 — Paridade Series ↔ DataSet
 
@@ -28,8 +124,135 @@ Métodos que existem em cada lado. Algumas assimetrias são intencionais (ex: `S
 
 | método | Series | DataSet | nota |
 | :--- | :-: | :-: | :-: |
+| `abs` | ✅ | — | só em Series |
+| `add_column` | — | ✅ | só em DataSet |
+| `all` | ✅ | — | só em Series |
+| `any` | ✅ | — | só em Series |
+| `append` | ✅ | — | só em Series |
+| `argmax` | ✅ | — | só em Series |
+| `argmin` | ✅ | — | só em Series |
+| `argsort` | ✅ | — | só em Series |
+| `assign` | — | ✅ | só em DataSet |
+| `astype` | ✅ | — | só em Series |
+| `at` | — | ✅ | só em DataSet |
+| `autocorr` | ✅ | — | só em Series |
+| `between` | ✅ | — | só em Series |
+| `bfill` | ✅ | — | só em Series |
+| `clip` | ✅ | — | só em Series |
+| `clone` | ✅ | — | só em Series |
+| `column` | — | ✅ | só em DataSet |
+| `columns` | — | ✅ | só em DataSet |
+| `combine_first` | ✅ | — | só em Series |
+| `compare` | ✅ | ✅ |  |
+| `concat` | — | ✅ | só em DataSet |
+| `corr` | ✅ | ✅ |  |
+| `count_nonnull` | ✅ | — | só em Series |
+| `count_true` | ✅ | — | só em Series |
+| `cov` | ✅ | ✅ |  |
+| `cummax` | ✅ | — | só em Series |
+| `cummin` | ✅ | — | só em Series |
+| `cumprod` | ✅ | — | só em Series |
+| `cumsum` | ✅ | — | só em Series |
+| `describe` | ✅ | ✅ |  |
+| `diff` | ✅ | — | só em Series |
+| `dot` | ✅ | — | só em Series |
+| `drop_column` | — | ✅ | só em DataSet |
+| `drop_duplicates` | ✅ | ✅ |  |
+| `dropna` | ✅ | ✅ |  |
+| `dtypes` | — | ✅ | só em DataSet |
+| `duplicated` | ✅ | ✅ |  |
+| `eq` | ✅ | — | só em Series |
+| `equals` | ✅ | ✅ |  |
+| `expanding` | ✅ | — | só em Series |
+| `explode` | — | ✅ | só em DataSet |
+| `ffill` | ✅ | — | só em Series |
+| `fillna` | ✅ | ✅ |  |
+| `filter` | ✅ | ✅ |  |
+| `first_valid_index` | ✅ | — | só em Series |
+| `ge` | ✅ | — | só em Series |
+| `get` | ✅ | — | só em Series |
+| `groupby` | — | ✅ | só em DataSet |
+| `gt` | ✅ | — | só em Series |
+| `has_column` | — | ✅ | só em DataSet |
+| `head` | ✅ | ✅ |  |
+| `iat` | — | ✅ | só em DataSet |
+| `idxmax` | ✅ | — | só em Series |
+| `idxmin` | ✅ | — | só em Series |
+| `iloc` | — | ✅ | só em DataSet |
+| `insert` | — | ✅ | só em DataSet |
+| `is_monotonic_decreasing` | ✅ | — | só em Series |
+| `is_monotonic_increasing` | ✅ | — | só em Series |
+| `is_null` | ✅ | — | só em Series |
+| `is_unique` | ✅ | — | só em Series |
+| `isin` | ✅ | — | só em Series |
+| `isna` | ✅ | — | só em Series |
+| `join` | — | ✅ | só em DataSet |
+| `kurtosis` | ✅ | — | só em Series |
+| `land` | ✅ | — | só em Series |
+| `last_valid_index` | ✅ | — | só em Series |
+| `le` | ✅ | — | só em Series |
+| `len` | ✅ | — | só em Series |
+| `lnot` | ✅ | — | só em Series |
+| `lor` | ✅ | — | só em Series |
+| `lt` | ✅ | — | só em Series |
+| `lxor` | ✅ | — | só em Series |
+| `mad` | ✅ | — | só em Series |
+| `map` | ✅ | — | só em Series |
+| `mask` | ✅ | — | só em Series |
+| `max` | ✅ | — | só em Series |
+| `mean` | ✅ | — | só em Series |
+| `median` | ✅ | — | só em Series |
+| `melt` | — | ✅ | só em DataSet |
+| `min` | ✅ | — | só em Series |
+| `mode` | ✅ | — | só em Series |
+| `ncols` | — | ✅ | só em DataSet |
+| `ne` | ✅ | — | só em Series |
+| `nlargest` | ✅ | — | só em Series |
+| `notna` | ✅ | — | só em Series |
+| `nrows` | — | ✅ | só em DataSet |
+| `nsmallest` | ✅ | — | só em Series |
+| `nunique` | ✅ | ✅ |  |
+| `pct_change` | ✅ | — | só em Series |
+| `pct_rank` | ✅ | — | só em Series |
+| `pivot` | — | ✅ | só em DataSet |
+| `pivot_table` | — | ✅ | só em DataSet |
+| `prod` | ✅ | — | só em Series |
+| `quantile` | ✅ | — | só em Series |
+| `rank` | ✅ | — | só em Series |
+| `rename` | — | ✅ | só em DataSet |
+| `rename_column` | — | ✅ | só em DataSet |
+| `rep_each` | ✅ | — | só em Series |
+| `rolling` | ✅ | ✅ |  |
+| `round` | ✅ | — | só em Series |
+| `row` | — | ✅ | só em DataSet |
+| `sample` | — | ✅ | só em DataSet |
+| `searchsorted` | ✅ | — | só em Series |
+| `select` | — | ✅ | só em DataSet |
+| `sem` | ✅ | — | só em Series |
+| `set` | ✅ | — | só em Series |
+| `set_null` | ✅ | — | só em Series |
+| `shift` | ✅ | — | só em Series |
+| `skew` | ✅ | — | só em Series |
+| `sort` | ✅ | — | só em Series |
+| `sort_by` | — | ✅ | só em DataSet |
+| `stack` | — | ✅ | só em DataSet |
+| `std` | ✅ | — | só em Series |
+| `sum` | ✅ | — | só em Series |
+| `tail` | ✅ | ✅ |  |
+| `take` | ✅ | ✅ |  |
+| `to_dict` | — | ✅ | só em DataSet |
+| `to_markdown` | — | ✅ | só em DataSet |
+| `to_string` | — | ✅ | só em DataSet |
+| `to_table` | ✅ | ✅ |  |
+| `unique` | ✅ | — | só em Series |
+| `unstack` | — | ✅ | só em DataSet |
+| `update_column` | — | ✅ | só em DataSet |
+| `value_counts` | ✅ | — | só em Series |
+| `var` | ✅ | — | só em Series |
+| `view` | ✅ | — | só em Series |
+| `where` | ✅ | — | só em Series |
 
-**Sumário Eixo 2:** 0 métodos em ambos · 0 só em Series · 0 só em DataSet
+**Sumário Eixo 2:** 16 métodos em ambos · 79 só em Series · 32 só em DataSet
 
 ## Eixo 3 — Espelhamento C ↔ Lua
 
@@ -40,110 +263,110 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
-| `add` | ⚠️ |  |
-| `add_scalar` | ⚠️ |  |
-| `append` | ⚠️ |  |
-| `append_null` | ⚠️ |  |
-| `argmax` | ⚠️ |  |
-| `argmin` | ⚠️ |  |
-| `argsort` | ⚠️ |  |
-| `bfill` | ⚠️ |  |
-| `clone` | ⚠️ |  |
-| `count_nonnull` | ⚠️ |  |
-| `create` | ⚠️ |  |
+| `add` | ✅ |  |
+| `add_scalar` | ✅ |  |
+| `append` | ✅ |  |
+| `append_null` | ✅ |  |
+| `argmax` | ✅ |  |
+| `argmin` | ✅ |  |
+| `argsort` | ✅ |  |
+| `bfill` | ✅ |  |
+| `clone` | ✅ |  |
+| `count_nonnull` | ✅ |  |
+| `create` | ✅ |  |
 | `create_from_array` | ⚠️ |  |
 | `create_with_capacity` | ⚠️ |  |
-| `cummax` | ⚠️ |  |
-| `cummin` | ⚠️ |  |
-| `cumprod` | ⚠️ |  |
-| `cumsum` | ⚠️ |  |
-| `diff` | ⚠️ |  |
-| `div` | ⚠️ |  |
-| `div_scalar` | ⚠️ |  |
-| `eq` | ⚠️ |  |
-| `ffill` | ⚠️ |  |
-| `filter` | ⚠️ |  |
-| `free` | ⚠️ |  |
-| `ge` | ⚠️ |  |
-| `get` | ⚠️ |  |
-| `gt` | ⚠️ |  |
-| `is_null` | ⚠️ |  |
-| `le` | ⚠️ |  |
-| `lt` | ⚠️ |  |
-| `max` | ⚠️ |  |
-| `mean` | ⚠️ |  |
-| `min` | ⚠️ |  |
-| `mul` | ⚠️ |  |
-| `mul_scalar` | ⚠️ |  |
-| `ne` | ⚠️ |  |
-| `rank` | ⚠️ |  |
-| `set` | ⚠️ |  |
-| `set_null` | ⚠️ |  |
-| `shift` | ⚠️ |  |
-| `sort` | ⚠️ |  |
-| `sorted_nonnull` | ⚠️ |  |
-| `std` | ⚠️ |  |
-| `sub` | ⚠️ |  |
-| `sub_scalar` | ⚠️ |  |
-| `sum` | ⚠️ |  |
-| `take` | ⚠️ |  |
-| `var` | ⚠️ |  |
-| `view` | ⚠️ |  |
+| `cummax` | ✅ |  |
+| `cummin` | ✅ |  |
+| `cumprod` | ✅ |  |
+| `cumsum` | ✅ |  |
+| `diff` | ✅ |  |
+| `div` | ✅ |  |
+| `div_scalar` | ✅ |  |
+| `eq` | ✅ |  |
+| `ffill` | ✅ |  |
+| `filter` | ✅ |  |
+| `free` | ✅ |  |
+| `ge` | ✅ |  |
+| `get` | ✅ |  |
+| `gt` | ✅ |  |
+| `is_null` | ✅ |  |
+| `le` | ✅ |  |
+| `lt` | ✅ |  |
+| `max` | ✅ |  |
+| `mean` | ✅ |  |
+| `min` | ✅ |  |
+| `mul` | ✅ |  |
+| `mul_scalar` | ✅ |  |
+| `ne` | ✅ |  |
+| `rank` | ✅ |  |
+| `set` | ✅ |  |
+| `set_null` | ✅ |  |
+| `shift` | ✅ |  |
+| `sort` | ✅ |  |
+| `sorted_nonnull` | ✅ |  |
+| `std` | ✅ |  |
+| `sub` | ✅ |  |
+| `sub_scalar` | ✅ |  |
+| `sum` | ✅ |  |
+| `take` | ✅ |  |
+| `var` | ✅ |  |
+| `view` | ✅ |  |
 
 
 ### i64 — 49 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
-| `add` | ⚠️ |  |
-| `add_scalar` | ⚠️ |  |
-| `append` | ⚠️ |  |
-| `append_null` | ⚠️ |  |
-| `argmax` | ⚠️ |  |
-| `argmin` | ⚠️ |  |
-| `argsort` | ⚠️ |  |
-| `bfill` | ⚠️ |  |
-| `clone` | ⚠️ |  |
-| `count_nonnull` | ⚠️ |  |
-| `create` | ⚠️ |  |
+| `add` | ✅ |  |
+| `add_scalar` | ✅ |  |
+| `append` | ✅ |  |
+| `append_null` | ✅ |  |
+| `argmax` | ✅ |  |
+| `argmin` | ✅ |  |
+| `argsort` | ✅ |  |
+| `bfill` | ✅ |  |
+| `clone` | ✅ |  |
+| `count_nonnull` | ✅ |  |
+| `create` | ✅ |  |
 | `create_from_array` | ⚠️ |  |
 | `create_with_capacity` | ⚠️ |  |
-| `cummax` | ⚠️ |  |
-| `cummin` | ⚠️ |  |
-| `cumprod` | ⚠️ |  |
-| `cumsum` | ⚠️ |  |
-| `diff` | ⚠️ |  |
-| `div` | ⚠️ |  |
-| `div_scalar` | ⚠️ |  |
-| `eq` | ⚠️ |  |
-| `ffill` | ⚠️ |  |
-| `filter` | ⚠️ |  |
-| `free` | ⚠️ |  |
-| `ge` | ⚠️ |  |
-| `get` | ⚠️ |  |
-| `gt` | ⚠️ |  |
-| `is_null` | ⚠️ |  |
-| `le` | ⚠️ |  |
-| `lt` | ⚠️ |  |
-| `max` | ⚠️ |  |
-| `mean` | ⚠️ |  |
-| `min` | ⚠️ |  |
-| `mul` | ⚠️ |  |
-| `mul_scalar` | ⚠️ |  |
-| `ne` | ⚠️ |  |
-| `rank` | ⚠️ |  |
-| `set` | ⚠️ |  |
-| `set_null` | ⚠️ |  |
-| `shift` | ⚠️ |  |
-| `sort` | ⚠️ |  |
-| `sorted_nonnull` | ⚠️ |  |
-| `std` | ⚠️ |  |
-| `sub` | ⚠️ |  |
-| `sub_scalar` | ⚠️ |  |
-| `sum` | ⚠️ |  |
-| `take` | ⚠️ |  |
-| `var` | ⚠️ |  |
-| `view` | ⚠️ |  |
+| `cummax` | ✅ |  |
+| `cummin` | ✅ |  |
+| `cumprod` | ✅ |  |
+| `cumsum` | ✅ |  |
+| `diff` | ✅ |  |
+| `div` | ✅ |  |
+| `div_scalar` | ✅ |  |
+| `eq` | ✅ |  |
+| `ffill` | ✅ |  |
+| `filter` | ✅ |  |
+| `free` | ✅ |  |
+| `ge` | ✅ |  |
+| `get` | ✅ |  |
+| `gt` | ✅ |  |
+| `is_null` | ✅ |  |
+| `le` | ✅ |  |
+| `lt` | ✅ |  |
+| `max` | ✅ |  |
+| `mean` | ✅ |  |
+| `min` | ✅ |  |
+| `mul` | ✅ |  |
+| `mul_scalar` | ✅ |  |
+| `ne` | ✅ |  |
+| `rank` | ✅ |  |
+| `set` | ✅ |  |
+| `set_null` | ✅ |  |
+| `shift` | ✅ |  |
+| `sort` | ✅ |  |
+| `sorted_nonnull` | ✅ |  |
+| `std` | ✅ |  |
+| `sub` | ✅ |  |
+| `sub_scalar` | ✅ |  |
+| `sum` | ✅ |  |
+| `take` | ✅ |  |
+| `var` | ✅ |  |
+| `view` | ✅ |  |
 
 
 ### bool — 19 funções C
@@ -153,20 +376,20 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `all` | ⚠️ |  |
 | `and` | ⚠️ |  |
 | `any` | ⚠️ |  |
-| `append` | ⚠️ |  |
-| `append_null` | ⚠️ |  |
-| `clone` | ⚠️ |  |
+| `append` | ✅ |  |
+| `append_null` | ✅ |  |
+| `clone` | ✅ |  |
 | `count_true` | ⚠️ |  |
-| `create` | ⚠️ |  |
+| `create` | ✅ |  |
 | `create_from_array` | ⚠️ |  |
 | `create_with_capacity` | ⚠️ |  |
-| `free` | ⚠️ |  |
-| `get` | ⚠️ |  |
-| `is_null` | ⚠️ |  |
+| `free` | ✅ |  |
+| `get` | ✅ |  |
+| `is_null` | ✅ |  |
 | `not` | ⚠️ |  |
 | `or` | ⚠️ |  |
-| `set` | ⚠️ |  |
-| `set_null` | ⚠️ |  |
+| `set` | ✅ |  |
+| `set_null` | ✅ |  |
 | `view` | ⚠️ |  |
 | `xor` | ⚠️ |  |
 
@@ -175,74 +398,74 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
-| `append` | ⚠️ |  |
-| `append_null` | ⚠️ |  |
-| `argsort` | ⚠️ |  |
-| `clone` | ⚠️ |  |
-| `count_nonnull` | ⚠️ |  |
-| `create` | ⚠️ |  |
+| `append` | ✅ |  |
+| `append_null` | ✅ |  |
+| `argsort` | ✅ |  |
+| `clone` | ✅ |  |
+| `count_nonnull` | ✅ |  |
+| `create` | ✅ |  |
 | `create_from_array` | ⚠️ |  |
 | `create_with_capacity` | ⚠️ |  |
-| `eq` | ⚠️ |  |
-| `filter` | ⚠️ |  |
-| `free` | ⚠️ |  |
-| `ge` | ⚠️ |  |
-| `get` | ⚠️ |  |
-| `gt` | ⚠️ |  |
-| `is_null` | ⚠️ |  |
-| `le` | ⚠️ |  |
-| `lt` | ⚠️ |  |
-| `ne` | ⚠️ |  |
-| `set` | ⚠️ |  |
-| `set_null` | ⚠️ |  |
-| `sort` | ⚠️ |  |
-| `take` | ⚠️ |  |
+| `eq` | ✅ |  |
+| `filter` | ✅ |  |
+| `free` | ✅ |  |
+| `ge` | ✅ |  |
+| `get` | ✅ |  |
+| `gt` | ✅ |  |
+| `is_null` | ✅ |  |
+| `le` | ✅ |  |
+| `lt` | ✅ |  |
+| `ne` | ✅ |  |
+| `set` | ✅ |  |
+| `set_null` | ✅ |  |
+| `sort` | ✅ |  |
+| `take` | ✅ |  |
 
 
 ### dt — 40 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
-| `add_ms` | ⚠️ |  |
-| `append` | ⚠️ |  |
-| `append_null` | ⚠️ |  |
-| `argsort` | ⚠️ |  |
-| `clone` | ⚠️ |  |
-| `count_nonnull` | ⚠️ |  |
-| `create` | ⚠️ |  |
+| `add_ms` | ✅ |  |
+| `append` | ✅ |  |
+| `append_null` | ✅ |  |
+| `argsort` | ✅ |  |
+| `clone` | ✅ |  |
+| `count_nonnull` | ✅ |  |
+| `create` | ✅ |  |
 | `create_from_array` | ⚠️ |  |
 | `create_with_capacity` | ⚠️ |  |
-| `day` | ⚠️ |  |
-| `diff_ms` | ⚠️ |  |
-| `eq` | ⚠️ |  |
-| `filter` | ⚠️ |  |
-| `format` | ⚠️ |  |
-| `free` | ⚠️ |  |
-| `from_parts` | ⚠️ |  |
-| `ge` | ⚠️ |  |
-| `get` | ⚠️ |  |
-| `gt` | ⚠️ |  |
-| `hour` | ⚠️ |  |
-| `is_null` | ⚠️ |  |
-| `le` | ⚠️ |  |
-| `lt` | ⚠️ |  |
-| `minute` | ⚠️ |  |
-| `month` | ⚠️ |  |
-| `ms` | ⚠️ |  |
-| `ne` | ⚠️ |  |
-| `parse` | ⚠️ |  |
-| `quarter` | ⚠️ |  |
-| `second` | ⚠️ |  |
-| `set` | ⚠️ |  |
-| `set_null` | ⚠️ |  |
-| `sort` | ⚠️ |  |
-| `take` | ⚠️ |  |
-| `truncate` | ⚠️ |  |
+| `day` | ✅ |  |
+| `diff_ms` | ✅ |  |
+| `eq` | ✅ |  |
+| `filter` | ✅ |  |
+| `format` | ✅ |  |
+| `free` | ✅ |  |
+| `from_parts` | ✅ |  |
+| `ge` | ✅ |  |
+| `get` | ✅ |  |
+| `gt` | ✅ |  |
+| `hour` | ✅ |  |
+| `is_null` | ✅ |  |
+| `le` | ✅ |  |
+| `lt` | ✅ |  |
+| `minute` | ✅ |  |
+| `month` | ✅ |  |
+| `ms` | ✅ |  |
+| `ne` | ✅ |  |
+| `parse` | ✅ |  |
+| `quarter` | ✅ |  |
+| `second` | ✅ |  |
+| `set` | ✅ |  |
+| `set_null` | ✅ |  |
+| `sort` | ✅ |  |
+| `take` | ✅ |  |
+| `truncate` | ✅ |  |
 | `view` | ⚠️ |  |
-| `week` | ⚠️ |  |
-| `weekday` | ⚠️ |  |
-| `year` | ⚠️ |  |
-| `yearday` | ⚠️ |  |
+| `week` | ✅ |  |
+| `weekday` | ✅ |  |
+| `year` | ✅ |  |
+| `yearday` | ✅ |  |
 
 ## Eixo 4 — Paridade Anel 2 (operações relacionais) por dtype
 
@@ -253,23 +476,38 @@ Heurística conservadora: verifica menção explícita do dtype no corpo da fun�
 
 | operação | f64 | i64 | bool | string | datetime | categorical |
 | :--- | :-: | :-: | :-: | :-: | :-: | :-: |
-| `groupby` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `join` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `concat` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `pivot` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `pivot_table` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `melt` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `stack` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `unstack` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `explode` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `rolling` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `sort_by` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `filter` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `groupby` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `join` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `concat` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `pivot` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `pivot_table` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `melt` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `stack` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `unstack` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `explode` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `rolling` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `sort_by` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `filter` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
 
 ### GroupBy — agregações
 
 | operação | f64 | i64 | bool | string | datetime | categorical |
 | :--- | :-: | :-: | :-: | :-: | :-: | :-: |
+| `groupby.agg` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `groupby.count` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `groupby.first` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `groupby.last` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `groupby.max` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `groupby.mean` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `groupby.median` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `groupby.min` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `groupby.nunique` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `groupby.prod` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `groupby.quantile` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `groupby.std` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `groupby.sum` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `groupby.transform` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| `groupby.var` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
 
 ## Eixo 5 — Paridade I/O por dtype
 
@@ -495,9 +733,9 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 **Contagem global de status no relatório:**
 
-- ✅ paridade: 161
-- ⚪ exceção registrada: 3
-- ⚠️ suspeita (revisar): 199
+- ✅ paridade: 794
+- ⚪ exceção registrada: 146
+- ⚠️ suspeita (revisar): 232
 - ❌ inconsistência clara: 62
 
 

@@ -436,6 +436,11 @@ decisões já tomadas (não delibera contrato).*
 - ~~Implementar a decisão de G.1 sobre `\uXXXX`~~ **`[Done]`** — JSON decodifica
   para UTF-8; degradação silenciosa eliminada (Fase 3). Era bloqueante de release.
 - Property-based tests adicionais; avaliar fuzzing dos parsers (lacuna registrada).
+- **Parity checker portável e determinístico:** `common.lua` lista os submódulos de
+  `series/`/`dataset/` via `io.popen("find ...")`, que só funciona no `find` Unix —
+  no Windows o report sai vazio (Eixos 1–4 acusam "0 métodos", falso). Trocar a
+  listagem por Lua puro (sem shell), tornando o relatório idêntico entre
+  Linux/Fedora e Windows. Conserto único na infraestrutura; os 12 eixos não mudam.
 - Valgrind clean em todos os binários. `COVERAGE.md` + `MANIFEST.txt` regenerados.
 
 ### Fase 6 — Spike: FFI loader instalável `[Planned]` *(pode ser puxado para antes)*

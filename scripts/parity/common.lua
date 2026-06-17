@@ -16,23 +16,42 @@ function M.read_file(path)
 end
 
 -- ===================================================================
--- Lê lua/smaug/core/series.lua (monolítico) ou, se não existir,
--- concatena todos os submódulos da pasta series/ em ordem.
--- Usado pelos scripts de paridade que fazem análise estática do fonte.
+-- Submódulos do split (Fase 4), na ordem de carregamento do init.lua.
+-- Fonte da verdade explícita: sem shell (`find` não existe igual no
+-- Windows), portanto determinístico e idêntico entre Linux e Windows.
+-- A leitura é tolerante: arquivo ausente é ignorado, nunca quebra.
+-- Manutenção: ao adicionar/remover um submódulo, atualizar esta lista.
 -- ===================================================================
-function M.read_series_lua()
-    local mono = M.read_file("lua/smaug/core/series.lua")
-    if mono then return mono end
+M.SERIES_SUBMODULES = {
+    "lua/smaug/core/series/_types.lua",
+    "lua/smaug/core/series/_core.lua",
+    "lua/smaug/core/series/_factories.lua",
+    "lua/smaug/core/series/_bool_ops.lua",
+    "lua/smaug/core/series/access/_access.lua",
+    "lua/smaug/core/series/access/_transform.lua",
+    "lua/smaug/core/series/stats/_reduce.lua",
+    "lua/smaug/core/series/stats/_stat.lua",
+    "lua/smaug/core/series/stats/_stat_adv.lua",
+    "lua/smaug/core/series/window/_cumulative.lua",
+    "lua/smaug/core/series/window/_rolling.lua",
+    "lua/smaug/core/series/selection/_predicates.lua",
+    "lua/smaug/core/series/selection/_selection.lua",
+    "lua/smaug/core/series/text/_str.lua",
+    "lua/smaug/core/series/temporal/_dt.lua",
+    "lua/smaug/core/series/categorical/_categorical.lua",
+    "lua/smaug/core/series/init.lua",
+}
 
-    local files = {}
-    local function collect(dir)
-        local p = io.popen("find " .. dir .. " -name '*.lua' | sort")
-        if not p then return end
-        for line in p:lines() do files[#files+1] = line end
-        p:close()
-    end
-    collect("lua/smaug/core/series")
+M.DATASET_SUBMODULES = {
+    "lua/smaug/core/dataset/_core.lua",
+    "lua/smaug/core/dataset/_relational.lua",
+    "lua/smaug/core/dataset/_stat.lua",
+    "lua/smaug/core/dataset/_io_support.lua",
+    "lua/smaug/core/dataset/init.lua",
+}
 
+-- Concatena uma lista de submódulos numa única string de fonte.
+local function concat_submodules(files)
     local parts = {}
     for _, path in ipairs(files) do
         local c = M.read_file(path)
@@ -44,30 +63,24 @@ function M.read_series_lua()
 end
 
 -- ===================================================================
+-- Lê lua/smaug/core/series.lua (monolítico) ou, se não existir,
+-- concatena os submódulos da pasta series/ na ordem canônica.
+-- Usado pelos scripts de paridade que fazem análise estática do fonte.
+-- ===================================================================
+function M.read_series_lua()
+    local mono = M.read_file("lua/smaug/core/series.lua")
+    if mono then return mono end
+    return concat_submodules(M.SERIES_SUBMODULES)
+end
+
+-- ===================================================================
 -- Lê lua/smaug/core/dataset.lua (monolítico) ou, se não existir,
--- concatena todos os submódulos da pasta dataset/ em ordem.
+-- concatena os submódulos da pasta dataset/ na ordem canônica.
 -- ===================================================================
 function M.read_dataset_lua()
     local mono = M.read_file("lua/smaug/core/dataset.lua")
     if mono then return mono end
-
-    local files = {}
-    local function collect(dir)
-        local p = io.popen("find " .. dir .. " -name '*.lua' | sort")
-        if not p then return end
-        for line in p:lines() do files[#files+1] = line end
-        p:close()
-    end
-    collect("lua/smaug/core/dataset")
-
-    local parts = {}
-    for _, path in ipairs(files) do
-        local c = M.read_file(path)
-        if c then
-            parts[#parts+1] = "-- === " .. path .. " ===\n" .. c
-        end
-    end
-    return table.concat(parts, "\n")
+    return concat_submodules(M.DATASET_SUBMODULES)
 end
 
 -- ===================================================================
