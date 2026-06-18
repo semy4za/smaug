@@ -4,7 +4,7 @@
 # Como funciona: compila cada src/*.c como um .o instrumentado (--coverage) UMA
 # vez; TODOS os executores de teste linkam contra esses MESMOS .o (mesmos .gcno),
 # entao os .gcda agregam de tres fontes:
-#   1. testes C diretos (incl. test_cow test_io test_io_real test_enrich_c e test_stress) -- linkados contra a .so;
+#   1. testes C diretos (incl. test_cow test_io_c test_ops_window e test_stress) -- linkados contra a .so;
 #   2. testes Lua (carregam a mesma .so via FFI);
 #   3. test_allocfail (--wrap malloc/realloc) -- linka contra os MESMOS .o.
 #
@@ -24,11 +24,11 @@ set -euo pipefail
 
 command -v luajit >/dev/null 2>&1 || { echo "ERRO: luajit nao encontrado (necessario para agregar os testes Lua)."; exit 1; }
 
-SRCS="smaug_core smaug_ops_f64 smaug_ops_i64 smaug_ops_bool smaug_str smaug_ops_str smaug_csv smaug_json smaug_datetime"
+SRCS="smaug_core smaug_ops_f64 smaug_ops_i64 smaug_ops_bool smaug_str smaug_ops_str smaug_csv smaug_json smaug_datetime smaug_ops_window"
 # Tudo que exercita o backend. Se test_stress deixar a medicao lenta demais,
 # pode remove-lo daqui -- ele cobre majoritariamente ramos que ops ja pega.
-C_TESTS="test_alloc test_ops test_ops_edge test_bool test_bool_lifecycle test_string test_cow test_io_c test_datetime_c test_stress"
-LUA_TESTS="test_series test_dataset test_edge test_special test_fillna test_props test_i64 test_string test_bool_dtype test_groupby test_concat test_join test_series_ops test_dataset_ops test_str_tier_b test_rolling_series test_io"
+C_TESTS="test_alloc test_ops test_ops_edge test_bool test_bool_lifecycle test_string test_cow test_io_c test_datetime_c test_ops_window test_stress"
+LUA_TESTS="series/test_constructors series/test_access series/test_reduce series/test_stat series/test_window series/test_predicates series/test_selection series/test_str series/test_dt series/test_categorical dataset/test_core dataset/test_relational dataset/test_stat dataset/test_io_support io/test_csv io/test_json props/test_props props/test_integration"
 COVDIR=cov
 OUT=docs/COVERAGE.md
 
@@ -59,7 +59,7 @@ cp "$COVDIR/libsmaug.so" build/libsmaug.so
 
 # 3. testes C diretos (incl. cow e stress), linkados contra a .so
 for t in $C_TESTS; do
-    gcc -std=c11 -O0 -I./include "tests/$t.c" -L"./$COVDIR" -lsmaug -lm -o "$COVDIR/$t"
+    gcc -std=c11 -O0 -I./include "tests/c/$t.c" -L"./$COVDIR" -lsmaug -lm -o "$COVDIR/$t"
     LD_LIBRARY_PATH="./$COVDIR" "./$COVDIR/$t" >/dev/null 2>&1
 done
 
@@ -72,7 +72,7 @@ done
 #    contra os MESMOS .o instrumentados + --coverage. Seus .gcda agregam.
 gcc -std=c11 -O0 --coverage -I./include \
     -Wl,--wrap=malloc -Wl,--wrap=realloc \
-    tests/test_allocfail.c $objs -lm -o "$COVDIR/test_allocfail"
+    tests/c/test_allocfail.c $objs -lm -o "$COVDIR/test_allocfail"
 "./$COVDIR/test_allocfail" >/dev/null 2>&1
 
 # 6. agrega com contagem EXATA (parse do texto .gcov)

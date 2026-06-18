@@ -7,7 +7,7 @@
 --   - retorno via "return {...}" → tabela Lua
 
 local C = dofile("scripts/parity/common.lua")
-local series = C.read_file("lua/smaug/core/series.lua") or ""
+local series = C.read_series_lua() or ""
 
 -- Métodos que conceitualmente retornam algo categorizado
 local interesting = {

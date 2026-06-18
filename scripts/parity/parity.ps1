@@ -1,4 +1,4 @@
-# scripts/parity/parity.ps1
+﻿# scripts/parity/parity.ps1
 # Roda todos os scripts de paridade e gera docs/PARITY_REPORT.md.
 # Equivalente PowerShell do parity.sh.
 #
@@ -14,6 +14,13 @@ Set-Location $root
 
 $out = "docs\PARITY_REPORT.md"
 
+# Escrita UTF-8 SEM BOM. No Windows PowerShell 5.1, `-Encoding utf8` grava COM
+# BOM (EF BB BF), que aparece como "ï»¿" em alguns viewers e suja o git diff.
+# Estes helpers usam UTF8Encoding($false) explicitamente — consistente em 5.1 e 7+.
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+function Write-Utf8 { param($Path, $Text) [System.IO.File]::WriteAllText($Path, $Text, $utf8NoBom) }
+function Append-Utf8 { param($Path, $Text) [System.IO.File]::AppendAllText($Path, $Text, $utf8NoBom) }
+
 # Detecta luajit
 $luajit = Get-Command luajit -ErrorAction SilentlyContinue
 if (-not $luajit) {
@@ -23,7 +30,7 @@ if (-not $luajit) {
 
 # Header do relatório
 $now = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss UTC")
-@"
+$header = @"
 # Smaug — Relatório de Paridade
 
 > Arquivo gerado por ``bash scripts/parity/parity.sh`` ou ``powershell scripts/parity/parity.ps1``.
@@ -38,7 +45,9 @@ Convenção de status:
 - ❌ inconsistência clara — gap real
 
 Gerado em: $now
-"@ | Set-Content -Path $out -Encoding utf8
+
+"@
+Write-Utf8 -Path $out -Text $header
 
 # Lista dos eixos
 $eixos = @(
@@ -62,13 +71,18 @@ foreach ($eixo in $eixos) {
     $proc.StartInfo.UseShellExecute = $false
     $proc.StartInfo.RedirectStandardOutput = $true
     $proc.StartInfo.RedirectStandardError = $true
+    # luajit emite UTF-8 cru; sem isto o .NET decodifica os bytes usando a
+    # codepage do console (CP850 em Windows PT-BR), corrompendo — e ✅ (mojibake
+    # "ÔÇö" / "Ô£à"). Forçar a leitura como UTF-8 resolve na origem.
+    $proc.StartInfo.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+    $proc.StartInfo.StandardErrorEncoding  = [System.Text.Encoding]::UTF8
     $proc.StartInfo.WorkingDirectory = $root
     [void]$proc.Start()
     $stdout = $proc.StandardOutput.ReadToEnd()
     $stderr = $proc.StandardError.ReadToEnd()
     $proc.WaitForExit()
     if ($proc.ExitCode -eq 0) {
-        Add-Content -Path $out -Value $stdout -Encoding utf8 -NoNewline
+        Append-Utf8 -Path $out -Text $stdout
         Write-Host "  OK     $eixo"
     } else {
         Write-Host "  FALHOU $eixo" -ForegroundColor Red
@@ -78,7 +92,9 @@ foreach ($eixo in $eixos) {
 }
 
 # Resumo executivo no final
-$reportText = Get-Content -Path $out -Raw
+# Releitura forçada em UTF-8: Get-Content -Raw sem encoding usa a codepage do
+# sistema (CP850 em PT-BR) e recriaria o mojibake na memória, zerando as contagens.
+$reportText = [System.IO.File]::ReadAllText((Resolve-Path $out), $utf8NoBom)
 
 # Contagens — uso regex porque os marcadores são emojis multi-byte
 $okCount   = ([regex]::Matches($reportText, "🟩")).Count
@@ -86,7 +102,7 @@ $excCount  = ([regex]::Matches($reportText, "⚪")).Count
 $warnCount = ([regex]::Matches($reportText, "⚠️")).Count
 $errCount  = ([regex]::Matches($reportText, "❌")).Count
 
-@"
+$footer = @"
 
 ---
 
@@ -107,7 +123,8 @@ $errCount  = ([regex]::Matches($reportText, "❌")).Count
 2. Se for decisão consciente, adicione em ``scripts/parity/exceptions.txt``.
 3. Se for gap real, registre em ``Roadmap.md`` ou corrija e rode novamente.
 4. Procure por ❌ — sempre gap real, exige ação.
-"@ | Add-Content -Path $out -Encoding utf8
+"@
+Append-Utf8 -Path $out -Text $footer
 
 Write-Host ""
 Write-Host "Relatorio: $out"

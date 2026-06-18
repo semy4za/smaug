@@ -501,6 +501,301 @@ smaug_series_f64_t *smaug_f64_take(const smaug_series_f64_t *s,
     return r;
 }
 
+/* ===================================================================
+   Grupo A — Operações de janela e redução posicional (Fase 3 Ring 0)
+   Todas retornam nova série do mesmo tamanho que a entrada.
+   NULL propaga: posição nula na entrada → posição nula na saída.
+   =================================================================== */
+
+/* cumsum: soma cumulativa. Null na posição i → null em [i, n-1].
+   Série vazia ou toda-null → série toda-null. */
+smaug_series_f64_t *smaug_f64_cumsum(const smaug_series_f64_t *s) {
+    if (!s) return NULL;
+    smaug_series_f64_t *r = alloc_result(s->size);
+    if (!r) return NULL;
+    double acc = 0.0;
+    int null_seen = 0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (null_seen || INVALID(s, i)) {
+            null_seen = 1;
+            /* null_mask já inicializado como 0x00 por alloc_result */
+        } else {
+            acc += s->data[i];
+            r->data[i]      = acc;
+            r->null_mask[i] = 0xFF;
+        }
+    }
+    return r;
+}
+
+/* cumprod: produto cumulativo. Null propaga igual ao cumsum. */
+smaug_series_f64_t *smaug_f64_cumprod(const smaug_series_f64_t *s) {
+    if (!s) return NULL;
+    smaug_series_f64_t *r = alloc_result(s->size);
+    if (!r) return NULL;
+    double acc = 1.0;
+    int null_seen = 0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (null_seen || INVALID(s, i)) {
+            null_seen = 1;
+        } else {
+            acc *= s->data[i];
+            r->data[i]      = acc;
+            r->null_mask[i] = 0xFF;
+        }
+    }
+    return r;
+}
+
+/* cummin: mínimo cumulativo. Nulos não propagam para frente — são pulados;
+   a posição nula fica nula mas não contamina as seguintes.
+   Contrato distinto de cumsum/cumprod (sem null-contagion). */
+smaug_series_f64_t *smaug_f64_cummin(const smaug_series_f64_t *s) {
+    if (!s) return NULL;
+    smaug_series_f64_t *r = alloc_result(s->size);
+    if (!r) return NULL;
+    int has_val = 0;
+    double cur = 0.0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (INVALID(s, i)) continue;  /* null → null na saída (já 0x00) */
+        double v = s->data[i];
+        if (!has_val || v < cur) { cur = v; has_val = 1; }
+        r->data[i]      = cur;
+        r->null_mask[i] = 0xFF;
+    }
+    return r;
+}
+
+/* cummax: máximo cumulativo. Mesmo contrato de cummin. */
+smaug_series_f64_t *smaug_f64_cummax(const smaug_series_f64_t *s) {
+    if (!s) return NULL;
+    smaug_series_f64_t *r = alloc_result(s->size);
+    if (!r) return NULL;
+    int has_val = 0;
+    double cur = 0.0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (INVALID(s, i)) continue;
+        double v = s->data[i];
+        if (!has_val || v > cur) { cur = v; has_val = 1; }
+        r->data[i]      = cur;
+        r->null_mask[i] = 0xFF;
+    }
+    return r;
+}
+
+/* diff(periods): diferença s[i] - s[i-periods].
+   Primeiros `periods` elementos → null. Null em qualquer operando → null. */
+smaug_series_f64_t *smaug_f64_diff(const smaug_series_f64_t *s, size_t periods) {
+    if (!s) return NULL;
+    smaug_series_f64_t *r = alloc_result(s->size);
+    if (!r) return NULL;
+    for (size_t i = periods; i < s->size; i++) {
+        if (VALID(s, i) && VALID(s, i - periods)) {
+            r->data[i]      = s->data[i] - s->data[i - periods];
+            r->null_mask[i] = 0xFF;
+        }
+        /* senão permanece null (0x00) */
+    }
+    return r;
+}
+
+/* shift(periods): desloca a série. periods > 0 → desloca para baixo
+   (primeiros `periods` viram null); periods == 0 → clone.
+   Série deslocada para além do tamanho → toda null. */
+smaug_series_f64_t *smaug_f64_shift(const smaug_series_f64_t *s, size_t periods) {
+    if (!s) return NULL;
+    smaug_series_f64_t *r = alloc_result(s->size);
+    if (!r) return NULL;
+    if (periods >= s->size) return r;  /* toda null */
+    for (size_t i = periods; i < s->size; i++) {
+        r->data[i]      = s->data[i - periods];
+        r->null_mask[i] = s->null_mask[i - periods];
+    }
+    return r;
+}
+
+/* ffill: preenche null com o último valor válido anterior.
+   Nulls antes do primeiro valor válido permanecem null. */
+smaug_series_f64_t *smaug_f64_ffill(const smaug_series_f64_t *s) {
+    if (!s) return NULL;
+    smaug_series_f64_t *r = alloc_result(s->size);
+    if (!r) return NULL;
+    int has_last = 0;
+    double last = 0.0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (VALID(s, i)) {
+            last = s->data[i];
+            has_last = 1;
+        }
+        if (has_last) {
+            r->data[i]      = last;
+            r->null_mask[i] = 0xFF;
+        }
+        /* senão permanece null (0x00) */
+    }
+    return r;
+}
+
+/* bfill: preenche null com o próximo valor válido seguinte.
+   Nulls após o último valor válido permanecem null. */
+smaug_series_f64_t *smaug_f64_bfill(const smaug_series_f64_t *s) {
+    if (!s) return NULL;
+    smaug_series_f64_t *r = alloc_result(s->size);
+    if (!r) return NULL;
+    int has_next = 0;
+    double next = 0.0;
+    /* percorre de trás para frente */
+    for (size_t i = s->size; i-- > 0; ) {
+        if (VALID(s, i)) {
+            next = s->data[i];
+            has_next = 1;
+        }
+        if (has_next) {
+            r->data[i]      = next;
+            r->null_mask[i] = 0xFF;
+        }
+    }
+    return r;
+}
+
+/* argmin: índice 0-based do menor valor não-null. SIZE_MAX se não há válidos. */
+size_t smaug_f64_argmin(const smaug_series_f64_t *s) {
+    if (!s || s->size == 0) return SIZE_MAX;
+    size_t best_i = SIZE_MAX;
+    double best_v = 0.0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (VALID(s, i)) {
+            if (best_i == SIZE_MAX || s->data[i] < best_v) {
+                best_v = s->data[i];
+                best_i = i;
+            }
+        }
+    }
+    return best_i;
+}
+
+/* argmax: índice 0-based do maior valor não-null. SIZE_MAX se não há válidos. */
+size_t smaug_f64_argmax(const smaug_series_f64_t *s) {
+    if (!s || s->size == 0) return SIZE_MAX;
+    size_t best_i = SIZE_MAX;
+    double best_v = 0.0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (VALID(s, i)) {
+            if (best_i == SIZE_MAX || s->data[i] > best_v) {
+                best_v = s->data[i];
+                best_i = i;
+            }
+        }
+    }
+    return best_i;
+}
+
+/* ===================================================================
+   Grupo B — sorted_nonnull e rank (Fase 3 Ring 0)
+   =================================================================== */
+
+static int cmp_double(const void *a, const void *b) {
+    double da = *(const double *)a, db = *(const double *)b;
+    return (da > db) - (da < db);
+}
+
+/* Comparador de pares [valor, índice_original] para rank */
+static int cmp_rank_pair(const void *a, const void *b) {
+    const double *pa = (const double *)a, *pb = (const double *)b;
+    if (pa[0] != pb[0]) return (pa[0] > pb[0]) - (pa[0] < pb[0]);
+    return (pa[1] > pb[1]) - (pa[1] < pb[1]);
+}
+
+/* smaug_f64_sorted_nonnull: coleta os valores não-nulos de s em array
+   alocado (malloc), ordenado crescente. Devolve o ponteiro e escreve
+   o n efetivo em *out_n. Retorna NULL em OOM ou se s == NULL.
+   O array retornado tem *out_n doubles; caller libera com smaug_free.
+   Série vazia ou toda-null: retorna NULL com *out_n = 0 (não é erro). */
+double *smaug_f64_sorted_nonnull(const smaug_series_f64_t *s, size_t *out_n) {
+    if (!s || !out_n) return NULL;
+    size_t n = 0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (VALID(s, i)) n++;
+    }
+    *out_n = n;
+    if (n == 0) return NULL;
+
+    double *arr = malloc(n * sizeof(double));
+    if (!arr) return NULL;
+
+    size_t j = 0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (VALID(s, i)) arr[j++] = s->data[i];
+    }
+    qsort(arr, n, sizeof(double), cmp_double);
+    return arr;
+}
+
+/* ===================================================================
+   rank: atribui posição ordenada a cada elemento (1-based).
+   method:
+     0 = average  (default; empates recebem a média das posições)
+     1 = min       (empates recebem a menor posição)
+     2 = max       (empates recebem a maior posição)
+     3 = first     (empates recebem posições por ordem de aparição)
+   Nulos → NAN no resultado (caller converte para NA).
+   Retorna double* de tamanho s->size; caller libera com smaug_free.
+   =================================================================== */
+double *smaug_f64_rank(const smaug_series_f64_t *s, int method) {
+    if (!s) return NULL;
+    size_t n = s->size;
+
+    double *result = malloc(n * sizeof(double));
+    if (!result) return NULL;
+
+    for (size_t i = 0; i < n; i++) result[i] = NAN;
+
+    size_t m = 0;
+    for (size_t i = 0; i < n; i++) {
+        if (VALID(s, i)) m++;
+    }
+    if (m == 0) return result;
+
+    /* pares [valor, índice_original] */
+    double (*pairs)[2] = malloc(m * sizeof(*pairs));
+    if (!pairs) { free(result); return NULL; }
+
+    size_t j = 0;
+    for (size_t i = 0; i < n; i++) {
+        if (VALID(s, i)) {
+            pairs[j][0] = s->data[i];
+            pairs[j][1] = (double)i;
+            j++;
+        }
+    }
+    qsort(pairs, m, sizeof(*pairs), cmp_rank_pair);
+
+    size_t p = 0;
+    while (p < m) {
+        size_t q = p;
+        while (q + 1 < m && pairs[q+1][0] == pairs[p][0]) q++;
+
+        double r_min = (double)(p + 1);
+        double r_max = (double)(q + 1);
+
+        for (size_t k = p; k <= q; k++) {
+            size_t orig_i = (size_t)pairs[k][1];
+            double rank_val;
+            switch (method) {
+                case 1:  rank_val = r_min;                   break;  /* min */
+                case 2:  rank_val = r_max;                   break;  /* max */
+                case 3:  rank_val = (double)(k + 1);         break;  /* first */
+                default: rank_val = (r_min + r_max) / 2.0;  break;  /* average */
+            }
+            result[orig_i] = rank_val;
+        }
+        p = q + 1;
+    }
+
+    free(pairs);
+    return result;
+}
+
 /* filter: retorna nova série com elementos onde mask[i] != 0.
    mask deve ter o mesmo tamanho que s. */
 smaug_series_f64_t *smaug_f64_filter(const smaug_series_f64_t *s,

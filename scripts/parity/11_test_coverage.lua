@@ -5,14 +5,16 @@
 
 local C = dofile("scripts/parity/common.lua")
 
--- Lista de testes Lua
+-- Lista de testes Lua (estrutura por domínio — tests/{series,dataset,io,props}/)
 local test_files = {
-    "test_series", "test_dataset", "test_edge", "test_special",
-    "test_fillna", "test_props", "test_i64", "test_string",
-    "test_bool_dtype", "test_groupby", "test_concat", "test_join",
-    "test_series_ops", "test_dataset_ops", "test_str_tier_b",
-    "test_rolling_series", "test_io", "test_io_real",
-    "test_enrich", "test_datetime", "test_categorical",
+    "series/test_constructors", "series/test_access", "series/test_reduce",
+    "series/test_stat", "series/test_window", "series/test_predicates",
+    "series/test_selection", "series/test_str", "series/test_dt",
+    "series/test_categorical",
+    "dataset/test_core", "dataset/test_relational", "dataset/test_stat",
+    "dataset/test_io_support",
+    "io/test_csv", "io/test_json",
+    "props/test_props", "props/test_integration",
 }
 
 local dtypes = { "float64", "int64", "bool", "string", "datetime", "categorical" }

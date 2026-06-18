@@ -5,8 +5,8 @@
 
 local C = dofile("scripts/parity/common.lua")
 
-local series  = C.read_file("lua/smaug/core/series.lua") or ""
-local dataset = C.read_file("lua/smaug/core/dataset.lua") or ""
+local series  = C.read_series_lua() or ""
+local dataset = C.read_dataset_lua() or ""
 local api_idx = C.read_file("docs/API_INDEX.md") or ""
 
 local s_methods  = C.extract_lua_methods(series,  "function methods%.([%w_]+)")

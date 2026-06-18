@@ -214,6 +214,16 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `:idxmin()` / `:idxmax()` | alias de `:argmin()` / `:argmax()` |
 | `:first_valid_index()` / `:last_valid_index()` | índice 1-based do 1º / último não-nulo; nil se toda nula |
 
+**Duplicatas e operações binárias:**
+
+| Método | O que faz |
+|--------|-----------|
+| `:duplicated([keep])` | máscara de duplicatas; keep ∈ {first,last,none}; null é valor → `Series<bool>` |
+| `:drop_duplicates([keep])` | remove duplicatas preservando ordem → nova Series |
+| `:combine_first(other)` | preenche nulls de self com valores de other (mesmo tamanho/dtype) |
+| `:searchsorted(value, [side])` | busca binária; exige série ordenada crescente; side ∈ {left,right} |
+| `:rep_each(n)` | repete cada elemento n vezes; n escalar ≥0 ou `Series<int64>` (nome evita keyword `repeat`) |
+
 **Valores ausentes:**
 
 | Método | O que faz |
@@ -444,6 +454,8 @@ com `nil` no meio (limitação do `#` do Lua).
 | `:cov()` | matriz N×N de covariância amostral entre colunas numéricas → DataSet |
 | `:equals(other)` | igualdade estrutural (colunas, ordem, dtypes, valores) → bool |
 | `:compare(other)` | diferenças célula a célula → DataSet `{linha, coluna, self, other}` |
+| `:duplicated([subset], [keep])` | máscara de linhas duplicadas; subset = nome/lista/nil; keep ∈ {first,last,none} → `Series<bool>` |
+| `:drop_duplicates([subset], [keep])` | remove linhas duplicadas → novo DataSet |
 | `:rename(mapping)` | renomeia colunas em lote: `{old=new, ...}` → novo DataSet |
 | `:at(i, col)` / `:iat(i, ci)` | célula única por nome / por índice posicional de coluna |
 | `:insert(loc, nome, series)` | insere coluna na posição `loc` (1-based) |
@@ -516,7 +528,16 @@ smaug.join(a, b, on, [how], [suffixes])
 
 Itens documentados em `Roadmap.md`:
 
-- **v1.0 (em finalização):** auditoria de docs, hardening global de cobertura, docstrings.
-- **v1.5:** NDJSON (depende de schema), SQLite, Excel, Parquet, lazy execution,
-  regex (`.str` Tier C), `interpolate`, `cross_join`, `query`/`eval`, stable sort.
-- **v2.0:** ORM, schema declarativo, `Matrix`/`Tensor2D`, broadcasting axis-aware, paralelismo.
+- **v1.0 (em finalização):** inventário arquitetural, Bloco G (decisões de fundação),
+  migração de primitivas para o núcleo, reorganização estrutural, hardening global
+  de cobertura, distribuição (LuaRocks), docstrings.
+- **v1.5:** NDJSON (depende de schema), driver de banco (`connect`/`query`/`execute`),
+  SQLite, Excel, Parquet/Arrow (I/O), lazy execution, serialização `.smg` (Anel 4),
+  `.str` Tier D (regex, Unicode-aware), `interpolate`, `cross_join`, `query`/`eval`,
+  stable sort.
+- **v2.0:** Models (Anel 5 — schema, validação, CRUD local).
+- **Trilha Analítica (2.x+):** `Matrix` (Anel 6), `Tensor` + broadcasting axis-aware
+  (Anel 7), ML e pipelines (Anel 8).
+
+*ORM relacional, query builder e tradução SQL são **Fronteiras encerradas** (ver
+`Roadmap.md`), não itens de roadmap.*

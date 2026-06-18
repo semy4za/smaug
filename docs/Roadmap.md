@@ -28,8 +28,10 @@ deve ser natural de ler e conciso de compor.
 ## Arquitetura em anéis
 
 O projeto cresce de dentro pra fora. Um anel só expande quando o interior está
-sólido — não o contrário. Ver `ARCHITECTURE.md` para o modelo completo (7 anéis),
-princípios, diagrama, regra de decisão e régua de versões.
+sólido — não o contrário. A partir do Anel 3, o crescimento segue **duas trilhas
+paralelas** (Projeto: Persistência→Models; Analítica: Matrix→Tensor→ML). Ver
+`ARCHITECTURE.md` para o modelo completo (10 anéis, duas trilhas), princípios,
+diagrama, regra de decisão e régua de versões.
 
 ---
 
@@ -38,14 +40,18 @@ princípios, diagrama, regra de decisão e régua de versões.
 Memória, tipos, operações primitivas. API estável. O engine não confia no
 caller — toda fronteira pública valida e comunica o resultado.
 
-**Métricas (após sessão de bugfix dos parsers I/O):** linha 95.99% (2248/2342),
-branch-alvo 88.12% (2270/2576, 90 exclusões `COV-EXCL-BR` documentadas).
-Valgrind-clean em todos os 9 binários (incluindo `test_allocfail` com 15330
-allocs/15330 frees e `test_stress` com 90751/90751). Zero warnings `-Wall -Wextra`.
+**Métricas de cobertura:** medição anterior (antes da Fase 3) — linha 95.99%
+(2248/2342), branch-alvo 88.12% (2270/2576, 90 exclusões `COV-EXCL-BR`
+documentadas). **A remedir no Fedora:** a Fase 3 acrescentou `smaug_ops_window.c`
+ao backend e `make_coverage.sh` só passou a instrumentá-lo nesta sessão — os
+números de cobertura serão regenerados na próxima medição autoritativa.
+Valgrind-clean em todos os 12 binários. Zero warnings `-Wall -Wextra`.
 
-**Testes C:** `test_alloc`, `test_ops`, `test_ops_edge` (269 checks),
-`test_bool`, `test_bool_lifecycle` (154 checks), `test_string` (118 checks),
-`test_cow` (15 checks), `test_io_c` (174 checks), `test_datetime_c` (201 checks),
+**Testes C (12 binários, em `tests/c/`):** `test_alloc`, `test_ops`,
+`test_ops_edge` (269 checks), `test_bool`, `test_bool_lifecycle` (154 checks),
+`test_string` (118 checks), `test_cow` (15 checks), `test_io_c` (190 checks),
+`test_datetime_c` (201 checks), `test_ops_window` (207 checks — primitivas Ring 0
+da Fase 3: cumulativas, rank, sorted_nonnull, multi_argsort, rolling),
 `test_allocfail` (1158 verificações via `--wrap`), `test_stress` (51 851 checks).
 
 | Componente | Status |
@@ -90,7 +96,9 @@ explícita via `astype` (suporta os pares entre os 6 dtypes).
 
 Series, DataSet, ergonomia. A API Lua é a linguagem principal do Smaug.
 
-**Testes Lua:** 21 suítes, 360k+ checks (incluindo property-based com 360 862 verificações).
+**Testes Lua:** 18 suítes em subpastas por domínio (`tests/series/`,
+`tests/dataset/`, `tests/io/`, `tests/props/`), ~2300 checks diretos +
+property-based com 360 862 verificações.
 
 | Componente | Status |
 |---|---|
@@ -125,9 +133,10 @@ só disparam entre objetos do mesmo metatype (Lua 5.1/LuaJIT). A sintaxe
 
 GroupBy, Join, Concat, Pivot, Melt, Rolling — implementados e testados.
 
-**Testes Lua:** `test_groupby` (46), `test_concat` (35), `test_join` (52),
-`test_dataset_ops` (61), `test_rolling_series` (37), `test_series_ops` (73),
-`test_enrich` (151) — agregados, transformações, rolling estendido, expanding.
+**Testes Lua:** cobertos em `tests/dataset/test_relational.lua` (groupby,
+concat, join — 164 checks) e `tests/series/test_window.lua` (rolling, expanding —
+64 checks); agregados, transformações e rolling estendido também exercitados em
+`tests/dataset/test_core.lua` e `tests/series/test_stat.lua`.
 
 | Componente | Status |
 |---|---|
@@ -153,9 +162,10 @@ GroupBy, Join, Concat, Pivot, Melt, Rolling — implementados e testados.
 
 Parsers próprios, zero dependências externas. Fronteira `smaug_table_t` plugável.
 
-**Testes:** `test_io_c` (174 checks C), `test_io.lua` (70 checks),
-`test_io_real.lua` (55 checks com dados reais: `pedidos_digitados.csv`,
-916 linhas, sep `;`).
+**Testes:** `tests/c/test_io_c.c` (190 checks C, inclui casos UTF-8 do G.1),
+`tests/io/test_csv.lua` (101 checks, inclui dados reais: `pedidos_digitados.csv`
+em `tests/fixtures/`, sep `;`), `tests/io/test_json.lua` (28 checks, inclui
+unicode).
 
 | Componente | Status |
 |---|---|
@@ -216,12 +226,12 @@ foram concluídos nas sessões de junho/2026.
 | Item | Status |
 |---|---|
 | Bugs Valgrind dos parsers I/O (CSV+JSON, paths de OOM) | `[Done]` |
-| Suite completo Valgrind-clean em 9 binários | `[Done]` |
+| Suite completo Valgrind-clean em 12 binários | `[Done]` |
 | Auditoria de docs (Roadmap, API_INDEX, README, etc.) | `[Done]` |
 | Hardening global de cobertura (`smaug_csv` 85%, `smaug_json` 72%, `smaug_datetime` 70%) | `[Planned]` |
 | Docstrings nos métodos públicos de `Series` e `DataSet` | `[Planned]` |
 
-### Bloco F — Enriquecimento dos núcleos (encerra v1.0) `[Planned]`
+### Bloco F — Enriquecimento dos núcleos (encerra v1.0) `[Done]`
 
 Decisão arquitetural: a v1.0 não fecha com o mínimo viável. Fecha com cobertura
 operacional ampla das pretensões reais de uma DataFrame library, mantendo a
@@ -309,7 +319,7 @@ permanecem em v1.5 como `.str` Tier D.
 | `to_markdown()` | `DataSet` | tabela markdown (útil em READMEs, issues, PRs) |
 | `to_string([opts])` | `DataSet` | render plain text (já temos via `print`, formalizar) |
 
-#### F.6 — Pacote de duplicatas e operações binárias
+#### F.6 — Pacote de duplicatas e operações binárias `[Done]`
 
 | Item | Onde | Notas |
 |---|---|---|
@@ -317,107 +327,271 @@ permanecem em v1.5 como `.str` Tier D.
 | `drop_duplicates([subset], [keep])` | `Series` + `DataSet` | multi-coluna |
 | `combine_first(other)` | `Series` | preenche null de self com valores de other |
 | `searchsorted(value)` | `Series` | binary search; pede série ordenada (verifica via `is_monotonic_increasing`) |
-| `repeat(n)` | `Series` | repete cada elemento n vezes (n escalar ou Series<int64>) |
-
-### Checklist de release v1.0
-
-- [x] Bloco A implementado e testado.
-- [x] Bloco B implementado e testado.
-- [x] Bloco C implementado e testado.
-- [x] Bloco D implementado e testado.
-- [x] `test_io_real.lua` para cotações (float64 alta precisão, SHIB).
-- [x] Bugs Valgrind dos parsers I/O corrigidos.
-- [x] Auditoria de docs concluída.
-- [x] Bloco F.1 — Pacote estatístico.
-- [x] Bloco F.2 — Pacote de predicados.
-- [x] Bloco F.3 — Pacote `.dt` estendido.
-- [x] Bloco F.4 — Pacote `.str` Tier C (sem regex/Unicode).
-- [x] Bloco F.5 — Pacote de acesso e ergonomia.
-- [ ] Bloco F.6 — Pacote de duplicatas e operações binárias.
-- [ ] Hardening global (cobertura ≥ 95% branch-alvo nos arquivos restantes).
-- [ ] Docstrings nos métodos públicos de `Series` e `DataSet`.
-- [ ] `bash scripts/build.sh --all` verde + `make valgrind` clean.
-- [ ] CHANGELOG entry v1.0.0.
-- [ ] `git tag v1.0.0`.
+| `rep_each(n)` | `Series` | repete cada elemento n vezes (n escalar ou Series<int64>). Nome é `rep_each`, não `repeat` — `repeat` é palavra reservada em Lua |
 
 ---
 
-## Pós-1.0 — v1.5 (com dependências externas)
+# Caminho para a v1.0 e além
 
-| Item | Área |
-|---|---|
-| NDJSON | I/O (depende de schema declarativo — sem schema, inferência por linha é frágil) |
-| SQLite (read/write) | I/O |
-| Excel `.xlsx` | I/O |
-| Parquet / Arrow | I/O |
-| `lazy execution` (`LazyDataSet → plano → .collect()`) | engine |
-| predicate / projection pushdown | engine |
-| `expanding.*` adicionais / `resample` | rolling / temporal |
-| `interpolate` | valores ausentes |
-| regex string operations | `.str` Tier C |
-| `cross_join` / `join por expressão` | joins |
-| `query` / `eval` | DataSet |
-| schema formal e lineage | engenharia de dados |
-| `stable sort` (timsort) | ordenação |
+> **Princípio de governança.** A coerência de um fluxo futuro justifica *verificar
+> que a porta está aberta* (barato, agora, via teste de negação no Bloco G).
+> Nunca justifica *construir a porta antes da hora* (caro, fora de escopo). Toda
+> vez que uma decisão revelar um caminho de longo prazo consistente (ML, banco,
+> Models, Matrix), a resposta é a mesma: o Bloco G confirma que nada o bloqueia;
+> a implementação fica na trilha pós-v1.0.
 
-## Pós-1.0 — v2.0 (Persistência e ML)
-
-ORM, schema declarativo, engine de migração. `Matrix`/`Tensor2D`.
-Broadcasting axis-aware. Paralelismo. Anel 4 + Anel 5. Ver `ARCHITECTURE.md`.
+Três naturezas, nunca confundidas:
+- **Dívida pré-v1.0 (obrigatória)** — ameaça estabilidade, memória, corrupção de
+  dados, instalação ou contrato documentado. Segura o release.
+- **Feature futura** — adiciona capacidade nova. *Não é dívida.* Não segura release.
+- **Fronteira encerrada** — decidiu-se conscientemente não fazer. *Não é dívida.*
 
 ---
 
-## Dívida técnica registrada
+## PARTE I — Caminho até a v1.0 (fila sequencial)
 
-**Anel 0:**
-- `sum(min_count)`: semântica decidida, implementação pendente.
-- Observabilidade: sistema de warnings unificado (overflow i64, NaN em operações).
-- Build: bloco CMake desatualizado (decisão pendente sobre Lua 5.4 — ver ARCHITECTURE).
-- Fuzzing: ausente — lacuna registrada.
-- Cobertura `smaug_datetime.c` (70.33% branch-alvo) — fechar no hardening global.
-- Cobertura `smaug_json.c` (72.27% branch-alvo) — fechar no hardening global.
-- Cobertura `smaug_csv.c` (85.13% branch-alvo) — fechar no hardening global.
-- Branches novos dos cleanup paths de OOM nos parsers I/O — `test_allocfail` precisa
-  estender para cobrir os `for (k=0; k<c; k++) free(col_names[k])` introduzidos
-  na sessão de bugfix.
+Cada fase só começa quando a anterior entrega o dado que ela consome. ML e a
+Trilha de Projeto entram aqui apenas como **lente** (teste de negação), nunca como
+implementação.
 
-**Anel 1:**
-- `.str` Tier C: regex (`extract`/`findall`/`match`), normalização UTF-8 Unicode-aware. Registrado em v1.5.
+### Fase 1 — Inventário arquitetural `[Done]`
+*Leitura, não escrita. Produziu o mapa que alimentou o Bloco G. Entregável é um
+documento de trabalho interno (mapa de `series.lua`/`dataset.lua` por blocos,
+mapa de upvalues, débitos técnicos D1–D4, candidatos a Ring 0) — mantido fora do
+repositório por escolha consciente: guia de sessão, não artefato versionável.*
+- Mapear `series.lua` e `dataset.lua` por blocos de responsabilidade (linhas, eixo).
+- Mapear accessors (`.str`, `.dt`, `.cat`) e `CategoricalSeries`.
+- Três dimensões por bloco: (A) responsabilidade certa Lua ou C? (B) coeso ou
+  arquivo-deus? (C) fecha alguma porta de Ring/Trilha futura? (resposta por **negação**).
+- Mapa de acoplamento por upvalue (`DTYPES`, `methods`, `NA`, `str_map`, `bool_map`,
+  `check_index`, …).
+- Marcar candidatos a primitiva Ring 0 (loop denso + aritmética mecânica).
+- Entregável: documento de inventário, sem alterar código.
 
-**Decisões arquiteturais encerradas:**
-- **Broadcasting rejeitado para Anel 1:** operações escalares cobrem o caso de uso.
-  Broadcasting real (axis-aware) pertence ao `Tensor2D`/ML (Anel 5).
-- **`bool` como dtype de primeira classe:** `[Done]`. `BoolSeries` aposentada.
-- **COW string:** view/COW excluídos do tipo string conscientemente.
-  String usa modelo de cópia direta. Limitação documentada em `COW.md`.
-- **`categorical` como Lua puro:** sem C backend. Dictionary encoding gerenciado
-  em Lua usando tabelas para `_codes`, `_levels`, `_level_map`. Decisão consciente
-  para evitar fragmentação do contrato C com um tipo que é essencialmente um
-  índice + tabela de strings.
-- **NDJSON adiado:** o formato exige schema global para ser robusto. Inferência
-  por linha gera conflitos de tipo entre linhas (ex: `false` JSON vira `null`
-  no parser C, linha com `"a":null` infere `string`, conflita com linha com
-  `"a":1` que infere `int64`). NDJSON entra junto com o schema declarativo.
-- **Sem index nomeado:** posição 1-based é o índice. Tudo da família `loc`/
-  `MultiIndex`/`reindex`/`align`/`set_index`/`reset_index`/`xs`/`swaplevel`/
-  `droplevel`/`reorder_levels` fica fora — permanentemente, não adiado.
-  Operações que dependem implicitamente de index temporal (`at_time`,
-  `between_time`, `asof`, `asfreq`, `resample`, `to_period`, `to_timestamp`,
-  `tz_convert`, `tz_localize`) também ficam fora. Quando o caso de uso aparecer,
-  resolve-se com coluna `datetime` explícita.
-- **Sem plotting:** Smaug é engine de dados, não GUI. `.plot`, `.hist`, `.boxplot`
-  e família ficam fora. Visualização é responsabilidade de quem consome o Smaug.
-- **I/O exótico fora:** `to_pickle`, `to_hdf`, `to_xarray`, `to_stata`,
-  `to_clipboard`, `to_latex`, `to_orc`, `to_feather`, `to_html`, `style`,
-  `__dataframe__` não fazem parte do escopo. CSV+JSON cobrem o caso real.
-  Parquet/Excel/SQL ficam em v1.5 como peças encaixáveis no Anel 3.
-- **Tipos extras descartados:** `sparse`, `list`, `struct`, `period`, `timedelta`
-  separado, `interval`, `decimal` não entram. Os 6 dtypes (`float64`, `int64`,
-  `bool`, `string`, `datetime`, `categorical`) cobrem o caso real.
-- **Operadores reversos sem ação:** `radd`/`rsub`/`rmul`/etc. são solução pandas
-  para um problema Python. `__add` no metatable Lua já cobre `1 + s` e `s + 1`
-  simetricamente — não-issue.
-- **`pipe`, `combine`, `update`, `squeeze`, `to_frame`** rejeitados: Lua já tem
-  `:method()` encadeado nativamente; semântica de `combine`/`update` é frágil;
-  a fronteira Series↔DataSet em Smaug é mais limpa que em pandas (sem necessidade
-  de squeeze/to_frame).
+### Fase 2 — Bloco G: decisões de fundação `[Done]`
+*Consumiu o inventário. Decidiu (não implementou). Documento de decisões mantido
+fora do repositório, junto ao inventário. Resultado consolidado: G.1
+**implementado** (UTF-8 no JSON); G.2 **confirmado** (epoch_ms int64 definitivo;
+semana ISO 53 é simplificação documentada, não bug); G.3 **boundary audit
+fechado** (multi_argsort/rank/rolling → C; GroupBy/Join/Expanding → Lua); G.4
+**todas as primitivas implementadas** (Grupos A+B+C, ver Fase 3); G.5 checklist
+permanente de lições do Bloco F; G.6–G.9 **portas confirmadas abertas, sem ação
+pré-v1.0** (buffer contíguo já exposto, from_dict+astype cobrem construção
+defensiva, dtypes mapeiam SQL, formato `.smg` é pós-v1.0).*
+- **G.1 — UTF-8 / strings:** `[IMPLEMENTADO]` `.str` permanece byte-oriented; o
+  reader JSON decodifica `\uXXXX` para UTF-8 (antes degradava silenciosamente para
+  `?`). Surrogate isolado ou hex inválido → erro claro. Ver Fase 3 / CHANGELOG.
+- **G.2 — Datetime:** `[CONFIRMADO]` epoch_ms int64 UTC definitivo. Semana ISO
+  retorna 53 para dias pertencentes ao ano anterior — simplificação consciente,
+  documentada na API, não é bug.
+- **G.3 — Boundary audit:** `[FECHADO]` `multi_argsort`, `rank`, rolling
+  `sum/mean/min/max` → C. GroupBy (orquestração + agg), Join (hash) e Expanding →
+  permanecem Lua.
+- **G.4 — Engine candidates (Ring 0):** `[IMPLEMENTADO]` Grupo A (10 cumulativas/
+  shift/fill/argmin/argmax), Grupo B (sorted_nonnull, rank, pct_rank), Grupo C
+  (multi_argsort 5 dtypes + rolling com deque monotônica). Ver Fase 3.
+- **G.5 — Lições do Bloco F:** `[CHECKLIST PERMANENTE]` palavras reservadas Lua
+  (`repeat`→`rep_each`), `#table` com nil → sentinela `NA`, sem `tbl[i,j]` (usar
+  `df:at`), `__lt`/`__le` só entre mesmos metatypes, função C nova sempre via
+  descritor `DTYPES`.
+- **G.6 — Buffer/matriz:** `[PORTA ABERTA]` `smaug_series_f64_t.data` já expõe
+  `double*` contíguo; layout de N séries independentes é o caminho natural
+  pós-v1.0 (Trilha Analítica).
+- **G.7 — Construção defensiva de DataSet:** `[PORTA ABERTA]` `from_dict` + `astype`
+  cobrem o caso v1.0; validação de schema externa fica no Anel 3 (Trilha de Projeto).
+- **G.8 — Persistência e Model Layer:** `[PORTA ABERTA]` dtypes/schema atuais
+  comportam Persistence (Anel 4) e Models (Anel 5) por cima; formato `.smg` com
+  magic bytes + versionamento é pós-v1.0.
+- **G.9 — Conectividade futura:** `[PORTA ABERTA]` os 6 dtypes têm mapeamento SQL
+  direto; roundtrip categorical via dois `astype` explícitos. Verificado barato
+  agora; nenhuma ação pré-v1.0.
+
+### Fase 3 — Migração de primitivas para Ring 0 `[Done]`
+*Só o que o Bloco G decidiu. Grupos A+B+C migrados e validados por
+`tests/c/test_ops_window.c` (207 checks). Consumidores Lua reescritos; suíte Lua
+permanece verde. Cada migração registrada no CHANGELOG.*
+- Por primitiva aprovada: implementar em C com guards → teste C dedicado (+allocfail
+  se aloca) → reescrever o consumidor Lua → suíte Lua permanece verde → Valgrind +
+  cobertura.
+- Atualizar paridade (eixo C↔Lua mirror) se aplicável. Cada migração: CHANGELOG.
+
+### Fase 4 — Reorganização estrutural (split dos arquivos-deus) `[Done]`
+*Comportamento idêntico, zero mudança de API. `series.lua` (4389 linhas) → 16
+submódulos em `series/`; `dataset.lua` (2256 linhas) → 4 submódulos em `dataset/`;
+testes em subpastas por domínio (`tests/c/`, `tests/series/`, `tests/dataset/`,
+`tests/io/`, `tests/props/`). Mecanismo de injeção via `I` (sem `require`
+cruzado). As três fontes de build e o Eixo 12 atualizados (este último na sessão
+de sincronização de scripts, 2026-06-17). Ver CHANGELOG.*
+
+### Fase 5 — Hardening global `[In progress]`
+*Estrutura congelada; cada teste mira o lugar definitivo. Esta fase IMPLEMENTA
+decisões já tomadas (não delibera contrato).*
+- Medição de cobertura no Fedora (gcov autoritativo) → `COVERAGE.md` real.
+  **Nota:** `smaug_ops_window.c` (Fase 3) entra na medição pela primeira vez —
+  `make_coverage.sh` só passou a instrumentá-lo na sessão de 2026-06-17.
+- **Fechar cobertura dos parsers** (números reais): `smaug_datetime.c` 70.33% ·
+  `smaug_json.c` 72.27% · `smaug_csv.c` 85.13% → ≥95% branch-alvo.
+- `test_allocfail` estendido à camada de ops (Frente B: ~33 branches em
+  f64/i64/bool/str/ops_str + ~25 residuais) e aos cleanup paths de OOM dos parsers.
+- ~~Implementar a decisão de G.1 sobre `\uXXXX`~~ **`[Done]`** — JSON decodifica
+  para UTF-8; degradação silenciosa eliminada (Fase 3). Era bloqueante de release.
+- Property-based tests adicionais; avaliar fuzzing dos parsers (lacuna registrada).
+- **Parity checker portável e determinístico:** `common.lua` lista os submódulos de
+  `series/`/`dataset/` via `io.popen("find ...")`, que só funciona no `find` Unix —
+  no Windows o report sai vazio (Eixos 1–4 acusam "0 métodos", falso). Trocar a
+  listagem por Lua puro (sem shell), tornando o relatório idêntico entre
+  Linux/Fedora e Windows. Conserto único na infraestrutura; os 12 eixos não mudam.
+- Valgrind clean em todos os binários. `COVERAGE.md` + `MANIFEST.txt` regenerados.
+
+### Fase 6 — Spike: FFI loader instalável `[Planned]` *(pode ser puxado para antes)*
+- `ffi_loader` descobre a `.so`/`.dll`/`.dylib` num layout *instalado* (não só
+  `./build/` ou `SMAUG_LIB`); resolve os três sufixos por plataforma em runtime.
+- Teste de fogo: carregar de diretório de instalação simulado, máquina sem toolchain.
+- Cadeia de fallback (env var → caminho do rock → relativo ao módulo).
+
+### Fase 7 — Documentação de API (pré-release) `[Planned]`
+- Docstrings nos métodos públicos de `Series` e `DataSet`.
+- Revisar API_INDEX, API_Reference, ARCHITECTURE, COW, CONTRACT contra o estado
+  pós-reorganização. README final.
+- Registrar decisões conscientes (string view/COW, dtypes Tier 3, boolean indexing
+  diferido, Tier D).
+
+### Fase 8 — Distribuição e empacotamento `[Planned]`
+*"O usuário não compila." Decisão de distribuição é fundação.*
+- **Decisão de distribuição:** rocks binários por plataforma OU GitHub releases com
+  binários OU rock que compila na instalação (viola "não compilar" — provável
+  descarte). Critério, não default.
+- Pipeline de build de binários: Linux x64, Windows x64, macOS (decidir se entra na v1.0).
+- Empacotamento: `.so`/`.dll`/`.dylib` + árvore `lua/` + versão.
+- `smaug-1.0.0-1.rockspec` (se LuaRocks); integrar o loader da Fase 6.
+- **Teste de fogo:** `luarocks install smaug` em máquina limpa, sem toolchain.
+- Publicar; verificar que o empacotamento não fecha porta para ecossistema
+  multi-pacote futuro (`smaug` + `smaug-ml`?).
+
+### Fase 9 — Onboarding e lançamento público `[Planned]`
+- **Installation guide:** caminho LuaRocks (uma linha) + instalação manual (binário
+  + path) como fallback.
+- Quickstart: do `require("smaug")` ao primeiro DataSet em ~10 linhas.
+- Requisitos de plataforma e versão de LuaJIT documentados; troubleshooting do FFI.
+- Site / blog / plano de divulgação.
+
+### Fase 10 — Release v1.0.0 (marco) `[Planned]`
+- `build.sh --all` verde + `make valgrind` clean (Fedora) · `windows_build.ps1`
+  verde (Windows) · `luarocks install` validado em máquina limpa.
+- Entrada CHANGELOG v1.0.0 · `git tag v1.0.0` · publicação e anúncio.
+
+---
+
+## PARTE II — Pós-v1.0: trilhas paralelas
+
+*Não é fila. Frentes que compartilham o núcleo (Anel 0–2) e avançam conforme
+demanda. Cada item vira seu mini-roadmap quando começar. Nada aqui antes da Fase 10.
+Rege o Princípio de governança no topo.*
+
+### Trilha Analítica — `Series → DataSet → Matrix → Tensor → ML`
+*A linha matemática. Porta: buffer contíguo (G.6).*
+- **Anel 6 — Matrix** `[Concept]`: layout 2D denso sobre buffer contíguo; álgebra
+  linear básica.
+- **Anel 7 — Tensor** `[Concept]`: N-dimensional; broadcasting axis-aware.
+- **Anel 8 — ML** `[Concept]`: pipeline de preparação (imputação, encoding,
+  normalização) reusando primitivas do Anel 0; modelos consomem schema do Anel 5
+  (**ponto de encontro das trilhas**).
+
+### Trilha de Projeto — `I/O → Persistence → Models`
+*A linha de construção de aplicações. Portas: G.7, G.8, G.9.*
+- **Anel 3 estendido — Driver de banco** `[Planned]` (depende de driver externo → v1.5):
+  - `smaug.connect(...)` — ciclo de vida de conexão (connect/close, vazamento, GC).
+  - `db:query(sql, params)` → DataSet · `db:execute(sql, params)` → linhas afetadas.
+  - `db:begin()` / `commit()` / `rollback()` — repassados ao banco.
+  - **Bindings obrigatórios** (`?`/`$1`) — segurança contra injection, não-opcional.
+  - Conversão defensiva tipo-do-banco → dtype-Smaug (consome G.7/G.9).
+  - Usuário escreve SQL, Smaug transporta. Não gera, não traduz. `write_table` /
+    query-builder: **fora de escopo**.
+- **Anel 4 — Persistência / Serialização** `[Concept]` (reusa fundação atual; candidato cedo):
+  - Formato `.smg`: header (magic, versão, schema) + buffers por coluna + máscara
+    de nulos. `df:save(...)` / `smaug.load(...)`. Snapshots.
+  - Endianness/portabilidade (ARM↔x64); versionamento do formato; categorical
+    (levels) e datetime (epoch_ms).
+  - Reader defensivo: truncado/corrompido/versão futura → erro claro, nunca crash.
+- **Anel 5 — Models** `[Concept]` (ring próprio; NÃO é ORM relacional, NÃO é persistência):
+  - `smaug.Model("Pedido", {id="int64", valor="float64", uf="string"})` — schema nomeado.
+  - Validação, constraints, defaults, documentação do dado.
+  - CRUD sobre DataSet **em memória**; persistência via Anel 4.
+  - Sem transação/índice/concorrência — quem precisa disso usa SQLite via driver.
+  - **Diretriz de design (forma, não cronograma):** Models não deve ser um catálogo
+    de tipos — isso só duplicaria o que o DataSet já infere. O valor está no schema
+    como *contrato executável* (`nullable`, `unique`, `enum`, `default`, constraints).
+    Esse é o critério que separa um Anel 5 que agrega de um que é redundante. Decisão
+    de forma; não antecipa a implementação nem altera a fila pré-v1.0.
+
+### Features futuras (não são dívida; v1.5+)
+*Adicionam capacidade. Entram quando houver demanda.*
+- **Dtypes Tier 3:** float32, int32/16/8 (só se caso real justificar — ML é candidato).
+- **`.str` Tier D:** regex (`extract`/`findall`/`match`/`fullmatch`), normalização
+  Unicode-aware (depende de G.1).
+- **I/O v1.5:** NDJSON (bloqueado por schema), Excel `.xlsx`, Parquet/Arrow.
+- **Engine:** lazy execution, predicate/projection pushdown, stable sort (timsort).
+- **DataSet:** `query`/`eval`, `cross_join`/join por expressão, boolean indexing
+  `df[df.cidade == "SP"]`.
+- **Temporal/rolling:** `expanding.*` adicionais, `resample`, `interpolate`.
+- **Engenharia de dados:** schema formal e lineage.
+- **Runtime:** `sum(min_count)` (semântica decidida, implementação pendente),
+  sistema de warnings unificado (overflow i64, NaN).
+- **String view/COW:** buffer-of-bytes + offset rebasing (hoje string usa cópia direta).
+- **Build:** resolver bloco CMake desatualizado / decisão Lua 5.4.
+
+---
+
+## FRONTEIRAS ENCERRADAS — contrato contra a erosão
+
+*Esta seção é um contrato, não um apêndice. Cada item foi uma batalha que
+escolhemos não lutar — e a maior parte da complexidade histórica do pandas nasceu
+de não ter essa lista. Reabrir qualquer item exige **motivo novo e explícito,
+registrado** — nunca "parece pequeno".*
+
+*A erosão vem de dois vetores: de fora pra dentro (o usuário que pede "só um
+reindex...") e de dentro pra fora (o desenvolvedor que racionaliza "já que estou
+fazendo broadcasting no Tensor, trago um pouco pro Ring 1"). O segundo é o mais
+perigoso, porque se disfarça de consolidação.*
+
+### Grupo 1 — Fronteiras de princípio (permanentes)
+*Dizem respeito ao que o Smaug **é**. Reabrir muda a natureza do produto.*
+- **Sem index nomeado.** Posição 1-based é o índice; datas são colunas datetime
+  explícitas. Fora *permanentemente*, e com elas: `loc`/`iloc`-por-label/`reindex`/
+  `align`/`set_index`/`reset_index`/`MultiIndex`/`xs`/`swaplevel`/`droplevel`/
+  `reorder_levels`, e as temporais dependentes de index (`at_time`/`between_time`/
+  `asof`/`asfreq`/`resample`/`to_period`/`to_timestamp`/`tz_convert`/`tz_localize`).
+  *É a Fronteira mais importante da lista* — a coexistência posição+label+alinhamento
+  é a raiz da complexidade do pandas.
+- **Sem plotting.** `.plot`/`.hist`/`.boxplot`. Plot é interface; Smaug é motor.
+- **Operadores reversos** (`radd`/`rsub`/…). Solução pandas pra limitação do Python;
+  o metatable Lua já cobre `1 + s` e `s + 1` simetricamente.
+- **Broadcasting no Ring 1.** Escalar cobre o caso de Series; broadcasting axis-aware
+  pertence a Matrix/Tensor. *Atenção ao vetor de erosão interno na Trilha Analítica.*
+- **`pipe`/`combine`/`update`/`squeeze`/`to_frame`.** Lua tem `:method()` encadeado;
+  a fronteira Series↔DataSet já é limpa.
+- **Framework de estrutura de projeto** ("Smaug entende `/project /models /reports`").
+  É outro projeto que *importa* o Smaug.
+- **ORM relacional** (objeto↔banco estilo SQLAlchemy). Responsabilidade do SQLite via driver.
+- **Query builder / tradução de operações → SQL.** Custo altíssimo, valor baixo.
+  O usuário escreve o SQL.
+- **I/O de apresentação ou de outro ecossistema:** `to_pickle`/`to_hdf`/`to_xarray`/
+  `to_stata`/`to_clipboard`/`to_latex`/`to_orc`/`to_html`/`style`/`__dataframe__`.
+
+### Grupo 2 — Fronteiras de momento (reavaliar com caso real)
+*Certas hoje pela ausência de caso real. Não são princípio — são "ainda não".*
+- **Dtypes Tier 3 (float32, int32/16/8).** Os 6 dtypes cobrem o caso tabular. **Mas:**
+  quando ML entrar, `float32` deixa de ser exótico e vira concreto. Linguagem:
+  *"fora enquanto não houver caso real; ML provavelmente é esse caso para float32"* —
+  não "descartado permanentemente".
+- **`categorical` como Lua puro** (sem backend C). Decisão para v1.0. Marcar como
+  *"implementação atual"*, não princípio: se houver datasets grandes e *profiling
+  mostrar gargalo real*, um backend C pode valer.
+
+### Grupo 3 — Fronteiras a observar
+*Fora do escopo atual, mas não "nunca".*
+- **feather / Arrow como formato de I/O.** Diferente de pickle/stata/html: é o
+  formato de interop analítico moderno. Reavaliar como **I/O (Anel 3)** se houver
+  demanda. **Trava de escopo:** vale só para Arrow-como-arquivo. **Arrow como
+  representação interna de memória permanece fora** — seria decisão de fundação do
+  tamanho de um Bloco G, não uma adição de I/O.
