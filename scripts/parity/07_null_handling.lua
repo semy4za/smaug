@@ -7,7 +7,7 @@
 --   - conta diferente
 
 local C = dofile("scripts/parity/common.lua")
-local series = C.read_file("lua/smaug/core/series.lua") or ""
+local series = C.read_series_lua() or ""
 
 local function method_body(content, fname)
     local start_pat = "function methods%." .. fname .. "%b()"

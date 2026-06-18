@@ -40,8 +40,8 @@ end
 -- ----------------------------------------------------------------
 -- Lua: mensagens de erro padronizadas
 -- ----------------------------------------------------------------
-local series  = C.read_file("lua/smaug/core/series.lua") or ""
-local dataset = C.read_file("lua/smaug/core/dataset.lua") or ""
+local series  = C.read_series_lua() or ""
+local dataset = C.read_dataset_lua() or ""
 
 local function count_errors(content, prefix_pattern)
     local total, padronizadas = 0, 0

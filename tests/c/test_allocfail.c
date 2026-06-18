@@ -21,6 +21,7 @@
 #include "../include/smaug.h"
 #include "../include/smaug_io.h"
 #include "../include/smaug_string.h"
+#include "../include/smaug_ops_window.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1578,6 +1579,161 @@ static void af_table_free_partial(void) {
 }
 
 
+/* ======================================================================
+   FRENTE B — Grupo A/B (Fase 3 Ring 0): cumulativas, diff/shift, fill,
+   sorted_nonnull, rank — e janela deslizante (rolling). Varre os caminhos
+   de OOM dessas primitivas, antes descobertos no COVERAGE.
+   ====================================================================== */
+
+/* helper: série f64 com nulos no meio, para exercitar VALID/INVALID + fill */
+static smaug_series_f64_t *mk_f64_gapped(void) {
+    double arr[6] = {1, 2, 3, 4, 5, 6};
+    smaug_series_f64_t *s = smaug_f64_create_from_array(arr, 6);
+    if (s) { smaug_f64_set_null(s, 1); smaug_f64_set_null(s, 3); }
+    return s;
+}
+static smaug_series_i64_t *mk_i64_gapped(void) {
+    int64_t arr[6] = {1, 2, 3, 4, 5, 6};
+    smaug_series_i64_t *s = smaug_i64_create_from_array(arr, 6);
+    if (s) { smaug_i64_set_null(s, 1); smaug_i64_set_null(s, 3); }
+    return s;
+}
+
+/* --- f64 Grupo A: cumulativas + diff/shift + fill --- */
+#define AF_F64_UNARY(fnname, call) \
+static void fnname(void) { \
+    smaug_series_f64_t *base = mk_f64_gapped(); assert(base); \
+    for (long k = 0; k < MAX_ALLOCS; k++) { \
+        reset(k); \
+        smaug_series_f64_t *r = call; \
+        if (r) { OK(r->size == base->size, #fnname " size"); smaug_f64_free(r); } \
+    } \
+    smaug_f64_free(base); \
+}
+AF_F64_UNARY(af_f64_cumsum,  smaug_f64_cumsum(base))
+AF_F64_UNARY(af_f64_cumprod, smaug_f64_cumprod(base))
+AF_F64_UNARY(af_f64_cummin,  smaug_f64_cummin(base))
+AF_F64_UNARY(af_f64_cummax,  smaug_f64_cummax(base))
+AF_F64_UNARY(af_f64_diff,    smaug_f64_diff(base, 1))
+AF_F64_UNARY(af_f64_shift,   smaug_f64_shift(base, 2))
+AF_F64_UNARY(af_f64_ffill,   smaug_f64_ffill(base))
+AF_F64_UNARY(af_f64_bfill,   smaug_f64_bfill(base))
+
+/* --- f64 Grupo B: sorted_nonnull + rank (retornam buffer cru) --- */
+static void af_f64_sorted_nonnull(void) {
+    smaug_series_f64_t *base = mk_f64_gapped(); assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        size_t n = 0;
+        double *out = smaug_f64_sorted_nonnull(base, &n);
+        if (out) { OK(n == 4, "f64 sorted_nonnull conta"); free(out); }
+    }
+    smaug_f64_free(base);
+}
+static void af_f64_rank(void) {
+    smaug_series_f64_t *base = mk_f64_gapped(); assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        double *out = smaug_f64_rank(base, 0);
+        if (out) { OK(1, "f64 rank ok"); free(out); }
+    }
+    smaug_f64_free(base);
+}
+
+/* --- i64 Grupo A --- */
+#define AF_I64_UNARY(fnname, call) \
+static void fnname(void) { \
+    smaug_series_i64_t *base = mk_i64_gapped(); assert(base); \
+    for (long k = 0; k < MAX_ALLOCS; k++) { \
+        reset(k); \
+        smaug_series_i64_t *r = call; \
+        if (r) { OK(r->size == base->size, #fnname " size"); smaug_i64_free(r); } \
+    } \
+    smaug_i64_free(base); \
+}
+AF_I64_UNARY(af_i64_cumsum,  smaug_i64_cumsum(base))
+AF_I64_UNARY(af_i64_cumprod, smaug_i64_cumprod(base))
+AF_I64_UNARY(af_i64_cummin,  smaug_i64_cummin(base))
+AF_I64_UNARY(af_i64_cummax,  smaug_i64_cummax(base))
+AF_I64_UNARY(af_i64_diff,    smaug_i64_diff(base, 1))
+AF_I64_UNARY(af_i64_shift,   smaug_i64_shift(base, 2))
+AF_I64_UNARY(af_i64_ffill,   smaug_i64_ffill(base))
+AF_I64_UNARY(af_i64_bfill,   smaug_i64_bfill(base))
+
+static void af_i64_sorted_nonnull(void) {
+    smaug_series_i64_t *base = mk_i64_gapped(); assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        size_t n = 0;
+        int64_t *out = smaug_i64_sorted_nonnull(base, &n);
+        if (out) { OK(n == 4, "i64 sorted_nonnull conta"); free(out); }
+    }
+    smaug_i64_free(base);
+}
+static void af_i64_rank(void) {
+    smaug_series_i64_t *base = mk_i64_gapped(); assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        double *out = smaug_i64_rank(base, 0);
+        if (out) { OK(1, "i64 rank ok"); free(out); }
+    }
+    smaug_i64_free(base);
+}
+
+/* --- rolling f64 (sum/mean/min/max) — min/max usam deque interno --- */
+#define AF_F64_ROLL(fnname, call) \
+static void fnname(void) { \
+    smaug_series_f64_t *base = mk_f64_gapped(); assert(base); \
+    for (long k = 0; k < MAX_ALLOCS; k++) { \
+        reset(k); \
+        smaug_series_f64_t *r = call; \
+        if (r) { OK(r->size == base->size, #fnname " size"); smaug_f64_free(r); } \
+    } \
+    smaug_f64_free(base); \
+}
+AF_F64_ROLL(af_f64_rolling_sum,  smaug_f64_rolling_sum(base, 3))
+AF_F64_ROLL(af_f64_rolling_mean, smaug_f64_rolling_mean(base, 3))
+AF_F64_ROLL(af_f64_rolling_min,  smaug_f64_rolling_min(base, 3))
+AF_F64_ROLL(af_f64_rolling_max,  smaug_f64_rolling_max(base, 3))
+
+/* --- rolling i64 (sum/min/max → i64; mean → f64) --- */
+static void af_i64_rolling_sum(void) {
+    smaug_series_i64_t *base = mk_i64_gapped(); assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_i64_t *r = smaug_i64_rolling_sum(base, 3);
+        if (r) { OK(r->size == base->size, "i64 rolling_sum size"); smaug_i64_free(r); }
+    }
+    smaug_i64_free(base);
+}
+static void af_i64_rolling_mean(void) {
+    smaug_series_i64_t *base = mk_i64_gapped(); assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_f64_t *r = smaug_i64_rolling_mean(base, 3);
+        if (r) { OK(r->size == base->size, "i64 rolling_mean size"); smaug_f64_free(r); }
+    }
+    smaug_i64_free(base);
+}
+static void af_i64_rolling_min(void) {
+    smaug_series_i64_t *base = mk_i64_gapped(); assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_i64_t *r = smaug_i64_rolling_min(base, 3);
+        if (r) { OK(r->size == base->size, "i64 rolling_min size"); smaug_i64_free(r); }
+    }
+    smaug_i64_free(base);
+}
+static void af_i64_rolling_max(void) {
+    smaug_series_i64_t *base = mk_i64_gapped(); assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_i64_t *r = smaug_i64_rolling_max(base, 3);
+        if (r) { OK(r->size == base->size, "i64 rolling_max size"); smaug_i64_free(r); }
+    }
+    smaug_i64_free(base);
+}
+
 int main(void) {
     af_f64_create();
     af_f64_create_from_array();
@@ -1685,6 +1841,16 @@ int main(void) {
     af_json_read_long_string();
     af_json_write();
     af_table_free_partial();
+
+    /* Frente B — Grupo A/B (Fase 3) e rolling */
+    af_f64_cumsum(); af_f64_cumprod(); af_f64_cummin(); af_f64_cummax();
+    af_f64_diff(); af_f64_shift(); af_f64_ffill(); af_f64_bfill();
+    af_f64_sorted_nonnull(); af_f64_rank();
+    af_i64_cumsum(); af_i64_cumprod(); af_i64_cummin(); af_i64_cummax();
+    af_i64_diff(); af_i64_shift(); af_i64_ffill(); af_i64_bfill();
+    af_i64_sorted_nonnull(); af_i64_rank();
+    af_f64_rolling_sum(); af_f64_rolling_mean(); af_f64_rolling_min(); af_f64_rolling_max();
+    af_i64_rolling_sum(); af_i64_rolling_mean(); af_i64_rolling_min(); af_i64_rolling_max();
 
 
     sanity_no_fail();

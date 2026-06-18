@@ -1,8 +1,7 @@
 # Smaug — Relatório de Paridade
 
-> Arquivo gerado por `bash scripts/parity/parity.sh` ou `powershell scripts/parity/parity.ps1`.
-> **Não editar à mão.** Decisões conscientes de não-paridade ficam em
-> `scripts/parity/exceptions.txt`.
+> Arquivo gerado por `bash scripts/parity/parity.sh`. **Não editar à mão.**
+> Decisões conscientes de não-paridade ficam em `scripts/parity/exceptions.txt`.
 
 Convenção de status:
 
@@ -11,7 +10,7 @@ Convenção de status:
 - ⚠️ ausência sem registro — suspeita, requer revisão humana
 - ❌ inconsistência clara — gap real
 
-Gerado em: 2026-06-17 19:38:16 UTC
+Gerado em: 2026-06-18 02:23:01 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -530,34 +529,34 @@ Métodos críticos: o tipo de retorno está conforme o esperado e simétrico ent
 
 | método | esperado | detectado | status |
 | :--- | :-: | :-: | :-: |
-| `eq` | Series<bool> | — | ❌ não encontrado |
-| `ne` | Series<bool> | — | ❌ não encontrado |
-| `lt` | Series<bool> | — | ❌ não encontrado |
-| `le` | Series<bool> | — | ❌ não encontrado |
-| `gt` | Series<bool> | — | ❌ não encontrado |
-| `ge` | Series<bool> | — | ❌ não encontrado |
-| `is_null` | valor escalar (bool) | — | ❌ não encontrado |
-| `isna` | valor escalar (bool) | — | ❌ não encontrado |
-| `notna` | valor escalar (bool) | — | ❌ não encontrado |
-| `unique` | Series | — | ❌ não encontrado |
-| `value_counts` | DataSet | — | ❌ não encontrado |
-| `describe` | tabela Lua | — | ❌ não encontrado |
-| `head` | Series | — | ❌ não encontrado |
-| `tail` | Series | — | ❌ não encontrado |
-| `take` | Series | — | ❌ não encontrado |
-| `filter` | Series | — | ❌ não encontrado |
-| `clone` | Series | — | ❌ não encontrado |
-| `sort` | Series | — | ❌ não encontrado |
-| `argsort` | tabela de índices | — | ❌ não encontrado |
-| `to_table` | tabela Lua | — | ❌ não encontrado |
-| `cumsum` | Series | — | ❌ não encontrado |
-| `cumprod` | Series | — | ❌ não encontrado |
-| `cummax` | Series | — | ❌ não encontrado |
-| `cummin` | Series | — | ❌ não encontrado |
-| `diff` | Series | — | ❌ não encontrado |
-| `shift` | Series | — | ❌ não encontrado |
-| `map` | Series | — | ❌ não encontrado |
-| `CategoricalSeries:value_counts` | DataSet (paridade com Series) | — | ❌ inconsistente com Series |
+| `eq` | Series<bool> | Series<bool> | ✅ |
+| `ne` | Series<bool> | Series<bool> | ✅ |
+| `lt` | Series<bool> | Series<bool> | ✅ |
+| `le` | Series<bool> | Series<bool> | ✅ |
+| `gt` | Series<bool> | Series<bool> | ✅ |
+| `ge` | Series<bool> | Series<bool> | ✅ |
+| `is_null` | valor escalar (bool) | Series<bool> | ⚠️ |
+| `isna` | valor escalar (bool) | Series<bool> | ⚠️ |
+| `notna` | valor escalar (bool) | Series<bool> | ⚠️ |
+| `unique` | Series | Series<bool> | ✅ |
+| `value_counts` | DataSet | Series<bool> | ⚠️ |
+| `describe` | tabela Lua | Series<bool> | ⚠️ |
+| `head` | Series | Series<bool> | ✅ |
+| `tail` | Series | Series<bool> | ✅ |
+| `take` | Series | Series<bool> | ✅ |
+| `filter` | Series | Series<bool> | ✅ |
+| `clone` | Series | Series<bool> | ✅ |
+| `sort` | Series | Series<bool> | ✅ |
+| `argsort` | tabela de índices | Series<bool> | ⚠️ |
+| `to_table` | tabela Lua | Series<bool> | ⚠️ |
+| `cumsum` | Series | Series<bool> | ✅ |
+| `cumprod` | Series | Series<bool> | ✅ |
+| `cummax` | Series | Series<bool> | ✅ |
+| `cummin` | Series | Series<bool> | ✅ |
+| `diff` | Series | Series<bool> | ✅ |
+| `shift` | Series | Series<bool> | ✅ |
+| `map` | Series | Series<bool> | ✅ |
+| `CategoricalSeries:value_counts` | DataSet (paridade com Series) | Series | ❌ inconsistente com Series |
 
 ## Eixo 7 — Tratamento de null consistente
 
@@ -566,31 +565,31 @@ Cada método tem uma política de null esperada (ignore_na, erra, propaga). Veri
 
 | método | política esperada | detectado | status |
 | :--- | :-: | :-: | :-: |
-| `sum` | ignore_na flag | — | ❌ não encontrado |
-| `mean` | ignore_na flag | — | ❌ não encontrado |
-| `min` | ignore_na flag | — | ❌ não encontrado |
-| `max` | ignore_na flag | — | ❌ não encontrado |
-| `median` | ignore_na flag | — | ❌ não encontrado |
-| `quantile` | ignore_na flag | — | ❌ não encontrado |
-| `var` | ignore_na flag | — | ❌ não encontrado |
-| `std` | ignore_na flag | — | ❌ não encontrado |
-| `prod` | ignore_na flag | — | ❌ não encontrado |
-| `skew` | ignore_na flag | — | ❌ não encontrado |
-| `kurtosis` | ignore_na flag | — | ❌ não encontrado |
-| `mad` | ignore_na flag | — | ❌ não encontrado |
-| `sem` | ignore_na flag | — | ❌ não encontrado |
-| `mode` | ignore_na flag | — | ❌ não encontrado |
-| `sort` | erra com null | — | ❌ não encontrado |
-| `argsort` | erra com null | — | ❌ não encontrado |
-| `abs` | propaga null | — | ❌ não encontrado |
-| `round` | propaga null | — | ❌ não encontrado |
-| `clip` | propaga null | — | ❌ não encontrado |
-| `cumsum` | propaga null | — | ❌ não encontrado |
-| `cumprod` | propaga null | — | ❌ não encontrado |
-| `cummin` | propaga null | — | ❌ não encontrado |
-| `cummax` | propaga null | — | ❌ não encontrado |
-| `diff` | propaga null | — | ❌ não encontrado |
-| `shift` | propaga null | — | ❌ não encontrado |
+| `sum` | ignore_na flag | tem ignore_na | ✅ |
+| `mean` | ignore_na flag | tem ignore_na | ✅ |
+| `min` | ignore_na flag | tem ignore_na | ✅ |
+| `max` | ignore_na flag | tem ignore_na | ✅ |
+| `median` | ignore_na flag | tem ignore_na | ✅ |
+| `quantile` | ignore_na flag | tem ignore_na | ✅ |
+| `var` | ignore_na flag | tem ignore_na | ✅ |
+| `std` | ignore_na flag | tem ignore_na | ✅ |
+| `prod` | ignore_na flag | tem ignore_na | ✅ |
+| `skew` | ignore_na flag | sem ignore_na | ⚠️ |
+| `kurtosis` | ignore_na flag | sem ignore_na | ⚠️ |
+| `mad` | ignore_na flag | sem ignore_na | ⚠️ |
+| `sem` | ignore_na flag | sem ignore_na | ⚠️ |
+| `mode` | ignore_na flag | sem ignore_na | ⚠️ |
+| `sort` | erra com null | verifica nulls | ✅ |
+| `argsort` | erra com null | verifica nulls | ✅ |
+| `abs` | propaga null | propaga | ✅ |
+| `round` | propaga null | propaga | ✅ |
+| `clip` | propaga null | propaga | ✅ |
+| `cumsum` | propaga null | propaga | ✅ |
+| `cumprod` | propaga null | propaga | ✅ |
+| `cummin` | propaga null | propaga | ✅ |
+| `cummax` | propaga null | propaga | ✅ |
+| `diff` | propaga null | propaga | ✅ |
+| `shift` | propaga null | propaga | ✅ |
 | `sin` | propaga null | — | ❌ não encontrado |
 | `cos` | propaga null | — | ❌ não encontrado |
 | `tan` | propaga null | — | ❌ não encontrado |
@@ -605,22 +604,22 @@ Grupos de nomes que devem seguir convenções claras. Aliases declarados via `me
 
 | grupo | método | Series | DataSet | nota |
 | :--- | :-: | :-: | :-: | :-: |
-| **Tamanho** | `len` | — | — |  |
-| **Tamanho** | `size` | — | — |  |
-| **Nulidade — predicados** | `is_null` | — | — |  |
-| **Nulidade — predicados** | `isna` | — | — |  |
-| **Nulidade — predicados** | `notna` | — | — |  |
-| **Contagem** | `count_nonnull` | — | — |  |
-| **Contagem** | `count_true` | — | — |  |
-| **Lógica Kleene** | `land` | — | — |  |
-| **Lógica Kleene** | `lor` | — | — |  |
-| **Lógica Kleene** | `lxor` | — | — |  |
-| **Lógica Kleene** | `lnot` | — | — |  |
-| **Seleção posicional** | `head` | — | — |  |
-| **Seleção posicional** | `tail` | — | — |  |
-| **Seleção posicional** | `take` | — | — |  |
-| **Seleção posicional** | `view` | — | — |  |
-| **Seleção posicional** | `iloc` | — | — |  |
+| **Tamanho** | `len` | ✅ | — | DataSet: alias de `nrows` |
+| **Tamanho** | `size` | — | — | Series: alias de `len` |
+| **Nulidade — predicados** | `is_null` | ✅ | — |  |
+| **Nulidade — predicados** | `isna` | ✅ | — |  |
+| **Nulidade — predicados** | `notna` | ✅ | — |  |
+| **Contagem** | `count_nonnull` | ✅ | — |  |
+| **Contagem** | `count_true` | ✅ | — |  |
+| **Lógica Kleene** | `land` | ✅ | — |  |
+| **Lógica Kleene** | `lor` | ✅ | — |  |
+| **Lógica Kleene** | `lxor` | ✅ | — |  |
+| **Lógica Kleene** | `lnot` | ✅ | — |  |
+| **Seleção posicional** | `head` | ✅ | ✅ |  |
+| **Seleção posicional** | `tail` | ✅ | ✅ |  |
+| **Seleção posicional** | `take` | ✅ | ✅ |  |
+| **Seleção posicional** | `view` | ✅ | — |  |
+| **Seleção posicional** | `iloc` | — | ✅ |  |
 
 ### Convenções
 
@@ -647,8 +646,8 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 0/0 erros com prefixo `smaug:` (0.0%)
-- `dataset.lua`: 0/0 erros com prefixo `smaug:` (0.0%)
+- `series.lua`: 204/204 erros com prefixo `smaug:` (100.0%)
+- `dataset.lua`: 88/88 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
 
@@ -718,13 +717,13 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 | categoria | total | documentados | faltam | % | detalhe |
 | :--- | :-: | :-: | :-: | :-: | :-: |
-| `Series.methods` | 0 | 0 | 0 | 0% | ✅ completo |
-| `DataSet.methods` | 0 | 0 | 0 | 0% | ✅ completo |
-| `GroupBy:*` | 0 | 0 | 0 | 0% | ✅ completo |
-| `CategoricalSeries:*` | 0 | 0 | 0 | 0% | ✅ completo |
-| `CatProxy:*` (.cat) | 0 | 0 | 0 | 0% | ✅ completo |
-| `StrProxy:*` (.str) | 0 | 0 | 0 | 0% | ✅ completo |
-| `SeriesDT:*` (.dt) | 0 | 0 | 0 | 0% | ✅ completo |
+| `Series.methods` | 95 | 95 | 0 | 100% | ✅ completo |
+| `DataSet.methods` | 48 | 48 | 0 | 100% | ✅ completo |
+| `GroupBy:*` | 15 | 15 | 0 | 100% | ✅ completo |
+| `CategoricalSeries:*` | 41 | 41 | 0 | 100% | ✅ completo |
+| `CatProxy:*` (.cat) | 6 | 6 | 0 | 100% | ✅ completo |
+| `StrProxy:*` (.str) | 28 | 28 | 0 | 100% | ✅ completo |
+| `SeriesDT:*` (.dt) | 33 | 33 | 0 | 100% | ✅ completo |
 
 ---
 
@@ -733,10 +732,10 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 **Contagem global de status no relatório:**
 
-- ✅ paridade: 794
+- ✅ paridade: 852
 - ⚪ exceção registrada: 146
-- ⚠️ suspeita (revisar): 232
-- ❌ inconsistência clara: 62
+- ⚠️ suspeita (revisar): 133
+- ❌ inconsistência clara: 10
 
 
 ## Como usar este relatório
