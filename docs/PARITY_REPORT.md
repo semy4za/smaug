@@ -11,7 +11,7 @@ ConvenÃ§Ã£o de status:
 - âš ï¸ ausÃªncia sem registro â€” suspeita, requer revisÃ£o humana
 - âŒ inconsistÃªncia clara â€” gap real
 
-Gerado em: 2026-06-15 14:02:05 UTC
+Gerado em: 2026-06-18 03:28:43 UTC
 
 ## Eixo 1 ÔÇö Paridade de m├®todos entre dtypes
 
@@ -702,7 +702,7 @@ Cada m├®todo p├║blico do c├│digo deveria aparecer em `API_INDEX.md`. 
 
 **Contagem global de status no relatÃ³rio:**
 
-- âœ… paridade: 1
+- âœ… paridade: 0
 - âšª exceÃ§Ã£o registrada: 1
 - âš ï¸ suspeita (revisar): 1
 - âŒ inconsistÃªncia clara: 1

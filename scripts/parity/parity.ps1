@@ -81,7 +81,7 @@ foreach ($eixo in $eixos) {
 $reportText = Get-Content -Path $out -Raw
 
 # Contagens — uso regex porque os marcadores são emojis multi-byte
-$okCount   = ([regex]::Matches($reportText, "✅")).Count
+$okCount   = ([regex]::Matches($reportText, "🟩")).Count
 $excCount  = ([regex]::Matches($reportText, "⚪")).Count
 $warnCount = ([regex]::Matches($reportText, "⚠️")).Count
 $errCount  = ([regex]::Matches($reportText, "❌")).Count
