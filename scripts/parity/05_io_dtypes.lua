@@ -28,10 +28,10 @@ end
 local rows = {}
 for _, d in ipairs(dtypes) do
     local row = { "`"..dt_lua[d].."`" }
-    row[#row+1] = dtype_in(csv_c, d)  and "✅" or "⚠️"
-    row[#row+1] = dtype_in(csv_lua, d) and "✅" or "⚠️"
-    row[#row+1] = dtype_in(json_c, d) and "✅" or "⚠️"
-    row[#row+1] = dtype_in(json_lua, d) and "✅" or "⚠️"
+    row[#row+1] = dtype_in(csv_c, d)  and "🟩" or "🟨"
+    row[#row+1] = dtype_in(csv_lua, d) and "🟩" or "🟨"
+    row[#row+1] = dtype_in(json_c, d) and "🟩" or "🟨"
+    row[#row+1] = dtype_in(json_lua, d) and "🟩" or "🟨"
     rows[#rows+1] = row
 end
 
@@ -39,8 +39,8 @@ local header = { "dtype", "CSV C", "CSV Lua", "JSON C", "JSON Lua" }
 
 local out = {
     C.section(5, "Paridade I/O por dtype",
-        "✅ = dtype mencionado/usado nos arquivos do parser/writer. "
-        .. "⚠️ = sem menção (dtype provavelmente não suportado no formato). "
+        "🟩 = dtype mencionado/usado nos arquivos do parser/writer. "
+        .. "🟨 = sem menção (dtype provavelmente não suportado no formato). "
         .. "Limitações conhecidas: `categorical` não tem representação nativa "
         .. "em CSV/JSON (lida como string e convertida via `astype`)."),
     "",

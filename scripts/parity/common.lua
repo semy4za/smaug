@@ -171,16 +171,16 @@ function M.render_table(header, rows)
 end
 
 -- ===================================================================
--- Conta status (✅ ⚪ ⚠️ ❌) numa lista de linhas-resultado.
+-- Conta status (🟩 ⬜ 🟨 🟥) numa lista de linhas-resultado.
 -- ===================================================================
 function M.count_status(rows, col_idx)
     local c = {ok=0, exc=0, warn=0, err=0}
     for _, row in ipairs(rows) do
         local cell = row[col_idx] or ""
-        if     cell:find("✅") then c.ok   = c.ok   + 1
-        elseif cell:find("⚪") then c.exc  = c.exc  + 1
-        elseif cell:find("⚠️") then c.warn = c.warn + 1
-        elseif cell:find("❌") then c.err  = c.err  + 1
+        if     cell:find("🟩") then c.ok   = c.ok   + 1
+        elseif cell:find("⬜") then c.exc  = c.exc  + 1
+        elseif cell:find("🟨") then c.warn = c.warn + 1
+        elseif cell:find("🟥") then c.err  = c.err  + 1
         end
     end
     return c

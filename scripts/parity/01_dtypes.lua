@@ -150,11 +150,11 @@ for _, method in ipairs(universe) do
 
         if d == "categorical" then
             if cat_set[method] then
-                cell = "✅"
+                cell = "🟩"
             elseif exc then
-                cell = "⚪"
+                cell = "⬜"
             else
-                cell = "⚠️"
+                cell = "🟨"
             end
         else
             -- núcleo (f64/i64/bool/string/datetime) usa Series.methods
@@ -167,19 +167,19 @@ for _, method in ipairs(universe) do
             if has_definition then
                 local ok = method_accepts(body_for_lookup, lua_name)
                 if ok then
-                    cell = "✅"
+                    cell = "🟩"
                 elseif exc then
-                    cell = "⚪"
+                    cell = "⬜"
                 else
-                    cell = "⚠️"
+                    cell = "🟨"
                 end
             else
                 -- método não está em Series.methods — verifica se é CategoricalSeries-only
                 if cat_set[method] then
                     -- método existe só em CategoricalSeries
-                    if exc then cell = "⚪" else cell = "⚠️" end
+                    if exc then cell = "⬜" else cell = "🟨" end
                 else
-                    cell = "⚠️"
+                    cell = "🟨"
                 end
             end
         end
@@ -196,8 +196,8 @@ end
 local header = { "método", "f64", "i64", "bool", "string", "datetime", "categorical" }
 local section = C.section(1, "Paridade de métodos entre dtypes",
     "Cada linha = um método rastreado em `Series.methods` ou `CategoricalSeries`. "
-    .. "Coluna = um dos 6 dtypes. ✅ disponível · ⚪ não aplicável (exceção registrada) · "
-    .. "⚠️ ausência sem registro (suspeita) · ❌ inconsistência clara.")
+    .. "Coluna = um dos 6 dtypes. 🟩 disponível · ⬜ não aplicável (exceção registrada) · "
+    .. "🟨 ausência sem registro (suspeita) · 🟥 inconsistência clara.")
 
 local out = { section, C.render_table(header, rows), "" }
 
@@ -207,14 +207,14 @@ local cnt = { ok=0, exc=0, warn=0 }
 for _, row in ipairs(rows) do
     for i = 2, #row do
         local c = row[i]
-        if     c:find("✅") then cnt.ok   = cnt.ok   + 1
-        elseif c:find("⚪") then cnt.exc  = cnt.exc  + 1
-        elseif c:find("⚠️") then cnt.warn = cnt.warn + 1
+        if     c:find("🟩") then cnt.ok   = cnt.ok   + 1
+        elseif c:find("⬜") then cnt.exc  = cnt.exc  + 1
+        elseif c:find("🟨") then cnt.warn = cnt.warn + 1
         end
     end
 end
 out[#out+1] = string.format("**Sumário Eixo 1:** %d métodos × %d dtypes = %d células · "
-    .. "✅ %d (%.1f%%) · ⚪ %d (%.1f%%) · ⚠️ %d (%.1f%%)",
+    .. "🟩 %d (%.1f%%) · ⬜ %d (%.1f%%) · 🟨 %d (%.1f%%)",
     stats_methods, #DTYPES, total_cells,
     cnt.ok,   100*cnt.ok/total_cells,
     cnt.exc,  100*cnt.exc/total_cells,

@@ -41,7 +41,7 @@ for _, d in ipairs(dtypes) do
         -- procura referência à função C no frontend
         local needle = "smaug_" .. d .. "_" .. fname
         local found_in_lua = series:find(needle, 1, true) ~= nil
-        local status = found_in_lua and "✅" or "⚠️"
+        local status = found_in_lua and "🟩" or "🟨"
         rows[#rows+1] = { "`"..fname.."`", status, "" }
     end
 
@@ -53,7 +53,7 @@ end
 local out = {
     C.section(3, "Espelhamento C ↔ Lua",
         "Cada função pública do backend C deveria ter caminho no frontend Lua "
-        .. "(direto via FFI ou exposto via método Series). ⚠️ = função C que não "
+        .. "(direto via FFI ou exposto via método Series). 🟨 = função C que não "
         .. "aparece em `lua/smaug/core/series.lua` (pode ser órfã ou exposta "
         .. "indiretamente via outro nome)."),
 }

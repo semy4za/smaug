@@ -33,7 +33,7 @@ for _, item in ipairs(files) do
     rows_c[#rows_c+1] = {
         "`"..item.dtype.."`",
         item.expected,
-        has_sentinel and "✅ usa" or "⚠️ não detectado",
+        has_sentinel and "🟩 usa" or "🟨 não detectado",
     }
 end
 

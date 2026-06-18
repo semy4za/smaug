@@ -22,6 +22,7 @@
 #include "../include/smaug_io.h"
 #include "../include/smaug_string.h"
 #include "../include/smaug_ops_window.h"
+#include "../include/smaug_datetime.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1734,6 +1735,105 @@ static void af_i64_rolling_max(void) {
     smaug_i64_free(base);
 }
 
+/* ======================================================================
+   FRENTE B fase 2 — Anel 3: datetime (lifecycle + ops que alocam).
+   datetime estava SEM cobertura allocfail; a auditoria das exclusoes
+   revelou varias "coberto por test_allocfail" que de fato NAO eram
+   cobertas (conveniencia disfarcada). Esta frente as torna verdadeiras
+   ou expoe o ramo para teste.
+   ====================================================================== */
+static smaug_series_dt_t *mk_dt_gapped(void) {
+    int64_t arr[6] = {1000, 2000, 3000, 4000, 5000, 6000};
+    smaug_series_dt_t *s = smaug_dt_create_from_array(arr, 6);
+    if (s) { smaug_dt_set_null(s, 1); smaug_dt_set_null(s, 3); }
+    return s;
+}
+
+static void af_dt_create(void) {
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_dt_t *s = smaug_dt_create(5);
+        if (s) { OK(s->size == 5, "dt create size"); smaug_dt_free(s); }
+    }
+}
+static void af_dt_create_from_array(void) {
+    int64_t arr[4] = {1, 2, 3, 4};
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_dt_t *s = smaug_dt_create_from_array(arr, 4);
+        if (s) { OK(s->size == 4, "dt from_array size"); smaug_dt_free(s); }
+    }
+}
+static void af_dt_clone(void) {
+    smaug_series_dt_t *base = mk_dt_gapped(); assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_dt_t *c = smaug_dt_clone(base);
+        if (c) { OK(c->size == base->size, "dt clone size"); smaug_dt_free(c); }
+    }
+    smaug_dt_free(base);
+}
+static void af_dt_view(void) {
+    smaug_series_dt_t *base = mk_dt_gapped(); assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_dt_t *v = smaug_dt_view(base, 0, 3);
+        if (v) { OK(v->size == 3, "dt view size"); smaug_dt_free(v); }
+    }
+    smaug_dt_free(base);
+}
+static void af_dt_append_grow(void) {
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        smaug_series_dt_t *s = smaug_dt_create_with_capacity(0, 0);
+        assert(s);
+        reset(k);
+        int rc = smaug_dt_append(s, 1234);
+        OK(rc == 0 || rc == -1, "dt append rc valido");
+        if (rc == 0) OK(s->size == 1, "dt append cresceu");
+        else         OK(s->size == 0, "dt append falhou sem corromper");
+        reset(-1);
+        smaug_dt_free(s);
+    }
+}
+static void af_dt_argsort(void) {
+    smaug_series_dt_t *base = mk_dt_gapped(); assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        size_t *idx = smaug_dt_argsort(base, true);
+        if (idx) { OK(1, "dt argsort ok"); free(idx); }
+    }
+    smaug_dt_free(base);
+}
+static void af_dt_sort(void) {
+    smaug_series_dt_t *base = mk_dt_gapped(); assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_dt_t *r = smaug_dt_sort(base, true);
+        if (r) { OK(r->size == base->size, "dt sort size"); smaug_dt_free(r); }
+    }
+    smaug_dt_free(base);
+}
+static void af_dt_take(void) {
+    smaug_series_dt_t *base = mk_dt_gapped(); assert(base);
+    size_t idx[3] = {0, 2, 4};
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_dt_t *r = smaug_dt_take(base, idx, 3);
+        if (r) { OK(r->size == 3, "dt take size"); smaug_dt_free(r); }
+    }
+    smaug_dt_free(base);
+}
+static void af_dt_filter(void) {
+    smaug_series_dt_t *base = mk_dt_gapped(); assert(base);
+    uint8_t mask[6] = {1, 0, 1, 0, 1, 0};
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_dt_t *r = smaug_dt_filter(base, mask);
+        if (r) { OK(1, "dt filter ok"); smaug_dt_free(r); }
+    }
+    smaug_dt_free(base);
+}
+
 int main(void) {
     af_f64_create();
     af_f64_create_from_array();
@@ -1851,6 +1951,10 @@ int main(void) {
     af_i64_sorted_nonnull(); af_i64_rank();
     af_f64_rolling_sum(); af_f64_rolling_mean(); af_f64_rolling_min(); af_f64_rolling_max();
     af_i64_rolling_sum(); af_i64_rolling_mean(); af_i64_rolling_min(); af_i64_rolling_max();
+
+    /* Frente B fase 2 — datetime (lifecycle + argsort/sort/take/filter) */
+    af_dt_create(); af_dt_create_from_array(); af_dt_clone(); af_dt_view();
+    af_dt_append_grow(); af_dt_argsort(); af_dt_sort(); af_dt_take(); af_dt_filter();
 
 
     sanity_no_fail();

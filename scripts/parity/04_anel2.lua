@@ -53,8 +53,8 @@ local function dtype_accepted(body, dtype)
     if body == "" then return true end
     -- "if dt == 'float64' or dt == 'int64' then ... result[#] = c" → aceita
     -- "elseif dt == 'X' then error()" → bloqueia
-    -- Estratégia conservadora: se aparece 'X' como string no corpo, marca como ✅
-    -- Se não aparece, ⚠️ (suspeita).
+    -- Estratégia conservadora: se aparece 'X' como string no corpo, marca como 🟩
+    -- Se não aparece, 🟨 (suspeita).
     if body:find('"'..dtype..'"', 1, true) then
         return true, "menciona explicitamente"
     end
@@ -72,7 +72,7 @@ for _, m in ipairs(gb_methods) do
         local row = { "`groupby."..m.."`" }
         for _, dt in ipairs(dtypes) do
             local ok = dtype_accepted(body, dt)
-            row[#row+1] = ok == true and "✅" or "⚠️"
+            row[#row+1] = ok == true and "🟩" or "🟨"
         end
         rows_gb[#rows_gb+1] = row
     end
@@ -89,7 +89,7 @@ for _, op in ipairs(ds_ops_of_interest) do
     local row = { "`"..op.."`" }
     for _, dt in ipairs(dtypes) do
         local ok = dtype_accepted(body, dt)
-        row[#row+1] = ok == true and "✅" or "⚠️"
+        row[#row+1] = ok == true and "🟩" or "🟨"
     end
     rows_ds[#rows_ds+1] = row
 end
@@ -102,8 +102,8 @@ local header = { "operação", "f64", "i64", "bool", "string", "datetime", "cate
 local out = {
     C.section(4, "Paridade Anel 2 (operações relacionais) por dtype",
         "Heurística conservadora: verifica menção explícita do dtype no corpo da "
-        .. "função. ✅ = dtype mencionado explicitamente (provável suporte). "
-        .. "⚠️ = dtype não mencionado (pode ser sem suporte, pode ser polimorfismo "
+        .. "função. 🟩 = dtype mencionado explicitamente (provável suporte). "
+        .. "🟨 = dtype não mencionado (pode ser sem suporte, pode ser polimorfismo "
         .. "via dispatcher genérico — requer revisão manual)."),
     "",
     "### DataSet — operações estruturais",

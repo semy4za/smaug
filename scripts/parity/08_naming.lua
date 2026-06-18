@@ -55,8 +55,8 @@ local groups = {
 local rows = {}
 for _, g in ipairs(groups) do
     for _, item in ipairs(g.items) do
-        local in_s = series_set[item] and "✅" or "—"
-        local in_d = dataset_set[item] and "✅" or "—"
+        local in_s = series_set[item] and "🟩" or "—"
+        local in_d = dataset_set[item] and "🟩" or "—"
         local alias_s = s_aliases[item]
         local alias_d = d_aliases[item]
         local note = ""

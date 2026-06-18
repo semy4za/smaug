@@ -36,11 +36,11 @@ for _, fn in ipairs(lifecycle) do
         local found = content:find(needle, 1, true) ~= nil
         local exc_key = fn .. "/" .. d
         if found then
-            row[#row+1] = "✅"
+            row[#row+1] = "🟩"
         elseif excs10[exc_key] then
-            row[#row+1] = "⚪"
+            row[#row+1] = "⬜"
         else
-            row[#row+1] = "⚠️"
+            row[#row+1] = "🟨"
         end
     end
     rows[#rows+1] = row

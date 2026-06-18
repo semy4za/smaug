@@ -39,10 +39,10 @@ $header = @"
 
 Convenção de status:
 
-- ✅ paridade presente
-- ⚪ não aplicável (exceção registrada em ``exceptions.txt``)
-- ⚠️ ausência sem registro — suspeita, requer revisão humana
-- ❌ inconsistência clara — gap real
+- 🟩 paridade presente
+- ⬜ não aplicável (exceção registrada em ``exceptions.txt``)
+- 🟨 ausência sem registro — suspeita, requer revisão humana
+- 🟥 inconsistência clara — gap real
 
 Gerado em: $now
 
@@ -98,9 +98,9 @@ $reportText = [System.IO.File]::ReadAllText((Resolve-Path $out), $utf8NoBom)
 
 # Contagens — uso regex porque os marcadores são emojis multi-byte
 $okCount   = ([regex]::Matches($reportText, "🟩")).Count
-$excCount  = ([regex]::Matches($reportText, "⚪")).Count
-$warnCount = ([regex]::Matches($reportText, "⚠️")).Count
-$errCount  = ([regex]::Matches($reportText, "❌")).Count
+$excCount  = ([regex]::Matches($reportText, "⬜")).Count
+$warnCount = ([regex]::Matches($reportText, "🟨")).Count
+$errCount  = ([regex]::Matches($reportText, "🟥")).Count
 
 $footer = @"
 
@@ -111,18 +111,18 @@ $footer = @"
 
 **Contagem global de status no relatório:**
 
-- ✅ paridade: $okCount
-- ⚪ exceção registrada: $excCount
-- ⚠️ suspeita (revisar): $warnCount
-- ❌ inconsistência clara: $errCount
+- 🟩 paridade: $okCount
+- ⬜ exceção registrada: $excCount
+- 🟨 suspeita (revisar): $warnCount
+- 🟥 inconsistência clara: $errCount
 
 
 ## Como usar este relatório
 
-1. Procure por ⚠️ — cada um é um candidato a gap real ou exceção a registrar.
+1. Procure por 🟨 — cada um é um candidato a gap real ou exceção a registrar.
 2. Se for decisão consciente, adicione em ``scripts/parity/exceptions.txt``.
 3. Se for gap real, registre em ``Roadmap.md`` ou corrija e rode novamente.
-4. Procure por ❌ — sempre gap real, exige ação.
+4. Procure por 🟥 — sempre gap real, exige ação.
 "@
 Append-Utf8 -Path $out -Text $footer
 

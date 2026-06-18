@@ -37,8 +37,8 @@ table.sort(sorted)
 
 local rows = {}
 for _, m in ipairs(sorted) do
-    local s = series_set[m]  and "✅" or "—"
-    local d = dataset_set[m] and "✅" or "—"
+    local s = series_set[m]  and "🟩" or "—"
+    local d = dataset_set[m] and "🟩" or "—"
     local note = ""
     if series_set[m] and not dataset_set[m] then
         note = "só em Series"

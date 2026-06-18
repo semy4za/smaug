@@ -43,27 +43,27 @@ local rows = {}
 
 local function check(method, expectation, body)
     if body == "" then
-        return { "`"..method.."`", expectation, "—", "❌ não encontrado" }
+        return { "`"..method.."`", expectation, "—", "🟥 não encontrado" }
     end
     if expectation == "ignore_na flag" then
         local has_flag = body:find("ignore_na") ~= nil
         return { "`"..method.."`", expectation,
                  has_flag and "tem ignore_na" or "sem ignore_na",
-                 has_flag and "✅" or "⚠️" }
+                 has_flag and "🟩" or "🟨" }
     elseif expectation == "erra com null" then
         local has_check = body:find("nulos") ~= nil or
                           body:find("count_nonnull") ~= nil or
                           body:find("smaug:.+sort.+null") ~= nil
         return { "`"..method.."`", expectation,
                  has_check and "verifica nulls" or "sem verificação",
-                 has_check and "✅" or "⚠️" }
+                 has_check and "🟩" or "🟨" }
     elseif expectation == "propaga null" then
         local has_propagation = body:find("is_null") ~= nil or
                                 body:find("set_null") ~= nil or
                                 body:find("== nil") ~= nil
         return { "`"..method.."`", expectation,
                  has_propagation and "propaga" or "sem propagação visível",
-                 has_propagation and "✅" or "⚠️" }
+                 has_propagation and "🟩" or "🟨" }
     end
     return { "`"..method.."`", expectation, "?", "?" }
 end
@@ -86,7 +86,7 @@ local header = { "método", "política esperada", "detectado", "status" }
 local out = {
     C.section(7, "Tratamento de null consistente",
         "Cada método tem uma política de null esperada (ignore_na, erra, propaga). "
-        .. "Verificação heurística sobre o corpo da função. ⚠️ = padrão esperado "
+        .. "Verificação heurística sobre o corpo da função. 🟨 = padrão esperado "
         .. "não foi detectado; pode ser implementação alternativa ou bug."),
     "",
     C.render_table(header, rows),

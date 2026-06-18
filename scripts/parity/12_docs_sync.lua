@@ -56,8 +56,8 @@ for _, g in ipairs(groups) do
     local pct = total > 0 and (100*present/total) or 0
     rows[#rows+1] = { g.name, total, present, total-present,
                       string.format("%.0f%%", pct),
-                      (#missing > 0 and ("⚠️ faltam: " .. table.concat(missing, ", "):sub(1,80))
-                                     or "✅ completo") }
+                      (#missing > 0 and ("🟨 faltam: " .. table.concat(missing, ", "):sub(1,80))
+                                     or "🟩 completo") }
 end
 
 local header = { "categoria", "total", "documentados", "faltam", "%", "detalhe" }

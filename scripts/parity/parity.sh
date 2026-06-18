@@ -19,10 +19,10 @@ cat > "$OUT" <<EOF
 
 Convenção de status:
 
-- ✅ paridade presente
-- ⚪ não aplicável (exceção registrada em \`exceptions.txt\`)
-- ⚠️ ausência sem registro — suspeita, requer revisão humana
-- ❌ inconsistência clara — gap real
+- 🟩 paridade presente
+- ⬜ não aplicável (exceção registrada em \`exceptions.txt\`)
+- 🟨 ausência sem registro — suspeita, requer revisão humana
+- 🟥 inconsistência clara — gap real
 
 Gerado em: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 EOF
@@ -70,19 +70,19 @@ cat >> "$OUT" <<EOF
 EOF
 
 # Contagens globais
-WARN_COUNT=$(grep -c "⚠️" "$OUT")
-ERR_COUNT=$(grep -c "❌" "$OUT")
-OK_COUNT=$(grep -o "✅" "$OUT" | wc -l)
-EXC_COUNT=$(grep -o "⚪" "$OUT" | wc -l)
+WARN_COUNT=$(grep -c "🟨" "$OUT")
+ERR_COUNT=$(grep -c "🟥" "$OUT")
+OK_COUNT=$(grep -o "🟩" "$OUT" | wc -l)
+EXC_COUNT=$(grep -o "⬜" "$OUT" | wc -l)
 
 cat >> "$OUT" <<EOF
 
 **Contagem global de status no relatório:**
 
-- ✅ paridade: $OK_COUNT
-- ⚪ exceção registrada: $EXC_COUNT
-- ⚠️ suspeita (revisar): $WARN_COUNT
-- ❌ inconsistência clara: $ERR_COUNT
+- 🟩 paridade: $OK_COUNT
+- ⬜ exceção registrada: $EXC_COUNT
+- 🟨 suspeita (revisar): $WARN_COUNT
+- 🟥 inconsistência clara: $ERR_COUNT
 
 EOF
 
@@ -90,10 +90,10 @@ cat >> "$OUT" <<EOF
 
 ## Como usar este relatório
 
-1. Procure por ⚠️ — cada um é um candidato a gap real ou exceção a registrar.
+1. Procure por 🟨 — cada um é um candidato a gap real ou exceção a registrar.
 2. Se for decisão consciente, adicione em \`scripts/parity/exceptions.txt\`.
 3. Se for gap real, registre em \`Roadmap.md\` ou corrija e rode novamente.
-4. Procure por ❌ — sempre gap real, exige ação.
+4. Procure por 🟥 — sempre gap real, exige ação.
 EOF
 
 echo

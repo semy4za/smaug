@@ -103,10 +103,10 @@ for _, item in ipairs(interesting) do
     local rets = extract_returns(body)
     local actual = classify_return(rets)
     local status
-    if actual == "—" then status = "❌ não encontrado"
-    elseif actual:lower():find(expected:lower(), 1, true) then status = "✅"
-    elseif expected:find(actual, 1, true) then status = "✅"
-    else status = "⚠️"
+    if actual == "—" then status = "🟥 não encontrado"
+    elseif actual:lower():find(expected:lower(), 1, true) then status = "🟩"
+    elseif expected:find(actual, 1, true) then status = "🟩"
+    else status = "🟨"
     end
     rows[#rows+1] = { "`"..m.."`", expected, actual, status }
 end
@@ -117,14 +117,14 @@ local cs_body = series:match(cs_body_pat) or ""
 local cs_rets = extract_returns(cs_body)
 local cs_class = classify_return(cs_rets)
 rows[#rows+1] = { "`CategoricalSeries:value_counts`", "DataSet (paridade com Series)", cs_class,
-                   cs_class == "DataSet" and "✅" or "❌ inconsistente com Series" }
+                   cs_class == "DataSet" and "🟩" or "🟥 inconsistente com Series" }
 
 local header = { "método", "esperado", "detectado", "status" }
 
 local out = {
     C.section(6, "Tipos de retorno consistentes",
         "Métodos críticos: o tipo de retorno está conforme o esperado e simétrico "
-        .. "entre dtypes? ⚠️ = divergência possível. ❌ = inconsistência clara."),
+        .. "entre dtypes? 🟨 = divergência possível. 🟥 = inconsistência clara."),
     "",
     C.render_table(header, rows),
     "",
