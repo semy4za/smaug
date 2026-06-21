@@ -241,8 +241,8 @@ uint8_t* smaug_f64_eq(const smaug_series_f64_t *s, double threshold, smaug_mask_
 smaug_mask_t *out = NULL;
 uint8_t *mask = smaug_f64_gt(s, 100.0, &out);
 smaug_series_f64_t *filtrado = smaug_f64_filter(s, mask);
-free(mask);
-free(out);
+smaug_free(mask);
+smaug_free(out);
 ```
 
 ---
@@ -286,7 +286,7 @@ bool   smaug_bool_all(const uint8_t *a, const smaug_mask_t *am, size_t n);
 ```
 
 - Cada op lógica aloca um novo array de valores (e, via `out_mask` não-NULL, a
-  máscara do resultado). **O caller libera ambos** com `free()`.
+  máscara do resultado). **O caller libera ambos** com `smaug_free()`.
 - Máscara `NULL` na entrada = todos os elementos válidos.
 - **Lógica de três valores (Kleene)**, igual a SQL/pandas:
 
@@ -512,7 +512,7 @@ char* smaug_write_csv_mem(const smaug_table_t *t,
 /* buffer retornado terminado em \0; liberar com smaug_free */
 ```
 
-**Inferência de tipo:** cada coluna testada em ordem `int64 → float64 → bool → string`.
+**Inferência de tipo:** cada coluna testada em ordem `bool → int64 → float64 → string`.
 Coluna mista sobe para o tipo mais abrangente. Coluna toda NA → string.
 
 **RFC 4180:** aspas duplas suportadas (`"campo com, vírgula"`, `""aspas""` → `"`).

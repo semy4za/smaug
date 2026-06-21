@@ -52,8 +52,9 @@ const char* smaug_str_get(const smaug_series_str_t *s, size_t idx, size_t *out_l
 
 /* Define a string no índice idx (copia `len` bytes de `str` para o buffer).
    Como a representação é offset-based, isto pode exigir remontar o buffer —
-   operação O(n) no pior caso; a construção típica é em lote. Retorna 0 em
-   sucesso, -1 em erro (idx inválido, OOM). */
+   operação O(n) no pior caso; a construção típica é em lote. Retorna `SMG_OK`
+   em sucesso; `SMG_ERR_OOB` (idx inválido), `SMG_ERR_ARGUMENT` (ponteiro nulo)
+   ou `SMG_ERR_NOMEM` (OOM) em erro. */
 smaug_status_t smaug_str_set(smaug_series_str_t *s, size_t idx, const char *str, size_t len);
 
 smaug_status_t smaug_str_set_null(smaug_series_str_t *s, size_t idx);

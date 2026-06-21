@@ -3,9 +3,9 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `30e964f`  |  Data: 2026-06-17 16:40:22 -0300
+- Commit medido: `835036b`  |  Data: 2026-06-18 11:26:59 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `2837/3280 = 86.49%` -- 90 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- **Branch-bruto** (todos os ramos): `2850/3280 = 86.89%` -- 80 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 | Arquivo | Linhas | Branch-alvo (taken) |
@@ -18,9 +18,9 @@
 | `smaug_ops_str.c` | `115/116 = 99.14%` `[█████████░]` | `115/115 = 100.00%` `[██████████]` |
 | `smaug_csv.c` | `260/282 = 92.20%` `[█████████░]` | `300/363 = 82.64%` `[████████░░]` |
 | `smaug_json.c` | `307/348 = 88.22%` `[████████░░]` | `355/491 = 72.30%` `[███████░░░]` |
-| `smaug_datetime.c` | `317/346 = 91.62%` `[█████████░]` | `286/393 = 72.77%` `[███████░░░]` |
+| `smaug_datetime.c` | `329/356 = 92.42%` `[█████████░]` | `299/403 = 74.19%` `[███████░░░]` |
 | `smaug_ops_window.c` | `213/220 = 96.82%` `[█████████░]` | `214/251 = 85.26%` `[████████░░]` |
-| **TOTAL** | `2849/2954 = 96.45%` `[█████████░]` | `2837/3190 = 88.93%` `[████████░░]` |
+| **TOTAL** | `2861/2964 = 96.52%` `[█████████░]` | `2850/3200 = 89.06%` `[████████░░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
@@ -179,7 +179,7 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_json.c:619` — if (!buf) return -1;
 - `smaug_json.c:623` — return (w == len) ? 0 : -1;
 
-**`smaug_datetime.c`** — 61 linha(s) com ramo descoberto:
+**`smaug_datetime.c`** — 58 linha(s) com ramo descoberto:
 - `smaug_datetime.c:234` — if (!s)             { if (status) *status = SMG_ERR_ARGUMENT; return DT_SENTINEL; }
 - `smaug_datetime.c:235` — if (idx >= s->size) { if (status) *status = SMG_ERR_OOB;      return DT_SENTINEL; }
 - `smaug_datetime.c:236` — if (INVALID_DT(s, idx)) { if (status) *status = SMG_NULL_VALUE; return DT_SENTINEL; }
@@ -189,7 +189,6 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_datetime.c:253` — if (dt_cow_detach(s) != 0) return SMG_ERR_NOMEM;
 - `smaug_datetime.c:260` — if (!s || idx >= s->size) return true;
 - `smaug_datetime.c:266` — if (dt_cow_detach(s) != 0) return -1;
-- `smaug_datetime.c:268` — if (dt_grow(s) != 0) return -1;
 - `smaug_datetime.c:277` — if (!s) return -1;
 - `smaug_datetime.c:278` — if (dt_cow_detach(s) != 0) return -1;
 - `smaug_datetime.c:279` — if (s->size >= s->capacity) {
@@ -238,9 +237,7 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_datetime.c:639` — if (!entries) return NULL;
 - `smaug_datetime.c:650` — if (!indices) { free(entries); return NULL; }
 - `smaug_datetime.c:681` — if (!s || !idx) return NULL;
-- `smaug_datetime.c:683` — if (!result) return NULL;
 - `smaug_datetime.c:698` — if (!s || !mask) return NULL;
-- `smaug_datetime.c:703` — if (!result) return NULL;
 
 **`smaug_ops_window.c`** — 30 linha(s) com ramo descoberto:
 - `smaug_ops_window.c:32` — switch (col->kind) {
@@ -349,9 +346,6 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_datetime.c:63` — ramo z<0 no algoritmo de Hinnant — datas antes de ~292Mi a.C.
 - `smaug_datetime.c:81` — ramo Y<0 no algoritmo de Hinnant — datas antes de ~292Mi a.C.
 - `smaug_datetime.c:110` — overflow de capacity
-- `smaug_datetime.c:113` — OOM em realloc(data) — coberto por test_allocfail
-- `smaug_datetime.c:117` — OOM em realloc(null_mask) — coberto por test_allocfail
-- `smaug_datetime.c:118` — realloc de shrink após falha — padrão defensivo documentado
 - `smaug_datetime.c:118` — realloc de shrink após falha — padrão defensivo documentado
 - `smaug_datetime.c:120` — realloc de shrink
 - `smaug_datetime.c:120` — realloc de shrink
@@ -359,12 +353,5 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_datetime.c:138` — OOM em malloc de buffers COW — coberto por test_allocfail
 - `smaug_datetime.c:138` — OOM em malloc de buffers COW — coberto por test_allocfail
 - `smaug_datetime.c:152` — size > capacity — invariante; create() nunca viola
-- `smaug_datetime.c:155` — OOM em malloc(struct) — coberto por test_allocfail
-- `smaug_datetime.c:161` — OOM em malloc(data) — coberto por test_allocfail
-- `smaug_datetime.c:164` — OOM em malloc(null_mask) — coberto por test_allocfail
-- `smaug_datetime.c:186` — OOM em create — coberto por test_allocfail
-- `smaug_datetime.c:194` — external_alloc — só vistas têm external_alloc=true; free de view liberaria buffer compartilhado
-- `smaug_datetime.c:204` — OOM em create — coberto por test_allocfail
 - `smaug_datetime.c:205` — size==0 — clone de série vazia tem size=0, memcpy não executado
 - `smaug_datetime.c:215` — args inválidos — start > size ou len > size-start
-- `smaug_datetime.c:217` — OOM em malloc(view struct) — coberto por test_allocfail

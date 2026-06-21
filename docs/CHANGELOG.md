@@ -6,6 +6,101 @@ decisões, achados, motivações.
 
 ---
 
+## 2026-06-20 — Coerência de construção: inferência universal de dtype
+
+Implementação da camada Lua das decisões de coerência de API tomadas na
+sessão de design anterior. Tema: a construção a partir de dados infere o
+dtype de forma consistente em todos os pontos de entrada; quando o valor é
+ambíguo, o engine recusa em vez de adivinhar.
+
+### Adicionado
+
+- **`Series` chamável:** `smaug.Series({1,2,3})` agora funciona, espelhando
+  `smaug.DataSet({...})`. Alias `Series.from_array` (mantém `from_table`).
+  Ambos despacham dinamicamente para `from_table`, preservando a interceptação
+  de `categorical` feita no orquestrador.
+- **`Series.infer_dtype`** — fonte única de inferência de dtype, reusada por
+  `Series.from_table`/`full`/`__call`, `DataSet.from_columns`/`__call` e
+  `Series:map`. Antes a regra estava duplicada (uma cópia no `DataSet.__call`,
+  outra implícita no `map`) e divergente.
+
+### Corrigido — incoerências de construção
+
+- **Fim do default-float64 silencioso:** `Series.from_table` e
+  `DataSet.from_columns` sem dtype caíam em `float64` independente do conteúdo;
+  uma lista de strings ou booleans quebrava no `set`. Agora inferem como os
+  demais construtores.
+- **Bool inferido de boolean nativo:** uma lista `{true, false}` sem dtype
+  agora vira `bool` (Series, DataSet e broadcast `df["c"] = true`). Antes virava
+  `int64`/`float64` e quebrava ou perdia o tipo. Inferência de bool só a partir
+  de `boolean` Lua — nunca de `0`/`1` ou `"yes"`/`"no"` (seria adivinhar
+  semântica). Lista vazia ou toda-nula → `string` (fallback universal).
+- **`map` reconhece retorno boolean:** `s:map(fn)` com `fn` devolvendo
+  `true`/`false` agora infere `bool`, inclusive respeitando `dtype="bool"`
+  explícito. Antes falhava — a validação rejeitava o booleano antes de honrar o
+  dtype declarado.
+
+### Decisões de contrato
+
+- **`astype("bool")` numérico é rígido:** aceita apenas `0`→false e `1`→true
+  (e `0.0`/`1.0`). Qualquer outro valor é erro orientando para `:map(fn)`, em
+  vez da coerção estilo C (`≠0 → true`), que adivinhava semântica e contradizia
+  o construtor rígido. String→bool inalterado (`"true"`/`"false"`, resto → null).
+- **`assign` é imutável, inclusive ao substituir coluna:** retorna sempre um
+  DataSet novo; o original nunca é mutado, nem quando a coluna já existe.
+  Comportamento já existente, agora fixado por teste e documentado.
+
+`test_constructors.lua`, `test_core.lua` — testes atualizados para o novo
+comportamento (bool inferido, astype rígido com casos de erro explícitos) e
+novo teste de imutabilidade do `assign` ao substituir coluna. Removida uma
+duplicação acidental de bloco em `test_core.lua`.
+
+### Docs
+
+`API_INDEX.md` — `assign` marcado como retornando novo DataSet, consistente
+com `filter`/`fillna`/`drop_duplicates`/`rename`.
+
+---
+
+## Aritmética numérica: promoção de tipos e divisão verdadeira
+
+Segunda parte da mesma sessão. Tema: operações aritméticas entre numéricos não
+barram o que é matematicamente sem ambiguidade, nem corrompem silenciosamente.
+Toda a mudança é na camada Lua (o despacho de operadores); nenhuma função C mudou
+— a cobertura permaneceu idêntica, confirmando que nenhum caminho novo foi criado.
+
+### Corrigido
+
+- **Promoção numérica em operações:** `int64` e `float64` em lados opostos de
+  `+ - * /` agora promovem para `float64`, em vez de barrar com erro de tipo.
+  `df["valor"] * df["quantidade"]` (float × int) passa a funcionar. Mistura com
+  não-numérico (bool/string/datetime) continua sendo erro.
+- **Truncamento silencioso de escalar (bug):** `int_series * 2.5` produzia
+  `int64` truncando o escalar para `2` (resultado `4` em vez de `5.0`) — corrupção
+  silenciosa. Agora o escalar fracionário sobre série int64 promove a série a
+  `float64` antes da operação, e o resultado é correto.
+
+### Decisões de contrato
+
+- **`/` é divisão verdadeira:** `int64 / int64` agora produz `float64`
+  (`7 / 2 = 3.5`), alinhado a Python 3, numpy e polars. Antes fazia divisão
+  inteira truncada (`7 / 2 = 3`).
+- **`:floordiv(outra)` — divisão inteira explícita:** repõe o comportamento que
+  `/` deixou de ter. Produz `int64` truncado (`7 // 2 = 3`); divisão por zero → null.
+  Exige operandos int64 (float orienta a usar `/` e converter). É o primeiro
+  método aritmético nomeado da Series.
+
+`test_constructors.lua` — testes de aritmética atualizados para o novo contrato
+(promoção, `/` float) e bloco dedicado novo cobrindo promoção série×série,
+série×escalar (incl. o caso que antes corrompia), `/` verdadeira e `:floordiv`.
+
+### Docs
+
+`API_INDEX.md` — documentada a semântica de promoção, `/` verdadeira e o método
+`:floordiv`.
+
+---
+
 ## 2026-06-17 — Sincronização dos scripts de build com a estrutura da Fase 4
 
 Auditoria completa de `scripts/` (a pedido), motivada pela revisão do Roadmap.

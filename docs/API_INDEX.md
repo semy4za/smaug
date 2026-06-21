@@ -121,7 +121,7 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 
 ## Camada Lua — frontend (`lua/smaug/`)
 
-### `Series` (`core/series.lua`)
+### `Series` (`core/series/`)
 
 **Factories:** `Series.new(dtype, size, name)`, `Series.from_table(arr, dtype, name)`,
 `Series.full(n, val)`. `Series.NA` (sentinela de nulo em tabelas).
@@ -261,7 +261,15 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `:sin()` / `:cos()` / `:tan()` | trigonométricas |
 | `:exp()` / `:log()` / `:sqrt()` | exponencial / log natural / raiz quadrada |
 
-**Operadores:** `+ - * /` (série×série e série×escalar), `serie[i]`.
+**Operadores aritméticos:** `+ - * /` (série×série e série×escalar), `serie[i]`.
+Numéricos de dtypes diferentes promovem para `float64` (int64 ⊕ float64 → float64);
+mistura com não-numérico (bool/string/datetime) é erro. `/` é **divisão verdadeira**
+(sempre `float64`: `7/2 = 3.5`).
+
+| Método | O que faz |
+|--------|-----------|
+| `:floordiv(outra)` | divisão inteira truncada → `int64` (`7//2 = 3`); exige int64; `/0` → null |
+
 **Operadores bool** (só em `Series<bool>`): `*`=and, `+`=or, `-`=xor.
 
 ### `.str` — proxy de operações sobre Series string
@@ -368,7 +376,7 @@ Disponível quando `s._dtype == "datetime"`. Erro claro em qualquer outro dtype.
 | `:land(b)` / `:lor(b)` / `:lxor(b)` / `:lnot()` | lógica Kleene |
 | `:describe()` | `{count, nulls, count_true, count_false}` |
 
-### `CategoricalSeries` (`core/series.lua`)
+### `CategoricalSeries` (`core/series/categorical/_categorical.lua`)
 
 Dtype Tier 2 implementado em Lua puro (sem C backend). Armazenamento via
 dictionary encoding: `_codes` (int 1-based), `_levels` (lista ordenada),
@@ -428,7 +436,7 @@ com `nil` no meio (limitação do `#` do Lua).
 | `.cat:add_categories(lista)` | adiciona novos labels (idempotente) |
 | `.cat:remove_categories(lista)` | remove labels; referências viram null |
 
-### `DataSet` (`core/dataset.lua`)
+### `DataSet` (`core/dataset/`)
 
 **Construção:** `DataSet.new(name)`, `smaug.DataSet({{nome, dados, dtype?}, ...})`.
 
@@ -448,7 +456,7 @@ com `nil` no meio (limitação do `#` do Lua).
 | `:select(nomes)` | subconjunto/reordenação de colunas |
 | `:dropna([subset])` | remove linhas com NULL |
 | `:update_column(nome, series)` | substitui coluna existente |
-| `:assign(nome, fn_ou_series)` | adiciona/substitui coluna calculada |
+| `:assign(nome, fn_ou_series)` | adiciona/substitui coluna calculada → novo DataSet (original nunca é mutado, nem ao substituir coluna existente) |
 | `:nunique()` | `{coluna → nº distintos não-nulos}` |
 | `:corr()` | matriz N×N de correlação de Pearson entre colunas numéricas → DataSet |
 | `:cov()` | matriz N×N de covariância amostral entre colunas numéricas → DataSet |

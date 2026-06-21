@@ -297,11 +297,12 @@ df_bc["taxa"] = 0.15
 check(df_bc:col("taxa"):get(1) == 0.15,     "broadcast float: valor")
 check(df_bc:col("taxa")._dtype == "float64","broadcast float: dtype float64")
 
--- boolean → int64 (1/0)
+-- boolean → bool (H.6.1: bool nativo infere "bool", não int64 1/0)
 df_bc["ativo"] = true
-check(df_bc:col("ativo"):get(1) == 1,    "broadcast bool true → 1")
+check(df_bc:col("ativo")._dtype == "bool", "broadcast bool: dtype bool")
+check(df_bc:col("ativo"):get(1) == true,   "broadcast bool true → true")
 df_bc["inativo"] = false
-check(df_bc:col("inativo"):get(2) == 0,  "broadcast bool false → 0")
+check(df_bc:col("inativo"):get(2) == false,"broadcast bool false → false")
 
 -- DataSet vazio rejeita broadcast
 check(not pcall(function()
@@ -326,12 +327,8 @@ local sf3 = Series.full(2, 1.5)
 check(sf3._dtype == "float64","Series.full: dtype inferido float64")
 
 local sf4 = Series.full(3, true)
-check(sf4:get(1) == 1,        "Series.full: bool true → 1")
-check(sf4._dtype == "int64",  "Series.full: bool dtype int64")
-
-local sf4 = Series.full(3, true)
-check(sf4:get(1) == 1,        "Series.full: bool true → 1")
-check(sf4._dtype == "int64",  "Series.full: bool dtype int64")
+check(sf4:get(1) == true,   "Series.full: bool true → true")
+check(sf4._dtype == "bool", "Series.full: bool dtype bool")
 
 -- =====================================================================
 -- Series<bool> como coluna de primeira classe no DataSet
@@ -341,10 +338,10 @@ local df_bool = smaug.DataSet({
     {"cidade", {"SP", "RJ", "SP", "MG"}, "string"},
 })
 
--- broadcast de boolean cria coluna int64 (1/0), não Series<bool>
+-- broadcast de boolean cria coluna bool de fato (H.6.1), não mais int64 (1/0)
 df_bool["flag"] = true
-check(df_bool:col("flag")._dtype == "int64", "broadcast bool -> int64")
-check(df_bool:col("flag"):get(1) == 1,       "broadcast bool valor")
+check(df_bool:col("flag")._dtype == "bool", "broadcast bool -> bool")
+check(df_bool:col("flag"):get(1) == true,   "broadcast bool valor")
 
 -- adicionar coluna Series<bool> explícita via __newindex
 local mask_sp = df_bool:col("cidade"):eq("SP")
@@ -461,6 +458,9 @@ check(ds4:col("vendas"):get(1) == 1010,  "assign substituir: valor novo")
 check(ds4:ncols() == ds:ncols(),         "assign substituir: ncols inalterado")
 -- posição da coluna preservada
 check(ds4._col_names[2] == "vendas",     "assign substituir: posição preservada")
+-- original não mutado, mesmo SUBSTITUINDO coluna existente (H.6.6.2: contrato
+-- de imutabilidade do assign — fácil esquecer de capturar o retorno)
+check(ds:col("vendas"):get(1) == 10,     "assign substituir: original preserva valor antigo")
 
 -- erro: tamanho errado
 local ok1, _ = pcall(function()

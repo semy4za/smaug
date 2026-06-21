@@ -73,10 +73,16 @@ local g = Series.from_table({1, Series.NA, 3}, "float64")
 local h = g + e
 check(h:is_null(2), "NA propaga em Series+Series")
 
--- ---- erros de tipo/tamanho ----
-local i64s = Series.int64(3)
-local ok = pcall(function() return i64s + d end)   -- dtypes diferentes
-check(not ok, "erro: + entre dtypes diferentes")
+-- ---- promoção e erros de tipo/tamanho (Bloco N) ----
+local i64s = Series.from_table({1, 2, 3}, "int64")
+-- N.1: int64 + float64 promove para float64 (não barra mais)
+local promoted = i64s + d
+check(promoted._dtype == "float64", "N.1: int64+float64 promove a float64")
+-- guarda que CONTINUA válida: numérico × não-numérico barra
+local okb = pcall(function() return i64s + Series.from_table({true,false,true},"bool") end)
+check(not okb, "erro: + entre numérico e bool")
+local oks = pcall(function() return i64s + Series.from_table({"a","b","c"},"string") end)
+check(not oks, "erro: + entre numérico e string")
 
 -- ---- int64: sentinela INT64_MIN vira nil ----
 local k = Series.from_table({10, Series.NA, 30}, "int64")
@@ -84,12 +90,18 @@ check(k:sum() == 40, "i64 sum ignora NA")
 check(k:sum(false) == nil, "i64 sum(false) com NA -> nil (INT64_MIN)")
 check(k:max() == 30, "i64 max")
 
--- ---- int64: divisão por zero vira null ----
+-- ---- divisão por zero vira null; '/' é float (N.3), :floordiv é int (N.4) ----
 local num = Series.from_table({10, 20}, "int64")
 local den = Series.from_table({2, 0}, "int64")
 local q = num / den
-check(q:get(1) == 5, "i64 div ok")
-check(q:is_null(2), "i64 div por zero -> null")
+check(q._dtype == "float64", "N.3: '/' entre int64 promove a float64")
+check(q:get(1) == 5, "f64 div ok (10/2=5.0)")
+check(q:is_null(2), "div por zero -> null")
+-- :floordiv preserva int64 e o null em /0
+local qi = num:floordiv(den)
+check(qi._dtype == "int64", "N.4: floordiv preserva int64")
+check(qi:get(1) == 5, "floordiv ok (10//2=5)")
+check(qi:is_null(2), "floordiv por zero -> null")
 
 -- ---- clone independente ----
 local orig = Series.from_table({1, 2, 3}, "float64")
@@ -357,8 +369,14 @@ do
     check((a + b):get(1) == 13, "i64 add")
     check((a - b):get(1) == 7,  "i64 sub")
     check((a * b):get(1) == 30, "i64 mul")
-    -- divisão inteira: 10/3 = 3 (trunca)
-    check((a / b):get(1) == 3, "i64 div inteira trunca")
+    -- N.3: '/' é divisão verdadeira → float64 (10/3 = 3.333...)
+    local d = a / b
+    check(d._dtype == "float64", "N.3: int64 '/' promove a float64")
+    check(math.abs(d:get(1) - 10/3) < 1e-9, "i64 '/' = divisão verdadeira")
+    -- N.4: divisão inteira (truncada) agora via :floordiv
+    local fd = a:floordiv(b)
+    check(fd._dtype == "int64", "N.4: floordiv preserva int64")
+    check(fd:get(1) == 3, "i64 floordiv trunca (10//3=3)")
     check((a + b):len() == 3, "i64 add preserva tamanho")
 end
 
@@ -658,24 +676,29 @@ local ss = sb:astype("string")
 check(ss._dtype == "string",     "astype bool->string dtype")
 check(ss:get(1) == "true",       "astype true->'true'")
 check(ss:get(2) == "false",      "astype false->'false'")
--- int64 → bool
-local ni = Series.from_table({0, 1, 2, 0}, "int64")
+-- int64 → bool (H.6.5.a: rígido, só 0/1 — valor fora disso é erro, não coerção)
+local ni = Series.from_table({0, 1, 1, 0}, "int64")
 local nb = ni:astype("bool")
 check(nb._dtype == "bool",       "astype int64->bool dtype")
 check(nb:get(1) == false,        "astype 0->false")
 check(nb:get(2) == true,         "astype 1->true")
-check(nb:get(3) == true,         "astype 2->true (nao-zero)")
+check(not pcall(function()
+    Series.from_table({0, 1, 2, 0}, "int64"):astype("bool")
+end), "astype int64->bool: 2 (nao-zero, nao-um) -> erro, nao coercao")
 -- string → bool
 local st = Series.from_table({"true","false","x"}, "string")
 local stb = st:astype("bool")
 check(stb:get(1) == true,        "astype 'true'->true")
 check(stb:get(2) == false,       "astype 'false'->false")
 check(stb:is_null(3),            "astype 'x'->null")
--- float64 → bool
-local ff = Series.from_table({0.0, 1.5, -1.0}, "float64")
+-- float64 → bool (H.6.5.a: 1.0/0.0 valem, fracionário trava)
+local ff = Series.from_table({0.0, 1.0, 1.0}, "float64")
 local fb = ff:astype("bool")
 check(fb:get(1) == false,        "astype 0.0->false")
-check(fb:get(2) == true,         "astype 1.5->true")
+check(fb:get(2) == true,         "astype 1.0->true")
+check(not pcall(function()
+    Series.from_table({0.0, 1.5, -1.0}, "float64"):astype("bool")
+end), "astype float64->bool: 1.5 (fracionario) -> erro, nao coercao")
 
 -- ---- DataSet com coluna bool ----
 local ds = smaug.DataSet({
@@ -695,6 +718,53 @@ check(h:col("ativo"):get(1) == true,    "head ativo[1]")
 local dd = ds:describe()
 check(dd.ativo ~= nil,                  "describe DataSet tem ativo")
 check(dd.ativo.count_true == 2,         "describe ativo count_true")
+
+
+-- ===================================================================
+-- Bloco N — aritmética numérica: promoção e divisão
+-- ===================================================================
+do
+    -- N.1: promoção série × série (int64 ↔ float64 → float64)
+    local i = Series.from_table({2, 3, 4}, "int64")
+    local f = Series.from_table({1.5, 2.0, 0.5}, "float64")
+    check((i * f)._dtype == "float64",        "N.1: int*float -> float64")
+    check((f * i)._dtype == "float64",        "N.1: float*int -> float64")
+    check((i * f):get(1) == 3.0,              "N.1: int*float valor (2*1.5=3)")
+    check((i + f):get(1) == 3.5,              "N.1: int+float valor (2+1.5=3.5)")
+    -- mesmo dtype: inalterado
+    check((i * Series.from_table({2,2,2},"int64"))._dtype == "int64", "N.1: int*int continua int64")
+
+    -- N.2: promoção série × escalar (corrige corrupção do escalar truncado)
+    check((i * 2.5)._dtype == "float64",      "N.2: int*2.5 -> float64")
+    check((i * 2.5):get(1) == 5.0,            "N.2: int*2.5 valor (2*2.5=5, não 4)")
+    check((i + 1.5):get(1) == 3.5,            "N.2: int+1.5 valor (2+1.5=3.5)")
+    check((i * 2)._dtype == "int64",          "N.2: escalar int mantém int64")
+    check((i * 2):get(1) == 4,                "N.2: int*2 valor")
+    check((2.5 * i):get(1) == 5.0,            "N.2: escalar float à esquerda (2.5*2=5)")
+
+    -- N.3: '/' é divisão verdadeira (sempre float64)
+    local a = Series.from_table({7, 8, 9}, "int64")
+    local b = Series.from_table({2, 2, 2}, "int64")
+    check((a / b)._dtype == "float64",        "N.3: int/int -> float64")
+    check((a / b):get(1) == 3.5,              "N.3: 7/2 = 3.5")
+    check((a / 2):get(1) == 3.5,              "N.3: int/escalar int -> float (7/2=3.5)")
+
+    -- N.4: :floordiv repõe a divisão inteira (int64, truncada, /0 → null)
+    check(a:floordiv(b)._dtype == "int64",    "N.4: floordiv -> int64")
+    check(a:floordiv(b):get(1) == 3,          "N.4: 7//2 = 3")
+    check(a:floordiv(2):get(1) == 3,          "N.4: floordiv escalar (7//2=3)")
+    local z = Series.from_table({10}, "int64"):floordiv(Series.from_table({0}, "int64"))
+    check(z:is_null(1),                       "N.4: floordiv por zero -> null")
+    -- floordiv exige int: float e escalar fracionário orientam erro
+    check(not pcall(function() return f:floordiv(2) end),  "N.4: floordiv em float -> erro")
+    check(not pcall(function() return a:floordiv(2.5) end),"N.4: floordiv por fracionário -> erro")
+
+    -- guardas: numérico × não-numérico continua barrando
+    check(not pcall(function() return i * Series.from_table({true,false,true},"bool") end),
+          "N: int*bool continua barrando")
+    check(not pcall(function() return i * Series.from_table({"a","b","c"},"string") end),
+          "N: int*string continua barrando")
+end
 
 
 print(string.format("OK — %d checks passaram (Series: constructors, f64, i64, bool, aritmética, lifecycle, map)", n_ok))

@@ -497,14 +497,14 @@ s:is_null(3)   -- false
 
 | métrica | valor |
 |---|---|
-| cobertura de linhas | 95.99% (2248/2342) |
-| branch-alvo (MC/DC) | 88.12% (2270/2576, 90 exclusões documentadas) |
-| checks OOM (allocfail) | 1 158 verificações |
+| cobertura de linhas | 96.52% (2861/2964) |
+| branch-alvo (MC/DC) | 89.06% (2850/3200, 80 exclusões documentadas) |
+| checks OOM (allocfail) | 1 492 verificações |
 | checks property-based | 360 862 |
 | checks de stress | 51 851 |
-| Valgrind | clean em todos os 9 binários |
+| Valgrind | clean em todos os 12 binários |
 | warnings `-Wall -Wextra` | zero |
-| suítes de teste | 10 em C, 21 em Lua |
+| suítes de teste | 12 em C, 18 em Lua |
 
 ---
 

@@ -1,8 +1,7 @@
 # Smaug — Relatório de Paridade
 
-> Arquivo gerado por `bash scripts/parity/parity.sh` ou `powershell scripts/parity/parity.ps1`.
-> **Não editar à mão.** Decisões conscientes de não-paridade ficam em
-> `scripts/parity/exceptions.txt`.
+> Arquivo gerado por `bash scripts/parity/parity.sh`. **Não editar à mão.**
+> Decisões conscientes de não-paridade ficam em `scripts/parity/exceptions.txt`.
 
 Convenção de status:
 
@@ -11,7 +10,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-06-18 14:24:12 UTC
+Gerado em: 2026-06-21 13:55:58 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -647,7 +646,7 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 204/204 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 217/217 erros com prefixo `smaug:` (100.0%)
 - `dataset.lua`: 88/88 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
@@ -679,7 +678,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 
 | arquivo | checks | float64 | int64 | bool | string | datetime | categorical |
 | :--- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| `series/test_constructors` | 268 | 25 | 41 | 14 | 8 | — | — |
+| `series/test_constructors` | 300 | 34 | 54 | 18 | 10 | — | — |
 | `series/test_access` | 92 | 13 | 4 | — | 2 | — | — |
 | `series/test_reduce` | 38 | 7 | — | — | — | — | — |
 | `series/test_stat` | 136 | 30 | 15 | — | 5 | — | — |
@@ -689,7 +688,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `series/test_str` | 271 | 4 | 9 | 1 | 49 | — | — |
 | `series/test_dt` | 256 | 3 | 6 | 2 | 9 | 58 | — |
 | `series/test_categorical` | 295 | 7 | 7 | 8 | 5 | 13 | 57 |
-| `dataset/test_core` | 208 | 26 | 30 | 4 | 11 | — | — |
+| `dataset/test_core` | 208 | 26 | 27 | 8 | 11 | — | — |
 | `dataset/test_relational` | 164 | 10 | 41 | 4 | 22 | — | — |
 | `dataset/test_stat` | 50 | 3 | 6 | — | 7 | — | — |
 | `dataset/test_io_support` | 44 | 2 | 13 | 1 | 6 | — | — |
@@ -698,16 +697,16 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 67 | 18 | 2 | — | — | — | — |
 
-**Total de checks:** 2300
+**Total de checks:** 2332
 
 ### Menções totais por dtype (toda a suite)
 
 | dtype | menções |
 | :--- | :-: |
-| float64 | 175 |
-| int64 | 259 |
-| bool | 40 |
-| string | 155 |
+| float64 | 184 |
+| int64 | 269 |
+| bool | 48 |
+| string | 157 |
 | datetime | 71 |
 | categorical | 57 |
 

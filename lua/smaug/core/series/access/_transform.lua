@@ -2,7 +2,7 @@
 --
 -- Transformações elementares: sort, view, take, astype, fillna, map, abs, round, clip.
 -- Recebe I com: I.methods, I.Series, I.wrap, I.DTYPES, I.ffi, I.C,
---               I.NA, I.is_na, I.is_nan
+--               I.NA, I.is_na, I.is_nan, I.infer_dtype_from_value
 -- Contribui: methods.sort, argsort, view, take, dropna, head, tail,
 --            to_table, astype, fillna, map, abs, round, clip
 
@@ -191,8 +191,13 @@ return function(I)
                     if v == "true" then out:set(i, true)
                     elseif v == "false" then out:set(i, false)
                     else out:set_null(i) end
-                else
-                    out:set(i, v ~= 0)
+                else  -- int64/float64 → bool: rígido, só 0/1 (H.6.5.a)
+                    if v == 0 or v == 1 then
+                        out:set(i, v == 1)
+                    else
+                        error("smaug: astype('bool'): valor " .. tostring(v) .. " no índice "
+                              .. i .. " não é 0/1; use :map(fn) para definir a regra", 2)
+                    end
                 end
             elseif src == "string" and dtype ~= "string" then
                 local num = tonumber(v)
@@ -269,12 +274,12 @@ return function(I)
     -- map
     -- =====================================================================
 
-    local function infer_from_value(v)
-        local t = type(v)
-        if t == "string" then return "string" end
-        if t == "number" then return (v % 1 == 0) and "int64" or "float64" end
-        return nil
-    end
+    -- infer_from_value: reusa a fonte única definida em _factories.lua (Bloco H,
+    -- H.2/H.6) em vez de uma cópia local incompleta. H.6.6.1: antes não
+    -- reconhecia boolean — map(fn) com retorno true/false falhava mesmo com
+    -- dtype="bool" explícito, porque o valor era rejeitado aqui antes de
+    -- chegar no check_map_value que respeitaria o dtype declarado.
+    local infer_from_value = I.infer_dtype_from_value
 
     local function check_map_value(v, dtype, i)
         if dtype == "int64" then
@@ -286,6 +291,11 @@ return function(I)
             if type(v) ~= "string" then
                 error("smaug: map: tipo inconsistente no índice " .. i
                       .. " (esperado string, recebido " .. type(v) .. ")", 4)
+            end
+        elseif dtype == "bool" then
+            if type(v) ~= "boolean" then
+                error("smaug: map: tipo inconsistente no índice " .. i
+                      .. " (esperado bool, recebido " .. type(v) .. ")", 4)
             end
         else  -- float64
             if type(v) ~= "number" then

@@ -30,12 +30,14 @@ return function(I)
     end
 
     -- from_columns: constrói de lista ordenada { {nome, series_ou_tabela, dtype?}, ... }
+    -- dtype omitido em qualquer par → Series.from_table infere (Series.infer_dtype,
+    -- Bloco H H.2). Antes: default float64 silencioso, igual ao que o __call tinha.
     function DataSet.from_columns(pairs_list, name)
         local df = DataSet.new(name)
         for _, pair in ipairs(pairs_list) do
             local cname, data, dtype = pair[1], pair[2], pair[3]
             local col = is_series(data) and data
-                        or Series.from_table(data, dtype or "float64", cname)
+                        or Series.from_table(data, dtype, cname)
             df:add_column(cname, col)
         end
         return df
@@ -434,16 +436,10 @@ return function(I)
     DataSet.__len = function(self) return self:nrows() end
 
     -- __call: DataSet({{"col", dados}, ...}, name?)
-    local function infer_dtype(arr)
-        for _, v in ipairs(arr) do
-            if type(v) == "string" then return "string" end
-        end
-        for _, v in ipairs(arr) do
-            if type(v) == "number" and v % 1 ~= 0 then return "float64" end
-        end
-        return "int64"
-    end
-
+    -- dtype omitido → Series.from_table infere via Series.infer_dtype (Bloco H,
+    -- H.2/H.6.1). Antes havia uma infer_dtype local aqui que não reconhecia
+    -- boolean nativo (caía em int64 e quebrava no set); removida — fonte única
+    -- agora é Series.infer_dtype (_factories.lua).
     setmetatable(DataSet, {
         __call = function(_, pairs_list, name)
             if type(pairs_list) ~= "table" then
@@ -461,7 +457,6 @@ return function(I)
                 elseif is_series(data) or is_boolseries(data) or is_categorical(data) then
                     col = data
                 elseif type(data) == "table" then
-                    dtype = dtype or infer_dtype(data)
                     col = Series.from_table(data, dtype, cname)
                 else
                     error("smaug: coluna '"..cname.."': dados devem ser tabela ou Series", 2)

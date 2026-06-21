@@ -429,18 +429,27 @@ decisões já tomadas (não delibera contrato).*
 - Medição de cobertura no Fedora (gcov autoritativo) → `COVERAGE.md` real.
   **Nota:** `smaug_ops_window.c` (Fase 3) entra na medição pela primeira vez —
   `make_coverage.sh` só passou a instrumentá-lo na sessão de 2026-06-17.
-- **Fechar cobertura dos parsers** (números reais): `smaug_datetime.c` 70.33% ·
-  `smaug_json.c` 72.27% · `smaug_csv.c` 85.13% → ≥95% branch-alvo.
-- `test_allocfail` estendido à camada de ops (Frente B: ~33 branches em
-  f64/i64/bool/str/ops_str + ~25 residuais) e aos cleanup paths de OOM dos parsers.
+- **Fechar cobertura dos parsers** (números reais, Fedora pós-Frente B):
+  `smaug_json.c` 72.30% · `smaug_datetime.c` 74.19% · `smaug_csv.c` 82.64% →
+  ≥95% branch-alvo. (Total do projeto: 89.06% branch-alvo, 96.52% linha.)
+- ~~`test_allocfail` estendido à camada de ops (Frente B)~~ **`[Done]`** —
+  estendido a f64/i64/bool/str/ops_str, window e datetime (lifecycle + sort/take/
+  filter); 1492 verificações. Revelou que exclusões "coberto por allocfail" do
+  datetime eram falsas (não havia af_* de datetime) — agora são verdadeiras.
 - ~~Implementar a decisão de G.1 sobre `\uXXXX`~~ **`[Done]`** — JSON decodifica
   para UTF-8; degradação silenciosa eliminada (Fase 3). Era bloqueante de release.
 - Property-based tests adicionais; avaliar fuzzing dos parsers (lacuna registrada).
-- **Parity checker portável e determinístico:** `common.lua` lista os submódulos de
-  `series/`/`dataset/` via `io.popen("find ...")`, que só funciona no `find` Unix —
-  no Windows o report sai vazio (Eixos 1–4 acusam "0 métodos", falso). Trocar a
-  listagem por Lua puro (sem shell), tornando o relatório idêntico entre
-  Linux/Fedora e Windows. Conserto único na infraestrutura; os 12 eixos não mudam.
+- ~~**Parity checker portável e determinístico**~~ **`[Done]`** — `common.lua`
+  passou a listar os submódulos de `series/`/`dataset/` em Lua puro (sem
+  `io.popen("find")`, que só funcionava no `find` Unix). Relatório idêntico entre
+  Fedora e Windows; os 12 eixos não mudaram. Contagem do resumo unificada entre
+  `parity.sh` e `parity.ps1` (ocorrências, não linhas).
+- ~~**Coerência de construção (camada Lua)**~~ **`[Done]`** — inferência de dtype
+  unificada numa fonte única, reusada por todos os construtores (`Series`/`DataSet`
+  `from_table`/`from_columns`/`__call`/`full`/`map`); fim do default-float64
+  silencioso; bool inferido de boolean nativo; `Series` chamável + alias
+  `from_array`; `astype("bool")` numérico rígido (só 0/1, resto orienta para
+  `map`); imutabilidade do `assign` fixada por teste. Ver CHANGELOG 2026-06-20.
 - Valgrind clean em todos os binários. `COVERAGE.md` + `MANIFEST.txt` regenerados.
 
 ### Fase 6 — Spike: FFI loader instalável `[Planned]` *(pode ser puxado para antes)*

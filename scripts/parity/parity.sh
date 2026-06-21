@@ -70,8 +70,12 @@ cat >> "$OUT" <<EOF
 EOF
 
 # Contagens globais
-WARN_COUNT=$(grep -c "🟨" "$OUT")
-ERR_COUNT=$(grep -c "🟥" "$OUT")
+# NOTA: as quatro contagens usam "grep -o | wc -l" (ocorrências reais), não
+# "grep -c" (linhas). Uma linha de tabela pode ter mais de um marcador (ex.:
+# Eixo 1, linha de método com vários dtypes 🟨) — "grep -c" subcontava 🟨/🟥
+# nesse caso. Critério agora idêntico ao parity.ps1 ([regex]::Matches().Count).
+WARN_COUNT=$(grep -o "🟨" "$OUT" | wc -l)
+ERR_COUNT=$(grep -o "🟥" "$OUT" | wc -l)
 OK_COUNT=$(grep -o "🟩" "$OUT" | wc -l)
 EXC_COUNT=$(grep -o "⬜" "$OUT" | wc -l)
 

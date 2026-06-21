@@ -303,7 +303,7 @@ A implementação ocorre nesse anel — nunca mais profundamente do que o necess
 | Ordenação determinística | ✅ Forte |
 | Contratos defensivos | ✅ Forte — toda fronteira pública valida |
 | Tratamento de OOM | ✅ Forte — todos os pontos públicos cobertos, incluindo parsers I/O |
-| Integridade de memória | ✅ Forte — Valgrind-clean em 9 binários |
+| Integridade de memória | ✅ Forte — Valgrind-clean em 12 binários |
 | Views e Copy-on-Write | ✅ Forte |
 | Isolamento após COW detach | ✅ Forte |
 | Álgebra booleana Kleene | ✅ Forte |
@@ -314,14 +314,13 @@ A implementação ocorre nesse anel — nunca mais profundamente do que o necess
 
 ### Validação e evidências
 
-> **Nota:** os números abaixo refletem a medição anterior ao fechamento do Bloco F.
-> As contagens atuais são maiores (28 suítes Lua, 10+ binários C). Os percentuais
-> de cobertura serão **regenerados a partir do gcov real no hardening global**
-> (Fase 5 do Roadmap) — não são atualizados de memória, por princípio.
+> **Nota:** contagens medidas no estado atual (pós-split da Fase 4 e Frente B do
+> hardening). Cobertura sempre regenerada a partir do gcov real no Fedora — nunca
+> atualizada de memória, por princípio.
 
 | Área | Estado |
 |---|---|
-| Testes C (Anéis 0+3) | ✅ test_alloc, test_ops, test_ops_edge (269), test_bool, test_bool_lifecycle (154), test_string (118), test_cow (15), test_io_c (174 checks) |
+| Testes C (Anéis 0+3) | ✅ 12 binários: test_alloc, test_ops, test_ops_edge (269), test_bool, test_bool_lifecycle (154), test_string (118), test_cow (15), test_io_c (190), test_datetime_c (201), test_ops_window (207), test_allocfail (1492), test_stress (51k+) |
 | Testes Lua (Anéis 1+2+3) | ✅ 18 suítes, 360 862+ checks |
 | Stress tests (51k+ checks) | ✅ Forte |
 | Property-based testing (360k+ checks) | ✅ Forte |
