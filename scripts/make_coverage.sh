@@ -71,7 +71,7 @@ done
 # 5. test_allocfail: precisa de --wrap (age no link do executavel), entao linka
 #    contra os MESMOS .o instrumentados + --coverage. Seus .gcda agregam.
 gcc -std=c11 -O0 --coverage -I./include \
-    -Wl,--wrap=malloc -Wl,--wrap=realloc \
+    -Wl,--wrap=malloc -Wl,--wrap=realloc -Wl,--wrap=calloc -Wl,--wrap=strdup \
     tests/c/test_allocfail.c $objs -lm -o "$COVDIR/test_allocfail"
 "./$COVDIR/test_allocfail" >/dev/null 2>&1
 

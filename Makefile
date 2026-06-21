@@ -28,7 +28,7 @@ LUA_TESTS_DATASET = dataset/test_core dataset/test_relational dataset/test_stat 
 LUA_TESTS_IO      = io/test_csv io/test_json
 LUA_TESTS_PROPS   = props/test_props props/test_integration
 LUA_TESTS         = $(LUA_TESTS_SERIES) $(LUA_TESTS_DATASET) $(LUA_TESTS_IO) $(LUA_TESTS_PROPS)
-WRAP_FLAGS    = -Wl,--wrap=malloc -Wl,--wrap=realloc
+WRAP_FLAGS    = -Wl,--wrap=malloc -Wl,--wrap=realloc -Wl,--wrap=calloc -Wl,--wrap=strdup
 
 $(TARGET): $(SRCS) | build
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^

@@ -136,7 +136,7 @@ foreach ($t in $cTestsWrap) {
     $exe = "build\$t.exe"
     $cargs = @(
         "-std=c11", "-g", "-O0", "-Wall", "-Wextra", "-I.\include",
-        "-Wl,--wrap=malloc", "-Wl,--wrap=realloc",
+        "-Wl,--wrap=malloc", "-Wl,--wrap=realloc", "-Wl,--wrap=calloc", "-Wl,--wrap=strdup",
         "tests\c\$t.c"
     ) + $sources + @("-lm", "-o", $exe)
     & $gcc @cargs

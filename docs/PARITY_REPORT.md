@@ -10,7 +10,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-06-21 13:55:58 UTC
+Gerado em: 2026-06-21 16:31:04 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 

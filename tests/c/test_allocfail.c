@@ -2,7 +2,8 @@
  *
  * Teste de falha de alocação (Fase 1.6 — endurecimento, padrão SQLite).
  *
- * Intercepta malloc/realloc via --wrap do linker (ver Makefile). Um contador
+ * Intercepta malloc/realloc/calloc/strdup via --wrap do linker (ver Makefile).
+ * Um contador
  * global faz a N-ésima alocação falhar (retornar NULL). Cada operação é
  * exercitada em LOOP: falha-se na alocação 0, depois na 1, na 2, ... varrendo
  * TODOS os pontos de alocação daquela operação. Verifica-se que cada falha
@@ -15,7 +16,7 @@
  *   - o caminho de erro do grow (realloc parcial: data cresce, null_mask falha)
  *     é finalmente exercitado.
  *
- * Compile/rode via:  make test-allocfail   (usa -Wl,--wrap=malloc,realloc)
+ * Compile/rode via:  make test-allocfail   (usa -Wl,--wrap=malloc,realloc,calloc,strdup)
  */
 
 #include "../include/smaug.h"
@@ -31,6 +32,8 @@
 /* ---- interceptação de malloc/realloc ---------------------------------- */
 extern void *__real_malloc(size_t);
 extern void *__real_realloc(void *, size_t);
+extern void *__real_calloc(size_t, size_t);
+extern char *__real_strdup(const char *);
 extern void  free(void *);
 
 static long g_fail_at = -1;   /* índice da alocação que deve falhar (-1 = nenhuma) */
@@ -43,6 +46,14 @@ void *__wrap_malloc(size_t n) {
 void *__wrap_realloc(void *p, size_t n) {
     if (g_count++ == g_fail_at) return NULL;
     return __real_realloc(p, n);
+}
+void *__wrap_calloc(size_t nmemb, size_t size) {
+    if (g_count++ == g_fail_at) return NULL;
+    return __real_calloc(nmemb, size);
+}
+char *__wrap_strdup(const char *s) {
+    if (g_count++ == g_fail_at) return NULL;
+    return __real_strdup(s);
 }
 
 static void reset(long fail_at) { g_fail_at = fail_at; g_count = 0; }

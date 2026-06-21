@@ -365,7 +365,7 @@ smaug_table_t *smaug_read_json_mem(const char *buf, size_t len) {
         col_names[c] = strdup(recs[0].keys[c]);
         if (!col_names[c]) {
             for (size_t k = 0; k < c; k++) free(col_names[k]);
-            free(col_names);
+            free(col_names); col_names = NULL;
             goto oom_recs;
         }
     }
@@ -399,13 +399,15 @@ smaug_table_t *smaug_read_json_mem(const char *buf, size_t len) {
     smaug_table_t *tbl = calloc(1, sizeof(smaug_table_t));
     if (!tbl) {
         for (size_t c = 0; c < n_cols; c++) free(col_names[c]);
-        free(dtypes); free(col_names); goto oom_recs;
+        free(dtypes); free(col_names); dtypes = NULL; col_names = NULL;
+        goto oom_recs;
     }
     tbl->columns = calloc(n_cols, sizeof(smaug_column_t));
     if (!tbl->columns) {
         free(tbl);
         for (size_t c = 0; c < n_cols; c++) free(col_names[c]);
-        free(dtypes); free(col_names); goto oom_recs;
+        free(dtypes); free(col_names); dtypes = NULL; col_names = NULL;
+        goto oom_recs;
     }
     tbl->ncols = n_cols;
     tbl->nrows = n_recs;

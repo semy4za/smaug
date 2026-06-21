@@ -136,7 +136,7 @@ LUA_TESTS=(series/test_constructors series/test_access series/test_reduce \
 
 CFLAGS=(-std=c11 -fPIC -Wall -Wextra -O2 -I./include)
 TEST_CFLAGS=(-std=c11 -g -O0 -Wall -Wextra -I./include)
-WRAP_FLAGS=(-Wl,--wrap=malloc -Wl,--wrap=realloc)
+WRAP_FLAGS=(-Wl,--wrap=malloc -Wl,--wrap=realloc -Wl,--wrap=calloc -Wl,--wrap=strdup)
 
 ALL_PASS=1
 run_result() {
