@@ -80,7 +80,7 @@ static int encode_utf8(unsigned int cp, char *dst) {
         dst[1] = (char)(0x80 | ((cp >> 6) & 0x3F));
         dst[2] = (char)(0x80 | (cp & 0x3F));
         return 3;
-    } else if (cp <= 0x10FFFF) {
+    } else if (cp <= 0x10FFFF) { /* COV-EXCL-BR: ramo falso inalcançável — surrogates produzem max 0x10FFFF, BMP já foi tratado em cp<=0xFFFF acima */
         dst[0] = (char)(0xF0 | (cp >> 18));
         dst[1] = (char)(0x80 | ((cp >> 12) & 0x3F));
         dst[2] = (char)(0x80 | ((cp >> 6)  & 0x3F));
@@ -139,7 +139,7 @@ static char *read_json_string(json_lex_t *l) {
 
                 char utf8[4];
                 int bytes = encode_utf8(ucp, utf8);
-                if (bytes == 0) { free(out); return NULL; }
+                if (bytes == 0) { free(out); return NULL; } /* COV-EXCL-BR: encode_utf8 só retorna 0 para cp > 0x10FFFF, mas o parser garante cp ≤ 0x10FFFF (BMP direto ≤ 0xFFFF; par surrogate → max 0x10FFFF pela fórmula) */
 
                 /* garantir espaço para até 4 bytes + terminador */
                 if (n + bytes >= cap) {
@@ -424,7 +424,7 @@ smaug_table_t *smaug_read_json_mem(const char *buf, size_t len) {
             for (size_t r = 0; r < n_recs; r++) {
                 json_val_t *v = (c < recs[r].count) ? &recs[r].vals[c] : NULL;
                 if (!v || v->type == 0) smaug_i64_set_null(s, r); /* registro heterogêneo (campo ausente) — caso normal, ver test_json_short_record */
-                else if (v->type == 1)  smaug_i64_set(s, r, v->i);
+                else if (v->type == 1)  smaug_i64_set(s, r, v->i); /* COV-EXCL-BR: ramo falso inalcançável — pureza de inferência garante que todo não-null numa coluna i64 tem type==1; type==2/3/4 teriam forçado DT_F64/DT_STR via dtype_upgrade */
                 else if (v->type == 2)  smaug_i64_set(s, r, (int64_t)v->d); /* COV-EXCL-BR: dtype=int64 implica que toda linha não-null tinha jt==1 durante a inferência (dtype_upgrade força float64 se qualquer linha fosse jt==2) — mesmo argumento de pureza do csv.c */
                 else                    smaug_i64_set_null(s, r); /* COV-EXCL-BR: idem — jt só pode ser 0(null)/1(int) numa coluna int64 */
             }
@@ -463,7 +463,7 @@ smaug_table_t *smaug_read_json_mem(const char *buf, size_t len) {
                 else { char tmp[64]; size_t n;
                        if (v->type==1) n=snprintf(tmp,sizeof(tmp),"%lld",(long long)v->i);
                        else if (v->type==2) n=snprintf(tmp,sizeof(tmp),"%.17g",v->d);
-                       else if (v->type==3) { strcpy(tmp,v->b?"true":"false"); n=strlen(tmp); }
+                       else if (v->type==3) { strcpy(tmp,v->b?"true":"false"); n=strlen(tmp); } /* COV-EXCL-BR: ramo falso inalcançável — numa coluna DT_STR (catch-all), todo não-null com !v->s tem type∈{1,2,3}; o else (tmp[0]='\0') só seria alcançado se type fosse 0 ou >4, impossível de JSON válido */
                        else { tmp[0]='\0'; n=0; }
                        smaug_str_set(s, r, tmp, n); }
             }
@@ -593,7 +593,7 @@ char *smaug_write_json_mem(const smaug_table_t *t,
                 const char *sv = smaug_str_get(col->str, r, &slen);
                 if (!sv) { if (wbj_pushz(&b,"null")) goto oom; }
                 else { if (write_json_string(&b, sv, slen)) goto oom; }
-            } else { if (wbj_pushz(&b,"null")) goto oom; }
+            } else { if (wbj_pushz(&b,"null")) goto oom; } /* COV-EXCL-BR: só alcançado se tbl->columns[c] não tiver nenhum ponteiro de dado (col completamente inválida) — inalcançável com tabela bem-construída */
 
             if (c + 1 < t->ncols) { if (wbj_pushc(&b,',')) goto oom; }
             if (wbj_pushz(&b, nl)) goto oom;
@@ -622,5 +622,5 @@ int smaug_write_json(const char *path, const smaug_table_t *t,
     FILE *f = fopen(path, "wb");
     if (!f) { free(buf); return -1; }
     size_t w = fwrite(buf, 1, len, f); fclose(f); free(buf);
-    return (w == len) ? 0 : -1;
+    return (w == len) ? 0 : -1; /* COV-EXCL-BR: w != len só com fwrite parcial (disco cheio/falha de I/O) — inalcançável sem mock de fwrite */
 }

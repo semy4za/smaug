@@ -5,6 +5,37 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-06-22 — Fase 5: cobertura dos parsers + correção de double-free sob OOM
+
+### Corrigido
+- **Double-free em `smaug_read_json_mem` sob OOM** (3 sites de limpeza): em
+  falha de alocação durante a montagem de colunas, `col_names`/`dtypes` eram
+  liberados manualmente antes de um `goto oom_recs` compartilhado que liberava
+  de novo. Corrigido anulando os ponteiros após a liberação. Reproduzido por
+  varredura de injeção de falha e validado Valgrind-clean (534 allocs = 534
+  frees, 0 erros).
+
+### Testes / Hardening
+- **Harness de allocfail estendido para `calloc` e `strdup`**: `--wrap=malloc,
+  realloc` não intercepta esses dois (resolvem internamente na libc), deixando
+  todos os guards de OOM sobre eles sem exercício. Adicionados `__wrap_calloc`
+  e `__wrap_strdup`; flag propagada às quatro configurações de build (Makefile,
+  build.sh, make_coverage.sh, windows_build.ps1). Verificações 1492 → 1496.
+- **Cobertura branch-alvo dos parsers** (medição Fedora autoritativa):
+  - `smaug_csv.c`: 82.64% → 90.53%
+  - `smaug_json.c`: 72.30% → 85.32%
+  - `smaug_datetime.c`: 72.77% → 85.40%
+  - `smaug_ops_window.c`: 85.26% → 94.78%
+  - **Total do backend C: 89.06% → ~94%**
+- Auditoria de exclusões: categoria C (conveniência disfarçada) substituída por
+  testes reais; categoria D (inalcançável fraco) validada por instrumentação +
+  400k checks e promovida a A com justificativa formal. Condições redundantes
+  (`st==NULL_VALUE || st!=OK`; `v->s != NULL` garantido) simplificadas, não
+  excluídas. Novos `COV-EXCL-BR` honestos: `encode_utf8` com cp>0x10FFFF,
+  ramos de pureza de inferência de dtype, while-body de deque inalcançável.
+
+## (data anterior) — Aritmética numérica: promoção de tipos e divisão verdadeira
+
 
 ## 2026-06-20 — Coerência de construção: inferência universal de dtype
 

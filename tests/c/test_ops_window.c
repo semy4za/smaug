@@ -8,6 +8,7 @@
 #include "../include/smaug_numeric.h"
 #include "../include/smaug_ops_window.h"
 #include "../include/smaug_string.h"
+#include "../include/smaug_datetime.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -772,6 +773,135 @@ static void test_i64_rolling_min_max(void) {
 }
 
 /* =====================================================================
+   Testes de cobertura — lacunas identificadas em 2026-06-21
+   ===================================================================== */
+
+static void test_multi_argsort_dt(void) {
+    /* SMAUG_COL_DT nunca exercitado em cmp_col_at (linha 32 branch 4) */
+    smaug_series_dt_t *s = smaug_dt_create_from_array(
+        (int64_t[]){3000000LL, 1000000LL, 2000000LL}, 3);
+    smaug_sort_col_t col = { .kind = SMAUG_COL_DT, .dt = s };
+    size_t *idx = smaug_multi_argsort(&col, 1, 3);
+    CHECK(idx != NULL, "multi_argsort DT: retorna índices");
+    CHECK(idx[0] == 1, "multi_argsort DT: menor primeiro");
+    CHECK(idx[1] == 2, "multi_argsort DT: médio no meio");
+    CHECK(idx[2] == 0, "multi_argsort DT: maior no final");
+    free(idx);
+    smaug_dt_free(s);
+}
+
+static void test_multi_argsort_edge_null_args(void) {
+    /* ncols=0 e nrows=0 (linha 133) */
+    smaug_sort_col_t col = {0};
+    CHECK(smaug_multi_argsort(NULL, 1, 5) == NULL, "multi_argsort NULL cols");
+    CHECK(smaug_multi_argsort(&col, 0, 5) == NULL, "multi_argsort ncols=0");
+    CHECK(smaug_multi_argsort(&col, 1, 0) == NULL, "multi_argsort nrows=0");
+}
+
+static void test_rolling_window_zero(void) {
+    /* window=0 para todas as 8 funções rolling (guards, ramos 2 de cada) */
+    double fd[] = {1.0, 2.0, 3.0};
+    smaug_series_f64_t *sf = f64_from(fd, 3);
+    CHECK(smaug_f64_rolling_sum(sf,  0) == NULL, "f64 rolling_sum window=0");
+    CHECK(smaug_f64_rolling_mean(sf, 0) == NULL, "f64 rolling_mean window=0");
+    CHECK(smaug_f64_rolling_min(sf,  0) == NULL, "f64 rolling_min window=0");
+    CHECK(smaug_f64_rolling_max(sf,  0) == NULL, "f64 rolling_max window=0");
+    smaug_f64_free(sf);
+
+    int64_t id[] = {1, 2, 3};
+    smaug_series_i64_t *si = i64_from(id, 3);
+    CHECK(smaug_i64_rolling_sum(si,  0) == NULL, "i64 rolling_sum window=0");
+    CHECK(smaug_i64_rolling_mean(si, 0) == NULL, "i64 rolling_mean window=0");
+    CHECK(smaug_i64_rolling_min(si,  0) == NULL, "i64 rolling_min window=0");
+    CHECK(smaug_i64_rolling_max(si,  0) == NULL, "i64 rolling_max window=0");
+    smaug_i64_free(si);
+}
+
+static void test_rolling_all_null_window(void) {
+    /* cnt==0 path: janela completa formada só de nulls → NA (linhas 210, 236, 346)
+     * [null, null, 1.0] window=2: posição 1 tem janela [null,null] → NA */
+    double arr[] = {-1.0, -1.0, 1.0};
+    smaug_series_f64_t *sf = f64_from(arr, 3);
+    smaug_f64_set_null(sf, 0);
+    smaug_f64_set_null(sf, 1);
+
+    /* rolling_sum */
+    smaug_series_f64_t *rs = smaug_f64_rolling_sum(sf, 2);
+    CHECK(rs && f64_null(rs, 1), "f64 rolling_sum all-null window: pos 1 = NA (cnt=0)");
+    smaug_f64_free(rs);
+    /* rolling_mean */
+    smaug_series_f64_t *rm = smaug_f64_rolling_mean(sf, 2);
+    CHECK(rm && f64_null(rm, 1), "f64 rolling_mean all-null window: pos 1 = NA");
+    smaug_f64_free(rm);
+    smaug_f64_free(sf);
+
+    /* i64: [null, null, 1] window=2 */
+    int64_t arri[] = {0, 0, 1};
+    smaug_series_i64_t *si = i64_from(arri, 3);
+    smaug_i64_set_null(si, 0);
+    smaug_i64_set_null(si, 1);
+    smaug_series_i64_t *ris = smaug_i64_rolling_sum(si, 2);
+    CHECK(ris && i64_null(ris, 1), "i64 rolling_sum all-null: pos 1 = NA (cnt=0)");
+    smaug_i64_free(ris);
+    smaug_i64_free(si);
+}
+
+static void test_rolling_null_in_deque_window(void) {
+    /* Null no meio de uma janela rolling_min/max — força o path de
+     * cleanup do deque (linhas 258-259/301-302 em f64, 394/416 em i64)
+     * e a deque vazia → NA (linhas 278/318/396/426).
+     *
+     * Série: [1.0, NA, NA, 2.0] window=2
+     *   i=0: push 0. skip.
+     *   i=1: output data[0]=1.0.
+     *   i=2: null — if(258): front(0)+2<=2? Yes. Pop. deque=[]. → 278/318: empty → NA.
+     *   i=3: output 2.0.
+     */
+    double arrf[] = {1.0, -9999.0, -9999.0, 2.0};
+    smaug_series_f64_t *sf = f64_from(arrf, 4);
+    smaug_f64_set_null(sf, 1);
+    smaug_f64_set_null(sf, 2);
+
+    /* rolling_min */
+    smaug_series_f64_t *rmin = smaug_f64_rolling_min(sf, 2);
+    CHECK(rmin && f64_null(rmin, 0),              "f64 rolling_min null-deque: [0]=NA");
+    CHECK(rmin && APPROX(f64_get(rmin, 1), 1.0),  "f64 rolling_min null-deque: [1]=1.0");
+    CHECK(rmin && f64_null(rmin, 2),              "f64 rolling_min null-deque: [2]=NA (258+278)");
+    CHECK(rmin && APPROX(f64_get(rmin, 3), 2.0),  "f64 rolling_min null-deque: [3]=2.0");
+    smaug_f64_free(rmin);
+
+    /* rolling_max */
+    smaug_series_f64_t *rmax = smaug_f64_rolling_max(sf, 2);
+    CHECK(rmax && f64_null(rmax, 0),              "f64 rolling_max null-deque: [0]=NA");
+    CHECK(rmax && APPROX(f64_get(rmax, 1), 1.0),  "f64 rolling_max null-deque: [1]=1.0");
+    CHECK(rmax && f64_null(rmax, 2),              "f64 rolling_max null-deque: [2]=NA (301+318)");
+    CHECK(rmax && APPROX(f64_get(rmax, 3), 2.0),  "f64 rolling_max null-deque: [3]=2.0");
+    smaug_f64_free(rmax);
+    smaug_f64_free(sf);
+
+    /* i64: [1, NA, NA, 2] window=2 — exercita while(394)/396 e while(416)/426 */
+    int64_t arri[] = {1, 0, 0, 2};
+    smaug_series_i64_t *si = i64_from(arri, 4);
+    smaug_i64_set_null(si, 1);
+    smaug_i64_set_null(si, 2);
+
+    smaug_series_i64_t *rimin = smaug_i64_rolling_min(si, 2);
+    CHECK(rimin && i64_null(rimin, 0),         "i64 rolling_min null-deque: [0]=NA");
+    CHECK(rimin && i64_get(rimin, 1) == 1,     "i64 rolling_min null-deque: [1]=1");
+    CHECK(rimin && i64_null(rimin, 2),         "i64 rolling_min null-deque: [2]=NA (394+396)");
+    CHECK(rimin && i64_get(rimin, 3) == 2,     "i64 rolling_min null-deque: [3]=2");
+    smaug_i64_free(rimin);
+
+    smaug_series_i64_t *rimax = smaug_i64_rolling_max(si, 2);
+    CHECK(rimax && i64_null(rimax, 0),         "i64 rolling_max null-deque: [0]=NA");
+    CHECK(rimax && i64_get(rimax, 1) == 1,     "i64 rolling_max null-deque: [1]=1");
+    CHECK(rimax && i64_null(rimax, 2),         "i64 rolling_max null-deque: [2]=NA (416+426)");
+    CHECK(rimax && i64_get(rimax, 3) == 2,     "i64 rolling_max null-deque: [3]=2");
+    smaug_i64_free(rimax);
+    smaug_i64_free(si);
+}
+
+/* =====================================================================
    main
    ===================================================================== */
 
@@ -806,6 +936,8 @@ int main(void) {
     test_multi_argsort_composite();
     test_multi_argsort_stable();
     test_multi_argsort_edge();
+    test_multi_argsort_dt();
+    test_multi_argsort_edge_null_args();
     test_f64_rolling_sum();
     test_f64_rolling_mean();
     test_f64_rolling_min();
@@ -813,6 +945,9 @@ int main(void) {
     test_i64_rolling_sum();
     test_i64_rolling_mean();
     test_i64_rolling_min_max();
+    test_rolling_window_zero();
+    test_rolling_all_null_window();
+    test_rolling_null_in_deque_window();
 
     if (g_fails == 0) {
         printf("PASS: test_ops_window (%d checks)\n", g_checks);

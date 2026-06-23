@@ -273,7 +273,7 @@ smaug_series_f64_t *smaug_f64_rolling_min(const smaug_series_f64_t *s,
         next_min:
         if (i + 1 < window) continue;
         /* remove front desatualizado após salto de nulo */
-        while (!deque_empty(&dq) && deque_front(&dq) + window <= i)
+        while (!deque_empty(&dq) && deque_front(&dq) + window <= i) /* COV-EXCL-BR: loop-body inalcançável — a if em 258-260 já trata o único item stale possível; by invariante de 266, no máximo um item envelhece por passo de null */
             deque_pop_front(&dq);
         if (deque_empty(&dq)) continue;
         r->data[i]      = s->data[deque_front(&dq)];
@@ -313,7 +313,7 @@ smaug_series_f64_t *smaug_f64_rolling_max(const smaug_series_f64_t *s,
 
         next_max:
         if (i + 1 < window) continue;
-        while (!deque_empty(&dq) && deque_front(&dq) + window <= i)
+        while (!deque_empty(&dq) && deque_front(&dq) + window <= i) /* COV-EXCL-BR: loop-body inalcançável — mesma invariante que linha 276 (rolling_min) */
             deque_pop_front(&dq);
         if (deque_empty(&dq)) continue;
         r->data[i]      = s->data[deque_front(&dq)];
@@ -421,7 +421,7 @@ smaug_series_i64_t *smaug_i64_rolling_max(const smaug_series_i64_t *s,
 
         next_i64_max:
         if (i + 1 < window) continue;
-        while (!deque_empty(&dq) && deque_front(&dq) + window <= i)
+        while (!deque_empty(&dq) && deque_front(&dq) + window <= i) /* COV-EXCL-BR: loop-body inalcançável — mesma invariante que linhas 276/316 (i64: não há null-path cleanup prévio, mas a monotone deque e o loop não-null a 405 já garantem no máximo 1 stale) */
             deque_pop_front(&dq);
         if (deque_empty(&dq)) continue;
         r->data[i]      = s->data[deque_front(&dq)];

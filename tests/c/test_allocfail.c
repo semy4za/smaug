@@ -1456,19 +1456,48 @@ static void af_csv_read_many_rows(void) {
     free(csv);  /* liberar sem wrap */
 }
 
-/* CSV — writer: pontos de realloc do wbuf */
+/* CSV — leitura sem header: nomes sintéticos "colN" via strdup de buffer local
+ * (caminho nunca exercitado pelo allocfail antes — strdup(tmp) é um ponto de
+ * alocação distinto do strdup(src) com header). */
+static void af_csv_read_no_header(void) {
+    const char *csv = "1,2.5,true\n3,4.5,false\n";
+    size_t csv_len  = strlen(csv);
+    smaug_csv_opts_t o = smaug_csv_default_opts();
+    o.header = 0;
+    for (long k = 0; k < MAX_IO_ALLOCS; k++) {
+        reset(k);
+        smaug_table_t *t = smaug_read_csv_mem(csv, csv_len, &o);
+        if (t) { smaug_table_free(t); }
+    }
+    reset(-1);
+    smaug_table_t *t = smaug_read_csv_mem(csv, csv_len, &o);
+    OK(t && !t->error && t->ncols == 3, "csv_read_no_header: sucesso, 3 colunas");
+    smaug_table_free(t);
+}
+
+/* CSV — writer: pontos de realloc do wbuf + todos os ramos por dtype
+ * (multi-coluna com NULL em cada família — a tabela antiga, de 1 coluna
+ * int64 sem null, nunca exercitava os ramos st==SMG_NULL_VALUE nem a
+ * coluna string nem o separador c>0 entre colunas). */
 static void af_csv_write(void) {
-    /* construir tabela simples na stack */
-    smaug_series_i64_t *s = smaug_i64_create(3);
-    assert(s);
-    smaug_i64_set(s, 0, 1);
-    smaug_i64_set(s, 1, 2);
-    smaug_i64_set(s, 2, 3);
+    smaug_series_i64_t  *si = smaug_i64_create(2);
+    smaug_series_f64_t  *sf = smaug_f64_create(2);
+    smaug_series_bool_t *sb = smaug_bool_create(2);
+    smaug_series_str_t  *ss = smaug_str_create(2);
+    assert(si && sf && sb && ss);
+    smaug_i64_set(si, 0, 1);        smaug_i64_set_null(si, 1);
+    smaug_f64_set_null(sf, 0);      smaug_f64_set(sf, 1, 2.5);
+    smaug_bool_set(sb, 0, 1);       smaug_bool_set_null(sb, 1);
+    smaug_str_set(ss, 0, "a,b", 3); smaug_str_set_null(ss, 1);
+
+    smaug_column_t cols[4] = {0};
+    cols[0].name = "i"; cols[0].dtype = "int64";   cols[0].i64     = si;
+    cols[1].name = "f"; cols[1].dtype = "float64"; cols[1].f64     = sf;
+    cols[2].name = "b"; cols[2].dtype = "bool";    cols[2].boolcol = sb;
+    cols[3].name = "s"; cols[3].dtype = "string";  cols[3].str     = ss;
 
     smaug_table_t t = {0};
-    smaug_column_t col = {0};
-    col.name = "v"; col.dtype = "int64"; col.i64 = s;
-    t.columns = &col; t.ncols = 1; t.nrows = 3;
+    t.columns = cols; t.ncols = 4; t.nrows = 2;
 
     smaug_csv_write_opts_t wo = smaug_csv_write_default_opts();
     for (long k = 0; k < MAX_IO_ALLOCS; k++) {
@@ -1480,9 +1509,10 @@ static void af_csv_write(void) {
     reset(-1);
     size_t len;
     char *out = smaug_write_csv_mem(&t, &wo, &len);
-    OK(out != NULL && len > 0, "csv_write: sucesso");
+    OK(out != NULL && len > 0,         "csv_write: sucesso");
+    OK(strstr(out, "\"a,b\"") != NULL, "csv_write: campo com vírgula escapado");
     free(out);
-    smaug_i64_free(s);
+    smaug_i64_free(si); smaug_f64_free(sf); smaug_bool_free(sb); smaug_str_free(ss);
 }
 
 /* JSON — leitura: todos os pontos de malloc do tokenizador e do parser */
@@ -1548,15 +1578,24 @@ static void af_json_read_long_string(void) {
 
 /* JSON — writer: pontos de realloc do wbuf */
 static void af_json_write(void) {
-    smaug_series_str_t *s = smaug_str_create(2);
-    assert(s);
-    smaug_str_set(s, 0, "SP", 2);
-    smaug_str_set(s, 1, "RJ", 2);
+    smaug_series_i64_t  *si = smaug_i64_create(2);
+    smaug_series_f64_t  *sf = smaug_f64_create(2);
+    smaug_series_bool_t *sb = smaug_bool_create(2);
+    smaug_series_str_t  *ss = smaug_str_create(2);
+    assert(si && sf && sb && ss);
+    smaug_i64_set(si, 0, 1);            smaug_i64_set_null(si, 1);
+    smaug_f64_set(sf, 0, (double)(0.0/0.0)); smaug_f64_set_null(sf, 1); /* NaN + null */
+    smaug_bool_set_null(sb, 0);         smaug_bool_set(sb, 1, 1);
+    smaug_str_set(ss, 0, "SP", 2);      smaug_str_set_null(ss, 1);
+
+    smaug_column_t cols[4] = {0};
+    cols[0].name = "i"; cols[0].dtype = "int64";   cols[0].i64     = si;
+    cols[1].name = "f"; cols[1].dtype = "float64"; cols[1].f64     = sf;
+    cols[2].name = "b"; cols[2].dtype = "bool";    cols[2].boolcol = sb;
+    cols[3].name = "s"; cols[3].dtype = "string";  cols[3].str     = ss;
 
     smaug_table_t t = {0};
-    smaug_column_t col = {0};
-    col.name = "uf"; col.dtype = "string"; col.str = s;
-    t.columns = &col; t.ncols = 1; t.nrows = 2;
+    t.columns = cols; t.ncols = 4; t.nrows = 2;
 
     smaug_json_write_opts_t wo = {0};
     for (long k = 0; k < MAX_IO_ALLOCS; k++) {
@@ -1570,10 +1609,62 @@ static void af_json_write(void) {
     char *out = smaug_write_json_mem(&t, &wo, &len);
     OK(out != NULL && len > 0, "json_write: sucesso");
     free(out);
-    smaug_str_free(s);
+    smaug_i64_free(si); smaug_f64_free(sf); smaug_bool_free(sb); smaug_str_free(ss);
 }
 
-/* smaug_table_free com tabela parcialmente construída */
+/* JSON — writer com pretty=1: os branches de nl/ind/ind2 (linhas 557–570,
+ * 598–610) só são exercitados quando pretty=1 — precisam de sweep próprio. */
+static void af_json_write_pretty(void) {
+    smaug_series_i64_t *si = smaug_i64_create(3);
+    smaug_series_str_t *ss = smaug_str_create(3);
+    assert(si && ss);
+    smaug_i64_set(si, 0, 1); smaug_i64_set_null(si, 1); smaug_i64_set(si, 2, 3);
+    smaug_str_set(ss, 0, "a", 1); smaug_str_set(ss, 1, "b", 1); smaug_str_set_null(ss, 2);
+    smaug_column_t cols[2] = {0};
+    cols[0].name = "i"; cols[0].dtype = "int64";  cols[0].i64 = si;
+    cols[1].name = "s"; cols[1].dtype = "string"; cols[1].str = ss;
+    smaug_table_t t = {0};
+    t.columns = cols; t.ncols = 2; t.nrows = 3;
+
+    smaug_json_write_opts_t wo = {.pretty = 1};
+    for (long k = 0; k < MAX_IO_ALLOCS; k++) {
+        reset(k);
+        size_t len;
+        char *out = smaug_write_json_mem(&t, &wo, &len);
+        if (out) { free(out); }
+    }
+    reset(-1);
+    size_t len;
+    char *out = smaug_write_json_mem(&t, &wo, &len);
+    OK(out != NULL && strstr(out,"\n") != NULL, "json_write_pretty: sucesso");
+    free(out);
+    smaug_i64_free(si); smaug_str_free(ss);
+}
+
+/* JSON — leitura de muitos registros: força o realloc do array de records
+ * (recs[]) que começa com cap=8 e dobra (linhas 332/333). */
+static void af_json_read_many_recs(void) {
+    char *j = malloc(8192); assert(j);
+    int pos = sprintf(j, "[");
+    for (int i = 0; i < 20; i++) {
+        pos += sprintf(j+pos, "%s{\"v\":%d}", i?",":"", i);
+    }
+    pos += sprintf(j+pos, "]");
+    size_t jlen = (size_t)pos;
+
+    for (long k = 0; k < MAX_IO_ALLOCS; k++) {
+        reset(k);
+        smaug_table_t *t = smaug_read_json_mem(j, jlen);
+        if (t) smaug_table_free(t);
+    }
+    reset(-1);
+    smaug_table_t *t = smaug_read_json_mem(j, jlen);
+    OK(t && !t->error && t->nrows == 20, "json_read_many_recs: sucesso 20 linhas");
+    smaug_table_free(t);
+    free(j);
+}
+
+
 static void af_table_free_partial(void) {
     /* simula OOM a meio da construção de colunas */
     const char *csv = "a,b,c\n1,2,3\n4,5,6\n";
@@ -1946,11 +2037,14 @@ int main(void) {
     af_csv_read_mem();
     af_csv_read_quoted();
     af_csv_read_many_rows();
+    af_csv_read_no_header();
     af_csv_write();
     af_json_read_mem();
     af_json_read_many_records();
     af_json_read_long_string();
     af_json_write();
+    af_json_write_pretty();
+    af_json_read_many_recs();
     af_table_free_partial();
 
     /* Frente B — Grupo A/B (Fase 3) e rolling */

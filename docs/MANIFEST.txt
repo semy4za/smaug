@@ -10,12 +10,12 @@ ed7d63f5177cc7d7fbfee9c7c18ebeb4d6fd7da02680ec7778cfe23be1d15b03      31  ./.git
 c3b4f3bbd7bb729f944d3d617bf2bb93b7d59cd3cea78c929261a1cc3c0ce3f2     630  ./docs/API_Reference.md
 ea801c0e26f97580568b70a6c7f3c49ab32c851f448984b17cdc1a959f4ffb23     332  ./docs/ARCHITECTURE.md
 f49236cfb0ec560b288dd147b16089010136bfe03d3bc75f38c8dea3f9d0edac     185  ./docs/Build_and_Testing.md
-1272842fe9a98c38aa3044b4b0e9cded89cb0bc556ab2d3b835955cc7b91ec10    1708  ./docs/CHANGELOG.md
+02aa63e87af75a096078eeb927323e2cdee2e0a75127433fbff21f7b8fcc25ec    1739  ./docs/CHANGELOG.md
 9a5745e0953b96ecc14c62e02951b104b7e2575938630a0bde0a5cecafee14ee      98  ./docs/CODE_REVIEW.md
 d725ddfecddc5c0ce7cae857ecb7bc57edc66202b40d66e723595709e2d14044     274  ./docs/CONTRACT.md
-60b82288e44434e14628d667bfad7e4a446f4798d6d8991f7184fd14c961ca35     341  ./docs/COVERAGE.md
+1d6e90699c8494eb13a8faeecdb21873fbfbc2f1e80e1fcb1c27b6897f5d0d52     267  ./docs/COVERAGE.md
 0b780addfb2929a2af46aa31af0849d30b479a51a35a730f9863843cf095e910     159  ./docs/COW.md
-49ebdeee7a9edffe93ce44f3982ca2e67fc81c6fae1d183cbceb6ea762db61db     746  ./docs/PARITY_REPORT.md
+af3a7845701c007af63fee1a995f6abe02303dad0342a8ff219a2e4696a50d39     746  ./docs/PARITY_REPORT.md
 e6f52cd1599cafbc65ba601bc222ed718294402d2a568b73521d7452bc55efba     537  ./docs/README.md
 2e4f216ac9727cee891c5485e603b8cf1720087f9691316220df22a69eeb0bab     606  ./docs/Roadmap.md
 aa9cae92e013e03bffaf812ce257644cc6f8d84b3a8eac0309c37279fe92e3b3      36  ./include/smaug.h
@@ -76,25 +76,26 @@ e13ae88df23731af74d85c8c7b9900fca6828913499ebce727b81c2dfa28780d     132  ./scri
 99d689a991aaa29bd0d1a677e7c9899551dd05eea6dd5568bf4d58946c2e0805     108  ./scripts/parity/parity.sh
 5f2934ed9b611b5e6333c6d4bd7c6ee83bda0c0b92ce27619cb2031890c12923     238  ./scripts/windows_build.ps1
 b655b8b2cdb754a05b7c117953e5cce9664db1ad6327f5400e59a4874c3a381f     638  ./src/smaug_core.c
-b9f35ec29071ec3ef92e70aadd81f2ccec1b1c84781c42c0e899ac6bf587f13e     481  ./src/smaug_csv.c
+4334d4f47628c22e9e252c3de6ba493d961e4089548bab8ec533574ed4b6b903     486  ./src/smaug_csv.c
 6187a7b51c2170a4aae226363887406d019cca55d6ebefd2905ca59710f4f045     714  ./src/smaug_datetime.c
-df9dd617f37c8e7b6f9095415f0cfc0cea27752b7a9835c12a272618c5ff8a53     626  ./src/smaug_json.c
+a5688dac7ad4836b8984d0c5cfa0db231ea9e1050f37b211af12f4ee11d5bfc8     626  ./src/smaug_json.c
 66fec31bbeb4d360dd0ef2cacacc02a05cf59ea5e14791da47d15d399ccd9036     281  ./src/smaug_ops_bool.c
 2512dba86423cc376de2146e5884f1290ad26a165e297e8f7e5ea0e79a724a37     823  ./src/smaug_ops_f64.c
 6aef2bd0b1f0d8133ba12e88fc1f057ab719562b91c2c9c5f100341be700bc8e     762  ./src/smaug_ops_i64.c
 ed1bac28c4cc7adc333a09a76056edba22d6679141e3b2b2097fd899473955c9     251  ./src/smaug_ops_str.c
-6b23fa2dc1b2a7624fd8d33fedfee7f0413418752fb38de66e57fdb8cc279374     433  ./src/smaug_ops_window.c
+b7713f55e9ece2a78d74e59b08fe1e8946c4bdd63ea254265a8eff41a53fc073     433  ./src/smaug_ops_window.c
 4a70832e24c42d6076930be0e23c6c5d5d134150def1ac789d72805030d17c73     336  ./src/smaug_str.c
+f16c11296598526b3179c0a70afe370f5cc542575e4ee34aef7910512422863d     626  ./tests/c/smaug_json.c
 1c5ab396661dd9c3a67c1c9f49325e572b0450a48f65c51f59bc46469a559fb4     276  ./tests/c/test_alloc.c
-d30fdb77e6e2e5ce464f7373f38691f3e7e578fc48623b64d23686abd2d093be    1975  ./tests/c/test_allocfail.c
+d25b72428e451b2e03871cc78dafc07ed01c323b2f6088363c41a1aa450a76dc    2069  ./tests/c/test_allocfail.c
 0542967f3be7181bbab4110ba8b991c6cc4cc549c78912d9f95de2b2202dcd21     217  ./tests/c/test_bool.c
 f0d8bf2ec8f652f56029599d3d6061cc9617f5cee3e890642a4ebdb9f92b7c76     305  ./tests/c/test_bool_lifecycle.c
 0d87515dd11969c713c672793f5a23ae9ab82ad0f8065e19f6b864af85a81e37     428  ./tests/c/test_cow.c
-3540f7b0294c15d3482b24d7e4d77660e95f1c03d6eeafdafb2b018493d42f82     601  ./tests/c/test_datetime_c.c
-6d0e4fc4ed448c245aad740ce7e165c47fb91498563e15607662778abc031926     963  ./tests/c/test_io_c.c
+561c8d2c27590f38b72b8ba77408e29e6ac613c55e8c63b09db7a8f9cf59d0d4     786  ./tests/c/test_datetime_c.c
+8861aebaa1e4af669c856c95374109e6777f45d3ab7c732f96f718a70c1974e9    1354  ./tests/c/test_io_c.c
 649352374847c05e07fcfc10d5406d6f19d0069500090e34158ec8b2e99db490      58  ./tests/c/test_ops.c
 5eaddbf57166ba0de2c6c9cc6a9fdb993e89e3cf7a434d206f036c0b8cf84341    1002  ./tests/c/test_ops_edge.c
-8bf227bf44324252ea63a3f6654e1ef159d838b90103c2229ad0d6a2d5d0599b     823  ./tests/c/test_ops_window.c
+c21a3708ef358f85d957bf5b8b40d9e40fe66ba80c7ce88aa6fca696a28338bb     958  ./tests/c/test_ops_window.c
 e656ea4300fba405ffbbf1da95d6a2b5e18e4efdbc589ab7e7d77432ea33a871     339  ./tests/c/test_stress.c
 97fdc383f086ecd5f4e9d3bf54d9e6243c0eac53a513727a5005ce33deae8360     402  ./tests/c/test_string.c
 258fd1e3508dc5eff4b39d648f9bc34bf26c59947e6acd79a370e4630fbf3069     696  ./tests/dataset/test_core.lua
@@ -116,4 +117,4 @@ c034d0fb6246491d34dab9e10c896b6a20fea1e0f14a55bc49cc360df676ee04      90  ./test
 3e858cca9fcf2edeb208785dedabfd98ec84121fec0d64105e2ec52ada2d303d     780  ./tests/series/test_str.lua
 fbc1912830ddccab0c8d1d598bdf972ec8cc44b178a2ae5298fef8ec27848e68     191  ./tests/series/test_window.lua
 #
-# total de arquivos: 113
+# total de arquivos: 114

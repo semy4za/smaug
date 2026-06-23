@@ -358,6 +358,30 @@ static void test_csv_short_row(void) {
     smaug_table_free(t);
 }
 
+static void test_csv_opts_zero_sep_quote(void) {
+    /* opts.sep/opts.quote == 0: a struct opts não é opaca — qualquer caller
+     * em C pode pegar os defaults e zerar um campo (ou montar a struct na
+     * mão sem inicializar). O guard "sep ? sep : ','" existe exatamente pra
+     * isso; não é inalcançável, só não tinha caller adversarial testando. */
+    smaug_csv_opts_t o = smaug_csv_default_opts();
+    o.sep = 0;
+    const char *csv = "a,b\n1,2\n";
+    smaug_table_t *t = smaug_read_csv_mem(csv, strlen(csv), &o);
+    CHECK(t && !t->error,        "sep=0: cai pro default ',' — sem erro");
+    CHECK(t->ncols == 2,         "sep=0: 2 colunas (separou por vírgula)");
+    CHECK(get_i64(t, 1, 0) == 2, "sep=0: b[0]=2");
+    smaug_table_free(t);
+
+    smaug_csv_opts_t o2 = smaug_csv_default_opts();
+    o2.quote = 0;
+    const char *csv2 = "a\n\"x\"\n";
+    smaug_table_t *t2 = smaug_read_csv_mem(csv2, strlen(csv2), &o2);
+    CHECK(t2 && !t2->error,      "quote=0: cai pro default '\"' — sem erro");
+    size_t n; const char *s = get_str(t2, 0, 0, &n);
+    CHECK(s && n == 1 && s[0] == 'x', "quote=0: aspas reconhecidas, campo='x'");
+    smaug_table_free(t2);
+}
+
 /* ===================================================================
    CSV writer — caminhos adicionais
    =================================================================== */
@@ -385,6 +409,56 @@ static void test_csv_write_nan(void) {
     free(out);
     smaug_f64_free(s);
 }
+
+static void test_csv_write_opts_zero_sep_quote(void) {
+    /* mesmo guard do lado da escrita (linhas 427/428): opts.sep/opts.quote
+     * podem chegar zerados de um caller em C que monta a struct na mão. */
+    smaug_series_i64_t *s = smaug_i64_create(1);
+    smaug_i64_set(s, 0, 1);
+    smaug_table_t t = {0};
+    smaug_column_t col = {0};
+    col.name = "a"; col.dtype = "int64"; col.i64 = s;
+    t.columns = &col; t.ncols = 1; t.nrows = 1;
+
+    smaug_csv_write_opts_t wo = smaug_csv_write_default_opts();
+    wo.sep = 0; wo.quote = 0;
+    size_t len;
+    char *out = smaug_write_csv_mem(&t, &wo, &len);
+    CHECK(out != NULL,             "write sep/quote=0: retorna buffer");
+    CHECK(strstr(out, "a\n1\n") != NULL, "write sep/quote=0: cai pro default ','/'\"'");
+    free(out);
+    smaug_i64_free(s);
+}
+
+static void test_csv_write_large_field(void) {
+    /* campo único > 8192 bytes força o wbuf a dobrar a capacidade mais de
+     * uma vez numa só chamada de wbuf_push (cap começa em 4096; precisa
+     * passar por 8192 até cobrir o campo) — cobre o loop `while` de
+     * csv.c:400, que um único dobramento nunca exercita. */
+    size_t big_len = 10000;
+    char *big = malloc(big_len + 1);
+    assert(big);
+    memset(big, 'x', big_len);
+    big[big_len] = '\0';
+
+    smaug_series_str_t *s = smaug_str_create(1);
+    smaug_str_set(s, 0, big, big_len);
+
+    smaug_table_t t = {0};
+    smaug_column_t col = {0};
+    col.name = "v"; col.dtype = "string"; col.str = s;
+    t.columns = &col; t.ncols = 1; t.nrows = 1;
+
+    smaug_csv_write_opts_t wo = smaug_csv_write_default_opts();
+    size_t len;
+    char *out = smaug_write_csv_mem(&t, &wo, &len);
+    CHECK(out != NULL,        "write campo grande: retorna buffer");
+    CHECK(len > big_len,      "write campo grande: buffer cresceu além do campo (header+\\n)");
+    free(out);
+    free(big);
+    smaug_str_free(s);
+}
+
 
 static void test_csv_write_field_with_sep(void) {
     /* campo com vírgula → deve ser escapado com aspas */
@@ -556,6 +630,30 @@ static void test_json_float_in_int_col(void) {
     CHECK(t && !t->error, "JSON int col: sem erro");
     CHECK(strcmp(t->columns[0].dtype,"int64") == 0, "JSON int col: int64");
     CHECK(get_i64(t, 0, 2) == 3, "JSON int col: v[2]=3");
+    smaug_table_free(t);
+}
+
+static void test_json_short_record(void) {
+    /* registro heterogêneo: 2o objeto é totalmente vazio ({}), ausente em
+     * TODAS as 4 colunas — registro com só "i" não bastava: a própria
+     * coluna "i" (int64) nunca ficava ausente, deixando o ramo !v
+     * (json.c:426) descoberto especificamente pra DT_I64. JSON heterogêneo
+     * é caso NORMAL (campo opcional ausente em alguns registros), não uma
+     * exceção rara — campos faltando viram NA em todas as 4 famílias. */
+    const char *j = "[{\"i\":1,\"f\":1.5,\"b\":true,\"s\":\"hello\"},{}]";
+    smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+    CHECK(t && !t->error,        "JSON registro curto: sem erro");
+    CHECK(t->ncols == 4,         "JSON registro curto: 4 colunas (do 1o registro)");
+    CHECK(t->nrows == 2,         "JSON registro curto: 2 linhas");
+    CHECK(col_is_null(t, 0, 1),  "JSON registro curto: i[1]=NA (ausente, {} vazio)");
+    CHECK(col_is_null(t, 1, 1),  "JSON registro curto: f[1]=NA (ausente)");
+    CHECK(col_is_null(t, 2, 1),  "JSON registro curto: b[1]=NA (ausente)");
+    CHECK(col_is_null(t, 3, 1),  "JSON registro curto: s[1]=NA (ausente)");
+    /* linha 0 — todos presentes, confirma que não regrediu */
+    CHECK(!col_is_null(t, 0, 0), "JSON registro curto: i[0] presente");
+    CHECK(!col_is_null(t, 1, 0), "JSON registro curto: f[0] presente");
+    CHECK(!col_is_null(t, 2, 0), "JSON registro curto: b[0] presente");
+    CHECK(!col_is_null(t, 3, 0), "JSON registro curto: s[0] presente");
     smaug_table_free(t);
 }
 
@@ -739,6 +837,94 @@ static void test_csv_na_custom(void) {
     smaug_table_free(t);
 }
 
+static void test_csv_na_custom_empty_field(void) {
+    /* na_values customizado SEM "" — campo vazio deixa de ser NA por
+     * definição e chega em try_i64/try_f64 como string vazia de verdade
+     * (cobre o ramo !*s, nunca alcançado pelo default que trata "" como NA
+     * antes mesmo de chamar try_i64/try_f64). */
+    const char *nav[] = {"N/D"};
+    smaug_csv_opts_t o = smaug_csv_default_opts();
+    o.na_values = nav;
+    o.na_count  = 1;
+    const char *csv = "v,w\nN/D,5\n,7\n1,8\n";
+    smaug_table_t *t = smaug_read_csv_mem(csv, strlen(csv), &o);
+    CHECK(t && !t->error,            "na custom sem vazio: sem erro");
+    CHECK(strcmp(t->columns[0].dtype,"string") == 0,
+                                      "na custom sem vazio: v vira string (\"\" não parseia)");
+    CHECK(col_is_null(t, 0, 0),      "na custom sem vazio: N/D → null");
+    CHECK(!col_is_null(t, 0, 1),     "na custom sem vazio: \"\" não é NA (não está na lista)");
+    size_t n; const char *s = get_str(t, 0, 1, &n);
+    CHECK(s && n == 0,               "na custom sem vazio: campo vazio vira string vazia, não null");
+    smaug_table_free(t);
+}
+
+static void test_csv_numeric_overflow(void) {
+    /* valor que excede int64 (errno=ERANGE em strtoll) mas cabe em double —
+     * cobre o ramo errno de try_i64 (linha 84), que difere do ramo "sobra
+     * lixo" (*end != '\0') já coberto por colunas de string comum. */
+    const char *csv = "v\n99999999999999999999\n1.5\n";
+    smaug_table_t *t = smaug_read_csv_mem(csv, strlen(csv), NULL);
+    CHECK(t && !t->error,         "overflow i64: sem erro");
+    CHECK(strcmp(t->columns[0].dtype,"float64") == 0,
+                                   "overflow i64: vira float64 (i64 falha por overflow, f64 aceita)");
+    smaug_table_free(t);
+}
+
+static void test_csv_float_overflow(void) {
+    /* valor que excede DBL_MAX (~1.8e308) — strtod retorna HUGE_VAL e seta
+     * errno=ERANGE. Único jeito de exercitar o ramo errno de try_f64;
+     * o ramo "sobra lixo" já é coberto por qualquer string comum. */
+    const char *csv = "v\n1e400\n1.5\n";
+    smaug_table_t *t = smaug_read_csv_mem(csv, strlen(csv), NULL);
+    CHECK(t && !t->error,         "overflow f64: sem erro");
+    CHECK(strcmp(t->columns[0].dtype,"string") == 0,
+                                   "overflow f64: 1e400 falha em f64 (overflow) → coluna vira string");
+    smaug_table_free(t);
+}
+
+static void test_csv_write_null_args(void) {
+    /* smaug_write_csv_mem(NULL,...) e (t, NULL, ...) — guards de fronteira
+     * pública (linhas 424/426), nunca testados com argumento NULL real. */
+    size_t len;
+    char *out1 = smaug_write_csv_mem(NULL, NULL, &len);
+    CHECK(out1 == NULL, "write_csv_mem: t=NULL retorna NULL");
+
+    smaug_series_i64_t *s = smaug_i64_create(1);
+    smaug_i64_set(s, 0, 1);
+    smaug_table_t t = {0};
+    smaug_column_t col = {0};
+    col.name = "v"; col.dtype = "int64"; col.i64 = s;
+    t.columns = &col; t.ncols = 1; t.nrows = 1;
+
+    char *out2 = smaug_write_csv_mem(&t, NULL, &len);
+    CHECK(out2 != NULL, "write_csv_mem: opts=NULL usa default, sem erro");
+    free(out2);
+
+    char *out3 = smaug_write_csv_mem(&t, NULL, NULL);
+    CHECK(out3 == NULL, "write_csv_mem: out_len=NULL retorna NULL");
+
+    smaug_i64_free(s);
+}
+
+static void test_json_str_mixed_types(void) {
+    /* coluna que mistura int/float/bool/string força dtype=string (catch-all
+     * heterogêneo) — diferente das colunas i64/f64/bool, aqui o formatador
+     * de fallback (tmp/snprintf) É alcançável de verdade: cada valor não-
+     * string precisa ser formatado como texto na hora de preencher. */
+    const char *j = "[{\"v\":1},{\"v\":2.5},{\"v\":true},{\"v\":\"texto\"},{\"v\":false}]";
+    smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+    CHECK(t && !t->error,         "JSON str misto: sem erro");
+    CHECK(strcmp(t->columns[0].dtype,"string") == 0, "JSON str misto: dtype string");
+    size_t n; const char *s;
+    s = get_str(t, 0, 0, &n); CHECK(s && n==1 && s[0]=='1',        "JSON str misto: int → \"1\"");
+    s = get_str(t, 0, 1, &n); CHECK(s && strncmp(s,"2.5",3)==0,    "JSON str misto: float → \"2.5\"");
+    s = get_str(t, 0, 2, &n); CHECK(s && n==4 && strncmp(s,"true",4)==0,  "JSON str misto: bool true → \"true\"");
+    s = get_str(t, 0, 3, &n); CHECK(s && n==5 && strncmp(s,"texto",5)==0, "JSON str misto: string passa direto");
+    s = get_str(t, 0, 4, &n); CHECK(s && n==5 && strncmp(s,"false",5)==0, "JSON str misto: bool false → \"false\"");
+    smaug_table_free(t);
+}
+
+
 static void test_json_negative_number(void) {
     const char *j = "[{\"v\":-42}]";
     smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
@@ -878,6 +1064,195 @@ static void test_json_bf_escape(void) {
     smaug_str_free(s);
 }
 
+static void test_json_lexer_edges(void) {
+    /* --- \r e \r\n como whitespace (linha 45: \r branch nunca exercitado) --- */
+    {
+        const char *j = "[\r{\"v\":1}\r\n]";
+        smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+        CHECK(t && !t->error,         "JSON \\r whitespace: sem erro");
+        CHECK(get_i64(t, 0, 0) == 1, "JSON \\r whitespace: v=1");
+        smaug_table_free(t);
+    }
+    /* --- expoente com sinal + e letra E maiúscula (linha 212 branches) --- */
+    {
+        const char *j = "[{\"v\":1.5E+3}]";
+        smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+        CHECK(t && !t->error,                        "JSON E+: sem erro");
+        CHECK(fabs(get_f64(t, 0, 0) - 1500.0) < 1.0,"JSON E+: 1.5E+3=1500");
+        smaug_table_free(t);
+    }
+    /* --- palavras-chave com prefixo parcial → TOK_ERROR (linhas 194/198/202) --- */
+    {
+        const char *cases[] = {
+            "[{\"v\":tru}]", "[{\"v\":fals}]", "[{\"v\":nul}]", NULL
+        };
+        for (int i = 0; cases[i]; i++) {
+            smaug_table_t *t = smaug_read_json_mem(cases[i], strlen(cases[i]));
+            CHECK(t && t->error, "JSON keyword parcial: erro esperado");
+            smaug_table_free(t);
+        }
+    }
+    /* --- escapes do reader: \/ \r \b \f (switch linha 156) --- */
+    {
+        const char *j = "[{\"v\":\"\\/\\r\\b\\f\"}]";
+        smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+        CHECK(t && !t->error,  "JSON escapes \\/\\r\\b\\f: sem erro");
+        size_t n; const char *s = get_str(t, 0, 0, &n);
+        CHECK(s && n == 4,     "JSON escapes: 4 bytes no campo");
+        CHECK(s[0] == '/',     "JSON escapes: \\/ → '/'");
+        CHECK(s[1] == '\r',    "JSON escapes: \\r → carriage return");
+        CHECK(s[2] == '\b',    "JSON escapes: \\b → backspace");
+        CHECK(s[3] == '\f',    "JSON escapes: \\f → form feed");
+        smaug_table_free(t);
+    }
+    /* --- elemento não-objeto no array (linhas 324-325) --- */
+    {
+        const char *j = "[1, 2, 3]";
+        smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+        CHECK(t && t->error,   "JSON array não-objeto: erro esperado");
+        smaug_table_free(t);
+    }
+    /* --- coluna toda-nula (dtypes[c] == DT_UNKNOWN, linha 396) --- */
+    {
+        const char *j = "[{\"v\":null},{\"v\":null}]";
+        smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+        CHECK(t && !t->error,  "JSON coluna toda-nula: sem erro");
+        CHECK(strcmp(t->columns[0].dtype,"string") == 0,
+                               "JSON coluna toda-nula: DT_UNKNOWN → string");
+        CHECK(col_is_null(t, 0, 0), "JSON coluna toda-nula: v[0]=NA");
+        CHECK(col_is_null(t, 0, 1), "JSON coluna toda-nula: v[1]=NA");
+        smaug_table_free(t);
+    }
+}
+
+static void test_json_surrogate_errors_extended(void) {
+    /* --- high surrogate seguido de \u com hex inválido (linha 130: cp2 < 0) --- */
+    {
+        const char *j = "[{\"v\":\"\\uD83D\\uXXXX\"}]";
+        smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+        CHECK(t && t->error, "JSON surrogate+hex_invalido: erro esperado");
+        smaug_table_free(t);
+    }
+    /* --- dois high surrogates seguidos (linha 132: ucp2 < 0xDC00) --- */
+    {
+        const char *j = "[{\"v\":\"\\uD83D\\uD800\"}]";
+        smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+        CHECK(t && t->error, "JSON high+high surrogate: erro esperado");
+        smaug_table_free(t);
+    }
+    /* --- \uXXXX truncado no final do buffer (linha 53: pos+4 > len) --- */
+    {
+        const char *j = "[{\"v\":\"\\u00\"}]"; /* só 2 dígitos hex */
+        smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+        CHECK(t && t->error, "JSON \\uXXXX truncado: erro esperado");
+        smaug_table_free(t);
+    }
+}
+
+static void test_json_unicode_realloc(void) {
+    /* 25 codepoints BMP 3-byte (U+4E2D = 中) = 75 bytes > cap inicial (64)
+     * força o realloc do buffer de string (linha 145/146) numa única string.
+     * Usa JSON com 25 \u4e2d consecutivos. */
+    char j[512];
+    int pos = sprintf(j, "[{\"v\":\"");
+    for (int i = 0; i < 25; i++) pos += sprintf(j+pos, "\\u4e2d");
+    pos += sprintf(j+pos, "\"}]");
+
+    smaug_table_t *t = smaug_read_json_mem(j, (size_t)pos);
+    CHECK(t && !t->error,        "JSON unicode realloc: sem erro");
+    size_t n; const char *s = get_str(t, 0, 0, &n);
+    CHECK(s && n == 75,          "JSON unicode realloc: 25×3 bytes = 75");
+    /* primeiro e último codepoint: 0xE4 0xB8 0xAD */
+    CHECK((unsigned char)s[0] == 0xE4 &&
+          (unsigned char)s[1] == 0xB8 &&
+          (unsigned char)s[2] == 0xAD,  "JSON unicode realloc: primeiro codepoint correto");
+    smaug_table_free(t);
+}
+
+static void test_json_write_opts_null(void) {
+    /* smaug_write_json_mem(NULL, ...) e (t, ..., NULL) — guards de fronteira
+     * (linha 549: !t || !out_len). */
+    size_t len;
+    char *out1 = smaug_write_json_mem(NULL, NULL, &len);
+    CHECK(out1 == NULL, "JSON write: t=NULL retorna NULL");
+
+    smaug_series_i64_t *s = smaug_i64_create(1);
+    smaug_i64_set(s, 0, 1);
+    smaug_table_t t = {0};
+    smaug_column_t col = {0};
+    col.name = "v"; col.dtype = "int64"; col.i64 = s;
+    t.columns = &col; t.ncols = 1; t.nrows = 1;
+
+    smaug_json_write_opts_t wo = {0};
+    char *out2 = smaug_write_json_mem(&t, &wo, NULL);
+    CHECK(out2 == NULL, "JSON write: out_len=NULL retorna NULL");
+    smaug_i64_free(s);
+}
+
+static void test_json_write_pretty_rich(void) {
+    /* pretty=1 com multi-coluna e nulls — exercita os branches de nl/ind/ind2
+     * e os separadores de colunas/linhas (linhas 557–605) que a versão simples
+     * não alcança porque tem só 1 coluna sem null. */
+    smaug_series_i64_t *si = smaug_i64_create(2);
+    smaug_series_str_t *ss = smaug_str_create(2);
+    smaug_i64_set(si, 0, 1);  smaug_i64_set_null(si, 1);
+    smaug_str_set(ss, 0, "a", 1); smaug_str_set_null(ss, 1);
+    smaug_column_t cols[2] = {0};
+    cols[0].name = "i"; cols[0].dtype = "int64";  cols[0].i64 = si;
+    cols[1].name = "s"; cols[1].dtype = "string"; cols[1].str = ss;
+    smaug_table_t t = {0};
+    t.columns = cols; t.ncols = 2; t.nrows = 2;
+
+    smaug_json_write_opts_t wo = {.pretty = 1};
+    size_t len;
+    char *out = smaug_write_json_mem(&t, &wo, &len);
+    CHECK(out != NULL,               "JSON write pretty rich: retorna buffer");
+    CHECK(strstr(out, "\n") != NULL, "JSON write pretty rich: tem newline");
+    CHECK(strstr(out, "null") != NULL, "JSON write pretty rich: null aparece");
+    free(out);
+    smaug_i64_free(si); smaug_str_free(ss);
+}
+
+static void test_json_parse_errors(void) {
+    /* chave sem ':' depois (linha 281) */
+    { const char *j = "[{\"v\" 1}]";
+      smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+      CHECK(t && t->error, "JSON sem ':': erro esperado");
+      smaug_table_free(t); }
+
+    /* dois campos sem ',' entre eles (linha 299) */
+    { const char *j = "[{\"v\":1 \"w\":2}]";
+      smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
+      CHECK(t && t->error, "JSON sem ',': erro esperado");
+      smaug_table_free(t); }
+}
+
+static void test_json_write_large_string(void) {
+    /* string de 10k chars → força o wbuf do writer a dobrar a capacidade
+     * mais de uma vez (linha 521: while ncap <= b->len+n cap*=2). */
+    size_t big_len = 10000;
+    char *big = malloc(big_len + 1);
+    assert(big);
+    memset(big, 'x', big_len);
+    big[big_len] = '\0';
+
+    smaug_series_str_t *s = smaug_str_create(1);
+    smaug_str_set(s, 0, big, big_len);
+    smaug_table_t t = {0};
+    smaug_column_t col = {0};
+    col.name = "v"; col.dtype = "string"; col.str = s;
+    t.columns = &col; t.ncols = 1; t.nrows = 1;
+
+    smaug_json_write_opts_t wo = {0};
+    size_t len;
+    char *out = smaug_write_json_mem(&t, &wo, &len);
+    CHECK(out != NULL,    "JSON write large: retorna buffer");
+    CHECK(len > big_len,  "JSON write large: buffer maior que o campo (overhead JSON)");
+    free(out);
+    free(big);
+    smaug_str_free(s);
+}
+
 /* ===================================================================
    main
    =================================================================== */
@@ -913,9 +1288,15 @@ int main(void) {
     test_csv_long_unquoted_field();
     test_csv_many_columns();
     test_csv_short_row();
+    test_csv_opts_zero_sep_quote();
+    test_csv_numeric_overflow();
+    test_csv_float_overflow();
 
     /* CSV — writer */
     test_csv_write_nan();
+    test_csv_write_opts_zero_sep_quote();
+    test_csv_write_large_field();
+    test_csv_write_null_args();
     test_csv_write_field_with_sep();
     test_csv_write_field_with_quote();
     test_csv_write_no_header();
@@ -929,6 +1310,7 @@ int main(void) {
     test_json_bool_values();
     test_json_int_and_float();
     test_json_float_in_int_col();
+    test_json_short_record();
     test_json_string_escape();
     test_json_file_not_found();
 
@@ -941,14 +1323,23 @@ int main(void) {
 
     /* CSV — na customizados */
     test_csv_na_custom();
+    test_csv_na_custom_empty_field();
 
     /* JSON — variantes numéricas e escapes */
     test_json_negative_number();
+    test_json_str_mixed_types();
     test_json_exponent_number();
     test_json_negative_exponent();
     test_json_unicode_escape();
     test_json_whitespace_variants();
     test_json_bf_escape();
+    test_json_lexer_edges();
+    test_json_surrogate_errors_extended();
+    test_json_unicode_realloc();
+    test_json_write_opts_null();
+    test_json_write_pretty_rich();
+    test_json_parse_errors();
+    test_json_write_large_string();
 
     /* Roundtrips */
     test_csv_roundtrip_all_dtypes();

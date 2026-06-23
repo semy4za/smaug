@@ -572,23 +572,208 @@ static void test_roundtrip(void) {
     }
 }
 
-/* ===================================================================
-   main
-   =================================================================== */
+static void test_get_null_status(void) {
+    /* smaug_dt_get com status=NULL — os ramos if(status) dentro de get()
+     * (linhas 234-237) nunca foram chamados com status=NULL. */
+    smaug_series_dt_t *s = smaug_dt_create(2);
+    int64_t ep = parse("2026-06-13T00:00:00Z");
+    smaug_dt_set(s, 0, ep);
+    /* status=NULL com valor válido */
+    int64_t v = smaug_dt_get(s, 0, NULL);
+    CHECK(v == ep, "get NULL status: valor correto");
+    /* status=NULL com null value */
+    int64_t v2 = smaug_dt_get(s, 1, NULL);
+    CHECK(v2 == INT64_MIN, "get NULL status: null → DT_SENTINEL");
+    /* status=NULL com OOB */
+    int64_t v3 = smaug_dt_get(s, 99, NULL);
+    CHECK(v3 == INT64_MIN, "get NULL status: OOB → DT_SENTINEL");
+    /* status=NULL com s=NULL */
+    int64_t v4 = smaug_dt_get(NULL, 0, NULL);
+    CHECK(v4 == INT64_MIN, "get NULL status: s=NULL → DT_SENTINEL");
+    smaug_dt_free(s);
+}
+
+static void test_is_null_oob(void) {
+    /* smaug_dt_is_null com idx OOB — linha 260 (idx >= s->size → true) */
+    smaug_series_dt_t *s = smaug_dt_create(2);
+    CHECK(smaug_dt_is_null(s, 999) == true, "is_null OOB → true");
+    smaug_dt_free(s);
+}
+
+static void test_append_grow(void) {
+    /* append além da capacidade inicial (linha 279: s->size >= s->capacity) */
+    smaug_series_dt_t *s = smaug_dt_create(1); /* capacity mínima */
+    int64_t ep = parse("2026-06-13T00:00:00Z");
+    /* preenche a capacidade inicial */
+    smaug_dt_set(s, 0, ep);
+    /* append forçando crescimento */
+    for (int i = 0; i < 8; i++) {
+        int rc = smaug_dt_append(s, ep + (int64_t)i * 86400000LL);
+        CHECK(rc == 0, "append grow: OK");
+    }
+    CHECK(s->size == 9, "append grow: size=9");
+    /* append_null também deve crescer */
+    int rc = smaug_dt_append_null(s);
+    CHECK(rc == 0, "append_null grow: OK");
+    CHECK(smaug_dt_is_null(s, 9), "append_null grow: null");
+    smaug_dt_free(s);
+}
+
+static void test_parse_errors_extended(void) {
+    int64_t ep;
+    /* formato YYYY sem primeiro '-' */
+    CHECK(smaug_dt_parse("20261301", 8, &ep) == -1, "parse: sem '-' após ano");
+    /* dígito inválido no mês (parse_digits, linha 306) */
+    CHECK(smaug_dt_parse("2026-0A-01", 10, &ep) == -1, "parse: dígito inválido no mês");
+    /* sem '-' após mês */
+    CHECK(smaug_dt_parse("2026-01X01", 10, &ep) == -1, "parse: sem '-' após mês");
+    /* sem ':' após hora (linha 333) */
+    CHECK(smaug_dt_parse("2026-06-13T14X30:00Z", 20, &ep) == -1, "parse: sem ':' após hora");
+    /* sem ':' após minuto (linha 335) */
+    CHECK(smaug_dt_parse("2026-06-13T14:30X00Z", 20, &ep) == -1, "parse: sem ':' após minuto");
+    /* minuto 60 inválido (linha 337) */
+    CHECK(smaug_dt_parse("2026-06-13T14:60:00Z", 20, &ep) == -1, "parse: minuto 60 inválido");
+    /* segundo 60 inválido */
+    CHECK(smaug_dt_parse("2026-06-13T14:30:60Z", 20, &ep) == -1, "parse: segundo 60 inválido");
+    /* timezone tz_h > 23 (linha 364) */
+    CHECK(smaug_dt_parse("2026-06-13T00:00:00+25:00", 25, &ep) == -1, "parse: tz_h>23");
+    /* timezone tz_m > 59 */
+    CHECK(smaug_dt_parse("2026-06-13T00:00:00+05:60", 25, &ep) == -1, "parse: tz_m>59");
+    /* separator ' ' (espaço) entre data e hora (linha 330) */
+    CHECK(smaug_dt_parse("2026-06-13 14:30:00Z", 20, &ep) == 0, "parse: sep=' ' válido");
+    /* timezone sem ':' entre h e m (linha 362: colon opcional) */
+    CHECK(smaug_dt_parse("2026-06-13T00:00:00+0530", 24, &ep) == 0, "parse: tz sem ':' válido");
+    /* ms com 1 dígito → pad para 100ms (linha 350) */
+    CHECK(smaug_dt_parse("2026-06-13T00:00:00.5Z", 22, &ep) == 0, "parse: ms 1 dígito");
+    CHECK(ep % 1000 == 500, "parse: ms 1 dígito → 500ms");
+    /* ms com 4 dígitos → só os 3 primeiros contam (linha 346) */
+    CHECK(smaug_dt_parse("2026-06-13T00:00:00.1234Z", 25, &ep) == 0, "parse: ms 4 dígitos");
+    CHECK(ep % 1000 == 123, "parse: ms 4 dígitos → 123ms");
+}
+
+static void test_format_small_buf(void) {
+    /* smaug_dt_format com buffer pequeno → escrita truncada → retorna -1
+     * (linha 408: written >= buf_size). */
+    int64_t ep = parse("2026-06-13T00:00:00Z");
+    char buf[5];
+    int rc = smaug_dt_format(ep, buf, 5);
+    CHECK(rc == -1, "format buf pequeno: retorna -1");
+}
+
+static void test_week_boundary(void) {
+    /* ISO week < 1: Jan 1 de 2023 é domingo — doy=1, wd=6 (dom=6),
+     * week = (1 - 7 + 10)/7 = 4/7 = 0 → branch week < 1 (linha 484). */
+    int64_t ep;
+    smaug_dt_parse("2023-01-01T00:00:00Z", 20, &ep);
+    int w = smaug_dt_week(ep);
+    CHECK(w == 52 || w == 53, "week boundary Jan 1 2023 (domingo): semana do ano anterior");
+
+    /* ISO week > 52 e semana 53 existe: 28-Dez de 2015 é segunda (wd=0 ≤ 3),
+     * então semana 53 existe → Dec 31 2015 → week=53 (linha 496). */
+    smaug_dt_parse("2015-12-31T00:00:00Z", 20, &ep);
+    w = smaug_dt_week(ep);
+    CHECK(w == 53, "week Dec 31 2015: semana 53 existe");
+
+    /* ISO week > 52 mas semana 53 NÃO existe: Dec 31 2018 → wd_dec28 > 3
+     * → week = 1 (pertence a semana 1 de 2019) (linha 502). */
+    smaug_dt_parse("2018-12-31T00:00:00Z", 20, &ep);
+    w = smaug_dt_week(ep);
+    CHECK(w == 1, "week Dec 31 2018: pertence à semana 1 de 2019");
+
+    /* wd_dec28 < 0: apenas com epoch_ms muito negativo (pré-~7M a.C.) —
+     * inalcançável em uso prático; o branch wd < 0 em weekday (linha 453)
+     * é exercitado por qualquer data pré-1970 com wd calculado negativo. */
+    smaug_dt_parse("1969-01-01T00:00:00Z", 20, &ep);
+    w = smaug_dt_week(ep);
+    CHECK(w >= 1 && w <= 53, "week pré-1970: dentro do intervalo");
+}
+
+static void test_from_parts_bounds(void) {
+    /* ms < 0 e ms > 999 (linha 514-515) — não coberto pelos testes existentes */
+    CHECK(smaug_dt_from_parts(2026,6,13,0,0,0,-1)  == INT64_MIN, "from_parts ms=-1");
+    CHECK(smaug_dt_from_parts(2026,6,13,0,0,0,1000)== INT64_MIN, "from_parts ms=1000");
+    CHECK(smaug_dt_from_parts(2026,6,13,0,0,-1,0)  == INT64_MIN, "from_parts sec=-1");
+}
+
+static void test_add_ms_overflow(void) {
+    /* overflow positivo e negativo (linhas 537-538) */
+    CHECK(smaug_dt_add_ms(INT64_MAX,  1) == INT64_MIN, "add_ms overflow+");
+    CHECK(smaug_dt_add_ms(INT64_MIN, -1) == INT64_MIN, "add_ms overflow-");
+}
+
+static void test_truncate_negative(void) {
+    /* truncate com epoch_ms negativo não múltiplo (linhas 546/549/552) */
+    /* -1500ms = 1500ms antes de epoch; segundo: floor = -2000ms */
+    int64_t t_s = smaug_dt_truncate(-1500LL, 's');
+    CHECK(t_s == -2000LL, "truncate 's' negativo não múltiplo");
+    /* -90001ms (não múltiplo de 60000): floor minuto = -120000ms */
+    int64_t t_m = smaug_dt_truncate(-90001LL, 'm');
+    CHECK(t_m == -120000LL, "truncate 'm' negativo não múltiplo");
+    /* -3601000ms (não múltiplo de 3600000): floor hora = -7200000ms */
+    int64_t t_h = smaug_dt_truncate(-3601000LL, 'h');
+    CHECK(t_h == -7200000LL, "truncate 'h' negativo não múltiplo");
+}
+
+static void test_take_filter_null_args(void) {
+    /* smaug_dt_take/filter com NULL (linhas 681/698) */
+    smaug_series_dt_t *s = smaug_dt_create(2);
+    size_t idx[1] = {0};
+    CHECK(smaug_dt_take(NULL, idx, 1) == NULL, "take NULL série");
+    CHECK(smaug_dt_take(s, NULL, 1)   == NULL, "take NULL idx");
+    uint8_t mask[2] = {1, 0};
+    CHECK(smaug_dt_filter(NULL, mask) == NULL, "filter NULL série");
+    CHECK(smaug_dt_filter(s, NULL)    == NULL, "filter NULL mask");
+    smaug_dt_free(s);
+}
+
+static void test_argsort_empate(void) {
+    /* cmp_dt_asc retorna 1 (linha 624: ea->val > eb->val) exige dois
+     * valores onde a > b na ordenação. O teste existente tem 4 valores
+     * distintos — adicionar aqui um com duplicatas para garantir o ramo. */
+    int64_t vals[3] = {
+        parse("2026-06-13T00:00:00Z"),
+        parse("2026-06-13T00:00:00Z"), /* duplicata */
+        parse("2026-01-01T00:00:00Z"),
+    };
+    smaug_series_dt_t *s = smaug_dt_create_from_array(vals, 3);
+    size_t *idx = smaug_dt_argsort(s, true);
+    CHECK(idx != NULL,     "argsort com empate: retorna índices");
+    CHECK(idx[0] == 2,     "argsort empate: menor primeiro");
+    free(idx);
+    /* descendente: verifica que ramo > também é exercitado */
+    size_t *idx2 = smaug_dt_argsort(s, false);
+    CHECK(idx2 != NULL,    "argsort desc com empate: OK");
+    CHECK(idx2[2] == 2,    "argsort desc: menor no final");
+    free(idx2);
+    smaug_dt_free(s);
+}
+
+
 
 int main(void) {
     test_lifecycle();
+    test_get_null_status();
+    test_is_null_oob();
+    test_append_grow();
     test_clone();
     test_view_cow();
     test_append();
     test_create_from_array();
     test_parse();
+    test_parse_errors_extended();
     test_format();
+    test_format_small_buf();
     test_components();
+    test_week_boundary();
     test_from_parts();
+    test_from_parts_bounds();
     test_arithmetic();
+    test_add_ms_overflow();
+    test_truncate_negative();
     test_comparisons();
     test_sort_take_filter();
+    test_take_filter_null_args();
+    test_argsort_empate();
     test_edge_dates();
     test_roundtrip();
 

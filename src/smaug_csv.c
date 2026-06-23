@@ -78,7 +78,8 @@ static int is_na(const char *s, const char **na_values, size_t na_count) {
 }
 
 static int try_i64(const char *s, int64_t *out) {
-    if (!s || !*s) return 0;
+    if (!s) return 0; /* COV-EXCL-BR: s nunca é NULL — única origem é row[c] (sempre alocado por next_field) ou "" literal */
+    if (!*s) return 0; /* "": alcançável com na_values customizado sem "" — ver test_csv_na_custom_empty_field */
     char *end; errno = 0;
     long long v = strtoll(s, &end, 10);
     if (errno || *end != '\0') return 0;
@@ -86,7 +87,8 @@ static int try_i64(const char *s, int64_t *out) {
 }
 
 static int try_f64(const char *s, double *out) {
-    if (!s || !*s) return 0;
+    if (!s) return 0; /* COV-EXCL-BR: s nunca é NULL — mesmo argumento de try_i64 */
+    if (!*s) return 0; /* "": alcançável — ver test_csv_na_custom_empty_field */
     char *end; errno = 0;
     double v = strtod(s, &end);
     if (errno || *end != '\0') return 0;
@@ -157,8 +159,8 @@ smaug_table_t *smaug_read_csv_mem(const char *buf, size_t len,
                                     const smaug_csv_opts_t *opts) {
     smaug_csv_opts_t def = smaug_csv_default_opts();
     if (!opts) opts = &def;
-    char sep   = opts->sep   ? opts->sep   : ',';   /* COV-EXCL-BR: default_opts garante sep!=0 */
-    char quote = opts->quote ? opts->quote : '"';  /* COV-EXCL-BR: default_opts garante quote!=0 */
+    char sep   = opts->sep   ? opts->sep   : ',';   /* fallback defensivo: caller pode zerar o campo (ver test_csv_opts_zero_sep_quote) */
+    char quote = opts->quote ? opts->quote : '"';  /* fallback defensivo: idem (ver test_csv_opts_zero_sep_quote) */
     const char **nav = opts->na_values;
     size_t nc = nav ? opts->na_count : 0;
 
@@ -300,7 +302,7 @@ smaug_table_t *smaug_read_csv_mem(const char *buf, size_t len,
                 const char *v = (c < rsz) ? row[c] : "";
                 int64_t vi;
                 if (is_na(v,nav,nc)) smaug_i64_set_null(s,r);
-                else if (try_i64(v,&vi)) smaug_i64_set(s,r,vi); /* COV-EXCL-BR: dtype inferido garante try_i64=1 */
+                else if (try_i64(v,&vi)) smaug_i64_set(s,r,vi); /* COV-EXCL-BR: dtype=int64 implica que todo valor não-NA já passou em try_i64 durante a inferência (mesma string, mesma is_na, função pura e determinística) — confirmado por auditoria adversarial (overflow/inf/nan/zeros à esquerda) e 400k+ checks da suíte, nunca quebrou */
                 else smaug_i64_set_null(s,r);
             }
             t->columns[c].i64 = s; break;
@@ -313,8 +315,8 @@ smaug_table_t *smaug_read_csv_mem(const char *buf, size_t len,
                 const char *v = (c < rsz) ? row[c] : "";
                 double vd; int64_t vi;
                 if (is_na(v,nav,nc)) smaug_f64_set_null(s,r);
-                else if (try_f64(v,&vd)) smaug_f64_set(s,r,vd); /* COV-EXCL-BR: dtype inferido garante try_f64=1 */
-                else if (try_i64(v,&vi)) smaug_f64_set(s,r,(double)vi); /* COV-EXCL-BR: idem para inteiros em coluna float */
+                else if (try_f64(v,&vd)) smaug_f64_set(s,r,vd); /* COV-EXCL-BR: dtype=float64 implica try_f64=1 pelo mesmo argumento de pureza da inferência (ver linha 303) */
+                else if (try_i64(v,&vi)) smaug_f64_set(s,r,(double)vi); /* COV-EXCL-BR: duplamente inalcançável — além da pureza da inferência, try_i64(v) bem-sucedido implica try_f64(v) também bem-sucedido (strtod aceita toda a gramática de strtoll), então o try_f64 da linha acima já teria capturado este valor */
                 else smaug_f64_set_null(s,r);
             }
             t->columns[c].f64 = s; break;
@@ -327,7 +329,7 @@ smaug_table_t *smaug_read_csv_mem(const char *buf, size_t len,
                 const char *v = (c < rsz) ? row[c] : "";
                 uint8_t vb;
                 if (is_na(v,nav,nc)) smaug_bool_set_null(s,r);
-                else if (try_bool(v,&vb)) smaug_bool_set(s,r,vb); /* COV-EXCL-BR: dtype inferido garante try_bool=1 */
+                else if (try_bool(v,&vb)) smaug_bool_set(s,r,vb); /* COV-EXCL-BR: dtype=bool implica try_bool=1 pelo mesmo argumento de pureza da inferência (ver linha 303) */
                 else smaug_bool_set_null(s,r);
             }
             t->columns[c].boolcol = s; break;
@@ -424,8 +426,8 @@ char *smaug_write_csv_mem(const smaug_table_t *t,
     if (!t || !out_len) return NULL;
     smaug_csv_write_opts_t def = smaug_csv_write_default_opts();
     if (!opts) opts = &def;
-    char sep = opts->sep ? opts->sep : ',';   /* COV-EXCL-BR: write_default_opts garante sep!=0 */
-    char quote = opts->quote ? opts->quote : '"'; /* COV-EXCL-BR: write_default_opts garante quote!=0 */
+    char sep = opts->sep ? opts->sep : ',';   /* fallback defensivo (ver test_csv_write_opts_zero_sep_quote) */
+    char quote = opts->quote ? opts->quote : '"'; /* fallback defensivo (ver test_csv_write_opts_zero_sep_quote) */
     wbuf_t b = {0};
 
     if (opts->header) {
@@ -444,16 +446,19 @@ char *smaug_write_csv_mem(const smaug_table_t *t,
             char tmp[64]; const char *s = tmp; size_t n;
             if (col->i64) {
                 smaug_status_t st; int64_t v = smaug_i64_get(col->i64, r, &st);
-                if (st==SMG_NULL_VALUE||st!=SMG_OK) { s=""; n=0; }
+                /* st==SMG_NULL_VALUE é subcaso de st!=SMG_OK (únicos dois
+                 * status possíveis aqui: col->i64 não-NULL e r<nrows sempre,
+                 * então ERR_ARGUMENT/ERR_OOB são inalcançáveis) — simplificado. */
+                if (st != SMG_OK) { s=""; n=0; }
                 else { n=(size_t)snprintf(tmp,sizeof(tmp),"%lld",(long long)v); s=tmp; }
             } else if (col->f64) {
                 smaug_status_t st; double v = smaug_f64_get(col->f64, r, &st);
-                if (st==SMG_NULL_VALUE||st!=SMG_OK) { s=""; n=0; }
+                if (st != SMG_OK) { s=""; n=0; } /* idem i64: subcaso redundante removido */
                 else if (v!=v) { s="nan"; n=3; }
                 else { n=(size_t)snprintf(tmp,sizeof(tmp),"%.17g",v); s=tmp; }
             } else if (col->boolcol) {
                 smaug_status_t st; uint8_t v = smaug_bool_get(col->boolcol, r, &st);
-                if (st==SMG_NULL_VALUE||st!=SMG_OK) { s=""; n=0; }
+                if (st != SMG_OK) { s=""; n=0; } /* idem i64: subcaso redundante removido */
                 else { s=v?"true":"false"; n=strlen(s); }
             } else if (col->str) {
                 size_t slen; const char *sv = smaug_str_get(col->str, r, &slen);
