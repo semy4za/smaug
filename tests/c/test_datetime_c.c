@@ -748,6 +748,110 @@ static void test_argsort_empate(void) {
     smaug_dt_free(s);
 }
 
+static void test_comparisons_outmask_null(void) {
+    /* Os 6 comparadores têm o ramo `if (out_mask) *out_mask = mask; else
+     * free(mask);` — o test_comparisons sempre passa out_mask não-NULL,
+     * deixando o else (out_mask==NULL → free(mask)) descoberto nos 6.
+     * Aqui chamamos cada um com out_mask=NULL (uso legítimo: só quero o
+     * resultado, não a máscara de validade). */
+    int64_t dates[] = {
+        parse("2026-01-01T00:00:00Z"),
+        parse("2026-06-13T00:00:00Z"),
+        parse("2026-12-31T00:00:00Z"),
+    };
+    smaug_series_dt_t *s = smaug_dt_create_from_array(dates, 3);
+    int64_t ref = parse("2026-06-13T00:00:00Z");
+
+    uint8_t *gt = smaug_dt_gt(s, ref, NULL);
+    CHECK(gt && gt[2] == 1, "gt out_mask=NULL: resultado correto");
+    smaug_free(gt);
+    uint8_t *lt = smaug_dt_lt(s, ref, NULL);
+    CHECK(lt && lt[0] == 1, "lt out_mask=NULL: resultado correto");
+    smaug_free(lt);
+    uint8_t *eq = smaug_dt_eq(s, ref, NULL);
+    CHECK(eq && eq[1] == 1, "eq out_mask=NULL: resultado correto");
+    smaug_free(eq);
+    uint8_t *ge = smaug_dt_ge(s, ref, NULL);
+    CHECK(ge && ge[1] == 1, "ge out_mask=NULL: resultado correto");
+    smaug_free(ge);
+    uint8_t *le = smaug_dt_le(s, ref, NULL);
+    CHECK(le && le[1] == 1, "le out_mask=NULL: resultado correto");
+    smaug_free(le);
+    uint8_t *ne = smaug_dt_ne(s, ref, NULL);
+    CHECK(ne && ne[0] == 1, "ne out_mask=NULL: resultado correto");
+    smaug_free(ne);
+
+    /* também: comparador com null no meio + out_mask=NULL (INVALID_DT branch
+     * sem capturar máscara) — garante que os 6 tratam null sem out_mask */
+    smaug_dt_set_null(s, 1);
+    uint8_t *gt2 = smaug_dt_gt(s, ref, NULL);
+    CHECK(gt2 && gt2[1] == 0, "gt out_mask=NULL com null: posição null = 0");
+    smaug_free(gt2);
+
+    smaug_dt_free(s);
+}
+
+static void test_parse_digit_below_zero(void) {
+    /* parse_digits L306 branch 0: caractere ABAIXO de '0' (ex '/' = 0x2F).
+     * Os testes existentes só usavam letras (acima de '9'). */
+    int64_t ep;
+    CHECK(smaug_dt_parse("2026-/1-01", 10, &ep) == -1, "parse: '/' no mês (abaixo de '0')");
+    CHECK(smaug_dt_parse("202/-01-01", 10, &ep) == -1, "parse: '/' no ano");
+}
+
+static void test_parse_tz_minus(void) {
+    /* L358 branch do '-' no timezone (o '+' já era testado; o '-' com offset
+     * que efetivamente subtrai precisa de caso próprio com minutos). */
+    int64_t ep_plus, ep_minus;
+    CHECK(smaug_dt_parse("2026-06-13T12:00:00+02:30", 25, &ep_plus)  == 0, "parse tz +02:30");
+    CHECK(smaug_dt_parse("2026-06-13T12:00:00-02:30", 25, &ep_minus) == 0, "parse tz -02:30");
+    /* +02:30 recua 2h30 em UTC; -02:30 avança 2h30 — diferença de 5h */
+    CHECK(ep_minus - ep_plus == 5LL*3600*1000, "parse tz: +/- diferem por 5h");
+}
+
+static void test_from_parts_each_bound(void) {
+    /* L514-515: cada componente fora do intervalo, individualmente, para
+     * exercitar cada sub-branch da condição composta. */
+    CHECK(smaug_dt_from_parts(2026,6,13,-1,0,0,0)  == INT64_MIN, "from_parts hour=-1");
+    CHECK(smaug_dt_from_parts(2026,6,13,24,0,0,0)  == INT64_MIN, "from_parts hour=24");
+    CHECK(smaug_dt_from_parts(2026,6,13,0,-1,0,0)  == INT64_MIN, "from_parts minute=-1");
+    CHECK(smaug_dt_from_parts(2026,6,13,0,0,60,0)  == INT64_MIN, "from_parts second=60");
+    CHECK(smaug_dt_from_parts(2026,6,13,0,0,0,-1)  == INT64_MIN, "from_parts ms=-1");
+    CHECK(smaug_dt_from_parts(2026,6,13,0,0,0,1000)== INT64_MIN, "from_parts ms=1000");
+    /* válido extremo: 23:59:59.999 */
+    CHECK(smaug_dt_from_parts(2026,6,13,23,59,59,999) != INT64_MIN, "from_parts limite válido");
+}
+
+static void test_truncate_negative_min_hour(void) {
+    /* L549/552: truncate minuto/hora com epoch negativo NÃO múltiplo
+     * (o teste anterior já cobria 's'; faltavam os ramos % != 0 de 'm' e 'h'
+     * que dependem do segundo operando da condição ternária). */
+    /* -1ms truncado a minuto: deve ir para -60000 */
+    CHECK(smaug_dt_truncate(-1LL, 'm') == -60000LL,   "truncate 'm' de -1ms = -60000");
+    /* -1ms truncado a hora: -3600000 */
+    CHECK(smaug_dt_truncate(-1LL, 'h') == -3600000LL, "truncate 'h' de -1ms = -3600000");
+    /* múltiplo exato negativo: -60000ms a minuto = -60000 (sem ajuste) */
+    CHECK(smaug_dt_truncate(-60000LL, 'm') == -60000LL, "truncate 'm' de múltiplo exato");
+}
+
+static void test_week_pre1970(void) {
+    /* L489/500: wd_dec28 < 0 — alcançável com anos pré-1970, onde dec28
+     * (dias desde epoch do 28-dez do ano anterior) é negativo e (dec28+3)%7
+     * fica negativo em C. Varre anos que disparam os ramos week<1 e week>52. */
+    int saw_valid = 0;
+    for (int y = 1900; y < 1970; y++) {
+        int64_t ep = smaug_dt_from_parts(y, 1, 1, 0, 0, 0, 0);
+        if (ep == INT64_MIN) continue;
+        int w = smaug_dt_week(ep);
+        CHECK(w >= 1 && w <= 53, "week pré-1970 jan1: intervalo válido");
+        int64_t ep2 = smaug_dt_from_parts(y, 12, 31, 0, 0, 0, 0);
+        int w2 = smaug_dt_week(ep2);
+        CHECK(w2 >= 1 && w2 <= 53, "week pré-1970 dez31: intervalo válido");
+        saw_valid = 1;
+    }
+    CHECK(saw_valid, "week pré-1970: varreu anos válidos");
+}
+
 
 
 int main(void) {
@@ -774,6 +878,12 @@ int main(void) {
     test_sort_take_filter();
     test_take_filter_null_args();
     test_argsort_empate();
+    test_comparisons_outmask_null();
+    test_parse_digit_below_zero();
+    test_parse_tz_minus();
+    test_from_parts_each_bound();
+    test_truncate_negative_min_hour();
+    test_week_pre1970();
     test_edge_dates();
     test_roundtrip();
 

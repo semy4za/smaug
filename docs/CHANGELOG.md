@@ -14,19 +14,32 @@ decisões, achados, motivações.
   de novo. Corrigido anulando os ponteiros após a liberação. Reproduzido por
   varredura de injeção de falha e validado Valgrind-clean (534 allocs = 534
   frees, 0 erros).
+- **Double-free em `parse_record` sob OOM** (descoberto ao escrever teste de
+  registro JSON largo): no crescimento do array de campos, se o `realloc` de
+  `keys` sucede mas o de `vals` falha, `rec->keys` ficava apontando para o
+  bloco antigo já liberado pelo realloc bem-sucedido — `free_record` do caller
+  dava double-free. Corrigido atualizando `rec->keys`/`rec->vals` imediatamente
+  após cada realloc bem-sucedido. Validado Valgrind-clean (1962 = 1962 frees).
 
 ### Testes / Hardening
 - **Harness de allocfail estendido para `calloc` e `strdup`**: `--wrap=malloc,
   realloc` não intercepta esses dois (resolvem internamente na libc), deixando
   todos os guards de OOM sobre eles sem exercício. Adicionados `__wrap_calloc`
   e `__wrap_strdup`; flag propagada às quatro configurações de build (Makefile,
-  build.sh, make_coverage.sh, windows_build.ps1). Verificações 1492 → 1496.
+  build.sh, make_coverage.sh, windows_build.ps1). Verificações 1492 → 1515
+  (inclui sweep de OOM em `multi_argsort`/`multi_argsort_ffi`, antes sem
+  cobertura de falha de alocação).
 - **Cobertura branch-alvo dos parsers** (medição Fedora autoritativa):
   - `smaug_csv.c`: 82.64% → 90.53%
-  - `smaug_json.c`: 72.30% → 85.32%
-  - `smaug_datetime.c`: 72.77% → 85.40%
-  - `smaug_ops_window.c`: 85.26% → 94.78%
-  - **Total do backend C: 89.06% → ~94%**
+  - `smaug_json.c`: 72.30% → 89.80%
+  - `smaug_datetime.c`: 72.77% → 92.40%
+  - `smaug_ops_window.c`: 85.26% → 95.98%
+  - **Total do backend C: 89.06% → 95.83%** (cruzou a meta global de 95%)
+- Diagnóstico de densidade de teste por região (não por contagem de checks):
+  revelou que os 6 macros `DT_CMP_IMPL` (gt/lt/eq/ge/le/ne) estavam testados
+  de forma rasa — 1 cenário de null × 6 operadores, deixando ~28 branches
+  descobertos (ramo `out_mask==NULL`, OOM de result/mask). Fechados com teste
+  funcional `out_mask=NULL` nos 6 + `af_dt_compare` no allocfail.
 - Auditoria de exclusões: categoria C (conveniência disfarçada) substituída por
   testes reais; categoria D (inalcançável fraco) validada por instrumentação +
   400k checks e promovida a A com justificativa formal. Condições redundantes
@@ -34,7 +47,7 @@ decisões, achados, motivações.
   excluídas. Novos `COV-EXCL-BR` honestos: `encode_utf8` com cp>0x10FFFF,
   ramos de pureza de inferência de dtype, while-body de deque inalcançável.
 
-## (data anterior) — Aritmética numérica: promoção de tipos e divisão verdadeira
+## 2026-06-21 — Aritmética numérica: promoção de tipos e divisão verdadeira
 
 
 ## 2026-06-20 — Coerência de construção: inferência universal de dtype

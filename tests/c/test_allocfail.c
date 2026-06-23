@@ -1664,6 +1664,30 @@ static void af_json_read_many_recs(void) {
     free(j);
 }
 
+/* JSON — registro único com muitos campos: força o realloc de keys/vals
+ * DENTRO de parse_record (cap começa em 8 e dobra; L288-289). Sob allocfail,
+ * o ramo !nk || !nv (L290) dispara — não alcançável por registros estreitos. */
+static void af_json_read_wide_record(void) {
+    char *j = malloc(8192); assert(j);
+    int pos = sprintf(j, "[{");
+    for (int i = 0; i < 12; i++) { /* 12 campos > cap inicial 8 → força realloc */
+        pos += sprintf(j+pos, "%s\"k%d\":%d", i?",":"", i, i);
+    }
+    pos += sprintf(j+pos, "}]");
+    size_t jlen = (size_t)pos;
+
+    for (long k = 0; k < MAX_IO_ALLOCS; k++) {
+        reset(k);
+        smaug_table_t *t = smaug_read_json_mem(j, jlen);
+        if (t) smaug_table_free(t);
+    }
+    reset(-1);
+    smaug_table_t *t = smaug_read_json_mem(j, jlen);
+    OK(t && !t->error && t->ncols == 12, "json_read_wide_record: 12 colunas");
+    smaug_table_free(t);
+    free(j);
+}
+
 
 static void af_table_free_partial(void) {
     /* simula OOM a meio da construção de colunas */
@@ -1936,6 +1960,95 @@ static void af_dt_filter(void) {
     smaug_dt_free(base);
 }
 
+/* dt setters sob OOM: dt_set/set_null/append fazem dt_cow_detach (e append
+ * faz dt_grow) — esses caminhos de NOMEM (L244/253/266/278/280) só são
+ * alcançados quando a série é uma VIEW (is_view=true); escrever numa view
+ * dispara o detach copy-on-write, que aloca. clone() NÃO cria view — só
+ * dt_view() marca is_view, então é ela que exercita o caminho COW. */
+/* dt comparadores sob OOM: os 6 macros DT_CMP_IMPL fazem 2 malloc cada
+ * (result + mask) — nunca exercitados sob allocfail antes. Cobre o ramo
+ * !result e !mask (free(result)) de cada operador. */
+static void af_dt_compare(void) {
+    int64_t arr[4] = {10, 20, 30, 40};
+    typedef uint8_t* (*cmp_fn)(const smaug_series_dt_t*, int64_t, smaug_mask_t**);
+    cmp_fn fns[6] = {
+        smaug_dt_gt, smaug_dt_lt, smaug_dt_eq,
+        smaug_dt_ge, smaug_dt_le, smaug_dt_ne
+    };
+    for (int op = 0; op < 6; op++) {
+        smaug_series_dt_t *s = smaug_dt_create_from_array(arr, 4); assert(s);
+        for (long k = 0; k < MAX_ALLOCS; k++) {
+            reset(k);
+            smaug_mask_t *mask = NULL;
+            uint8_t *r = fns[op](s, 25, &mask);
+            if (r) { OK(1, "dt compare ok"); free(r); free(mask); }
+        }
+        reset(-1);
+        smaug_dt_free(s);
+    }
+}
+
+static void af_dt_setters(void) {
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        smaug_series_dt_t *base = mk_dt_gapped(); assert(base);
+        smaug_series_dt_t *v = smaug_dt_view(base, 0, 4); /* is_view=true */
+        if (!v) { smaug_dt_free(base); reset(-1); continue; }
+        reset(k);
+        smaug_status_t st = smaug_dt_set(v, 0, 999); /* dispara dt_cow_detach */
+        OK(st == SMG_OK || st == SMG_ERR_NOMEM, "dt_set view: status válido");
+        reset(-1);
+        smaug_dt_free(v); smaug_dt_free(base);
+    }
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        smaug_series_dt_t *base = mk_dt_gapped(); assert(base);
+        smaug_series_dt_t *v = smaug_dt_view(base, 0, 4);
+        if (!v) { smaug_dt_free(base); reset(-1); continue; }
+        reset(k);
+        smaug_status_t st = smaug_dt_set_null(v, 0); /* dispara dt_cow_detach */
+        OK(st == SMG_OK || st == SMG_ERR_NOMEM, "dt_set_null view: status válido");
+        reset(-1);
+        smaug_dt_free(v); smaug_dt_free(base);
+    }
+    /* append numa view: dt_cow_detach + dt_grow */
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        smaug_series_dt_t *base = mk_dt_gapped(); assert(base);
+        smaug_series_dt_t *v = smaug_dt_view(base, 0, 4);
+        if (!v) { smaug_dt_free(base); reset(-1); continue; }
+        reset(k);
+        int rc = smaug_dt_append(v, 1234); /* detach + grow */
+        OK(rc == 0 || rc == -1, "dt_append view: rc válido");
+        reset(-1);
+        smaug_dt_free(v); smaug_dt_free(base);
+    }
+}
+
+/* multi_argsort: OOM nos dois malloc (idx linha 110, tmp linha 113) */
+static void af_multi_argsort(void) {
+    smaug_series_f64_t *f = mk_f64_gapped(); assert(f);
+    /* preenche os nulos para ter série densa (multi_argsort não aceita nulls) */
+    smaug_f64_set(f, 1, 2.5); smaug_f64_set(f, 3, 4.5);
+    smaug_sort_col_t col = { .kind = SMAUG_COL_F64, .f64 = f };
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        size_t *idx = smaug_multi_argsort(&col, 1, 6);
+        if (idx) { OK(1, "multi_argsort ok"); free(idx); }
+    }
+    smaug_f64_free(f);
+}
+
+/* multi_argsort_ffi: OOM no malloc de cols (linha 136) + propaga aos internos */
+static void af_multi_argsort_ffi(void) {
+    smaug_series_f64_t *f = mk_f64_gapped(); assert(f);
+    smaug_f64_set(f, 1, 2.5); smaug_f64_set(f, 3, 4.5);
+    smaug_sort_col_ffi_t col = { .kind = SMAUG_COL_F64, .ptr = f };
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        size_t *idx = smaug_multi_argsort_ffi(&col, 1, 6);
+        if (idx) { OK(1, "multi_argsort_ffi ok"); free(idx); }
+    }
+    smaug_f64_free(f);
+}
+
 int main(void) {
     af_f64_create();
     af_f64_create_from_array();
@@ -2045,6 +2158,7 @@ int main(void) {
     af_json_write();
     af_json_write_pretty();
     af_json_read_many_recs();
+    af_json_read_wide_record();
     af_table_free_partial();
 
     /* Frente B — Grupo A/B (Fase 3) e rolling */
@@ -2060,7 +2174,11 @@ int main(void) {
     /* Frente B fase 2 — datetime (lifecycle + argsort/sort/take/filter) */
     af_dt_create(); af_dt_create_from_array(); af_dt_clone(); af_dt_view();
     af_dt_append_grow(); af_dt_argsort(); af_dt_sort(); af_dt_take(); af_dt_filter();
+    af_dt_setters();
+    af_dt_compare();
 
+    /* Grupo C — multi_argsort (idx/tmp/cols OOM) */
+    af_multi_argsort(); af_multi_argsort_ffi();
 
     sanity_no_fail();
 
