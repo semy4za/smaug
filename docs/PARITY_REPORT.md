@@ -11,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-06-23 17:16:59 UTC
+Gerado em: 2026-06-23 18:03:58 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -647,7 +647,7 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 217/217 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 223/223 erros com prefixo `smaug:` (100.0%)
 - `dataset.lua`: 88/88 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
@@ -687,7 +687,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `series/test_predicates` | 155 | 6 | 42 | 3 | 11 | — | — |
 | `series/test_selection` | 23 | 3 | 1 | — | 1 | — | — |
 | `series/test_str` | 271 | 4 | 9 | 1 | 49 | — | — |
-| `series/test_dt` | 256 | 3 | 6 | 2 | 9 | 58 | — |
+| `series/test_dt` | 259 | 3 | 6 | 2 | 9 | 58 | — |
 | `series/test_categorical` | 295 | 7 | 7 | 8 | 5 | 13 | 57 |
 | `dataset/test_core` | 208 | 26 | 27 | 8 | 11 | — | — |
 | `dataset/test_relational` | 164 | 10 | 41 | 4 | 22 | — | — |
@@ -698,7 +698,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 67 | 18 | 2 | — | — | — | — |
 
-**Total de checks:** 2332
+**Total de checks:** 2335
 
 ### Menções totais por dtype (toda a suite)
 

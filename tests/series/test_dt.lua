@@ -375,6 +375,14 @@ check(filtered:len() == 2,    "filter gt: len=2 (jun e dec)")
 check(filtered:get(1) == ep_b,"filter gt: 1º = ep_b")
 check(filtered:get(2) == ep_c,"filter gt: 2º = ep_c")
 
+-- cmp_* com tipo errado → erro orientado (I2: guard adicionado em _types.lua)
+local ok_cmp_gt = pcall(function() sdn:gt("2024-01-01") end)
+local ok_cmp_lt = pcall(function() sdn:lt(true) end)
+local ok_cmp_eq = pcall(function() sdn:eq(nil) end)
+check(not ok_cmp_gt, "gt: string como target → erro (guard de tipo)")
+check(not ok_cmp_lt, "lt: boolean como target → erro (guard de tipo)")
+check(not ok_cmp_eq, "eq: nil como target → erro (guard de tipo)")
+
 -- clone: independência
 local cl = su:clone()
 cl:set(1, ep_zero)

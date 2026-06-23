@@ -14,7 +14,7 @@ fddba114efecba9aa4937793e135c2be7eb75a0b0fedd1d4d25fc3c23f47af62    1753  .\docs
 d725ddfecddc5c0ce7cae857ecb7bc57edc66202b40d66e723595709e2d14044     274  .\docs\CONTRACT.md
 93411c4cbc04355bbc4ef22830b7929e49920da62412c3c327800fc2b88f3ccc     251  .\docs\COVERAGE.md
 0b780addfb2929a2af46aa31af0849d30b479a51a35a730f9863843cf095e910     159  .\docs\COW.md
-ec92b0f56975a78c59171c623ad2997959a39929a67057e3e3783804f882c80b     747  .\docs\PARITY_REPORT.md
+f8f6b8b493ad136e499ca75094e194e9237efd7d522b87e140b786e5b1ef44e2     747  .\docs\PARITY_REPORT.md
 e6f52cd1599cafbc65ba601bc222ed718294402d2a568b73521d7452bc55efba     537  .\docs\README.md
 2e4f216ac9727cee891c5485e603b8cf1720087f9691316220df22a69eeb0bab     606  .\docs\Roadmap.md
 aa9cae92e013e03bffaf812ce257644cc6f8d84b3a8eac0309c37279fe92e3b3      36  .\include\smaug.h
@@ -36,7 +36,7 @@ aaa74b3d94eab04a7fb9f71d20e578353738437aac8bea2f82118b7b082f7c99      72  .\lua\
 5bd7803dcbfbfb6ca007e52d642f852a2d294edd86cea0f702b078cc2a8688ef     218  .\lua\smaug\core\series\_bool_ops.lua
 d0275a8b73745fabb2f65b84f5ff8e0eaaa196206cc0b6d3a4d9466eebe0689b     123  .\lua\smaug\core\series\_core.lua
 76eb51bbbabe7a51b9e2afaf8dcffb2686af0dc0d983ecf431b080197a6371c3     141  .\lua\smaug\core\series\_factories.lua
-bbb7b255942ba67b7757483d530983f4e6e94dcd1f13365db10899b82a3cf802     224  .\lua\smaug\core\series\_types.lua
+d30aa27d82621e98df4b94b3028f5bf312fa801a9eb72e792a30ca3959c98b51     224  .\lua\smaug\core\series\_types.lua
 4659964deabf055b5f02bbd2957d90365d0683b1eac630d6e5b7fb044733356b      74  .\lua\smaug\core\series\access\_access.lua
 5939add20641af4bf17b3af7a46d45c1d55ac7355b04eb7fd83be646371e78cf     396  .\lua\smaug\core\series\access\_transform.lua
 3bf0be41ce2dea34c914b086f394b8d4328afe76a9ca08c3b574422f5badf801     642  .\lua\smaug\core\series\categorical\_categorical.lua
@@ -108,7 +108,7 @@ d19e799fa44d28e5938142437fc8923c2d07416cb54d937c1d1f8624b6576b02     145  .\test
 8dc11dce804738cd95da5cb645c81dd470ce97e153c6295a839638c3b6439274     319  .\tests\series\test_access.lua
 a5351dc236135b505f815cc09cc72d82cc49d7e7ef592364c410c3735184dc82     882  .\tests\series\test_categorical.lua
 8751cf1c71d13816041fa9e0f023042a3b32188b893624f02bb81ee6e1d647c5     770  .\tests\series\test_constructors.lua
-3c6e85dec8163b509fb65363d3ea80554827089a9bbcccb03b2bcbb79f005251     791  .\tests\series\test_dt.lua
+4275fe9f3e40ae3e3fa3c6154ca93341e989e6f7431af4386bebe9432edc3b82     799  .\tests\series\test_dt.lua
 b9232c734cc112448b93f28b6d610b9d904fd9531e35c37e5bc0654b776fd3bc     493  .\tests\series\test_predicates.lua
 41615278e2eb53d14fb41b1c7796260de3cd575c334236d88a2482a5162932b1     170  .\tests\series\test_reduce.lua
 c034d0fb6246491d34dab9e10c896b6a20fea1e0f14a55bc49cc360df676ee04      90  .\tests\series\test_selection.lua
