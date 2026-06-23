@@ -30,6 +30,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Verificação que NÃO some sob -DNDEBUG (ver nota em test_cow.c). */
+#undef assert
+#define assert(cond) do { if (!(cond)) { \
+    fprintf(stderr, "FALHOU [%s:%d]: %s\n", __FILE__, __LINE__, #cond); \
+    exit(1); } n_checks++; } while (0)
+
 #define N_LINEAR  1000000
 #define N_SORT      50000
 #define N_CHAIN     10000

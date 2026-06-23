@@ -23,9 +23,21 @@
  */
 
 #include "../include/smaug.h"
-#include <assert.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
+
+/* Verificação que NÃO some sob -DNDEBUG. Os testes deste arquivo foram
+   escritos com assert() como verificação principal; redefinir assert como
+   uma checagem ativa (com contador) torna o teste robusto a builds release
+   que definam NDEBUG — sem reescrever cada chamada. A própria expressão
+   serve de mensagem. */
+#include <assert.h>   /* garante que <assert.h> não redefina depois */
+#undef assert
+static int n_checks = 0;
+#define assert(cond) do { if (!(cond)) { \
+    fprintf(stderr, "FALHOU [%s:%d]: %s\n", __FILE__, __LINE__, #cond); \
+    exit(1); } n_checks++; } while (0)
 
 /* ===================================================================
    Utilitário: preenche f64 com [0.0, 1.0, ..., n-1.0] */
@@ -423,6 +435,6 @@ int main(void) {
     test_i64_append_detaches_view();
     test_i64_append_null_detaches_view();
 
-    printf("PASS: COW (15 checks)\n");
+    printf("PASS: COW (%d checks)\n", n_checks);
     return 0;
 }

@@ -17,6 +17,15 @@
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
+
+/* Verificação que NÃO some sob -DNDEBUG (ver nota em test_cow.c): redefine
+   assert como checagem ativa com contador, sem reescrever cada chamada. */
+#undef assert
+static int n_checks = 0;
+#define assert(cond) do { if (!(cond)) { \
+    fprintf(stderr, "FALHOU [%s:%d]: %s\n", __FILE__, __LINE__, #cond); \
+    exit(1); } n_checks++; } while (0)
 
 /* ===================================================================
    create / invariantes
@@ -271,6 +280,6 @@ int main(void) {
     test_i64_lifecycle();
     test_core_input_guards();
 
-    printf("PASS\n");
+    printf("PASS: alloc (%d checks)\n", n_checks);
     return 0;
 }

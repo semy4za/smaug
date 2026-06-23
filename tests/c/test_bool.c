@@ -13,6 +13,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+/* Verificação que NÃO some sob -DNDEBUG (ver nota em test_cow.c): redefine
+   assert como checagem ativa com contador, sem reescrever cada chamada. */
+#undef assert
+static int n_checks = 0;
+#define assert(cond) do { if (!(cond)) { \
+    fprintf(stderr, "FALHOU [%s:%d]: %s\n", __FILE__, __LINE__, #cond); \
+    exit(1); } n_checks++; } while (0)
+
 #define V 0xFF
 #define N 0x00
 
@@ -212,6 +220,6 @@ int main(void) {
     assert(smaug_bool_count_true(dv, NULL, 3) == 2);
     assert(smaug_bool_all(dv, NULL, 3) == false);
 
-    printf("PASS\n");
+    printf("PASS: bool (%d checks)\n", n_checks);
     return 0;
 }
