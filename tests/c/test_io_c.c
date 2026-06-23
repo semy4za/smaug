@@ -140,6 +140,10 @@ static void test_csv_cr_only(void) {
     smaug_table_t *t = smaug_read_csv_mem(csv, strlen(csv), NULL);
     CHECK(t && !t->error,        "CR only: sem erro");
     CHECK(t->nrows == 2,         "CR only: 2 linhas");
+    CHECK(get_i64(t, 0, 0) == 1,"CR only: a[0]=1");
+    CHECK(get_i64(t, 1, 0) == 2,"CR only: b[0]=2");
+    CHECK(get_i64(t, 0, 1) == 3,"CR only: a[1]=3");
+    CHECK(get_i64(t, 1, 1) == 4,"CR only: b[1]=4");
     smaug_table_free(t);
 }
 
@@ -260,6 +264,10 @@ static void test_csv_infer_mixed_int_float(void) {
     smaug_table_t *t = smaug_read_csv_mem(csv, strlen(csv), NULL);
     CHECK(t && !t->error, "misto int/float: sem erro");
     CHECK(strcmp(t->columns[0].dtype,"float64") == 0, "misto: dtype float64");
+    /* valores: o '1' e o '3' (que pareciam int) viraram float corretamente */
+    CHECK(fabs(get_f64(t, 0, 0) - 1.0) < 1e-9, "misto: linha int 1 → 1.0");
+    CHECK(fabs(get_f64(t, 0, 1) - 2.5) < 1e-9, "misto: linha float 2.5");
+    CHECK(fabs(get_f64(t, 0, 2) - 3.0) < 1e-9, "misto: linha int 3 → 3.0");
     smaug_table_free(t);
 }
 
@@ -279,6 +287,9 @@ static void test_csv_infer_all_na_column(void) {
     smaug_table_t *t = smaug_read_csv_mem(csv, strlen(csv), NULL);
     CHECK(t && !t->error, "col toda NA: sem erro");
     CHECK(strcmp(t->columns[0].dtype,"string") == 0, "col toda NA: dtype string");
+    /* todos os valores devem ser NA de fato */
+    for (size_t r = 0; r < t->nrows; r++)
+        CHECK(col_is_null(t, 0, r), "col toda NA: cada célula é NA");
     smaug_table_free(t);
 }
 
@@ -288,6 +299,11 @@ static void test_csv_infer_bool_mixed_with_string(void) {
     smaug_table_t *t = smaug_read_csv_mem(csv, strlen(csv), NULL);
     CHECK(t && !t->error, "bool+str: sem erro");
     CHECK(strcmp(t->columns[0].dtype,"string") == 0, "bool+str: dtype string");
+    /* o "true"/"false" devem virar texto literal, não bool */
+    size_t n; const char *s0 = get_str(t, 0, 0, &n);
+    CHECK(s0 && n == 4 && strncmp(s0, "true", 4) == 0,  "bool+str: 'true' preservado como texto");
+    const char *s1 = get_str(t, 0, 1, &n);
+    CHECK(s1 && n == 5 && strncmp(s1, "hello", 5) == 0, "bool+str: 'hello' preservado");
     smaug_table_free(t);
 }
 
@@ -309,12 +325,14 @@ static void test_csv_crlf_at_eof(void) {
     smaug_table_t *t = smaug_read_csv_mem(csv, strlen(csv), NULL);
     CHECK(t && !t->error,         "CRLF EOF: sem erro");
     CHECK(t->nrows == 1,          "CRLF EOF: 1 linha");
+    CHECK(get_i64(t, 0, 0) == 1,  "CRLF EOF: v[0]=1 (\\r não entrou no valor)");
     smaug_table_free(t);
     /* \r sem \n no último byte */
     const char *csv2 = "v\n1\r";
     smaug_table_t *t2 = smaug_read_csv_mem(csv2, strlen(csv2), NULL);
     CHECK(t2 && !t2->error,       "CR EOF: sem erro");
     CHECK(t2->nrows == 1,         "CR EOF: 1 linha");
+    CHECK(get_i64(t2, 0, 0) == 1, "CR EOF: v[0]=1 (\\r final tratado)");
     smaug_table_free(t2);
 }
 
@@ -454,6 +472,14 @@ static void test_csv_write_large_field(void) {
     char *out = smaug_write_csv_mem(&t, &wo, &len);
     CHECK(out != NULL,        "write campo grande: retorna buffer");
     CHECK(len > big_len,      "write campo grande: buffer cresceu além do campo (header+\\n)");
+    /* integridade: o campo de 10000 'x' precisa sair COMPLETO e sem corrupção
+     * no meio (o ponto do teste é o crescimento do wbuf — se ele corromper
+     * durante um realloc, o tamanho ainda baterá mas o conteúdo não). */
+    char *body = strchr(out, '\n');           /* pula o header "v\n" */
+    CHECK(body != NULL,       "write campo grande: tem corpo após header");
+    body++;                                    /* primeiro byte do campo */
+    size_t run = strspn(body, "x");            /* conta 'x' consecutivos */
+    CHECK(run == big_len,     "write campo grande: 10000 'x' contíguos e íntegros");
     free(out);
     free(big);
     smaug_str_free(s);
@@ -620,6 +646,9 @@ static void test_json_int_and_float(void) {
     smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
     CHECK(t && !t->error, "JSON int+float: sem erro");
     CHECK(strcmp(t->columns[0].dtype,"float64") == 0, "JSON int+float: float64");
+    /* o 1 (que era int) precisa ter virado 1.0 no float64 */
+    CHECK(fabs(get_f64(t, 0, 0) - 1.0) < 1e-9, "JSON int+float: int 1 → 1.0");
+    CHECK(fabs(get_f64(t, 0, 1) - 2.5) < 1e-9, "JSON int+float: float 2.5");
     smaug_table_free(t);
 }
 
@@ -1248,6 +1277,18 @@ static void test_json_write_large_string(void) {
     char *out = smaug_write_json_mem(&t, &wo, &len);
     CHECK(out != NULL,    "JSON write large: retorna buffer");
     CHECK(len > big_len,  "JSON write large: buffer maior que o campo (overhead JSON)");
+    /* integridade: relê o JSON e confirma que a string de 10000 'x' voltou
+     * COMPLETA (um realloc corrompido daria tamanho certo mas conteúdo errado). */
+    smaug_table_t *t2 = smaug_read_json_mem(out, len);
+    CHECK(t2 && !t2->error,           "JSON write large: relê sem erro");
+    size_t n; const char *s2 = get_str(t2, 0, 0, &n);
+    CHECK(s2 && n == big_len,         "JSON write large: 10000 bytes relidos");
+    /* a string tem comprimento explícito n (não é null-terminada) — verificar
+     * dentro do limite, sem strspn que leria além do buffer. */
+    int all_x = (s2 != NULL);
+    for (size_t i = 0; all_x && i < n; i++) if (s2[i] != 'x') all_x = 0;
+    CHECK(all_x,                      "JSON write large: 10000 'x' íntegros");
+    smaug_table_free(t2);
     free(out);
     free(big);
     smaug_str_free(s);

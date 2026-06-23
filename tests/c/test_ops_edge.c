@@ -495,20 +495,25 @@ static void i64_overflow_behavior(void) {
     smaug_series_i64_t *r = smaug_i64_add(a, b);  /* INT64_MAX + 1 */
     OK(r != NULL,                   "i64 overflow: add retorna serie");
     OK(!smaug_i64_is_null(r, 0),    "i64 overflow: resultado e valor presente (nao NULL)");
-    /* o valor real é INT64_MIN em complemento de 2 — documentado, não é bug */
+    /* o contrato documenta wrap determinístico em complemento de 2:
+     * INT64_MAX + 1 == INT64_MIN. Verificar o valor prova que o wrap é
+     * determinístico, não só "presente". */
+    OK(smaug_i64_get(r, 0, NULL) == INT64_MIN, "i64 overflow: INT64_MAX+1 == INT64_MIN (wrap c2)");
     smaug_i64_free(r);
 
-    /* mul overflow: INT64_MAX * 2 */
+    /* mul overflow: INT64_MAX * 2 == -2 em complemento de 2 */
     smaug_i64_set(b, 0, 2);
     r = smaug_i64_mul(a, b);
     OK(r != NULL,                   "i64 overflow mul: retorna serie");
     OK(!smaug_i64_is_null(r, 0),    "i64 overflow mul: resultado presente");
+    OK(smaug_i64_get(r, 0, NULL) == -2, "i64 overflow mul: INT64_MAX*2 == -2 (wrap c2)");
     smaug_i64_free(r);
 
-    /* scalar: INT64_MAX + 1 via add_scalar */
+    /* scalar: INT64_MAX + 1 via add_scalar == INT64_MIN */
     r = smaug_i64_add_scalar(a, 1);
     OK(r != NULL,                   "i64 overflow add_scalar: retorna serie");
     OK(!smaug_i64_is_null(r, 0),    "i64 overflow add_scalar: resultado presente");
+    OK(smaug_i64_get(r, 0, NULL) == INT64_MIN, "i64 overflow add_scalar: == INT64_MIN (wrap c2)");
     smaug_i64_free(r);
 
     smaug_i64_free(a);
