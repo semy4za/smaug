@@ -3,10 +3,17 @@
 -- Entry point do Smaug. Expõe a API pública de alto nível.
 --   local smaug = require("smaug")
 --   local df = smaug.DataSet({{"venda",{10,20,30}},{"custo",{3,7,2}}})
---   local df = smaug.DataSet.from_columns(...)    -- infraestrutura, ainda funciona
+--   local s  = smaug.Series({1, 2, 3})            -- Series chamável (Bloco H.3)
+--   local s  = smaug.from_array({1, 2, 3})        -- alias de from_table
+--   local t  = smaug.read_csv("dados.csv")        -- I/O (Anel 3)
 --
--- API pública:    smaug.DataSet(...)   smaug.read_csv(...)  (ring 2, futuro)
--- Infraestrutura: DataSet.new/from_columns, Series.new/from_table (uso interno)
+-- API pública:    smaug.Series(...) é a forma OFICIAL de construir Series
+--                 (chamável; dtype opcional como 2º arg). smaug.DataSet(...)
+--                 idem. smaug.read_csv/read_json (+ _mem), :to_csv/:to_json (+ _mem).
+-- Disponível:     smaug.from_array (atalho não-oficial), smaug.float64/int64/
+--                 string/datetime (factories de tamanho fixo).
+-- Infraestrutura: DataSet.new/from_columns, Series.new/from_table (uso interno;
+--                 from_table é o nome canônico, Series(...) e from_array delegam nele).
 
 local Series     = require("smaug.core.series")
 local DataSet    = require("smaug.core.dataset")
@@ -39,14 +46,16 @@ DataSet.methods.to_csv_mem  = function(self, opts)       return io_csv.write_mem
 DataSet.methods.to_json      = function(self, path, opts) return io_json.write(self, path, opts) end
 DataSet.methods.to_json_mem  = function(self, opts)       return io_json.write_mem(self, opts)   end
 
--- I/O (Ring 2 — futuro)
--- smaug.read_csv     = require("smaug.io.csv").read
--- smaug.read_json    = require("smaug.io.json").read
+-- Futuro (Anel 3, pós-v1.0):
 -- smaug.read_parquet = require("smaug.io.parquet").read
 
--- Açúcar para Series (uso avançado / interoperabilidade)
+-- Açúcar para Series (uso avançado / interoperabilidade).
+-- A forma OFICIAL de construir é smaug.Series({...}) (chamável, dtype opcional
+-- como 2º arg). Os atalhos abaixo ficam disponíveis, mas não são a via ensinada.
 smaug.float64    = Series.float64
 smaug.int64      = Series.int64
-smaug.from_table = Series.from_table
+smaug.string     = Series.string
+smaug.datetime   = Series.datetime
+smaug.from_array = Series.from_array
 
 return smaug

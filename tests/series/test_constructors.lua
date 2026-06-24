@@ -767,4 +767,33 @@ do
 end
 
 
+-- =====================================================================
+-- Superfície pública do init.lua (smaug.*) — guarda a API exposta
+-- =====================================================================
+do
+    -- forma OFICIAL: smaug.Series chamável (com e sem dtype explícito)
+    local sc = smaug.Series({1, 2, 3})
+    check(sc and sc:len() == 3,                  "init: smaug.Series({...}) chamável")
+    check(sc._dtype == "int64",                  "init: smaug.Series infere int64")
+    local scf = smaug.Series({1.5, 2.5}, "float64")
+    check(scf._dtype == "float64",               "init: smaug.Series(x, dtype) explícito")
+
+    -- disponível (não-oficial): from_array delega para from_table
+    check(type(smaug.from_array) == "function",  "init: smaug.from_array disponível")
+    local fa = smaug.from_array({7, 8, 9})
+    check(fa and fa:len() == 3,                  "init: from_array constrói")
+
+    -- factories de dtype expostas no top-level (os quatro)
+    check(type(smaug.float64) == "function",     "init: smaug.float64 exposto")
+    check(type(smaug.int64) == "function",       "init: smaug.int64 exposto")
+    check(type(smaug.string) == "function",      "init: smaug.string exposto")
+    check(type(smaug.datetime) == "function",    "init: smaug.datetime exposto")
+
+    -- from_table REMOVIDO do top-level (mas vivo como infraestrutura em Series)
+    check(smaug.from_table == nil,               "init: smaug.from_table removido do top-level")
+    check(type(smaug.Series.from_table) == "function",
+                                                 "init: Series.from_table vivo como infraestrutura")
+end
+
+
 print(string.format("OK — %d checks passaram (Series: constructors, f64, i64, bool, aritmética, lifecycle, map)", n_ok))

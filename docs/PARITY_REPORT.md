@@ -1,7 +1,8 @@
 # Smaug — Relatório de Paridade
 
-> Arquivo gerado por `bash scripts/parity/parity.sh`. **Não editar à mão.**
-> Decisões conscientes de não-paridade ficam em `scripts/parity/exceptions.txt`.
+> Arquivo gerado por `bash scripts/parity/parity.sh` ou `powershell scripts/parity/parity.ps1`.
+> **Não editar à mão.** Decisões conscientes de não-paridade ficam em
+> `scripts/parity/exceptions.txt`.
 
 Convenção de status:
 
@@ -10,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-06-24 01:43:13 UTC
+Gerado em: 2026-06-24 16:42:56 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -678,7 +679,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 
 | arquivo | checks | float64 | int64 | bool | string | datetime | categorical |
 | :--- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| `series/test_constructors` | 300 | 34 | 54 | 18 | 10 | — | — |
+| `series/test_constructors` | 311 | 36 | 55 | 18 | 10 | — | — |
 | `series/test_access` | 92 | 13 | 4 | — | 2 | — | — |
 | `series/test_reduce` | 38 | 7 | — | — | — | — | — |
 | `series/test_stat` | 136 | 30 | 15 | — | 5 | — | — |
@@ -697,14 +698,14 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 67 | 18 | 2 | — | — | — | — |
 
-**Total de checks:** 2335
+**Total de checks:** 2346
 
 ### Menções totais por dtype (toda a suite)
 
 | dtype | menções |
 | :--- | :-: |
-| float64 | 184 |
-| int64 | 269 |
+| float64 | 186 |
+| int64 | 270 |
 | bool | 48 |
 | string | 157 |
 | datetime | 71 |

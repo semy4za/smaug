@@ -494,15 +494,19 @@ fecham a classe de inconsistências achada na auditoria código-vs-código. Orde
 docs primeiro (limpa a mesa), Ring 0 agrupado (exige Fedora), camada Lua (container),
 auditor por último (valida que tudo fechou).*
 
-1. **Docs sync** — README, ARCHITECTURE, `Build_and_Testing.md` (comandos para
-   suítes que não existem mais); I1 `astype("bool")` em CONTRACT.md + API_INDEX
-   (Roadmap já corrigido); COW.md (acrescentar datetime à tabela + gatilhos de detach).
-2. **Ring 0** (Fedora, cobertura+Valgrind): `rank` i64 — trocar ordenação via
-   `double` por struct `{int64_t,size_t}` (perde precisão acima de 2^53; `sort`/
-   `argsort` já corretos) · D1 `strdup` guard no `make_error` · D2 unificar
-   assinatura `append`/`set` no header.
-3. **Camada Lua** (container): expor `dt_view` (campo no descritor + teste Lua de
-   detach; Ring 0 já pronto e testado) · `view` em string → erro orientado (hoje
+1. **Docs sync** `[Done]` — README, ARCHITECTURE, `Build_and_Testing.md`, I1
+   `astype("bool")` em CONTRACT.md + API_INDEX. Números frágeis eliminados (vivem
+   em COVERAGE.md/MANIFEST/build.sh). **Pendente:** COW.md (acrescentar datetime à
+   tabela + gatilhos de detach) — fecha junto do `dt_view` no item 3; reescrever
+   exemplos de README/API_INDEX para a forma OFICIAL `smaug.Series({...})` (hoje
+   usam `Series.from_table(...)`, que vira infraestrutura).
+2. **Ring 0** `[Done]` — `rank` i64 ordena por int64 direto (precisão >2^53);
+   D1 `strdup` guard no `make_error`; D2 assimetria `append`/`set` documentada
+   como deliberada (não unificada — set sinaliza por quê, append só OOM).
+3. **Camada Lua** (container) — `init.lua`: `smaug.Series({...})` é a forma oficial,
+   `from_array` disponível, `from_table` removido do top-level (vivo como
+   infraestrutura) `[Done]`. **Pendente:** expor `dt_view` (campo no descritor +
+   teste Lua de detach; Ring 0 já pronto) · `view` em string → erro orientado (hoje
    `nil value` cru) · linha 190 `_types.lua` → `I64_MIN` (elimina literal e armadilha
    latente).
 4. **Auditor** — fortalecer eixo 10 do parity para cruzar header↔descritor↔COW.md
