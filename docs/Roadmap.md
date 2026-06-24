@@ -239,7 +239,7 @@ foram concluídos nas sessões de junho/2026.
 | Auditoria de asserção (C + Lua, caso a caso) — `test_ops`/`test_cow`/`test_bool`/`test_alloc`/`test_stress` convertidos de assert-only para checks reais | `[Done]` |
 | 2 double-frees corrigidos em `smaug_json.c` (`smaug_read_json_mem` 3 sites; `parse_record` realloc parcial) — descobertos ao escrever testes de cobertura | `[Done]` |
 | allocfail estendido a `calloc`/`strdup` (`--wrap` não interceptava em libc) | `[Done]` |
-| Sincronização factual das docs (README, ARCHITECTURE, `Build_and_Testing.md`) | `[Planned]` → Bloco I.1 |
+| Sincronização factual das docs (README, ARCHITECTURE, `Build_and_Testing.md`) | `[Done]` (Bloco I.1) |
 | `COVERAGE.md` + `MANIFEST.txt` regenerados no Fedora a cada commit | `[Done]` (processo) |
 | Docstrings nos métodos públicos de `Series` e `DataSet` | `[Planned]` (Fase 7) |
 
@@ -488,30 +488,38 @@ ciclo próprio com cobertura + Valgrind no Fedora.*
 - **Testes pendentes (Lua) `[Planned]`** — `from_array`/`__call` (existem, sem teste
   explícito); `map` com retorno bool; contrato de imutabilidade do `assign`.
 
-### Fase 5.I — Bloco I: fechamento de coerência pré-v1.0 `[Planned]`
+### Fase 5.I — Bloco I: fechamento de coerência pré-v1.0 `[Substancialmente concluído]`
 *Correções pontuais de robustez e coerência, agrupadas. Cada uma pequena; juntas,
-fecham a classe de inconsistências achada na auditoria código-vs-código. Ordem:
-docs primeiro (limpa a mesa), Ring 0 agrupado (exige Fedora), camada Lua (container),
-auditor por último (valida que tudo fechou).*
+fecharam a classe de inconsistências achada na auditoria código-vs-código. Ordem
+executada: docs, Ring 0, camada Lua, auditor por último (validou que tudo fechou).*
 
 1. **Docs sync** `[Done]` — README, ARCHITECTURE, `Build_and_Testing.md`, I1
    `astype("bool")` em CONTRACT.md + API_INDEX. Números frágeis eliminados (vivem
-   em COVERAGE.md/MANIFEST/build.sh). **Pendente:** COW.md (acrescentar datetime à
-   tabela + gatilhos de detach) — fecha junto do `dt_view` no item 3; reescrever
-   exemplos de README/API_INDEX para a forma OFICIAL `smaug.Series({...})` (hoje
-   usam `Series.from_table(...)`, que vira infraestrutura).
+   em COVERAGE.md/MANIFEST/build.sh). COW.md sincronizado (datetime na tabela de
+   tipos + gatilhos de detach). **Pendente residual:** reescrever exemplos de
+   README/API_INDEX para a forma OFICIAL `smaug.Series({...})` (hoje usam
+   `Series.from_table(...)`, que é infraestrutura) — baixo risco, doc.
 2. **Ring 0** `[Done]` — `rank` i64 ordena por int64 direto (precisão >2^53);
    D1 `strdup` guard no `make_error`; D2 assimetria `append`/`set` documentada
    como deliberada (não unificada — set sinaliza por quê, append só OOM).
-3. **Camada Lua** (container) — `init.lua`: `smaug.Series({...})` é a forma oficial,
+3. **Camada Lua** `[Done]` — `init.lua`: `smaug.Series({...})` é a forma oficial,
    `from_array` disponível, `from_table` removido do top-level (vivo como
-   infraestrutura) `[Done]`. **Pendente:** expor `dt_view` (campo no descritor +
-   teste Lua de detach; Ring 0 já pronto) · `view` em string → erro orientado (hoje
-   `nil value` cru) · linha 190 `_types.lua` → `I64_MIN` (elimina literal e armadilha
-   latente).
-4. **Auditor** — fortalecer eixo 10 do parity para cruzar header↔descritor↔COW.md
-   contra `exceptions.txt`, fechando as três pontas (hoje só checa o header). Caso
-   de teste vivo: deve acusar qualquer `view` exposto no C sem campo no descritor.
+   infraestrutura). `dt_view` exposto no descritor (+ teste Lua de detach; fecha as
+   três pontas com COW.md). `view` em dtype sem suporte (string/bool) → erro
+   orientado, não `nil`-call cru. linha `_types.lua` → `I64_MIN` (elimina literal
+   e armadilha latente).
+4. **Auditor** `[Done]` — eixo 10 do parity agora cruza header C ↔ descritor DTYPES
+   para funções de dois-lados (`view`/`take`/`filter`): marca 🟥 quando o C tem mas
+   o descritor não expõe, salvo exceção registrada. Validado por prova de fogo
+   (removido `dt_view` → 🟥; restaurado → 🟩). Reporta sem travar build.
+
+**Achados de tooling resolvidos no caminho** (mesma natureza dos da Fase 5 —
+ferramenta silenciosamente furada): (a) `test_dt.lua` tinha três preâmbulos
+concatenados com `local n_ok` redeclarado; o print final contava só o último
+segmento — reportava 65 de 262 checks reais (os 197 já existiam e rodavam, só não
+eram contados). Unificado num escopo único. (b) Exceção `view/string` no
+`exceptions.txt` usava nome longo, mas o eixo 10 gera a chave com nome curto
+(`view/str`) — a exceção nunca casava. Corrigida.
 
 ### Débitos técnicos registrados (não-agendados)
 *Rastreados, sem bloquear a v1.0. O que está agendado vive no Bloco I, não aqui.*
