@@ -23,6 +23,12 @@ a entradas inválidas é tão importante quanto qualquer operação matemática.
 E o design importa. A API deve ser bonita de escrever e o fluxo de dados
 deve ser natural de ler e conciso de compor.
 
+Coerência se verifica, não se presume. Disparidade estrutural ("existe aqui mas
+não ali") é trabalho de auditor automatizável — paridade cruzada com lista de
+exceções conscientes. Erro semântico de implementação (ex.: precisão perdida numa
+conversão) escapa ao auditor estrutural e exige leitura humana e revisão cruzada.
+As duas camadas se complementam; nenhuma substitui a outra.
+
 ---
 
 ## Arquitetura em anéis
@@ -40,19 +46,20 @@ diagrama, regra de decisão e régua de versões.
 Memória, tipos, operações primitivas. API estável. O engine não confia no
 caller — toda fronteira pública valida e comunica o resultado.
 
-**Métricas de cobertura:** medição anterior (antes da Fase 3) — linha 95.99%
-(2248/2342), branch-alvo 88.12% (2270/2576, 90 exclusões `COV-EXCL-BR`
-documentadas). **A remedir no Fedora:** a Fase 3 acrescentou `smaug_ops_window.c`
-ao backend e `make_coverage.sh` só passou a instrumentá-lo nesta sessão — os
-números de cobertura serão regenerados na próxima medição autoritativa.
-Valgrind-clean em todos os 12 binários. Zero warnings `-Wall -Wextra`.
+**Métricas de cobertura (Fedora autoritativo, 2026-06-23):** linha 98.84%
+(2980/3015), branch-alvo 95.83% (3037/3169, 101 exclusões `COV-EXCL-BR`
+documentadas; bruto 92.87% = 3037/3270). Meta de 95% branch-alvo atingida na
+campanha de hardening da Fase 5. Valgrind-clean em todos os 12 binários. Zero
+warnings `-Wall -Wextra`.
 
-**Testes C (12 binários, em `tests/c/`):** `test_alloc`, `test_ops`,
-`test_ops_edge` (269 checks), `test_bool`, `test_bool_lifecycle` (154 checks),
-`test_string` (118 checks), `test_cow` (15 checks), `test_io_c` (190 checks),
-`test_datetime_c` (201 checks), `test_ops_window` (207 checks — primitivas Ring 0
-da Fase 3: cumulativas, rank, sorted_nonnull, multi_argsort, rolling),
-`test_allocfail` (1158 verificações via `--wrap`), `test_stress` (51 851 checks).
+**Testes C (12 binários, em `tests/c/`):** `test_alloc` (243 checks), `test_ops`
+(33 checks), `test_ops_edge` (272 checks), `test_bool` (72 checks),
+`test_bool_lifecycle` (154 checks), `test_string` (118 checks), `test_cow`
+(193 checks), `test_io_c` (280 checks), `test_datetime_c` (416 checks),
+`test_ops_window` (241 checks — primitivas Ring 0 da Fase 3: cumulativas, rank,
+sorted_nonnull, multi_argsort, rolling), `test_allocfail` (1612 verificações via
+`--wrap`, intercepta `malloc`/`realloc`/`calloc`/`strdup`), `test_stress`
+(81 851 checks).
 
 | Componente | Status |
 |---|---|
@@ -77,8 +84,12 @@ da Fase 3: cumulativas, rank, sorted_nonnull, multi_argsort, rolling),
 4. **Comparações com `NaN`** devolvem `false` com máscara válida (não NA).
    Um `null` em comparação devolve `false` com máscara `0x00` (NA).
 5. **`i64` overflow faz wrap** (complemento de 2).
-6. **Conversões por elemento são tolerantes a falha.** `astype` nunca lança
-   erro por elemento — inconversíveis tornam-se `null`.
+6. **Conversões por elemento são tolerantes a falha — com uma exceção rígida.**
+   `astype` para `float64`/`int64`/`string`/`datetime` não lança erro por
+   elemento: inconversíveis tornam-se `null`. **Exceção:** `astype("bool")` a
+   partir de numérico é estrito — aceita só `0`/`1`; qualquer outro valor lança
+   erro que orienta para `:map(fn)` (decisão H.6.5.a). A regra de truthiness não
+   é imposta silenciosamente; quem quer defini-la usa `map`.
 7. **`div/0 → null` em ambos os tipos.** Comportamento uniforme, previsível.
 
 ### Sistema de tipos
@@ -97,14 +108,14 @@ explícita via `astype` (suporta os pares entre os 6 dtypes).
 Series, DataSet, ergonomia. A API Lua é a linguagem principal do Smaug.
 
 **Testes Lua:** 18 suítes em subpastas por domínio (`tests/series/`,
-`tests/dataset/`, `tests/io/`, `tests/props/`), ~2300 checks diretos +
-property-based com 360 862 verificações.
+`tests/dataset/`, `tests/io/`, `tests/props/`), 1097 checks diretos +
+property-based com 360 862 verificações (24 invariantes × 3 seeds × 400 casos).
 
 | Componente | Status |
 |---|---|
-| `Series` — 74 métodos (acesso, aritmética, reduções, comparações, sort, map, rolling, unique/value_counts, abs/round/clip, cumsum/cumprod/diff/shift, ffill/bfill, cummin/cummax, argmin/argmax, rank/pct_rank, skew/kurtosis, mad/sem, mode/prod, median/quantile, where/mask, nlargest/nsmallest, expanding, sin/cos/tan/exp/log/sqrt) | `[Done]` |
+| `Series` — 95 métodos (acesso, aritmética, reduções, comparações, sort, map, rolling, unique/value_counts, abs/round/clip, cumsum/cumprod/diff/shift, ffill/bfill, cummin/cummax, argmin/argmax, rank/pct_rank, skew/kurtosis, mad/sem, mode/prod, median/quantile, where/mask, nlargest/nsmallest, expanding, sin/cos/tan/exp/log/sqrt) | `[Done]` |
 | `bool` como dtype de primeira classe (`Series<bool>`, Kleene, `land`/`lor`/`lnot`/`lxor`) | `[Done]` |
-| `DataSet` — 36 métodos (CRUD, filter, sort, select, assign, nunique, rolling, rename, pivot_table, stack/unstack, explode) | `[Done]` |
+| `DataSet` — 48 métodos (CRUD, filter, sort, select, assign, nunique, rolling, rename, pivot_table, stack/unstack, explode) | `[Done]` |
 | `df[mask]` — indexação por `Series<bool>` (`__index` dispatch) | `[Done]` |
 | `.str` Tier A: `len`, `lower`/`upper`, `strip`, `contains`, `startswith`/`endswith`, `replace` | `[Done]` |
 | `.str` Tier B: `find`, `slice`, `pad`/`zfill`, `rep`, `cat`, `split` | `[Done]` |
@@ -119,7 +130,7 @@ property-based com 360 862 verificações.
 | `smaug.DataSet({{...}})` (açúcar de construção) | `[Done]` |
 | `fillna` / `dropna` dtype-aware | `[Done]` |
 | `describe` para numérico, string, bool, datetime, categorical | `[Done]` |
-| `astype` tolerante por elemento (pares entre os 6 dtypes) | `[Done]` |
+| `astype` — tolerante por elemento (→`null`), exceto `bool` numérico que é rígido (só 0/1, resto orienta para `map`) | `[Done]` |
 
 ### Nota — limite da linguagem
 
@@ -134,8 +145,8 @@ só disparam entre objetos do mesmo metatype (Lua 5.1/LuaJIT). A sintaxe
 GroupBy, Join, Concat, Pivot, Melt, Rolling — implementados e testados.
 
 **Testes Lua:** cobertos em `tests/dataset/test_relational.lua` (groupby,
-concat, join — 164 checks) e `tests/series/test_window.lua` (rolling, expanding —
-64 checks); agregados, transformações e rolling estendido também exercitados em
+concat, join — 52 checks) e `tests/series/test_window.lua` (rolling, expanding —
+62 checks); agregados, transformações e rolling estendido também exercitados em
 `tests/dataset/test_core.lua` e `tests/series/test_stat.lua`.
 
 | Componente | Status |
@@ -162,9 +173,9 @@ concat, join — 164 checks) e `tests/series/test_window.lua` (rolling, expandin
 
 Parsers próprios, zero dependências externas. Fronteira `smaug_table_t` plugável.
 
-**Testes:** `tests/c/test_io_c.c` (190 checks C, inclui casos UTF-8 do G.1),
-`tests/io/test_csv.lua` (101 checks, inclui dados reais: `pedidos_digitados.csv`
-em `tests/fixtures/`, sep `;`), `tests/io/test_json.lua` (28 checks, inclui
+**Testes:** `tests/c/test_io_c.c` (280 checks C, inclui casos UTF-8 do G.1),
+`tests/io/test_csv.lua` (55 checks, inclui dados reais: `pedidos_digitados.csv`
+em `tests/fixtures/`, sep `;`), `tests/io/test_json.lua` (27 checks, inclui
 unicode).
 
 | Componente | Status |
@@ -221,15 +232,20 @@ foram concluídos nas sessões de junho/2026.
 | `isna` / `notna` (alias de `is_null`) | `Series` |
 | `rename` em lote | `DataSet` |
 
-### Bloco E — Robustez (encerra v1.0) `[In progress]`
+### Bloco E — Robustez (encerra v1.0) `[Substancialmente concluído]`
 
 | Item | Status |
 |---|---|
 | Bugs Valgrind dos parsers I/O (CSV+JSON, paths de OOM) | `[Done]` |
 | Suite completo Valgrind-clean em 12 binários | `[Done]` |
 | Auditoria de docs (Roadmap, API_INDEX, README, etc.) | `[Done]` |
-| Hardening global de cobertura (`smaug_csv` 85%, `smaug_json` 72%, `smaug_datetime` 70%) | `[Planned]` |
-| Docstrings nos métodos públicos de `Series` e `DataSet` | `[Planned]` |
+| Hardening global de cobertura (`smaug_csv` 90.53%, `smaug_json` 89.80%, `smaug_datetime` 92.40%, `smaug_ops_window` 95.98%; total 95.83% branch-alvo) | `[Done]` |
+| Auditoria de asserção (13 C + 18 Lua, caso a caso) — `test_ops`/`test_cow`/`test_bool`/`test_alloc`/`test_stress` convertidos de assert-only para checks reais | `[Done]` |
+| 2 double-frees corrigidos em `smaug_json.c` (`smaug_read_json_mem` 3 sites; `parse_record` realloc parcial) — descobertos ao escrever testes de cobertura | `[Done]` |
+| allocfail estendido a `calloc`/`strdup` (`--wrap` não interceptava em libc) | `[Done]` |
+| Sincronização factual das docs (README, ARCHITECTURE, `Build_and_Testing.md`) | `[Planned]` → Bloco I.1 |
+| `COVERAGE.md` + `MANIFEST.txt` regenerados no Fedora a cada commit | `[Done]` (processo) |
+| Docstrings nos métodos públicos de `Series` e `DataSet` | `[Planned]` (Fase 7) |
 
 ### Bloco F — Enriquecimento dos núcleos (encerra v1.0) `[Done]`
 
@@ -408,8 +424,9 @@ defensiva, dtypes mapeiam SQL, formato `.smg` é pós-v1.0).*
 
 ### Fase 3 — Migração de primitivas para Ring 0 `[Done]`
 *Só o que o Bloco G decidiu. Grupos A+B+C migrados e validados por
-`tests/c/test_ops_window.c` (207 checks). Consumidores Lua reescritos; suíte Lua
-permanece verde. Cada migração registrada no CHANGELOG.*
+`tests/c/test_ops_window.c` (241 checks no estado atual; 207 na época da Fase 3,
+ampliado pela auditoria de asserção da Fase 5). Consumidores Lua reescritos; suíte
+Lua permanece verde. Cada migração registrada no CHANGELOG.*
 - Por primitiva aprovada: implementar em C com guards → teste C dedicado (+allocfail
   se aloca) → reescrever o consumidor Lua → suíte Lua permanece verde → Valgrind +
   cobertura.
@@ -417,40 +434,98 @@ permanece verde. Cada migração registrada no CHANGELOG.*
 
 ### Fase 4 — Reorganização estrutural (split dos arquivos-deus) `[Done]`
 *Comportamento idêntico, zero mudança de API. `series.lua` (4389 linhas) → 16
-submódulos em `series/`; `dataset.lua` (2256 linhas) → 4 submódulos em `dataset/`;
+submódulos + `init.lua` em `series/`; `dataset.lua` (2256 linhas) → 4 submódulos
++ `init.lua` em `dataset/`;
 testes em subpastas por domínio (`tests/c/`, `tests/series/`, `tests/dataset/`,
 `tests/io/`, `tests/props/`). Mecanismo de injeção via `I` (sem `require`
 cruzado). As três fontes de build e o Eixo 12 atualizados (este último na sessão
 de sincronização de scripts, 2026-06-17). Ver CHANGELOG.*
 
-### Fase 5 — Hardening global `[In progress]`
+### Fase 5 — Hardening global `[Substancialmente concluído]`
 *Estrutura congelada; cada teste mira o lugar definitivo. Esta fase IMPLEMENTA
 decisões já tomadas (não delibera contrato).*
-- Medição de cobertura no Fedora (gcov autoritativo) → `COVERAGE.md` real.
-  **Nota:** `smaug_ops_window.c` (Fase 3) entra na medição pela primeira vez —
-  `make_coverage.sh` só passou a instrumentá-lo na sessão de 2026-06-17.
-- **Fechar cobertura dos parsers** (números reais, Fedora pós-Frente B):
-  `smaug_json.c` 72.30% · `smaug_datetime.c` 74.19% · `smaug_csv.c` 82.64% →
-  ≥95% branch-alvo. (Total do projeto: 89.06% branch-alvo, 96.52% linha.)
+- ~~Medição de cobertura no Fedora (gcov autoritativo)~~ **`[Done]`** —
+  `COVERAGE.md` real, 95.83% branch-alvo, 98.84% linha. `smaug_ops_window.c`
+  integrado à medição.
+- ~~**Fechar cobertura dos parsers** → ≥95% branch-alvo~~ **`[Done]`** —
+  `smaug_json.c` 72.30%→89.80% · `smaug_datetime.c` 72.77%→92.40% · `smaug_csv.c`
+  82.64%→90.53% · `smaug_ops_window.c` 85.26%→95.98%. Total 89.06%→95.83%. O que
+  resta nos parsers (89-92%) são branches de inputs malformados muito específicos
+  e macros de comparação — rendimento decrescente, exclusões honestas auditadas.
+- ~~**Auditoria de asserção** (cobertura mede execução, não verificação)~~
+  **`[Done]`** — leitura caso a caso dos 13 C + 18 Lua. 5 binários convertidos de
+  assert-only para checks reais; `test_io_c`/`test_ops_edge` fortalecidos. Lição:
+  grep/regex não auditam qualidade de teste (falso negativo em todos os C).
+- ~~**2 double-frees em `smaug_json.c`**~~ **`[Done]`** — descobertos ao escrever
+  os testes de cobertura. Confirma coverage-como-processo, não como métrica.
 - ~~`test_allocfail` estendido à camada de ops (Frente B)~~ **`[Done]`** —
-  estendido a f64/i64/bool/str/ops_str, window e datetime (lifecycle + sort/take/
-  filter); 1492 verificações. Revelou que exclusões "coberto por allocfail" do
-  datetime eram falsas (não havia af_* de datetime) — agora são verdadeiras.
+  f64/i64/bool/str/ops_str, window e datetime; estendido a `calloc`/`strdup`;
+  1612 verificações.
 - ~~Implementar a decisão de G.1 sobre `\uXXXX`~~ **`[Done]`** — JSON decodifica
-  para UTF-8; degradação silenciosa eliminada (Fase 3). Era bloqueante de release.
-- Property-based tests adicionais; avaliar fuzzing dos parsers (lacuna registrada).
-- ~~**Parity checker portável e determinístico**~~ **`[Done]`** — `common.lua`
-  passou a listar os submódulos de `series/`/`dataset/` em Lua puro (sem
-  `io.popen("find")`, que só funcionava no `find` Unix). Relatório idêntico entre
-  Fedora e Windows; os 12 eixos não mudaram. Contagem do resumo unificada entre
-  `parity.sh` e `parity.ps1` (ocorrências, não linhas).
+  para UTF-8; degradação silenciosa eliminada (Fase 3).
+- ~~**Parity checker portável e determinístico**~~ **`[Done]`** — `common.lua` em
+  Lua puro; relatório idêntico Fedora/Windows; 12 eixos.
 - ~~**Coerência de construção (camada Lua)**~~ **`[Done]`** — inferência de dtype
-  unificada numa fonte única, reusada por todos os construtores (`Series`/`DataSet`
-  `from_table`/`from_columns`/`__call`/`full`/`map`); fim do default-float64
-  silencioso; bool inferido de boolean nativo; `Series` chamável + alias
-  `from_array`; `astype("bool")` numérico rígido (só 0/1, resto orienta para
-  `map`); imutabilidade do `assign` fixada por teste. Ver CHANGELOG 2026-06-20.
-- Valgrind clean em todos os binários. `COVERAGE.md` + `MANIFEST.txt` regenerados.
+  unificada numa fonte única (`Series.infer_dtype`), reusada por
+  `from_table`/`from_columns`/`__call`/`full`/`map`; fim do default-float64
+  silencioso; bool de boolean nativo; `Series` chamável + `from_array`;
+  `astype("bool")` rígido; imutabilidade do `assign` fixada por teste.
+- ~~Guard de tipo nos `cmp_*` de datetime~~ **`[Done]`** — alinhado com
+  f64/i64/string; `target` não-número → erro orientado (achado I2 da auditoria
+  código-vs-código).
+- **Pendente:** docs sync (README/ARCHITECTURE/`Build_and_Testing.md`) → agendado
+  no Bloco I, item 1. Property-based adicional / fuzzing dos parsers fica como
+  lacuna registrada (não-bloqueante).
+
+### Fase 5.H — Bloco H: coerência de API e convenções de entrada `[Parcial]`
+*Design fechado. Camada Lua concluída (barata, container); camada Ring 0/I/O é
+ciclo próprio com cobertura + Valgrind no Fedora.*
+
+- **Camada Lua `[Done]`** — H.1 (`full` constrói vs `fill` modifica), H.2 (inferência
+  universal, fim do default-float64), H.3 (`Series` chamável + `from_array`),
+  H.6.1/6.2/6.3 (bool de boolean nativo; lista vazia → string), H.6.5.a
+  (`astype("bool")` rígido). Tudo via fonte única `Series.infer_dtype`.
+- **Camada Ring 0/I/O `[Planned]`** — H.5.b (`decimal` em `smaug_csv_opts_t`),
+  H.5.c (`sep == decimal` → erro), H.5.a (`dayfirst` no reader), H.6.4 (ampliar
+  `smaug_dt_parse` para formatos não-ambíguos). Escopo exato de H.6.4 confirmado
+  ao atacar o bloco.
+- **Testes pendentes (Lua) `[Planned]`** — `from_array`/`__call` (existem, sem teste
+  explícito); `map` com retorno bool; contrato de imutabilidade do `assign`.
+
+### Fase 5.I — Bloco I: fechamento de coerência pré-v1.0 `[Planned]`
+*Correções pontuais de robustez e coerência, agrupadas. Cada uma pequena; juntas,
+fecham a classe de inconsistências achada na auditoria código-vs-código. Ordem:
+docs primeiro (limpa a mesa), Ring 0 agrupado (exige Fedora), camada Lua (container),
+auditor por último (valida que tudo fechou).*
+
+1. **Docs sync** — README, ARCHITECTURE, `Build_and_Testing.md` (comandos para
+   suítes que não existem mais); I1 `astype("bool")` em CONTRACT.md + API_INDEX
+   (Roadmap já corrigido); COW.md (acrescentar datetime à tabela + gatilhos de detach).
+2. **Ring 0** (Fedora, cobertura+Valgrind): `rank` i64 — trocar ordenação via
+   `double` por struct `{int64_t,size_t}` (perde precisão acima de 2^53; `sort`/
+   `argsort` já corretos) · D1 `strdup` guard no `make_error` · D2 unificar
+   assinatura `append`/`set` no header.
+3. **Camada Lua** (container): expor `dt_view` (campo no descritor + teste Lua de
+   detach; Ring 0 já pronto e testado) · `view` em string → erro orientado (hoje
+   `nil value` cru) · linha 190 `_types.lua` → `I64_MIN` (elimina literal e armadilha
+   latente).
+4. **Auditor** — fortalecer eixo 10 do parity para cruzar header↔descritor↔COW.md
+   contra `exceptions.txt`, fechando as três pontas (hoje só checa o header). Caso
+   de teste vivo: deve acusar qualquer `view` exposto no C sem campo no descritor.
+
+### Débitos técnicos registrados (não-agendados)
+*Rastreados, sem bloquear a v1.0. O que está agendado vive no Bloco I, não aqui.*
+
+| # | Local | Descrição | Severidade |
+|---|---|---|---|
+| D4 | Categorical | chave de hash via `tostring` (uniforme; sem bug observado) | Cosmético |
+| I3 | `smaug_ops_str.c` | `g_sort_series` global (vs contexto por parâmetro do `multi_argsort`). Single-thread: sem bug; inconsistência arquitetural | Baixa |
+| I4 | `get_value` f64/i64 (`_types.lua`) | passa `nil` como status; datetime checa. Sem bug (sempre após `check_index`); assimetria | Baixa |
+| — | Rolling DataSet (`_stat.lua`) | reimplementa rolling em Lua O(N×W), duplica o caminho C da Series, só sum/mean/min/max. Funciona; débito de duplicação + performance | Baixa |
+
+*Resolvido nesta sessão: I2 (guard de tipo nos `cmp_*` de datetime, alinhado com
+f64/i64/string).*
+
 
 ### Fase 6 — Spike: FFI loader instalável `[Planned]` *(pode ser puxado para antes)*
 - `ffi_loader` descobre a `.so`/`.dll`/`.dylib` num layout *instalado* (não só

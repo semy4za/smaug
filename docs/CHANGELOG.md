@@ -5,6 +5,9 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-06-23 
+- docs(roadmap): sincroniza métricas reais (cobertura 95.83%, checks por suíte), enxuga Blocos H/E, adiciona Bloco I (fechamento de coerência pré-v1.0) e registra achados da auditoria código-vs-código (dt_view, rank i64, rolling-dup, I3/I4)
+
 ## 2026-06-22 — Fase 5: cobertura dos parsers + correção de double-free sob OOM
 
 ### Corrigido
