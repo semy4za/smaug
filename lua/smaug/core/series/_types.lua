@@ -179,6 +179,7 @@ return function(I)
             count_nonnull = C.smaug_dt_count_nonnull,
             filter  = C.smaug_dt_filter,
             take    = C.smaug_dt_take,
+            view    = C.smaug_dt_view,
             sort    = C.smaug_dt_sort,
             argsort = C.smaug_dt_argsort,
             cmp_gt = function(c, t, om) if type(t)~="number" then error("smaug: comparação de datetime espera epoch_ms (número)",4) end return C.smaug_dt_gt(c, t, om) end,
@@ -187,7 +188,7 @@ return function(I)
             cmp_ge = function(c, t, om) if type(t)~="number" then error("smaug: comparação de datetime espera epoch_ms (número)",4) end return C.smaug_dt_ge(c, t, om) end,
             cmp_le = function(c, t, om) if type(t)~="number" then error("smaug: comparação de datetime espera epoch_ms (número)",4) end return C.smaug_dt_le(c, t, om) end,
             cmp_ne = function(c, t, om) if type(t)~="number" then error("smaug: comparação de datetime espera epoch_ms (número)",4) end return C.smaug_dt_ne(c, t, om) end,
-            is_int_sentinel = function(v) return v == -9223372036854775808 end,
+            is_int_sentinel = function(v) return v == I64_MIN end,
         },
         bool = {
             name        = "bool",

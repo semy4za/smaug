@@ -9,17 +9,8 @@ package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 
 local smaug  = require("smaug")
 local Series = smaug.Series
-local NA     = Series.NA
-
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
-end
-
-local smaug = require("smaug")
-local S  = smaug.Series
-local NA = smaug.NA
+local S      = smaug.Series
+local NA     = smaug.NA
 
 local n_ok = 0
 local function check(cond, msg)
@@ -388,6 +379,17 @@ local cl = su:clone()
 cl:set(1, ep_zero)
 check(su:get(1) == ep_c,      "clone: original intacto")
 
+-- view + COW detach (I.3: dt_view exposto no descritor; Ring 0 já testado)
+local sv_base = S.from_table({ep_a, ep_b, ep_c}, "datetime")
+local sv = sv_base:view(2, 2)              -- janela [ep_b, ep_c]
+check(sv:len() == 2,           "dt view: len da janela = 2")
+check(sv:get(1) == ep_b,       "dt view: 1º = ep_b")
+check(sv:get(2) == ep_c,       "dt view: 2º = ep_c")
+sv:set(1, ep_zero)                         -- escrita dispara detach
+check(sv:get(1) == ep_zero,    "dt view: escrita reflete na view")
+check(sv_base:get(2) == ep_b,  "dt view: detach COW — pai intacto após escrita")
+check(not pcall(function() sv_base:view(2, 5) end), "dt view: fora dos limites → erro")
+
 -- ================================================================
 -- 8. fillna / is_null
 -- ================================================================
@@ -548,20 +550,6 @@ check(S.dt_from_parts(2024, 1, 1, 25, 0, 0) == nil, "dt_from_parts: hora=25 → 
 -- =====================================================================
 -- .dt F.3 estendido (de test_dt_extended.lua)
 -- =====================================================================
-
---
--- Roda da raiz: luajit tests/test_dt_extended.lua
-
-package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
-local smaug = require("smaug")
-local S  = smaug.Series
-local NA = smaug.NA
-
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
-end
 
 local function P(iso) return S.dt_parse(iso) end
 

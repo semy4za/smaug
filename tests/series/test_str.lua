@@ -772,6 +772,14 @@ check(j.str:join("-") == j.str:cat("-"), "join idêntico a cat")
 local je = S.from_table({}, "string")
 check(je.str:join(",") == "",       "join série vazia → vazia")
 
+-- view não suportado em string → erro orientado (I.3; antes era nil-call cru)
+local sv = S.from_table({"SP", "RJ", "MG"}, "string")
+local ok_v, err_v = pcall(function() return sv:view(1, 2) end)
+check(not ok_v,                            "string view: erro (não nil-call)")
+check(type(err_v) == "string" and err_v:find("não é suportado", 1, true) ~= nil,
+                                           "string view: mensagem orienta (não suportado)")
+check(sv:take({1, 2}):len() == 2,          "string take: alternativa a view funciona")
+
 -- ================================================================
 -- Resultado
 -- ================================================================

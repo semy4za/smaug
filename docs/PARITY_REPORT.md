@@ -1,8 +1,7 @@
 # Smaug — Relatório de Paridade
 
-> Arquivo gerado por `bash scripts/parity/parity.sh` ou `powershell scripts/parity/parity.ps1`.
-> **Não editar à mão.** Decisões conscientes de não-paridade ficam em
-> `scripts/parity/exceptions.txt`.
+> Arquivo gerado por `bash scripts/parity/parity.sh`. **Não editar à mão.**
+> Decisões conscientes de não-paridade ficam em `scripts/parity/exceptions.txt`.
 
 Convenção de status:
 
@@ -11,7 +10,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-06-24 16:42:56 UTC
+Gerado em: 2026-06-24 23:32:22 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -461,7 +460,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `sort` | 🟩 |  |
 | `take` | 🟩 |  |
 | `truncate` | 🟩 |  |
-| `view` | 🟨 |  |
+| `view` | 🟩 |  |
 | `week` | 🟩 |  |
 | `weekday` | 🟩 |  |
 | `year` | 🟩 |  |
@@ -647,7 +646,7 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 223/223 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 224/224 erros com prefixo `smaug:` (100.0%)
 - `dataset.lua`: 88/88 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
@@ -662,13 +661,19 @@ Cada dtype com backend C deve oferecer o mesmo conjunto de operações de lifecy
 | `create_from_array` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 | `free` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 | `clone` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-| `view` | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
+| `view` | 🟩 | 🟩 | 🟩 | ⬜ | 🟩 |
 | `append` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 | `append_null` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 | `set` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 | `set_null` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 | `get` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 | `is_null` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+
+**Cruzamento header C ↔ descritor DTYPES** (funções de dois-lados): a função existe no C *e* é exposta no descritor de `_types.lua`? 🟥 = C tem mas o descritor não expõe (ou vice-versa) sem exceção registrada.
+
+| função | f64 | i64 | bool | str | dt |
+| :--- | :-: | :-: | :-: | :-: | :-: |
+| `view` | 🟩 | 🟩 | ⬜ | ⬜ | 🟩 |
 
 ## Eixo 11 — Cobertura de testes proporcional
 
@@ -686,8 +691,8 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `series/test_window` | 64 | 5 | 6 | — | 1 | — | — |
 | `series/test_predicates` | 155 | 6 | 42 | 3 | 11 | — | — |
 | `series/test_selection` | 23 | 3 | 1 | — | 1 | — | — |
-| `series/test_str` | 271 | 4 | 9 | 1 | 49 | — | — |
-| `series/test_dt` | 259 | 3 | 6 | 2 | 9 | 58 | — |
+| `series/test_str` | 274 | 4 | 9 | 1 | 51 | — | — |
+| `series/test_dt` | 263 | 3 | 6 | 2 | 9 | 59 | — |
 | `series/test_categorical` | 295 | 7 | 7 | 8 | 5 | 13 | 57 |
 | `dataset/test_core` | 208 | 26 | 27 | 8 | 11 | — | — |
 | `dataset/test_relational` | 164 | 10 | 41 | 4 | 22 | — | — |
@@ -698,7 +703,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 67 | 18 | 2 | — | — | — | — |
 
-**Total de checks:** 2346
+**Total de checks:** 2353
 
 ### Menções totais por dtype (toda a suite)
 
@@ -707,8 +712,8 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | float64 | 186 |
 | int64 | 270 |
 | bool | 48 |
-| string | 157 |
-| datetime | 71 |
+| string | 159 |
+| datetime | 72 |
 | categorical | 57 |
 
 ## Eixo 12 — Sincronização docs ↔ código
@@ -733,10 +738,10 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 852
-- ⬜ exceção registrada: 146
-- 🟨 suspeita (revisar): 244
-- 🟥 inconsistência clara: 10
+- 🟩 paridade: 856
+- ⬜ exceção registrada: 149
+- 🟨 suspeita (revisar): 242
+- 🟥 inconsistência clara: 11
 
 
 ## Como usar este relatório

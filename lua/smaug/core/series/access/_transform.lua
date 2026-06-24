@@ -48,6 +48,11 @@ return function(I)
 
     -- view: fatia zero-copy [start, start+len-1] (1-based).
     function methods.view(self, start, len)
+        if self._d.view == nil then
+            error("smaug: view() não é suportado para dtype '"..self._dtype..
+                  "' (sem buffer de tamanho fixo compartilhável); "..
+                  "use :take(idx) ou :head(n)/:tail(n) para uma cópia", 2)
+        end
         start = start or 1
         len   = len or (self:len() - start + 1)
         local n = self:len()

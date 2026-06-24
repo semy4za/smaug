@@ -197,8 +197,9 @@
 # ===================================================================
 # Eixo 10 — Lifecycle paridade
 # ===================================================================
-10:view/string        sem suporte (COW.md)
+10:view/str           sem suporte — offset-based, rebasing adiado (COW.md)
 10:view/categorical   Lua puro
+10:view/bool          BoolSeries imutável por construção (resultado de comparação); não há mutação a destacar
 
 # ===================================================================
 # Eixo 6 — Tipos de retorno

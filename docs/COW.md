@@ -120,10 +120,10 @@ Em qualquer caso: pai intacto, view intacta, sistema consistente.
 
 | operação Lua | C |
 |---|---|
-| `v:set(i, val)` | `smaug_f64_set` / `smaug_i64_set` |
-| `v:set_null(i)` | `smaug_f64_set_null` / `smaug_i64_set_null` |
-| `v:append(val)` | `smaug_f64_append` / `smaug_i64_append` |
-| `v:append(nil)` | `smaug_f64_append_null` / `smaug_i64_append_null` |
+| `v:set(i, val)` | `smaug_f64_set` / `smaug_i64_set` / `smaug_dt_set` |
+| `v:set_null(i)` | `smaug_f64_set_null` / `smaug_i64_set_null` / `smaug_dt_set_null` |
+| `v:append(val)` | `smaug_f64_append` / `smaug_i64_append` / `smaug_dt_append` |
+| `v:append(nil)` | `smaug_f64_append_null` / `smaug_i64_append_null` / `smaug_dt_append_null` |
 
 ## O que NÃO dispara o detach
 
@@ -139,12 +139,17 @@ Operações que produzem novo objeto nunca tocam o armazenamento compartilhado:
 |---|---|---|
 | `float64` | ✅ | ✅ |
 | `int64` | ✅ | ✅ |
+| `datetime` | ✅ | ✅ |
 | `string` | ❌ (futuro) | — |
 | `bool` | ❌ (imutável por construção) | — |
 
+`datetime` tem view + COW completos: é um buffer de `int64_t` (epoch_ms) de
+tamanho fixo, então a janela é zero-copy e o detach copia uma fatia contígua —
+mesma mecânica de `float64`/`int64`.
 `BoolSeries` são resultados de comparações — imutáveis por natureza.
 `string` não tem view ainda; quando ganhar, o detach será mais complexo
-(buffer de bytes + offsets rebaseados).
+(buffer de bytes + offsets rebaseados). Chamar `:view()` em `string` ou `bool`
+lança erro orientado (não falha silenciosa).
 
 ---
 
