@@ -205,7 +205,12 @@
 # Documentar quando intencional. Quando inconsistente sem razão, deixar
 # o checker apontar como ❌.
 # ===================================================================
-# (vazio por enquanto — preencher após primeira rodada do checker)
+# append/append_null retornam int (0/-1), set/set_null retornam smaug_status_t.
+# Assimetria DELIBERADA (D2, avaliado): set opera sobre índice existente e
+# precisa sinalizar por que falhou (OOB/ARGUMENT/NOMEM); append só pode falhar
+# por OOM, retorno binário basta. Frontend Lua trata ambos via checkrc (== 0).
+# Documentado no contrato de smaug_core.h. Não é inconsistência a corrigir.
+6:append/all_dtypes     retorno int (0/-1) intencional vs set status_t — ver smaug_core.h
 
 # ===================================================================
 # Eixo 8 — Nomenclatura

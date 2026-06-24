@@ -43,6 +43,14 @@ smaug_series_f64_t* smaug_f64_view(smaug_series_f64_t *s, size_t start, size_t l
  *                      i64), segura mesmo se o caller passar status = NULL.
  *   - is_null(idx inválido) -> true    (resposta conservadora e segura)
  *   - view(faixa inválida)  -> NULL    (sinal de erro não-colidente)
+ *   - append/append_null -> int (0 = ok, -1 = erro). A assinatura difere de
+ *                      set DE PROPÓSITO: set sinaliza POR QUE falhou (OOB vs
+ *                      ARGUMENT vs NOMEM), pois opera sobre um índice existente;
+ *                      append só pode falhar por OOM (no COW detach ou no grow)
+ *                      — não há índice a validar, logo um retorno binário basta.
+ *                      Não é inconsistência: é a sinalização mínima que cada
+ *                      operação exige. O frontend Lua trata ambos via `== 0`
+ *                      (checkrc), agnóstico ao tipo concreto.
  *
  * O frontend Lua valida o índice (check_index) e lança erro claro ANTES de
  * chamar o C; um caller em C direto recebe o status e decide. */

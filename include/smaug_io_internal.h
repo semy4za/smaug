@@ -45,6 +45,12 @@ static inline smaug_table_t *make_error(const char *msg) {
     smaug_table_t *t = calloc(1, sizeof(smaug_table_t));
     if (!t) return NULL;
     t->error = strdup(msg);
+    if (!t->error) {        /* OOM ao copiar a mensagem: não deixar t->error NULL
+                               (o caller leria como sucesso). Retorna NULL → o
+                               consumidor trata como OOM, sinalização correta. */
+        free(t);
+        return NULL;
+    }
     return t;
 }
 

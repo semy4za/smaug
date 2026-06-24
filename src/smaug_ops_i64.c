@@ -698,14 +698,16 @@ int64_t *smaug_i64_sorted_nonnull(const smaug_series_i64_t *s, size_t *out_n) {
 }
 
 static int cmp_i64_rank_pair(const void *a, const void *b) {
-    const double *pa = (const double *)a, *pb = (const double *)b;
-    /* [0] = valor como double, [1] = índice */
-    if (pa[0] != pb[0]) return (pa[0] > pb[0]) - (pa[0] < pb[0]);
-    return (pa[1] > pb[1]) - (pa[1] < pb[1]);
+    const i64_entry_t *pa = (const i64_entry_t *)a, *pb = (const i64_entry_t *)b;
+    /* compara o valor como int64 (sem conversão para double — preserva
+       precisão total acima de 2^53) e desempata pelo índice original
+       (size_t), mantendo a ordenação estável. */
+    if (pa->val != pb->val) return (pa->val > pb->val) - (pa->val < pb->val);
+    return (pa->idx > pb->idx) - (pa->idx < pb->idx);
 }
 
-/* rank i64: converte valores para double internamente para reusar a lógica
-   de comparação. Contrato e método idênticos ao f64. */
+/* rank i64: ordena por valor int64 direto (mesma lógica de comparação do
+   argsort i64). Contrato e método idênticos ao f64. */
 double *smaug_i64_rank(const smaug_series_i64_t *s, int method) {
     if (!s) return NULL;
     size_t n = s->size;
@@ -721,14 +723,14 @@ double *smaug_i64_rank(const smaug_series_i64_t *s, int method) {
     }
     if (m == 0) return result;
 
-    double (*pairs)[2] = malloc(m * sizeof(*pairs));
+    i64_entry_t *pairs = malloc(m * sizeof(*pairs));
     if (!pairs) { free(result); return NULL; }
 
     size_t j = 0;
     for (size_t i = 0; i < n; i++) {
         if (VALID(s, i)) {
-            pairs[j][0] = (double)s->data[i];
-            pairs[j][1] = (double)i;
+            pairs[j].val = s->data[i];
+            pairs[j].idx = i;
             j++;
         }
     }
@@ -737,13 +739,13 @@ double *smaug_i64_rank(const smaug_series_i64_t *s, int method) {
     size_t p = 0;
     while (p < m) {
         size_t q = p;
-        while (q + 1 < m && pairs[q+1][0] == pairs[p][0]) q++;
+        while (q + 1 < m && pairs[q+1].val == pairs[p].val) q++;
 
         double r_min = (double)(p + 1);
         double r_max = (double)(q + 1);
 
         for (size_t k = p; k <= q; k++) {
-            size_t orig_i = (size_t)pairs[k][1];
+            size_t orig_i = pairs[k].idx;
             double rank_val;
             switch (method) {
                 case 1:  rank_val = r_min;                   break;

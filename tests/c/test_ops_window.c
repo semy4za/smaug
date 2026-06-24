@@ -555,6 +555,19 @@ static void test_i64_rank(void) {
     free(r); smaug_i64_free(s);
 
     CHECK(smaug_i64_rank(NULL, 0) == NULL, "i64 rank NULL input");
+
+    /* precisão acima de 2^53: três int64 distintos e consecutivos que
+       colapsariam para o mesmo double. Com ordenação int64 direta, devem
+       ranquear como distintos (1,2,3), não como empate. */
+    int64_t big[] = { 9007199254740994LL,   /* 2^53 + 2 */
+                      9007199254740992LL,   /* 2^53     */
+                      9007199254740993LL };  /* 2^53 + 1 */
+    smaug_series_i64_t *sb = i64_from(big, 3);
+    double *rb = smaug_i64_rank(sb, 0);  /* average; sem empates → ranks inteiros */
+    CHECK(rb && APPROX(rb[0], 3.0), "i64 rank >2^53: maior valor → rank 3");
+    CHECK(rb && APPROX(rb[1], 1.0), "i64 rank >2^53: menor valor → rank 1");
+    CHECK(rb && APPROX(rb[2], 2.0), "i64 rank >2^53: valor médio → rank 2");
+    free(rb); smaug_i64_free(sb);
 }
 
 /* =====================================================================

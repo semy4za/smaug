@@ -3,7 +3,7 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `76f8c3c`  |  Data: 2026-06-23 22:24:25 -0300
+- Commit medido: `3b0404a`  |  Data: 2026-06-23 22:28:45 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
 - **Branch-bruto** (todos os ramos): `3037/3270 = 92.87%` -- 101 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
@@ -35,8 +35,8 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_ops_i64.c:633` — if (!s || s->size == 0) return SIZE_MAX;
 - `smaug_ops_i64.c:681` — if (!s || !out_n) return NULL;
 - `smaug_ops_i64.c:687` — if (n == 0) return NULL;
-- `smaug_ops_i64.c:722` — if (m == 0) return result;
-- `smaug_ops_i64.c:748` — switch (method) {
+- `smaug_ops_i64.c:724` — if (m == 0) return result;
+- `smaug_ops_i64.c:750` — switch (method) {
 
 **`smaug_csv.c`** — 24 linha(s) com ramo descoberto:
 - `smaug_csv.c:131` — if (i+1 < len && buf[i+1] == quote) { PUSH(quote); i += 2; }
