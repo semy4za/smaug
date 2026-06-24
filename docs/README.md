@@ -497,14 +497,16 @@ s:is_null(3)   -- false
 
 | métrica | valor |
 |---|---|
-| cobertura de linhas | 96.52% (2861/2964) |
-| branch-alvo (MC/DC) | 89.06% (2850/3200, 80 exclusões documentadas) |
-| checks OOM (allocfail) | 1 492 verificações |
-| checks property-based | 360 862 |
-| checks de stress | 51 851 |
-| Valgrind | clean em todos os 12 binários |
+| cobertura (linha + branch-alvo MC/DC) | ver `COVERAGE.md` (gerado no Fedora) |
+| testes OOM (allocfail via `--wrap`) | todos os pontos públicos dos Anéis 0+3 |
+| testes property-based | invariantes × seeds × casos |
+| testes de stress | N=1M, chains, views, ciclos |
+| Valgrind | clean em todos os binários |
 | warnings `-Wall -Wextra` | zero |
-| suítes de teste | 12 em C, 18 em Lua |
+| suítes de teste | C em `tests/c/`, Lua em `tests/{series,dataset,io,props}/` |
+
+Números exatos vivem nas fontes geradas — output do `build.sh`, `COVERAGE.md`,
+`MANIFEST.txt` — nunca cravados aqui, para não defasarem.
 
 ---
 

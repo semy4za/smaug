@@ -303,7 +303,7 @@ A implementação ocorre nesse anel — nunca mais profundamente do que o necess
 | Ordenação determinística | ✅ Forte |
 | Contratos defensivos | ✅ Forte — toda fronteira pública valida |
 | Tratamento de OOM | ✅ Forte — todos os pontos públicos cobertos, incluindo parsers I/O |
-| Integridade de memória | ✅ Forte — Valgrind-clean em 12 binários |
+| Integridade de memória | ✅ Forte — Valgrind-clean em todos os binários |
 | Views e Copy-on-Write | ✅ Forte |
 | Isolamento após COW detach | ✅ Forte |
 | Álgebra booleana Kleene | ✅ Forte |
@@ -314,19 +314,19 @@ A implementação ocorre nesse anel — nunca mais profundamente do que o necess
 
 ### Validação e evidências
 
-> **Nota:** contagens medidas no estado atual (pós-split da Fase 4 e Frente B do
-> hardening). Cobertura sempre regenerada a partir do gcov real no Fedora — nunca
-> atualizada de memória, por princípio.
+> **Nota:** este quadro registra *o que existe e seu estado*, não contagens. Números
+> que mudam com o código (check counts, cobertura) vivem nas fontes vivas — output do
+> `build.sh`, `COVERAGE.md` e `MANIFEST.txt`, sempre regenerados no Fedora, nunca
+> atualizados de memória. Doc afirma estrutura e comportamento; número exato se mede.
 
 | Área | Estado |
 |---|---|
-| Testes C (Anéis 0+3) | ✅ 12 binários: test_alloc, test_ops, test_ops_edge (269), test_bool, test_bool_lifecycle (154), test_string (118), test_cow (15), test_io_c (190), test_datetime_c (201), test_ops_window (207), test_allocfail (1492), test_stress (51k+) |
-| Testes Lua (Anéis 1+2+3) | ✅ 18 suítes, 360 862+ checks |
-| Stress tests (51k+ checks) | ✅ Forte |
-| Property-based testing (360k+ checks) | ✅ Forte |
-| AllocFail testing (1158 verificações) | ✅ Forte — inclui parsers CSV/JSON |
-| Branch coverage / MC/DC | ✅ 88.12% branch-alvo (parsers I/O incluídos, 90 exclusões) |
-| Cobertura de linhas | ✅ 95.99% |
+| Testes C (Anéis 0+3) | ✅ test_alloc, test_ops, test_ops_edge, test_bool, test_bool_lifecycle, test_string, test_cow, test_io_c, test_datetime_c, test_ops_window, test_allocfail, test_stress |
+| Testes Lua (Anéis 1+2+3) | ✅ suítes em `tests/series/`, `tests/dataset/`, `tests/io/`, `tests/props/` |
+| Stress tests | ✅ Forte — N=1M, chains, views simultâneas, ciclos |
+| Property-based testing | ✅ Forte — invariantes × seeds × casos |
+| AllocFail testing | ✅ Forte — OOM em todos os pontos públicos, inclui parsers CSV/JSON |
+| Branch coverage / MC/DC | ✅ branch-alvo e linha — ver `COVERAGE.md` (gerado no Fedora) |
 | Cross-platform (Windows/Linux) | ✅ Validado — MSYS2-UCRT64 + Fedora |
 | Dados reais | ✅ pedidos_digitados.csv (916 linhas), cotações CSV/JSON |
 | Fuzzing | ⚠️ Ausente — lacuna registrada |

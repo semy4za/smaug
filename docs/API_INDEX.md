@@ -149,7 +149,7 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `:view(start, len)` | view zero-copy COW-gravável |
 | `:take(idx)` / `:head(n)` / `:tail(n)` | seleção → nova Series |
 | `:dropna()` | → nova Series sem NULLs |
-| `:astype(dtype)` | conversão tolerante por elemento (inconversíveis → null) |
+| `:astype(dtype)` | conversão tolerante por elemento (inconversíveis → null); exceto `bool` numérico, que é rígido (só 0/1, resto orienta para `:map`) |
 | `:fillna(value)` | nova Series com NULLs→value; NaN intacto |
 | `:to_table([na])` | → tabela Lua |
 | `:describe()` | resumo estatístico |

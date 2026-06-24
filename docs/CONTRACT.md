@@ -59,9 +59,13 @@ true
 3.0
 ```
 
-`astype` nunca lança erro por causa de um elemento individual. Elementos
-inconversíveis tornam-se `null` — a série inteira não é descartada por um
-dado ruim. Operações em lote são tolerantes a dados imperfeitos.
+`astype` para `float64`/`int64`/`string`/`datetime` nunca lança erro por causa de
+um elemento individual. Elementos inconversíveis tornam-se `null` — a série inteira
+não é descartada por um dado ruim. Operações em lote são tolerantes a dados imperfeitos.
+
+**Exceção — `astype("bool")` a partir de numérico é estrito:** aceita só `0`/`1`;
+qualquer outro valor lança erro que orienta para `:map(fn)`. A regra de truthiness
+não é imposta silenciosamente — quem quer defini-la usa `map`.
 
 ---
 

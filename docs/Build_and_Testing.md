@@ -67,46 +67,46 @@ Compila `libsmaug.dll` e todos os testes. Coverage/Valgrind rodam no Fedora.
 
 ### Testes C (Anel 0 + Anel 3)
 
-| Binário | Checks | O que cobre |
-|---------|--------|-------------|
-| `test_alloc` | — | lifecycle f64/i64: create, clone, view, free |
-| `test_ops` | — | aritmética, reduções, comparações, sort f64/i64 |
-| `test_ops_edge` | 269 | casos degenerados: vazio, NaN, ±Inf, overflow |
-| `test_bool` | — | lifecycle bool, Kleene |
-| `test_bool_lifecycle` | 154 | COW em bool, integração |
-| `test_string` | 118 | lifecycle string, sort, filter |
-| `test_cow` | 15 | COW detach, isolamento após mutação |
-| `test_io_c` | 190 | parsers CSV/JSON: CRLF, aspas RFC 4180, NA, inferência, UTF-8 `\uXXXX`, roundtrips |
-| `test_datetime_c` | 201 | datetime C: lifecycle, parse ISO 8601, componentes calendário, aritmética, comparações, sort, COW, datas negativas, bissextos |
-| `test_ops_window` | 207 | ops de janela (Grupo C): multi_argsort 5 dtypes, rolling deque, cumulativas |
-| `test_allocfail` | 1492 | OOM em todos os pontos públicos (Anéis 0+3, via `--wrap`); inclui Grupo A/B e datetime |
-| `test_stress` | 51k+ | N=1M, chains, 200 views simultâneas, 10k ciclos |
+| Binário | O que cobre |
+|---------|-------------|
+| `test_alloc` | lifecycle f64/i64: create, clone, view, free |
+| `test_ops` | aritmética, reduções, comparações, sort f64/i64 |
+| `test_ops_edge` | casos degenerados: vazio, NaN, ±Inf, overflow |
+| `test_bool` | lifecycle bool, Kleene |
+| `test_bool_lifecycle` | COW em bool, integração |
+| `test_string` | lifecycle string, sort, filter |
+| `test_cow` | COW detach, isolamento após mutação |
+| `test_io_c` | parsers CSV/JSON: CRLF, aspas RFC 4180, NA, inferência, UTF-8 `\uXXXX`, roundtrips |
+| `test_datetime_c` | datetime C: lifecycle, parse ISO 8601, componentes calendário, aritmética, comparações, sort, COW, datas negativas, bissextos |
+| `test_ops_window` | ops de janela (Grupo C): multi_argsort 5 dtypes, rolling deque, cumulativas |
+| `test_allocfail` | OOM em todos os pontos públicos (Anéis 0+3, via `--wrap`); inclui Grupo A/B e datetime |
+| `test_stress` | N=1M, chains, views simultâneas, ciclos |
 
 ### Testes Lua (Anéis 1+2+3)
 
-As 18 suítes vivem em subpastas por domínio: `tests/series/`, `tests/dataset/`,
-`tests/io/`, `tests/props/`. Checks medidos no estado atual:
+As suítes vivem em subpastas por domínio: `tests/series/`, `tests/dataset/`,
+`tests/io/`, `tests/props/`.
 
-| Arquivo | Checks | O que cobre |
-|---------|--------|-------------|
-| `series/test_constructors.lua` | 65 | Series f64/i64/bool: construtores, aritmética, lifecycle, map, astype |
-| `series/test_access.lua` | 25 | acesso, edge cases, fillna |
-| `series/test_reduce.lua` | 37 | reduções, valores especiais f64 (NaN, ±Inf) |
-| `series/test_stat.lua` | 73 | stat, transformações, cumsum/diff/shift |
-| `series/test_window.lua` | 62 | rolling, expanding, cum*, diff, shift, ffill/bfill, argmin/argmax |
-| `series/test_predicates.lua` | 74 | predicados, duplicatas, searchsorted, rep_each |
-| `series/test_selection.lua` | 21 | at/iat, where, mask, ifelse, isna/notna |
-| `series/test_str.lua` | 61 | `.str` Tier A+B+C completo |
-| `series/test_dt.lua` | 65 | `.dt` base + F.3 estendido |
-| `series/test_categorical.lua` | 93 | categorical + completude datetime/categorical |
-| `dataset/test_core.lua` | 207 | core, ops, rename, pivot_table, stack, unstack, explode |
-| `dataset/test_relational.lua` | 52 | groupby, concat, join |
-| `dataset/test_stat.lua` | 49 | corr/cov, equals, compare, duplicated, drop_duplicates |
-| `dataset/test_io_support.lua` | 43 | at/iat, insert, to_dict, from_dict, to_markdown, to_string |
-| `io/test_csv.lua` | 55 | I/O CSV + dados reais (pedidos_digitados.csv, sep `;`) |
-| `io/test_json.lua` | 27 | I/O JSON + unicode |
-| `props/test_props.lua` | 360 862 | property-based: 24 invariantes × 3 seeds × 400 casos |
-| `props/test_integration.lua` | 66 | integração: reduções avançadas, rank, skew, kurtosis, mad, sem, funções matemáticas |
+| Arquivo | O que cobre |
+|---------|-------------|
+| `series/test_constructors.lua` | Series f64/i64/bool: construtores, aritmética, lifecycle, map, astype |
+| `series/test_access.lua` | acesso, edge cases, fillna |
+| `series/test_reduce.lua` | reduções, valores especiais f64 (NaN, ±Inf) |
+| `series/test_stat.lua` | stat, transformações, cumsum/diff/shift |
+| `series/test_window.lua` | rolling, expanding, cum*, diff, shift, ffill/bfill, argmin/argmax |
+| `series/test_predicates.lua` | predicados, duplicatas, searchsorted, rep_each |
+| `series/test_selection.lua` | at/iat, where, mask, ifelse, isna/notna |
+| `series/test_str.lua` | `.str` Tier A+B+C completo |
+| `series/test_dt.lua` | `.dt` base + F.3 estendido |
+| `series/test_categorical.lua` | categorical + completude datetime/categorical |
+| `dataset/test_core.lua` | core, ops, rename, pivot_table, stack, unstack, explode |
+| `dataset/test_relational.lua` | groupby, concat, join |
+| `dataset/test_stat.lua` | corr/cov, equals, compare, duplicated, drop_duplicates |
+| `dataset/test_io_support.lua` | at/iat, insert, to_dict, from_dict, to_markdown, to_string |
+| `io/test_csv.lua` | I/O CSV + dados reais (pedidos_digitados.csv, sep `;`) |
+| `io/test_json.lua` | I/O JSON + unicode |
+| `props/test_props.lua` | property-based: invariantes × seeds × casos |
+| `props/test_integration.lua` | integração: reduções avançadas, rank, skew, kurtosis, mad, sem, funções matemáticas |
 
 ### Fixtures de dados reais
 
@@ -131,10 +131,10 @@ bash scripts/make_coverage.sh
 Agrega: testes C diretos, `test_allocfail` (via `--wrap`) e testes Lua (via FFI).
 Resultado gerado em `docs/COVERAGE.md`.
 
-**Métricas atuais (Fedora, gcov):** linha 96.52% (2861/2964), branch-alvo 89.06%
-(2850/3200; bruto 86.89% com 80 exclusões `COV-EXCL-BR` documentadas no rodapé de
-`COVERAGE.md`). Parsers ainda abaixo do alvo de ≥95% (json 72.30%, datetime 74.19%,
-csv 82.64%) — fechamento em curso no hardening global.
+**Métricas (Fedora, gcov):** linha e branch-alvo com exclusões `COV-EXCL-BR`
+documentadas — geradas em `docs/COVERAGE.md`, nunca cravadas aqui. A meta de
+≥95% branch-alvo foi atingida na campanha de hardening; o que resta nos parsers
+são branches de inputs malformados muito específicos (rendimento decrescente).
 
 **Critério `COV-EXCL-BR`:** ramo inalcançável via API pública com justificativa
 técnica auditável. Exemplos: overflow de `SIZE_MAX`, guard de realloc-shrink,
@@ -148,10 +148,10 @@ flush via FFI instável — cobertura sempre medida no Linux.
 ## Valgrind
 
 ```bash
-bash scripts/build.sh --all   # roda Valgrind em todos os 12 binários
+bash scripts/build.sh --all   # roda Valgrind em todos os binários
 ```
 
-**Estado atual:** clean em todos os 12 binários. Zero leaks, zero reads de
+**Estado atual:** clean em todos os binários. Zero leaks, zero reads de
 memória não inicializada, todos os blocos alocados liberados.
 
 Bugs encontrados e corrigidos pelo Valgrind:
