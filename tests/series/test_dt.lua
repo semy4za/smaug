@@ -390,6 +390,28 @@ check(sv:get(1) == ep_zero,    "dt view: escrita reflete na view")
 check(sv_base:get(2) == ep_b,  "dt view: detach COW — pai intacto após escrita")
 check(not pcall(function() sv_base:view(2, 5) end), "dt view: fora dos limites → erro")
 
+-- H.5.a dayfirst na API pública (Series.dt_parse e astype)
+-- year-first: dayfirst não altera
+check(S.dt_parse("2026-06-13") == S.dt_parse("2026-06-13", true), "dt_parse year-first ignora dayfirst")
+-- year-last via dt_parse
+check(S.dt_parse("13/06/2026", true) == S.dt_parse("2026-06-13"), "dt_parse DD/MM (dayfirst=true)")
+check(S.dt_parse("06/13/2026") == S.dt_parse("2026-06-13"), "dt_parse MM/DD (default)")
+check(S.dt_parse("13/06/2026") == nil, "dt_parse 13/06 sem dayfirst → nil (falha visível)")
+check(S.dt_parse("5/6/2026", true) == S.dt_parse("2026-06-05"), "dt_parse 5/6 dayfirst=true = 5 jun")
+-- astype com opts {dayfirst=true}
+local sd = S.from_table({"13/06/2026", "25/12/2026"}, "string")
+local conv = sd:astype("datetime", {dayfirst = true})
+check(conv:get(1) == S.dt_parse("2026-06-13"), "astype datetime dayfirst=true: 13/06 → 13 jun")
+check(conv:get(2) == S.dt_parse("2026-12-25"), "astype datetime dayfirst=true: 25/12 → natal")
+-- astype default (MM/DD): 13/06 inconversível → null
+local sd2 = S.from_table({"13/06/2026"}, "string")
+local conv2 = sd2:astype("datetime")
+check(conv2:is_null(1), "astype datetime default: 13/06 → null (MM/DD, mês 13 inválido)")
+-- astype com name preservado via string (retrocompat)
+local sd3 = S.from_table({"2026-06-13"}, "string")
+local conv3 = sd3:astype("datetime", "nome_custom")
+check(conv3._name == "nome_custom", "astype 3º arg string = name (retrocompat)")
+
 -- ================================================================
 -- 8. fillna / is_null
 -- ================================================================

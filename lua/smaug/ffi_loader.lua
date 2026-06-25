@@ -412,7 +412,7 @@ ffi.cdef([[
     int            smaug_dt_append_null(smaug_series_dt_t *s);
 
     /* Parsing / formatação */
-    int smaug_dt_parse(const char *str, size_t len, int64_t *epoch_ms);
+    int smaug_dt_parse(const char *str, size_t len, int64_t *epoch_ms, int dayfirst);
     int smaug_dt_format(int64_t epoch_ms, char *buf, size_t buf_size);
 
     /* Componentes calendário */

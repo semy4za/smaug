@@ -310,25 +310,63 @@ static const char *parse_digits(const char *p, const char *end, int n, int *out)
     return p + n;
 }
 
-int smaug_dt_parse(const char *str, size_t len, int64_t *epoch_ms) {
+/* Lê 1 ou 2 dígitos (para dia/mês em formato year-last: "5/6/2026" ou
+   "05/06/2026"). Para no primeiro não-dígito. Retorna NULL se nenhum dígito. */
+static const char *parse_digits_1or2(const char *p, const char *end, int *out) {
+    if (p >= end || p[0] < '0' || p[0] > '9') return NULL;
+    int v = p[0] - '0';
+    p++;
+    if (p < end && p[0] >= '0' && p[0] <= '9') {
+        v = v * 10 + (p[0] - '0');
+        p++;
+    }
+    *out = v;
+    return p;
+}
+
+/* Lê a porção de DATA de [p,end), detectando year-first (YYYY-MM-DD) ou
+   year-last (DD/MM/YYYY ou MM/DD/YYYY). Para year-last, dayfirst escolhe a
+   ordem: 1 = dia primeiro (DD/MM), 0 = mês primeiro (MM/DD). Separador '-' ou
+   '/', consistente. Avança *pp e preenche y/mo/d. Retorna 0 ok, -1 erro. */
+static int parse_date_part(const char **pp, const char *end, int dayfirst,
+                           int *y, int *mo, int *d) {
+    const char *p = *pp;
+    /* tenta year-first: 4 dígitos + separador */
+    if (p + 4 <= end && p[0] >= '0' && p[0] <= '9' && p[1] >= '0' && p[1] <= '9'
+        && p[2] >= '0' && p[2] <= '9' && p[3] >= '0' && p[3] <= '9'
+        && (p[4] == '-' || p[4] == '/')) {
+        /* YYYY<sep>MM<sep>DD — ordem fixa, dayfirst não se aplica */
+        if (!(p = parse_digits(p, end, 4, y)))   return -1;
+        char sep = *p++;
+        if (!(p = parse_digits(p, end, 2, mo)))  return -1;
+        if (p >= end || *p++ != sep)             return -1;
+        if (!(p = parse_digits(p, end, 2, d)))   return -1;
+        *pp = p;
+        return 0;
+    }
+
+    /* year-last: AA<sep>BB<sep>YYYY (1-2 dígitos cada nos dois primeiros).
+       AA e BB são dia/mês conforme dayfirst. */
+    int a, b;
+    if (!(p = parse_digits_1or2(p, end, &a)))    return -1;
+    if (p >= end || (*p != '-' && *p != '/'))    return -1;
+    char sep = *p++;
+    if (!(p = parse_digits_1or2(p, end, &b)))    return -1;
+    if (p >= end || *p++ != sep)                 return -1;
+    if (!(p = parse_digits(p, end, 4, y)))       return -1;
+    if (dayfirst) { *d = a; *mo = b; }   /* DD/MM */
+    else          { *mo = a; *d = b; }   /* MM/DD */
+    *pp = p;
+    return 0;
+}
+
+int smaug_dt_parse(const char *str, size_t len, int64_t *epoch_ms, int dayfirst) {
     if (!str || !epoch_ms) return -1;
     const char *p   = str;
     const char *end = str + len;
 
-    /* YYYY-MM-DD */
     int y, mo, d, h = 0, mi = 0, sec = 0, ms = 0;
-    if (!(p = parse_digits(p, end, 4, &y)))       return -1;
-    /* separador de data: '-' (ISO) ou '/'. Deve ser consistente nas duas
-       posições — "2026-06/17" misturado é rejeitado. A ordem permanece
-       YYYY-MM-DD; ordens dia-primeiro/mês-primeiro (ambíguas) ficam para
-       dayfirst explícito, não aqui. */
-    if (p >= end) return -1;
-    char date_sep = *p;
-    if (date_sep != '-' && date_sep != '/')        return -1;
-    p++;
-    if (!(p = parse_digits(p, end, 2, &mo)))      return -1;
-    if (p >= end || *p++ != date_sep)              return -1;
-    if (!(p = parse_digits(p, end, 2, &d)))       return -1;
+    if (parse_date_part(&p, end, dayfirst, &y, &mo, &d) != 0) return -1;
     if (!is_valid_date(y, mo, d))                  return -1;
 
     /* Hora opcional: T ou ' ' */

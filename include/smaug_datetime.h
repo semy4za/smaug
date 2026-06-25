@@ -63,7 +63,10 @@ int smaug_dt_append_null(smaug_series_dt_t *s);
      "YYYY-MM-DDTHH:MM:SSZ"        → UTC explícito
    Retorna 0 em sucesso, -1 em formato inválido.
    epoch_ms é escrito apenas em sucesso. */
-int smaug_dt_parse(const char *str, size_t len, int64_t *epoch_ms);
+/* Parseia data/datetime. dayfirst: para formatos com ano no fim
+   (DD/MM/YYYY vs MM/DD/YYYY), 1 = dia primeiro, 0 = mês primeiro. Formatos
+   year-first (YYYY-MM-DD) ignoram dayfirst (ordem não-ambígua). */
+int smaug_dt_parse(const char *str, size_t len, int64_t *epoch_ms, int dayfirst);
 
 /* Formata epoch_ms como string ISO 8601 UTC no buffer.
    Formato: "YYYY-MM-DDTHH:MM:SS.mmmZ" (25 chars + \0 = 26 bytes).

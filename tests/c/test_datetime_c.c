@@ -27,7 +27,7 @@ static int g_ok = 0, g_fail = 0;
 
 static int64_t parse(const char *s) {
     int64_t ep = 0;
-    int r = smaug_dt_parse(s, strlen(s), &ep);
+    int r = smaug_dt_parse(s, strlen(s), &ep, 0);
     if (r != 0) {
         fprintf(stderr, "parse inesperado falhou para: %s\n", s);
         abort();
@@ -176,58 +176,103 @@ static void test_parse(void) {
     int64_t ep = 0;
 
     /* epoch: 1970-01-01 */
-    CHECK(smaug_dt_parse("1970-01-01T00:00:00Z", 20, &ep) == 0, "parse epoch");
+    CHECK(smaug_dt_parse("1970-01-01T00:00:00Z", 20, &ep, 0) == 0, "parse epoch");
     CHECK(ep == 0, "epoch = 0");
 
     /* só data (meia-noite UTC) */
-    CHECK(smaug_dt_parse("1970-01-02", 10, &ep) == 0, "parse só data");
+    CHECK(smaug_dt_parse("1970-01-02", 10, &ep, 0) == 0, "parse só data");
     CHECK(ep == 86400000LL, "só data = 1 dia em ms");
 
     /* com milissegundos */
-    CHECK(smaug_dt_parse("1970-01-01T00:00:00.500Z", 24, &ep) == 0, "parse com ms");
+    CHECK(smaug_dt_parse("1970-01-01T00:00:00.500Z", 24, &ep, 0) == 0, "parse com ms");
     CHECK(ep == 500, "500 ms");
 
     /* com offset +03:00 */
-    CHECK(smaug_dt_parse("1970-01-01T03:00:00+03:00", 25, &ep) == 0, "parse +03:00");
+    CHECK(smaug_dt_parse("1970-01-01T03:00:00+03:00", 25, &ep, 0) == 0, "parse +03:00");
     CHECK(ep == 0, "UTC=0 com offset +03:00");
 
     /* com offset -05:30 */
-    CHECK(smaug_dt_parse("1970-01-01T00:00:00-05:30", 25, &ep) == 0, "parse -05:30");
+    CHECK(smaug_dt_parse("1970-01-01T00:00:00-05:30", 25, &ep, 0) == 0, "parse -05:30");
     CHECK(ep == (5*60+30)*60*1000LL, "-05:30 → UTC+19800000ms");
 
     /* data negativa: 1969-12-31 = -1 dia */
-    CHECK(smaug_dt_parse("1969-12-31T00:00:00Z", 20, &ep) == 0, "parse pré-1970");
+    CHECK(smaug_dt_parse("1969-12-31T00:00:00Z", 20, &ep, 0) == 0, "parse pré-1970");
     CHECK(ep == -86400000LL, "1969-12-31 = -1 dia");
 
     /* formato inválido */
-    CHECK(smaug_dt_parse("abc", 3, &ep) == -1, "parse inválido");
-    CHECK(smaug_dt_parse("2026-13-01", 10, &ep) == -1, "mês 13 inválido");
-    CHECK(smaug_dt_parse("2026-02-30", 10, &ep) == -1, "fev 30 inválido");
-    CHECK(smaug_dt_parse("2026-06-13T25:00:00Z", 20, &ep) == -1, "hora 25 inválida");
-    CHECK(smaug_dt_parse(NULL, 0, &ep) == -1, "parse NULL");
-    CHECK(smaug_dt_parse("2026-06-13T00:00:00Z", 20, NULL) == -1, "out NULL");
+    CHECK(smaug_dt_parse("abc", 3, &ep, 0) == -1, "parse inválido");
+    CHECK(smaug_dt_parse("2026-13-01", 10, &ep, 0) == -1, "mês 13 inválido");
+    CHECK(smaug_dt_parse("2026-02-30", 10, &ep, 0) == -1, "fev 30 inválido");
+    CHECK(smaug_dt_parse("2026-06-13T25:00:00Z", 20, &ep, 0) == -1, "hora 25 inválida");
+    CHECK(smaug_dt_parse(NULL, 0, &ep, 0) == -1, "parse NULL");
+    CHECK(smaug_dt_parse("2026-06-13T00:00:00Z", 20, NULL, 0) == -1, "out NULL");
 
     /* com lixo no final */
-    CHECK(smaug_dt_parse("2026-06-13T00:00:00ZLIXO", 24, &ep) == -1, "lixo no final");
+    CHECK(smaug_dt_parse("2026-06-13T00:00:00ZLIXO", 24, &ep, 0) == -1, "lixo no final");
 
     /* separador '/' (H.6.4): mesma ordem YYYY/MM/DD, não-ambíguo */
     int64_t ep_slash = 0, ep_dash = 0;
-    CHECK(smaug_dt_parse("2026/06/13", 10, &ep_slash) == 0, "parse com / (só data)");
-    CHECK(smaug_dt_parse("2026-06-13", 10, &ep_dash) == 0,  "parse com - (referência)");
+    CHECK(smaug_dt_parse("2026/06/13", 10, &ep_slash, 0) == 0, "parse com / (só data)");
+    CHECK(smaug_dt_parse("2026-06-13", 10, &ep_dash, 0) == 0,  "parse com - (referência)");
     CHECK(ep_slash == ep_dash, "/ e - produzem o mesmo epoch (equivalência)");
 
     /* '/' com hora: separador de data muda, hora continua ':' */
-    CHECK(smaug_dt_parse("2026/06/13T14:30:00Z", 20, &ep) == 0, "parse / com hora");
+    CHECK(smaug_dt_parse("2026/06/13T14:30:00Z", 20, &ep, 0) == 0, "parse / com hora");
     int64_t ep_ref = parse("2026-06-13T14:30:00Z");
     CHECK(ep == ep_ref, "/ com hora = - com hora");
 
     /* consistência: separador misturado é rejeitado (sem meia-boca) */
-    CHECK(smaug_dt_parse("2026-06/13", 10, &ep) == -1, "separador misturado -/ rejeitado");
-    CHECK(smaug_dt_parse("2026/06-13", 10, &ep) == -1, "separador misturado /- rejeitado");
+    CHECK(smaug_dt_parse("2026-06/13", 10, &ep, 0) == -1, "separador misturado -/ rejeitado");
+    CHECK(smaug_dt_parse("2026/06-13", 10, &ep, 0) == -1, "separador misturado /- rejeitado");
 
     /* '/' não afrouxa validação: mês/dia inválidos continuam barrados */
-    CHECK(smaug_dt_parse("2026/13/01", 10, &ep) == -1, "/ mês 13 ainda inválido");
-    CHECK(smaug_dt_parse("2026/02/30", 10, &ep) == -1, "/ fev 30 ainda inválido");
+    CHECK(smaug_dt_parse("2026/13/01", 10, &ep, 0) == -1, "/ mês 13 ainda inválido");
+    CHECK(smaug_dt_parse("2026/02/30", 10, &ep, 0) == -1, "/ fev 30 ainda inválido");
+
+    /* H.5.a — dayfirst (year-last DD/MM/YYYY vs MM/DD/YYYY) */
+    int64_t ep_df = 0;
+
+    /* year-first ignora dayfirst (ordem não-ambígua) */
+    int64_t yf0 = 0, yf1 = 0;
+    CHECK(smaug_dt_parse("2026-06-13", 10, &yf0, 0) == 0, "year-first df=0 ok");
+    CHECK(smaug_dt_parse("2026-06-13", 10, &yf1, 1) == 0, "year-first df=1 ok");
+    CHECK(yf0 == yf1, "year-first: dayfirst não altera resultado");
+
+    /* dayfirst=0 (MM/DD): 06/13 ok, 13/06 rejeitado (falha visível) */
+    CHECK(smaug_dt_parse("06/13/2026", 10, &ep_df, 0) == 0,  "MM/DD 06/13 (df=0) ok");
+    CHECK(smaug_dt_parse("13/06/2026", 10, &ep_df, 0) == -1, "MM/DD 13/06 (df=0) → mês 13 rejeitado");
+
+    /* dayfirst=1 (DD/MM): 13/06 ok, 06/13 rejeitado */
+    CHECK(smaug_dt_parse("13/06/2026", 10, &ep_df, 1) == 0,  "DD/MM 13/06 (df=1) ok");
+    CHECK(smaug_dt_parse("06/13/2026", 10, &ep_df, 1) == -1, "DD/MM 06/13 (df=1) → mês 13 rejeitado");
+
+    /* equivalência: 13/06/2026 df=1 == 2026-06-13 */
+    smaug_dt_parse("13/06/2026", 10, &ep_df, 1);
+    CHECK(ep_df == parse("2026-06-13"), "DD/MM 13/06/2026 (df=1) == ISO 2026-06-13");
+
+    /* 1-2 dígitos: 5/6/2026 (teu caso real) */
+    smaug_dt_parse("5/6/2026", 8, &ep_df, 1);
+    CHECK(ep_df == parse("2026-06-05"), "5/6/2026 (df=1) = 5 de junho");
+    smaug_dt_parse("5/6/2026", 8, &ep_df, 0);
+    CHECK(ep_df == parse("2026-05-06"), "5/6/2026 (df=0) = 6 de maio");
+
+    /* year-last com hora e com separador '-' */
+    CHECK(smaug_dt_parse("13/06/2026 14:30:00", 19, &ep_df, 1) == 0, "year-last DD/MM com hora ok");
+    CHECK(ep_df == parse("2026-06-13T14:30:00"), "13/06/2026 14:30 (df=1) = ISO equivalente");
+    CHECK(smaug_dt_parse("13-06-2026", 10, &ep_df, 1) == 0, "year-last com '-' (df=1) ok");
+
+    /* ano-no-fim exige 4 dígitos; 2 dígitos rejeitado */
+    CHECK(smaug_dt_parse("13/06/26", 8, &ep_df, 1) == -1, "year-last ano 2 dígitos rejeitado");
+
+    /* cobertura dos caminhos de erro do parser de data (year-last/year-first) */
+    CHECK(smaug_dt_parse("", 0, &ep_df, 1) == -1,           "string vazia rejeitada");
+    CHECK(smaug_dt_parse("/06/2026", 8, &ep_df, 1) == -1,   "year-last sem 1º campo (não-dígito) rejeitado");
+    CHECK(smaug_dt_parse("13//2026", 8, &ep_df, 1) == -1,   "year-last sem 2º campo rejeitado");
+    CHECK(smaug_dt_parse("13/06/", 6, &ep_df, 1) == -1,     "year-last sem ano rejeitado");
+    CHECK(smaug_dt_parse("13:06:2026", 10, &ep_df, 1) == -1,"year-last separador ':' inválido rejeitado");
+    CHECK(smaug_dt_parse("1/2/2026", 8, &ep_df, 1) == 0,    "year-last 1 dígito em ambos (1/2) ok");
+    CHECK(smaug_dt_parse("202X-06-13", 10, &ep, 0) == -1,   "year-first ano com não-dígito rejeitado");
+    CHECK(smaug_dt_parse("2026-6-13", 9, &ep, 0) == -1,     "year-first mês 1 dígito ainda rejeitado (escopo)");
 }
 
 static void test_format(void) {
@@ -283,7 +328,7 @@ static void test_components(void) {
 
     /* 2024 não é bissexto em 100 anos mas divide 4: bissexto normal */
     /* 1900 não é bissexto (divisível por 100, não por 400) */
-    CHECK(smaug_dt_parse("1900-02-29", 10, &ep_neg) == -1, "1900 não bissexto");
+    CHECK(smaug_dt_parse("1900-02-29", 10, &ep_neg, 0) == -1, "1900 não bissexto");
     /* 2000 é bissexto (divisível por 400) */
     int64_t y2k = parse("2000-02-29T00:00:00Z");
     CHECK(smaug_dt_day(y2k) == 29, "2000 é bissexto");
@@ -583,7 +628,7 @@ static void test_roundtrip(void) {
     char buf[26];
     for (int i = 0; cases[i]; i++) {
         int64_t ep = 0;
-        int r = smaug_dt_parse(cases[i], strlen(cases[i]), &ep);
+        int r = smaug_dt_parse(cases[i], strlen(cases[i]), &ep, 0);
         CHECK(r == 0, "roundtrip parse OK");
         r = smaug_dt_format(ep, buf, 26);
         CHECK(r == 0, "roundtrip format OK");
@@ -641,32 +686,32 @@ static void test_append_grow(void) {
 static void test_parse_errors_extended(void) {
     int64_t ep;
     /* formato YYYY sem primeiro '-' */
-    CHECK(smaug_dt_parse("20261301", 8, &ep) == -1, "parse: sem '-' após ano");
+    CHECK(smaug_dt_parse("20261301", 8, &ep, 0) == -1, "parse: sem '-' após ano");
     /* dígito inválido no mês (parse_digits, linha 306) */
-    CHECK(smaug_dt_parse("2026-0A-01", 10, &ep) == -1, "parse: dígito inválido no mês");
+    CHECK(smaug_dt_parse("2026-0A-01", 10, &ep, 0) == -1, "parse: dígito inválido no mês");
     /* sem '-' após mês */
-    CHECK(smaug_dt_parse("2026-01X01", 10, &ep) == -1, "parse: sem '-' após mês");
+    CHECK(smaug_dt_parse("2026-01X01", 10, &ep, 0) == -1, "parse: sem '-' após mês");
     /* sem ':' após hora (linha 333) */
-    CHECK(smaug_dt_parse("2026-06-13T14X30:00Z", 20, &ep) == -1, "parse: sem ':' após hora");
+    CHECK(smaug_dt_parse("2026-06-13T14X30:00Z", 20, &ep, 0) == -1, "parse: sem ':' após hora");
     /* sem ':' após minuto (linha 335) */
-    CHECK(smaug_dt_parse("2026-06-13T14:30X00Z", 20, &ep) == -1, "parse: sem ':' após minuto");
+    CHECK(smaug_dt_parse("2026-06-13T14:30X00Z", 20, &ep, 0) == -1, "parse: sem ':' após minuto");
     /* minuto 60 inválido (linha 337) */
-    CHECK(smaug_dt_parse("2026-06-13T14:60:00Z", 20, &ep) == -1, "parse: minuto 60 inválido");
+    CHECK(smaug_dt_parse("2026-06-13T14:60:00Z", 20, &ep, 0) == -1, "parse: minuto 60 inválido");
     /* segundo 60 inválido */
-    CHECK(smaug_dt_parse("2026-06-13T14:30:60Z", 20, &ep) == -1, "parse: segundo 60 inválido");
+    CHECK(smaug_dt_parse("2026-06-13T14:30:60Z", 20, &ep, 0) == -1, "parse: segundo 60 inválido");
     /* timezone tz_h > 23 (linha 364) */
-    CHECK(smaug_dt_parse("2026-06-13T00:00:00+25:00", 25, &ep) == -1, "parse: tz_h>23");
+    CHECK(smaug_dt_parse("2026-06-13T00:00:00+25:00", 25, &ep, 0) == -1, "parse: tz_h>23");
     /* timezone tz_m > 59 */
-    CHECK(smaug_dt_parse("2026-06-13T00:00:00+05:60", 25, &ep) == -1, "parse: tz_m>59");
+    CHECK(smaug_dt_parse("2026-06-13T00:00:00+05:60", 25, &ep, 0) == -1, "parse: tz_m>59");
     /* separator ' ' (espaço) entre data e hora (linha 330) */
-    CHECK(smaug_dt_parse("2026-06-13 14:30:00Z", 20, &ep) == 0, "parse: sep=' ' válido");
+    CHECK(smaug_dt_parse("2026-06-13 14:30:00Z", 20, &ep, 0) == 0, "parse: sep=' ' válido");
     /* timezone sem ':' entre h e m (linha 362: colon opcional) */
-    CHECK(smaug_dt_parse("2026-06-13T00:00:00+0530", 24, &ep) == 0, "parse: tz sem ':' válido");
+    CHECK(smaug_dt_parse("2026-06-13T00:00:00+0530", 24, &ep, 0) == 0, "parse: tz sem ':' válido");
     /* ms com 1 dígito → pad para 100ms (linha 350) */
-    CHECK(smaug_dt_parse("2026-06-13T00:00:00.5Z", 22, &ep) == 0, "parse: ms 1 dígito");
+    CHECK(smaug_dt_parse("2026-06-13T00:00:00.5Z", 22, &ep, 0) == 0, "parse: ms 1 dígito");
     CHECK(ep % 1000 == 500, "parse: ms 1 dígito → 500ms");
     /* ms com 4 dígitos → só os 3 primeiros contam (linha 346) */
-    CHECK(smaug_dt_parse("2026-06-13T00:00:00.1234Z", 25, &ep) == 0, "parse: ms 4 dígitos");
+    CHECK(smaug_dt_parse("2026-06-13T00:00:00.1234Z", 25, &ep, 0) == 0, "parse: ms 4 dígitos");
     CHECK(ep % 1000 == 123, "parse: ms 4 dígitos → 123ms");
 }
 
@@ -683,26 +728,26 @@ static void test_week_boundary(void) {
     /* ISO week < 1: Jan 1 de 2023 é domingo — doy=1, wd=6 (dom=6),
      * week = (1 - 7 + 10)/7 = 4/7 = 0 → branch week < 1 (linha 484). */
     int64_t ep;
-    smaug_dt_parse("2023-01-01T00:00:00Z", 20, &ep);
+    smaug_dt_parse("2023-01-01T00:00:00Z", 20, &ep, 0);
     int w = smaug_dt_week(ep);
     CHECK(w == 52 || w == 53, "week boundary Jan 1 2023 (domingo): semana do ano anterior");
 
     /* ISO week > 52 e semana 53 existe: 28-Dez de 2015 é segunda (wd=0 ≤ 3),
      * então semana 53 existe → Dec 31 2015 → week=53 (linha 496). */
-    smaug_dt_parse("2015-12-31T00:00:00Z", 20, &ep);
+    smaug_dt_parse("2015-12-31T00:00:00Z", 20, &ep, 0);
     w = smaug_dt_week(ep);
     CHECK(w == 53, "week Dec 31 2015: semana 53 existe");
 
     /* ISO week > 52 mas semana 53 NÃO existe: Dec 31 2018 → wd_dec28 > 3
      * → week = 1 (pertence a semana 1 de 2019) (linha 502). */
-    smaug_dt_parse("2018-12-31T00:00:00Z", 20, &ep);
+    smaug_dt_parse("2018-12-31T00:00:00Z", 20, &ep, 0);
     w = smaug_dt_week(ep);
     CHECK(w == 1, "week Dec 31 2018: pertence à semana 1 de 2019");
 
     /* wd_dec28 < 0: apenas com epoch_ms muito negativo (pré-~7M a.C.) —
      * inalcançável em uso prático; o branch wd < 0 em weekday (linha 453)
      * é exercitado por qualquer data pré-1970 com wd calculado negativo. */
-    smaug_dt_parse("1969-01-01T00:00:00Z", 20, &ep);
+    smaug_dt_parse("1969-01-01T00:00:00Z", 20, &ep, 0);
     w = smaug_dt_week(ep);
     CHECK(w >= 1 && w <= 53, "week pré-1970: dentro do intervalo");
 }
@@ -814,16 +859,16 @@ static void test_parse_digit_below_zero(void) {
     /* parse_digits L306 branch 0: caractere ABAIXO de '0' (ex '/' = 0x2F).
      * Os testes existentes só usavam letras (acima de '9'). */
     int64_t ep;
-    CHECK(smaug_dt_parse("2026-/1-01", 10, &ep) == -1, "parse: '/' no mês (abaixo de '0')");
-    CHECK(smaug_dt_parse("202/-01-01", 10, &ep) == -1, "parse: '/' no ano");
+    CHECK(smaug_dt_parse("2026-/1-01", 10, &ep, 0) == -1, "parse: '/' no mês (abaixo de '0')");
+    CHECK(smaug_dt_parse("202/-01-01", 10, &ep, 0) == -1, "parse: '/' no ano");
 }
 
 static void test_parse_tz_minus(void) {
     /* L358 branch do '-' no timezone (o '+' já era testado; o '-' com offset
      * que efetivamente subtrai precisa de caso próprio com minutos). */
     int64_t ep_plus, ep_minus;
-    CHECK(smaug_dt_parse("2026-06-13T12:00:00+02:30", 25, &ep_plus)  == 0, "parse tz +02:30");
-    CHECK(smaug_dt_parse("2026-06-13T12:00:00-02:30", 25, &ep_minus) == 0, "parse tz -02:30");
+    CHECK(smaug_dt_parse("2026-06-13T12:00:00+02:30", 25, &ep_plus, 0)  == 0, "parse tz +02:30");
+    CHECK(smaug_dt_parse("2026-06-13T12:00:00-02:30", 25, &ep_minus, 0) == 0, "parse tz -02:30");
     /* +02:30 recua 2h30 em UTC; -02:30 avança 2h30 — diferença de 5h */
     CHECK(ep_minus - ep_plus == 5LL*3600*1000, "parse tz: +/- diferem por 5h");
 }

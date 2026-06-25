@@ -133,6 +133,14 @@ return function(I)
     -- astype(dtype): converte a série para outro dtype. Tolerante por elemento:
     -- inconversíveis → null. Nunca descarta a série inteira.
     function methods.astype(self, dtype, name)
+        -- 3º argumento: string = name (retrocompat) | tabela = {name=, dayfirst=}
+        local dayfirst = 0
+        if type(name) == "table" then
+            local opts = name
+            name = opts.name
+            if opts.dayfirst == true then dayfirst = 1
+            elseif opts.dayfirst == false then dayfirst = 0 end
+        end
         -- categorical é Lua puro — não está em DTYPES, mas é suportado
         if dtype == "categorical" then
             local Cat = Series.Categorical
@@ -171,7 +179,7 @@ return function(I)
             elseif dtype == "datetime" and src ~= "datetime" then
                 if src == "string" then
                     local ep = ffi.new("int64_t[1]")
-                    if C.smaug_dt_parse(v, #v, ep) == 0 then
+                    if C.smaug_dt_parse(v, #v, ep, dayfirst) == 0 then
                         out:set(i, tonumber(ep[0]))
                     else
                         out:set_null(i)

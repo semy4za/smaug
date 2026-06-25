@@ -156,7 +156,7 @@ return function(I)
             set = function(c, i, v)
                 if type(v) == "string" then
                     local ep = ffi.new("int64_t[1]")
-                    if C.smaug_dt_parse(v, #v, ep) ~= 0 then
+                    if C.smaug_dt_parse(v, #v, ep, 0) ~= 0 then
                         error("smaug: datetime parse falhou: " .. v, 3)
                     end
                     return C.smaug_dt_set(c, i, ep[0])
@@ -168,7 +168,7 @@ return function(I)
             append = function(c, v)
                 if type(v) == "string" then
                     local ep = ffi.new("int64_t[1]")
-                    if C.smaug_dt_parse(v, #v, ep) ~= 0 then
+                    if C.smaug_dt_parse(v, #v, ep, 0) ~= 0 then
                         error("smaug: datetime parse falhou: " .. v, 3)
                     end
                     return C.smaug_dt_append(c, ep[0])
