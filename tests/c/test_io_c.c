@@ -181,6 +181,89 @@ static void test_csv_no_header(void) {
     smaug_table_free(t);
 }
 
+/* H.5.b — decimal customizado (CSV brasileiro: sep=';' decimal=',') */
+static void test_csv_decimal_comma(void) {
+    const char *csv = "nome;valor\nproduto;34,12\noutro;5,5\n";
+    smaug_csv_opts_t o = smaug_csv_default_opts();
+    o.sep = ';'; o.decimal = ',';
+    smaug_table_t *t = smaug_read_csv_mem(csv, strlen(csv), &o);
+    CHECK(t && !t->error,                 "decimal ,: sem erro");
+    CHECK(t->ncols == 2,                  "decimal ,: 2 colunas");
+    CHECK(t->columns[1].f64 != NULL,      "decimal ,: valor inferido float64");
+    CHECK(get_f64(t, 1, 0) > 34.11 && get_f64(t, 1, 0) < 34.13, "decimal ,: 34,12 → 34.12");
+    CHECK(get_f64(t, 1, 1) > 5.49  && get_f64(t, 1, 1) < 5.51,  "decimal ,: 5,5 → 5.5");
+    smaug_table_free(t);
+}
+
+/* H.5.b — '.' literal com decimal ',' não é float válido (rigor preservado) */
+static void test_csv_decimal_comma_rejects_dot(void) {
+    const char *csv = "nome;valor\nproduto;34.12\n";
+    smaug_csv_opts_t o = smaug_csv_default_opts();
+    o.sep = ';'; o.decimal = ',';
+    smaug_table_t *t = smaug_read_csv_mem(csv, strlen(csv), &o);
+    CHECK(t && !t->error,                 "decimal ,: '.' literal sem erro de parse");
+    CHECK(t->columns[1].str != NULL,      "decimal ,: '34.12' vira string (não float)");
+    smaug_table_free(t);
+
+    /* :112 — após trocar ',' por '.', a string ainda é lixo → rejeitada como float */
+    const char *csv2 = "nome;valor\nx;12,3,4\noutro;5,6x\n";
+    smaug_table_t *t2 = smaug_read_csv_mem(csv2, strlen(csv2), &o);
+    CHECK(t2 && !t2->error,               "decimal ,: lixo após troca sem erro de parse");
+    CHECK(t2->columns[1].str != NULL,     "decimal ,: '12,3,4' e '5,6x' viram string");
+    smaug_table_free(t2);
+
+    /* :104 — campo numérico absurdamente longo (>=64 chars) → não-float, vira string */
+    char longnum[80];
+    longnum[0] = '\0';
+    /* monta "1111...,11" com >64 chars, separador decimal ',' */
+    char field[80];
+    for (int i = 0; i < 70; i++) field[i] = '1';
+    field[70] = ','; field[71] = '5'; field[72] = '\0';
+    char csv3[160];
+    snprintf(csv3, sizeof(csv3), "v\n%s\n", field);
+    smaug_table_t *t3 = smaug_read_csv_mem(csv3, strlen(csv3), &o);
+    CHECK(t3 && !t3->error,               "decimal ,: campo >64 chars sem erro de parse");
+    CHECK(t3->columns[0].str != NULL,     "decimal ,: número longo demais vira string (:104)");
+    smaug_table_free(t3);
+    (void)longnum;
+}
+
+/* H.5.b — roundtrip: escrever com decimal ',' e reler */
+static void test_csv_decimal_roundtrip(void) {
+    const char *csv = "v\n3,25\n";
+    smaug_csv_opts_t o = smaug_csv_default_opts();
+    o.sep = ';'; o.decimal = ',';
+    smaug_table_t *t = smaug_read_csv_mem(csv, strlen(csv), &o);
+    CHECK(t && !t->error,                 "roundtrip: read ok");
+    smaug_csv_write_opts_t wo = smaug_csv_write_default_opts();
+    wo.sep = ';'; wo.decimal = ',';
+    size_t len; char *out = smaug_write_csv_mem(t, &wo, &len);
+    CHECK(out != NULL,                    "roundtrip: write ok");
+    CHECK(strstr(out, "3,25") != NULL,    "roundtrip: emite 3,25 com vírgula");
+    CHECK(strstr(out, "3.25") == NULL,    "roundtrip: não emite ponto");
+    free(out);
+    smaug_table_free(t);
+}
+
+/* H.5.c — sep == decimal → erro orientado (read) e NULL (write) */
+static void test_csv_sep_equals_decimal(void) {
+    smaug_csv_opts_t o = smaug_csv_default_opts();
+    o.sep = ','; o.decimal = ',';
+    smaug_table_t *t = smaug_read_csv_mem("a,b\n1,2\n", 8, &o);
+    CHECK(t && t->error != NULL,          "sep==decimal: erro no read");
+    CHECK(strstr(t->error, "decimal") != NULL, "sep==decimal: mensagem orienta");
+    smaug_table_free(t);
+
+    /* write: sep==decimal → NULL */
+    const char *csv = "v\n1.5\n";
+    smaug_table_t *t2 = smaug_read_csv_mem(csv, strlen(csv), NULL);
+    smaug_csv_write_opts_t wo = smaug_csv_write_default_opts();
+    wo.sep = ';'; wo.decimal = ';';
+    size_t len; char *out = smaug_write_csv_mem(t2, &wo, &len);
+    CHECK(out == NULL,                    "sep==decimal: write retorna NULL");
+    smaug_table_free(t2);
+}
+
 static void test_csv_quotes_rfc4180(void) {
     /* campo com sep dentro de aspas */
     const char *csv = "nome,cidade\n\"Fulano, Jr.\",\"São Paulo\"\n";
@@ -1312,6 +1395,10 @@ int main(void) {
     test_csv_no_trailing_newline();
     test_csv_tab_sep();
     test_csv_no_header();
+    test_csv_decimal_comma();
+    test_csv_decimal_comma_rejects_dot();
+    test_csv_decimal_roundtrip();
+    test_csv_sep_equals_decimal();
     test_csv_quotes_rfc4180();
     test_csv_quotes_escaped();
     test_csv_quotes_unclosed();

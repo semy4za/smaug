@@ -318,9 +318,16 @@ int smaug_dt_parse(const char *str, size_t len, int64_t *epoch_ms) {
     /* YYYY-MM-DD */
     int y, mo, d, h = 0, mi = 0, sec = 0, ms = 0;
     if (!(p = parse_digits(p, end, 4, &y)))       return -1;
-    if (p >= end || *p++ != '-')                   return -1;
+    /* separador de data: '-' (ISO) ou '/'. Deve ser consistente nas duas
+       posições — "2026-06/17" misturado é rejeitado. A ordem permanece
+       YYYY-MM-DD; ordens dia-primeiro/mês-primeiro (ambíguas) ficam para
+       dayfirst explícito, não aqui. */
+    if (p >= end) return -1;
+    char date_sep = *p;
+    if (date_sep != '-' && date_sep != '/')        return -1;
+    p++;
     if (!(p = parse_digits(p, end, 2, &mo)))      return -1;
-    if (p >= end || *p++ != '-')                   return -1;
+    if (p >= end || *p++ != date_sep)              return -1;
     if (!(p = parse_digits(p, end, 2, &d)))       return -1;
     if (!is_valid_date(y, mo, d))                  return -1;
 

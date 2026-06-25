@@ -54,6 +54,7 @@ smaug_csv_opts_t smaug_csv_default_opts(void) {
     o.na_values = NULL;  /* usa o padrão interno */
     o.na_count  = 0;
     o.quote     = '"';
+    o.decimal   = '.';
     return o;
 }
 
@@ -62,6 +63,7 @@ smaug_csv_write_opts_t smaug_csv_write_default_opts(void) {
     o.sep    = ',';
     o.header = 1;
     o.quote  = '"';
+    o.decimal = '.';
     return o;
 }
 
@@ -86,10 +88,31 @@ static int try_i64(const char *s, int64_t *out) {
     *out = (int64_t)v; return 1;
 }
 
-static int try_f64(const char *s, double *out) {
+static int try_f64(const char *s, double *out, char decimal) {
     if (!s) return 0; /* COV-EXCL-BR: s nunca é NULL — mesmo argumento de try_i64 */
     if (!*s) return 0; /* "": alcançável — ver test_csv_na_custom_empty_field */
     char *end; errno = 0;
+
+    /* decimal customizado (ex.: ','): strtod só entende '.', então troca-se
+       o caractere decimal por '.' numa cópia local. Se decimal == '.', segue
+       o caminho direto sem cópia (zero overhead no caso comum). Um '.' literal
+       na string com decimal ',' não é dígito decimal válido e seria rejeitado
+       pelo strtod via *end, preservando o rigor. */
+    if (decimal != '.') {
+        char buf[64];
+        size_t n = strlen(s);
+        if (n >= sizeof(buf)) return 0;  /* número absurdamente longo → não-float */
+        for (size_t i = 0; i < n; i++) {
+            if (s[i] == decimal)      buf[i] = '.';
+            else if (s[i] == '.')     return 0;  /* '.' onde decimal é ',' → inválido */
+            else                      buf[i] = s[i];
+        }
+        buf[n] = '\0';
+        double v = strtod(buf, &end);
+        if (errno || *end != '\0') return 0;
+        *out = v; return 1;
+    }
+
     double v = strtod(s, &end);
     if (errno || *end != '\0') return 0;
     *out = v; return 1;
@@ -161,8 +184,15 @@ smaug_table_t *smaug_read_csv_mem(const char *buf, size_t len,
     if (!opts) opts = &def;
     char sep   = opts->sep   ? opts->sep   : ',';   /* fallback defensivo: caller pode zerar o campo (ver test_csv_opts_zero_sep_quote) */
     char quote = opts->quote ? opts->quote : '"';  /* fallback defensivo: idem (ver test_csv_opts_zero_sep_quote) */
+    char decimal = opts->decimal ? opts->decimal : '.';  /* fallback defensivo: campo zerado → '.' */
     const char **nav = opts->na_values;
     size_t nc = nav ? opts->na_count : 0;
+
+    /* H.5.c: separador de campo e decimal iguais tornam o parsing ambíguo
+       ("3,14" com sep=',' decimal=',' seria dois campos). Erro que orienta. */
+    if (sep == decimal)
+        return make_error("smaug_read_csv: separador de campo e decimal não podem "
+                          "ser o mesmo caractere (ex.: sep=';' com decimal=',')");
 
     if (len == 0) return make_error("smaug_read_csv: arquivo vazio");
 
@@ -265,7 +295,7 @@ smaug_table_t *smaug_read_csv_mem(const char *buf, size_t len,
             int cand;
             if      (try_bool(s, &vb)) cand = DT_BOOL;
             else if (try_i64(s, &vi))  cand = DT_I64;
-            else if (try_f64(s, &vd))  cand = DT_F64;
+            else if (try_f64(s, &vd, decimal))  cand = DT_F64;
             else                        cand = DT_STR;
             dtypes[c] = dtype_upgrade(dtypes[c], cand);
             if (dtypes[c] == DT_STR) continue;
@@ -315,7 +345,7 @@ smaug_table_t *smaug_read_csv_mem(const char *buf, size_t len,
                 const char *v = (c < rsz) ? row[c] : "";
                 double vd; int64_t vi;
                 if (is_na(v,nav,nc)) smaug_f64_set_null(s,r);
-                else if (try_f64(v,&vd)) smaug_f64_set(s,r,vd); /* COV-EXCL-BR: dtype=float64 implica try_f64=1 pelo mesmo argumento de pureza da inferência (ver linha 303) */
+                else if (try_f64(v,&vd,decimal)) smaug_f64_set(s,r,vd); /* COV-EXCL-BR: dtype=float64 implica try_f64=1 pelo mesmo argumento de pureza da inferência (ver linha 303) */
                 else if (try_i64(v,&vi)) smaug_f64_set(s,r,(double)vi); /* COV-EXCL-BR: duplamente inalcançável — além da pureza da inferência, try_i64(v) bem-sucedido implica try_f64(v) também bem-sucedido (strtod aceita toda a gramática de strtoll), então o try_f64 da linha acima já teria capturado este valor */
                 else smaug_f64_set_null(s,r);
             }
@@ -428,6 +458,9 @@ char *smaug_write_csv_mem(const smaug_table_t *t,
     if (!opts) opts = &def;
     char sep = opts->sep ? opts->sep : ',';   /* fallback defensivo (ver test_csv_write_opts_zero_sep_quote) */
     char quote = opts->quote ? opts->quote : '"'; /* fallback defensivo (ver test_csv_write_opts_zero_sep_quote) */
+    char decimal = opts->decimal ? opts->decimal : '.'; /* fallback defensivo: campo zerado → '.' */
+    /* H.5.c: sep == decimal produziria CSV ilegível (campo e decimal colidem). */
+    if (sep == decimal) return NULL;
     wbuf_t b = {0};
 
     if (opts->header) {
@@ -455,7 +488,16 @@ char *smaug_write_csv_mem(const smaug_table_t *t,
                 smaug_status_t st; double v = smaug_f64_get(col->f64, r, &st);
                 if (st != SMG_OK) { s=""; n=0; } /* idem i64: subcaso redundante removido */
                 else if (v!=v) { s="nan"; n=3; }
-                else { n=(size_t)snprintf(tmp,sizeof(tmp),"%.17g",v); s=tmp; }
+                else {
+                    n=(size_t)snprintf(tmp,sizeof(tmp),"%.17g",v);
+                    /* decimal customizado: troca o '.' do snprintf pelo separador
+                       configurado. "%.17g" produz no máximo um '.'. */
+                    if (decimal != '.') {
+                        for (size_t k = 0; k < n; k++)
+                            if (tmp[k] == '.') { tmp[k] = decimal; break; }
+                    }
+                    s=tmp;
+                }
             } else if (col->boolcol) {
                 smaug_status_t st; uint8_t v = smaug_bool_get(col->boolcol, r, &st);
                 if (st != SMG_OK) { s=""; n=0; } /* idem i64: subcaso redundante removido */

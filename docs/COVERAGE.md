@@ -3,9 +3,9 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `17ac169`  |  Data: 2026-06-24 20:38:03 -0300
+- Commit medido: `780554c`  |  Data: 2026-06-24 20:51:04 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `3037/3270 = 92.87%` -- 101 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- **Branch-bruto** (todos os ramos): `3063/3300 = 92.82%` -- 101 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 | Arquivo | Linhas | Branch-alvo (taken) |
@@ -16,11 +16,11 @@
 | `smaug_ops_bool.c` | `165/165 = 100.00%` `[██████████]` | `239/239 = 100.00%` `[██████████]` |
 | `smaug_str.c` | `162/164 = 98.78%` `[█████████░]` | `132/132 = 100.00%` `[██████████]` |
 | `smaug_ops_str.c` | `115/116 = 99.14%` `[█████████░]` | `115/115 = 100.00%` `[██████████]` |
-| `smaug_csv.c` | `284/292 = 97.26%` `[█████████░]` | `325/359 = 90.53%` `[█████████░]` |
+| `smaug_csv.c` | `304/312 = 97.44%` `[█████████░]` | `349/387 = 90.18%` `[█████████░]` |
 | `smaug_json.c` | `347/360 = 96.39%` `[█████████░]` | `414/461 = 89.80%` `[█████████░]` |
-| `smaug_datetime.c` | `371/374 = 99.20%` `[█████████░]` | `377/408 = 92.40%` `[█████████░]` |
+| `smaug_datetime.c` | `373/376 = 99.20%` `[█████████░]` | `379/410 = 92.44%` `[█████████░]` |
 | `smaug_ops_window.c` | `226/231 = 97.84%` `[█████████░]` | `239/249 = 95.98%` `[█████████░]` |
-| **TOTAL** | `2980/3015 = 98.84%` `[█████████░]` | `3037/3169 = 95.83%` `[█████████░]` |
+| **TOTAL** | `3002/3037 = 98.85%` `[█████████░]` | `3063/3199 = 95.75%` `[█████████░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
@@ -38,31 +38,35 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_ops_i64.c:724` — if (m == 0) return result;
 - `smaug_ops_i64.c:750` — switch (method) {
 
-**`smaug_csv.c`** — 24 linha(s) com ramo descoberto:
-- `smaug_csv.c:131` — if (i+1 < len && buf[i+1] == quote) { PUSH(quote); i += 2; }
-- `smaug_csv.c:134` — PUSH(buf[i]); i++;
-- `smaug_csv.c:145` — else if (i < len && buf[i] == '\n') { i++; *eol=1; }
-- `smaug_csv.c:180` — if (buf[pos] == '\n' || (buf[pos] == '\r' && (pos+1>=len || buf[pos+1]=='\n'))) {
-- `smaug_csv.c:181` — if (buf[pos] == '\r') pos++;
-- `smaug_csv.c:315` — const char *v = (c < rsz) ? row[c] : "";
-- `smaug_csv.c:329` — const char *v = (c < rsz) ? row[c] : "";
-- `smaug_csv.c:331` — if (is_na(v,nav,nc)) smaug_bool_set_null(s,r);
-- `smaug_csv.c:342` — const char *v = (c < rsz) ? row[c] : "";
-- `smaug_csv.c:353` — if (col_names) {
-- `smaug_csv.c:377` — if (rows[r]) { for(size_t c=0;c<row_sizes[r];c++) free(rows[r][c]); free(rows[r]); }
-- `smaug_csv.c:414` — if (s[i]==sep||s[i]=='\n'||s[i]=='\r'||s[i]==quote) { needs_quote=1; break; }
-- `smaug_csv.c:416` — if (wbuf_pushc(b, quote)) return -1;
-- `smaug_csv.c:418` — if (s[i] == quote && wbuf_pushc(b, quote)) return -1;
-- `smaug_csv.c:419` — if (wbuf_pushc(b, s[i])) return -1;
-- `smaug_csv.c:435` — if (c > 0 && wbuf_pushc(&b, sep)) goto oom;
-- `smaug_csv.c:439` — if (wbuf_pushc(&b, '\n')) goto oom;
-- `smaug_csv.c:444` — if (c > 0 && wbuf_pushc(&b, sep)) goto oom;
-- `smaug_csv.c:463` — } else if (col->str) {
-- `smaug_csv.c:467` — if (write_field(&b, s, n, sep, quote)) goto oom;
-- `smaug_csv.c:469` — if (wbuf_pushc(&b, '\n')) goto oom;
-- `smaug_csv.c:472` — if (wbuf_pushc(&b, '\0')) goto oom;
-- `smaug_csv.c:481` — if (!buf) return -1;
-- `smaug_csv.c:485` — return (w==len) ? 0 : -1;
+**`smaug_csv.c`** — 28 linha(s) com ramo descoberto:
+- `smaug_csv.c:112` — if (errno || *end != '\0') return 0;
+- `smaug_csv.c:154` — if (i+1 < len && buf[i+1] == quote) { PUSH(quote); i += 2; }
+- `smaug_csv.c:157` — PUSH(buf[i]); i++;
+- `smaug_csv.c:168` — else if (i < len && buf[i] == '\n') { i++; *eol=1; }
+- `smaug_csv.c:187` — char decimal = opts->decimal ? opts->decimal : '.';  /* fallback defensivo: campo zerado → '.' */
+- `smaug_csv.c:210` — if (buf[pos] == '\n' || (buf[pos] == '\r' && (pos+1>=len || buf[pos+1]=='\n'))) {
+- `smaug_csv.c:211` — if (buf[pos] == '\r') pos++;
+- `smaug_csv.c:345` — const char *v = (c < rsz) ? row[c] : "";
+- `smaug_csv.c:359` — const char *v = (c < rsz) ? row[c] : "";
+- `smaug_csv.c:361` — if (is_na(v,nav,nc)) smaug_bool_set_null(s,r);
+- `smaug_csv.c:372` — const char *v = (c < rsz) ? row[c] : "";
+- `smaug_csv.c:383` — if (col_names) {
+- `smaug_csv.c:407` — if (rows[r]) { for(size_t c=0;c<row_sizes[r];c++) free(rows[r][c]); free(rows[r]); }
+- `smaug_csv.c:444` — if (s[i]==sep||s[i]=='\n'||s[i]=='\r'||s[i]==quote) { needs_quote=1; break; }
+- `smaug_csv.c:446` — if (wbuf_pushc(b, quote)) return -1;
+- `smaug_csv.c:448` — if (s[i] == quote && wbuf_pushc(b, quote)) return -1;
+- `smaug_csv.c:449` — if (wbuf_pushc(b, s[i])) return -1;
+- `smaug_csv.c:461` — char decimal = opts->decimal ? opts->decimal : '.'; /* fallback defensivo: campo zerado → '.' */
+- `smaug_csv.c:468` — if (c > 0 && wbuf_pushc(&b, sep)) goto oom;
+- `smaug_csv.c:472` — if (wbuf_pushc(&b, '\n')) goto oom;
+- `smaug_csv.c:477` — if (c > 0 && wbuf_pushc(&b, sep)) goto oom;
+- `smaug_csv.c:496` — for (size_t k = 0; k < n; k++)
+- `smaug_csv.c:505` — } else if (col->str) {
+- `smaug_csv.c:509` — if (write_field(&b, s, n, sep, quote)) goto oom;
+- `smaug_csv.c:511` — if (wbuf_pushc(&b, '\n')) goto oom;
+- `smaug_csv.c:514` — if (wbuf_pushc(&b, '\0')) goto oom;
+- `smaug_csv.c:523` — if (!buf) return -1;
+- `smaug_csv.c:527` — return (w==len) ? 0 : -1;
 
 **`smaug_json.c`** — 37 linha(s) com ramo descoberto:
 - `smaug_json.c:43` — while (l->pos < l->len) {
@@ -109,30 +113,30 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_datetime.c:277` — if (!s) return -1;
 - `smaug_datetime.c:278` — if (dt_cow_detach(s) != 0) return -1;
 - `smaug_datetime.c:280` — if (dt_grow(s) != 0) return -1;
-- `smaug_datetime.c:321` — if (p >= end || *p++ != '-')                   return -1;
-- `smaug_datetime.c:323` — if (p >= end || *p++ != '-')                   return -1;
-- `smaug_datetime.c:324` — if (!(p = parse_digits(p, end, 2, &d)))       return -1;
-- `smaug_datetime.c:330` — if (p < end && (*p == 'T' || *p == ' ')) {
-- `smaug_datetime.c:332` — if (!(p = parse_digits(p, end, 2, &h)))   return -1;
-- `smaug_datetime.c:333` — if (p >= end || *p++ != ':')               return -1;
-- `smaug_datetime.c:334` — if (!(p = parse_digits(p, end, 2, &mi)))  return -1;
-- `smaug_datetime.c:335` — if (p >= end || *p++ != ':')               return -1;
-- `smaug_datetime.c:336` — if (!(p = parse_digits(p, end, 2, &sec))) return -1;
-- `smaug_datetime.c:345` — while (p < end && *p >= '0' && *p <= '9') {
-- `smaug_datetime.c:358` — } else if (*p == '+' || *p == '-') {
-- `smaug_datetime.c:361` — if (!(p = parse_digits(p, end, 2, &tz_h))) return -1;
-- `smaug_datetime.c:362` — if (p < end && *p == ':') p++;
-- `smaug_datetime.c:363` — if (!(p = parse_digits(p, end, 2, &tz_m))) return -1;
-- `smaug_datetime.c:408` — return (written > 0 && (size_t)written < buf_size) ? 0 : -1;
-- `smaug_datetime.c:546` — - (epoch_ms < 0 && epoch_ms % MS_PER_SECOND != 0 ? MS_PER_SECOND : 0);
-- `smaug_datetime.c:552` — - (epoch_ms < 0 && epoch_ms % MS_PER_HOUR != 0 ? MS_PER_HOUR : 0);
-- `smaug_datetime.c:608` — DT_CMP_IMPL(lt, < )
-- `smaug_datetime.c:609` — DT_CMP_IMPL(eq, ==)
-- `smaug_datetime.c:610` — DT_CMP_IMPL(ge, >=)
-- `smaug_datetime.c:611` — DT_CMP_IMPL(le, <=)
-- `smaug_datetime.c:612` — DT_CMP_IMPL(ne, !=)
-- `smaug_datetime.c:639` — if (!entries) return NULL;
-- `smaug_datetime.c:650` — if (!indices) { free(entries); return NULL; }
+- `smaug_datetime.c:325` — if (p >= end) return -1;
+- `smaug_datetime.c:330` — if (p >= end || *p++ != date_sep)              return -1;
+- `smaug_datetime.c:331` — if (!(p = parse_digits(p, end, 2, &d)))       return -1;
+- `smaug_datetime.c:337` — if (p < end && (*p == 'T' || *p == ' ')) {
+- `smaug_datetime.c:339` — if (!(p = parse_digits(p, end, 2, &h)))   return -1;
+- `smaug_datetime.c:340` — if (p >= end || *p++ != ':')               return -1;
+- `smaug_datetime.c:341` — if (!(p = parse_digits(p, end, 2, &mi)))  return -1;
+- `smaug_datetime.c:342` — if (p >= end || *p++ != ':')               return -1;
+- `smaug_datetime.c:343` — if (!(p = parse_digits(p, end, 2, &sec))) return -1;
+- `smaug_datetime.c:352` — while (p < end && *p >= '0' && *p <= '9') {
+- `smaug_datetime.c:365` — } else if (*p == '+' || *p == '-') {
+- `smaug_datetime.c:368` — if (!(p = parse_digits(p, end, 2, &tz_h))) return -1;
+- `smaug_datetime.c:369` — if (p < end && *p == ':') p++;
+- `smaug_datetime.c:370` — if (!(p = parse_digits(p, end, 2, &tz_m))) return -1;
+- `smaug_datetime.c:415` — return (written > 0 && (size_t)written < buf_size) ? 0 : -1;
+- `smaug_datetime.c:553` — - (epoch_ms < 0 && epoch_ms % MS_PER_SECOND != 0 ? MS_PER_SECOND : 0);
+- `smaug_datetime.c:559` — - (epoch_ms < 0 && epoch_ms % MS_PER_HOUR != 0 ? MS_PER_HOUR : 0);
+- `smaug_datetime.c:615` — DT_CMP_IMPL(lt, < )
+- `smaug_datetime.c:616` — DT_CMP_IMPL(eq, ==)
+- `smaug_datetime.c:617` — DT_CMP_IMPL(ge, >=)
+- `smaug_datetime.c:618` — DT_CMP_IMPL(le, <=)
+- `smaug_datetime.c:619` — DT_CMP_IMPL(ne, !=)
+- `smaug_datetime.c:646` — if (!entries) return NULL;
+- `smaug_datetime.c:657` — if (!indices) { free(entries); return NULL; }
 
 **`smaug_ops_window.c`** — 8 linha(s) com ramo descoberto:
 - `smaug_ops_window.c:32` — switch (col->kind) {
@@ -174,26 +178,26 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_csv.c:37` — falha de syscall não simulável sem mock
 - `smaug_csv.c:39` — ftell negativo só em fd inválido
 - `smaug_csv.c:42` — OOM de malloc no read_file
-- `smaug_csv.c:81` — s nunca é NULL — única origem é row[c] (sempre alocado por next_field) ou "" literal
-- `smaug_csv.c:90` — s nunca é NULL — mesmo argumento de try_i64
-- `smaug_csv.c:112` — loop externo garante pos < len antes de chamar
-- `smaug_csv.c:149` — só falha se PUSH falhou por OOM
-- `smaug_csv.c:197` — OOM de realloc de fields — coberto pelo allocfail
-- `smaug_csv.c:197` — OOM de realloc de fields — coberto pelo allocfail
-- `smaug_csv.c:197` — OOM de realloc de fields — coberto pelo allocfail
-- `smaug_csv.c:206` — OOM de realloc de rows — coberto pelo allocfail
-- `smaug_csv.c:206` — OOM de realloc de rows — coberto pelo allocfail
-- `smaug_csv.c:206` — OOM de realloc de rows — coberto pelo allocfail
-- `smaug_csv.c:206` — OOM de realloc de rows — coberto pelo allocfail
-- `smaug_csv.c:220` — rows[0] nunca NULL — n_rows>0 garante alocação
-- `smaug_csv.c:221` — next_field sempre produz >=1 campo por linha
-- `smaug_csv.c:231` — c<n_cols<=row_sizes[0] por construção
-- `smaug_csv.c:305` — dtype=int64 implica que todo valor não-NA já passou em try_i64 durante a inferência (mesma string, mesma is_na, função pura e determinística) — confirmado por auditoria adversarial (overflow/inf/nan/zeros à esquerda) e 400k+ checks da suíte, nunca quebrou
-- `smaug_csv.c:318` — dtype=float64 implica try_f64=1 pelo mesmo argumento de pureza da inferência (ver linha 303)
-- `smaug_csv.c:319` — duplamente inalcançável — além da pureza da inferência, try_i64(v) bem-sucedido implica try_f64(v) também bem-sucedido (strtod aceita toda a gramática de strtoll), então o try_f64 da linha acima já teria capturado este valor
-- `smaug_csv.c:319` — duplamente inalcançável — além da pureza da inferência, try_i64(v) bem-sucedido implica try_f64(v) também bem-sucedido (strtod aceita toda a gramática de strtoll), então o try_f64 da linha acima já teria capturado este valor
-- `smaug_csv.c:332` — dtype=bool implica try_bool=1 pelo mesmo argumento de pureza da inferência (ver linha 303)
-- `smaug_csv.c:436` — name sempre não-NULL após construção
+- `smaug_csv.c:83` — s nunca é NULL — única origem é row[c] (sempre alocado por next_field) ou "" literal
+- `smaug_csv.c:92` — s nunca é NULL — mesmo argumento de try_i64
+- `smaug_csv.c:135` — loop externo garante pos < len antes de chamar
+- `smaug_csv.c:172` — só falha se PUSH falhou por OOM
+- `smaug_csv.c:227` — OOM de realloc de fields — coberto pelo allocfail
+- `smaug_csv.c:227` — OOM de realloc de fields — coberto pelo allocfail
+- `smaug_csv.c:227` — OOM de realloc de fields — coberto pelo allocfail
+- `smaug_csv.c:236` — OOM de realloc de rows — coberto pelo allocfail
+- `smaug_csv.c:236` — OOM de realloc de rows — coberto pelo allocfail
+- `smaug_csv.c:236` — OOM de realloc de rows — coberto pelo allocfail
+- `smaug_csv.c:236` — OOM de realloc de rows — coberto pelo allocfail
+- `smaug_csv.c:250` — rows[0] nunca NULL — n_rows>0 garante alocação
+- `smaug_csv.c:251` — next_field sempre produz >=1 campo por linha
+- `smaug_csv.c:261` — c<n_cols<=row_sizes[0] por construção
+- `smaug_csv.c:335` — dtype=int64 implica que todo valor não-NA já passou em try_i64 durante a inferência (mesma string, mesma is_na, função pura e determinística) — confirmado por auditoria adversarial (overflow/inf/nan/zeros à esquerda) e 400k+ checks da suíte, nunca quebrou
+- `smaug_csv.c:348` — dtype=float64 implica try_f64=1 pelo mesmo argumento de pureza da inferência (ver linha 303)
+- `smaug_csv.c:349` — duplamente inalcançável — além da pureza da inferência, try_i64(v) bem-sucedido implica try_f64(v) também bem-sucedido (strtod aceita toda a gramática de strtoll), então o try_f64 da linha acima já teria capturado este valor
+- `smaug_csv.c:349` — duplamente inalcançável — além da pureza da inferência, try_i64(v) bem-sucedido implica try_f64(v) também bem-sucedido (strtod aceita toda a gramática de strtoll), então o try_f64 da linha acima já teria capturado este valor
+- `smaug_csv.c:362` — dtype=bool implica try_bool=1 pelo mesmo argumento de pureza da inferência (ver linha 303)
+- `smaug_csv.c:469` — name sempre não-NULL após construção
 - `smaug_json.c:113` — string não fechada — break inalcançável em JSON bem-formado
 - `smaug_json.c:148` — OOM de realloc em string JSON
 - `smaug_json.c:432` — dtype=int64 implica que toda linha não-null tinha jt==1 durante a inferência (dtype_upgrade força float64 se qualquer linha fosse jt==2) — mesmo argumento de pureza do csv.c

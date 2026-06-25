@@ -37,9 +37,11 @@ typedef struct {
     const char **na_values;   /* array de strings que representam NA (NULL = default) */
     size_t      na_count;     /* tamanho de na_values                         */
     char        quote;        /* caractere de aspas (default '"')             */
+    char        decimal;      /* separador decimal de floats (default '.')    */
 } smaug_csv_opts_t;
 
-/* Opções padrão: sep=',', header=1, quote='"', na={"","NA","null","N/A"} */
+/* Opções padrão: sep=',', header=1, quote='"', decimal='.',
+   na={"","NA","null","N/A"} */
 smaug_csv_opts_t smaug_csv_default_opts(void);
 
 /* Lê um arquivo CSV e retorna uma smaug_table_t*.
@@ -55,6 +57,7 @@ typedef struct {
     char sep;     /* separador (default ',')                    */
     int  header;  /* 1 = escrever cabeçalho (default 1)        */
     char quote;   /* aspas para campos com sep/newline/aspas   */
+    char decimal; /* separador decimal de floats (default '.') */
 } smaug_csv_write_opts_t;
 
 smaug_csv_write_opts_t smaug_csv_write_default_opts(void);

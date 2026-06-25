@@ -359,12 +359,14 @@ ffi.cdef([[
         const char **na_values;
         size_t      na_count;
         char        quote;
+        char        decimal;
     } smaug_csv_opts_t;
 
     typedef struct {
         char sep;
         int  header;
         char quote;
+        char decimal;
     } smaug_csv_write_opts_t;
 
     smaug_csv_opts_t        smaug_csv_default_opts(void);

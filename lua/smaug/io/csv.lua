@@ -186,6 +186,7 @@ function M.read(path, opts)
     if opts then
         if opts.sep    then copts.sep    = string.byte(opts.sep) end
         if opts.quote  then copts.quote  = string.byte(opts.quote) end
+        if opts.decimal then copts.decimal = string.byte(opts.decimal) end
         if opts.header ~= nil then copts.header = opts.header and 1 or 0 end
     end
     local t = C.smaug_read_csv(path, copts)
@@ -200,6 +201,7 @@ function M.read_mem(buf, opts)
     if opts then
         if opts.sep    then copts.sep    = string.byte(opts.sep) end
         if opts.quote  then copts.quote  = string.byte(opts.quote) end
+        if opts.decimal then copts.decimal = string.byte(opts.decimal) end
         if opts.header ~= nil then copts.header = opts.header and 1 or 0 end
     end
     local t = C.smaug_read_csv_mem(buf, #buf, copts)
@@ -216,6 +218,7 @@ function M.write(ds, path, opts)
     if opts then
         if opts.sep    then wopts.sep    = string.byte(opts.sep) end
         if opts.quote  then wopts.quote  = string.byte(opts.quote) end
+        if opts.decimal then wopts.decimal = string.byte(opts.decimal) end
         if opts.header ~= nil then wopts.header = opts.header and 1 or 0 end
     end
     local rc = C.smaug_write_csv(path, t, wopts)
@@ -232,6 +235,7 @@ function M.write_mem(ds, opts)
     if opts then
         if opts.sep    then wopts.sep    = string.byte(opts.sep) end
         if opts.quote  then wopts.quote  = string.byte(opts.quote) end
+        if opts.decimal then wopts.decimal = string.byte(opts.decimal) end
         if opts.header ~= nil then wopts.header = opts.header and 1 or 0 end
     end
     local outlen = ffi.new("size_t[1]")

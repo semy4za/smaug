@@ -209,6 +209,25 @@ static void test_parse(void) {
 
     /* com lixo no final */
     CHECK(smaug_dt_parse("2026-06-13T00:00:00ZLIXO", 24, &ep) == -1, "lixo no final");
+
+    /* separador '/' (H.6.4): mesma ordem YYYY/MM/DD, não-ambíguo */
+    int64_t ep_slash = 0, ep_dash = 0;
+    CHECK(smaug_dt_parse("2026/06/13", 10, &ep_slash) == 0, "parse com / (só data)");
+    CHECK(smaug_dt_parse("2026-06-13", 10, &ep_dash) == 0,  "parse com - (referência)");
+    CHECK(ep_slash == ep_dash, "/ e - produzem o mesmo epoch (equivalência)");
+
+    /* '/' com hora: separador de data muda, hora continua ':' */
+    CHECK(smaug_dt_parse("2026/06/13T14:30:00Z", 20, &ep) == 0, "parse / com hora");
+    int64_t ep_ref = parse("2026-06-13T14:30:00Z");
+    CHECK(ep == ep_ref, "/ com hora = - com hora");
+
+    /* consistência: separador misturado é rejeitado (sem meia-boca) */
+    CHECK(smaug_dt_parse("2026-06/13", 10, &ep) == -1, "separador misturado -/ rejeitado");
+    CHECK(smaug_dt_parse("2026/06-13", 10, &ep) == -1, "separador misturado /- rejeitado");
+
+    /* '/' não afrouxa validação: mês/dia inválidos continuam barrados */
+    CHECK(smaug_dt_parse("2026/13/01", 10, &ep) == -1, "/ mês 13 ainda inválido");
+    CHECK(smaug_dt_parse("2026/02/30", 10, &ep) == -1, "/ fev 30 ainda inválido");
 }
 
 static void test_format(void) {
