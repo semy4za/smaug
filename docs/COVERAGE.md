@@ -3,9 +3,9 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `780554c`  |  Data: 2026-06-24 20:51:04 -0300
+- Commit medido: `3b6bc8b`  |  Data: 2026-06-25 09:41:02 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `3063/3300 = 92.82%` -- 101 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- **Branch-bruto** (todos os ramos): `3105/3348 = 92.74%` -- 101 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 | Arquivo | Linhas | Branch-alvo (taken) |
@@ -18,9 +18,9 @@
 | `smaug_ops_str.c` | `115/116 = 99.14%` `[█████████░]` | `115/115 = 100.00%` `[██████████]` |
 | `smaug_csv.c` | `304/312 = 97.44%` `[█████████░]` | `349/387 = 90.18%` `[█████████░]` |
 | `smaug_json.c` | `347/360 = 96.39%` `[█████████░]` | `414/461 = 89.80%` `[█████████░]` |
-| `smaug_datetime.c` | `373/376 = 99.20%` `[█████████░]` | `379/410 = 92.44%` `[█████████░]` |
+| `smaug_datetime.c` | `396/399 = 99.25%` `[█████████░]` | `421/458 = 91.92%` `[█████████░]` |
 | `smaug_ops_window.c` | `226/231 = 97.84%` `[█████████░]` | `239/249 = 95.98%` `[█████████░]` |
-| **TOTAL** | `3002/3037 = 98.85%` `[█████████░]` | `3063/3199 = 95.75%` `[█████████░]` |
+| **TOTAL** | `3025/3060 = 98.86%` `[█████████░]` | `3105/3247 = 95.63%` `[█████████░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
@@ -107,36 +107,40 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_json.c:625` — if (!buf) return -1;
 - `smaug_json.c:629` — return (w == len) ? 0 : -1;
 
-**`smaug_datetime.c`** — 29 linha(s) com ramo descoberto:
+**`smaug_datetime.c`** — 33 linha(s) com ramo descoberto:
 - `smaug_datetime.c:234` — if (!s)             { if (status) *status = SMG_ERR_ARGUMENT; return DT_SENTINEL; }
 - `smaug_datetime.c:251` — if (!s)             return SMG_ERR_ARGUMENT;
 - `smaug_datetime.c:277` — if (!s) return -1;
 - `smaug_datetime.c:278` — if (dt_cow_detach(s) != 0) return -1;
 - `smaug_datetime.c:280` — if (dt_grow(s) != 0) return -1;
-- `smaug_datetime.c:325` — if (p >= end) return -1;
-- `smaug_datetime.c:330` — if (p >= end || *p++ != date_sep)              return -1;
-- `smaug_datetime.c:331` — if (!(p = parse_digits(p, end, 2, &d)))       return -1;
-- `smaug_datetime.c:337` — if (p < end && (*p == 'T' || *p == ' ')) {
-- `smaug_datetime.c:339` — if (!(p = parse_digits(p, end, 2, &h)))   return -1;
-- `smaug_datetime.c:340` — if (p >= end || *p++ != ':')               return -1;
-- `smaug_datetime.c:341` — if (!(p = parse_digits(p, end, 2, &mi)))  return -1;
-- `smaug_datetime.c:342` — if (p >= end || *p++ != ':')               return -1;
-- `smaug_datetime.c:343` — if (!(p = parse_digits(p, end, 2, &sec))) return -1;
-- `smaug_datetime.c:352` — while (p < end && *p >= '0' && *p <= '9') {
-- `smaug_datetime.c:365` — } else if (*p == '+' || *p == '-') {
-- `smaug_datetime.c:368` — if (!(p = parse_digits(p, end, 2, &tz_h))) return -1;
-- `smaug_datetime.c:369` — if (p < end && *p == ':') p++;
-- `smaug_datetime.c:370` — if (!(p = parse_digits(p, end, 2, &tz_m))) return -1;
-- `smaug_datetime.c:415` — return (written > 0 && (size_t)written < buf_size) ? 0 : -1;
-- `smaug_datetime.c:553` — - (epoch_ms < 0 && epoch_ms % MS_PER_SECOND != 0 ? MS_PER_SECOND : 0);
-- `smaug_datetime.c:559` — - (epoch_ms < 0 && epoch_ms % MS_PER_HOUR != 0 ? MS_PER_HOUR : 0);
-- `smaug_datetime.c:615` — DT_CMP_IMPL(lt, < )
-- `smaug_datetime.c:616` — DT_CMP_IMPL(eq, ==)
-- `smaug_datetime.c:617` — DT_CMP_IMPL(ge, >=)
-- `smaug_datetime.c:618` — DT_CMP_IMPL(le, <=)
-- `smaug_datetime.c:619` — DT_CMP_IMPL(ne, !=)
-- `smaug_datetime.c:646` — if (!entries) return NULL;
-- `smaug_datetime.c:657` — if (!indices) { free(entries); return NULL; }
+- `smaug_datetime.c:319` — if (p < end && p[0] >= '0' && p[0] <= '9') {
+- `smaug_datetime.c:335` — if (p + 4 <= end && p[0] >= '0' && p[0] <= '9' && p[1] >= '0' && p[1] <= '9'
+- `smaug_datetime.c:339` — if (!(p = parse_digits(p, end, 4, y)))   return -1;
+- `smaug_datetime.c:342` — if (p >= end || *p++ != sep)             return -1;
+- `smaug_datetime.c:343` — if (!(p = parse_digits(p, end, 2, d)))   return -1;
+- `smaug_datetime.c:352` — if (p >= end || (*p != '-' && *p != '/'))    return -1;
+- `smaug_datetime.c:355` — if (p >= end || *p++ != sep)                 return -1;
+- `smaug_datetime.c:375` — if (p < end && (*p == 'T' || *p == ' ')) {
+- `smaug_datetime.c:377` — if (!(p = parse_digits(p, end, 2, &h)))   return -1;
+- `smaug_datetime.c:378` — if (p >= end || *p++ != ':')               return -1;
+- `smaug_datetime.c:379` — if (!(p = parse_digits(p, end, 2, &mi)))  return -1;
+- `smaug_datetime.c:380` — if (p >= end || *p++ != ':')               return -1;
+- `smaug_datetime.c:381` — if (!(p = parse_digits(p, end, 2, &sec))) return -1;
+- `smaug_datetime.c:390` — while (p < end && *p >= '0' && *p <= '9') {
+- `smaug_datetime.c:403` — } else if (*p == '+' || *p == '-') {
+- `smaug_datetime.c:406` — if (!(p = parse_digits(p, end, 2, &tz_h))) return -1;
+- `smaug_datetime.c:407` — if (p < end && *p == ':') p++;
+- `smaug_datetime.c:408` — if (!(p = parse_digits(p, end, 2, &tz_m))) return -1;
+- `smaug_datetime.c:453` — return (written > 0 && (size_t)written < buf_size) ? 0 : -1;
+- `smaug_datetime.c:591` — - (epoch_ms < 0 && epoch_ms % MS_PER_SECOND != 0 ? MS_PER_SECOND : 0);
+- `smaug_datetime.c:597` — - (epoch_ms < 0 && epoch_ms % MS_PER_HOUR != 0 ? MS_PER_HOUR : 0);
+- `smaug_datetime.c:653` — DT_CMP_IMPL(lt, < )
+- `smaug_datetime.c:654` — DT_CMP_IMPL(eq, ==)
+- `smaug_datetime.c:655` — DT_CMP_IMPL(ge, >=)
+- `smaug_datetime.c:656` — DT_CMP_IMPL(le, <=)
+- `smaug_datetime.c:657` — DT_CMP_IMPL(ne, !=)
+- `smaug_datetime.c:684` — if (!entries) return NULL;
+- `smaug_datetime.c:695` — if (!indices) { free(entries); return NULL; }
 
 **`smaug_ops_window.c`** — 8 linha(s) com ramo descoberto:
 - `smaug_ops_window.c:32` — switch (col->kind) {
