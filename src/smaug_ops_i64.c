@@ -4,8 +4,6 @@
 #include <stdlib.h>    /* malloc, free, qsort */
 #include <stddef.h>
 
-#define VALID(s, i)  ((s)->null_mask[(i)] == 0xFF)
-#define INVALID(s,i) ((s)->null_mask[(i)] != 0xFF)
 
 /* smaug_i64_create vem de smaug_core.h (incluído via smaug_numeric.h). */
 static smaug_series_i64_t *alloc_result(size_t size) {
@@ -26,9 +24,9 @@ smaug_series_i64_t *smaug_i64_add(const smaug_series_i64_t *a,
     if (!r) return NULL;
 
     for (size_t i = 0; i < a->size; i++) {
-        if (VALID(a, i) && VALID(b, i)) {
+        if (SMAUG_VALID(a->null_mask, i) && SMAUG_VALID(b->null_mask, i)) {
             r->data[i]      = a->data[i] + b->data[i];
-            r->null_mask[i] = 0xFF;
+            r->null_mask[i] = SMAUG_MASK_VALID;
         }
     }
     return r;
@@ -42,9 +40,9 @@ smaug_series_i64_t *smaug_i64_sub(const smaug_series_i64_t *a,
     if (!r) return NULL;
 
     for (size_t i = 0; i < a->size; i++) {
-        if (VALID(a, i) && VALID(b, i)) {
+        if (SMAUG_VALID(a->null_mask, i) && SMAUG_VALID(b->null_mask, i)) {
             r->data[i]      = a->data[i] - b->data[i];
-            r->null_mask[i] = 0xFF;
+            r->null_mask[i] = SMAUG_MASK_VALID;
         }
     }
     return r;
@@ -58,9 +56,9 @@ smaug_series_i64_t *smaug_i64_mul(const smaug_series_i64_t *a,
     if (!r) return NULL;
 
     for (size_t i = 0; i < a->size; i++) {
-        if (VALID(a, i) && VALID(b, i)) {
+        if (SMAUG_VALID(a->null_mask, i) && SMAUG_VALID(b->null_mask, i)) {
             r->data[i]      = a->data[i] * b->data[i];
-            r->null_mask[i] = 0xFF;
+            r->null_mask[i] = SMAUG_MASK_VALID;
         }
     }
     return r;
@@ -75,11 +73,11 @@ smaug_series_i64_t *smaug_i64_div(const smaug_series_i64_t *a,
     if (!r) return NULL;
 
     for (size_t i = 0; i < a->size; i++) {
-        if (VALID(a, i) && VALID(b, i) && b->data[i] != 0) {
+        if (SMAUG_VALID(a->null_mask, i) && SMAUG_VALID(b->null_mask, i) && b->data[i] != 0) {
             r->data[i]      = a->data[i] / b->data[i];
-            r->null_mask[i] = 0xFF;
+            r->null_mask[i] = SMAUG_MASK_VALID;
         }
-        /* divisão por zero fica como NULL (null_mask[i] == 0x00) */
+        /* divisão por zero fica como NULL (null_mask[i] == SMAUG_MASK_NULL) */
     }
     return r;
 }
@@ -95,9 +93,9 @@ smaug_series_i64_t *smaug_i64_add_scalar(const smaug_series_i64_t *a, int64_t sc
     if (!r) return NULL;
 
     for (size_t i = 0; i < a->size; i++) {
-        if (VALID(a, i)) {
+        if (SMAUG_VALID(a->null_mask, i)) {
             r->data[i]      = a->data[i] + scalar;
-            r->null_mask[i] = 0xFF;
+            r->null_mask[i] = SMAUG_MASK_VALID;
         }
     }
     return r;
@@ -110,9 +108,9 @@ smaug_series_i64_t *smaug_i64_sub_scalar(const smaug_series_i64_t *a, int64_t sc
     if (!r) return NULL;
 
     for (size_t i = 0; i < a->size; i++) {
-        if (VALID(a, i)) {
+        if (SMAUG_VALID(a->null_mask, i)) {
             r->data[i]      = a->data[i] - scalar;
-            r->null_mask[i] = 0xFF;
+            r->null_mask[i] = SMAUG_MASK_VALID;
         }
     }
     return r;
@@ -125,9 +123,9 @@ smaug_series_i64_t *smaug_i64_mul_scalar(const smaug_series_i64_t *a, int64_t sc
     if (!r) return NULL;
 
     for (size_t i = 0; i < a->size; i++) {
-        if (VALID(a, i)) {
+        if (SMAUG_VALID(a->null_mask, i)) {
             r->data[i]      = a->data[i] * scalar;
-            r->null_mask[i] = 0xFF;
+            r->null_mask[i] = SMAUG_MASK_VALID;
         }
     }
     return r;
@@ -142,9 +140,9 @@ smaug_series_i64_t *smaug_i64_div_scalar(const smaug_series_i64_t *a, int64_t sc
     if (!r) return NULL;
 
     for (size_t i = 0; i < a->size; i++) {
-        if (VALID(a, i)) {
+        if (SMAUG_VALID(a->null_mask, i)) {
             r->data[i]      = a->data[i] / scalar;
-            r->null_mask[i] = 0xFF;
+            r->null_mask[i] = SMAUG_MASK_VALID;
         }
     }
     return r;
@@ -163,7 +161,7 @@ int64_t smaug_i64_sum(const smaug_series_i64_t *s, bool ignore_na) {
 
     int64_t sum = 0;
     for (size_t i = 0; i < s->size; i++) {
-        if (VALID(s, i)) {
+        if (SMAUG_VALID(s->null_mask, i)) {
             sum += s->data[i];
         } else if (!ignore_na) {
             return INT64_MIN;   /* sentinel: série contém NULL */
@@ -179,7 +177,7 @@ int64_t smaug_i64_min(const smaug_series_i64_t *s, bool ignore_na) {
     bool    found      = false;
 
     for (size_t i = 0; i < s->size; i++) {
-        if (VALID(s, i)) {
+        if (SMAUG_VALID(s->null_mask, i)) {
             if (!found || s->data[i] < result) {
                 result = s->data[i];
                 found  = true;
@@ -198,7 +196,7 @@ int64_t smaug_i64_max(const smaug_series_i64_t *s, bool ignore_na) {
     bool    found  = false;
 
     for (size_t i = 0; i < s->size; i++) {
-        if (VALID(s, i)) {
+        if (SMAUG_VALID(s->null_mask, i)) {
             if (!found || s->data[i] > result) {
                 result = s->data[i];
                 found  = true;
@@ -218,7 +216,7 @@ double smaug_i64_mean(const smaug_series_i64_t *s, bool ignore_na) {
     size_t count = 0;
 
     for (size_t i = 0; i < s->size; i++) {
-        if (VALID(s, i)) {
+        if (SMAUG_VALID(s->null_mask, i)) {
             sum += (double)s->data[i];
             count++;
         } else if (!ignore_na) {
@@ -238,7 +236,7 @@ double smaug_i64_var(const smaug_series_i64_t *s, bool ignore_na) {
     size_t count  = 0;
 
     for (size_t i = 0; i < s->size; i++) {
-        if (VALID(s, i)) {
+        if (SMAUG_VALID(s->null_mask, i)) {
             double d = (double)s->data[i] - mean;
             sum_sq += d * d;
             count++;
@@ -270,12 +268,12 @@ uint8_t *smaug_i64_gt(const smaug_series_i64_t *s, int64_t threshold,
     }
 
     for (size_t i = 0; i < s->size; i++) {
-        if (VALID(s, i)) {
+        if (SMAUG_VALID(s->null_mask, i)) {
             result[i] = s->data[i] > threshold ? 1 : 0;
-            if (mask) mask[i] = 0xFF;
+            if (mask) mask[i] = SMAUG_MASK_VALID;
         } else {
             result[i] = 0;
-            if (mask) mask[i] = 0x00;
+            if (mask) mask[i] = SMAUG_MASK_NULL;
         }
     }
     return result;
@@ -296,12 +294,12 @@ uint8_t *smaug_i64_lt(const smaug_series_i64_t *s, int64_t threshold,
     }
 
     for (size_t i = 0; i < s->size; i++) {
-        if (VALID(s, i)) {
+        if (SMAUG_VALID(s->null_mask, i)) {
             result[i] = s->data[i] < threshold ? 1 : 0;
-            if (mask) mask[i] = 0xFF;
+            if (mask) mask[i] = SMAUG_MASK_VALID;
         } else {
             result[i] = 0;
-            if (mask) mask[i] = 0x00;
+            if (mask) mask[i] = SMAUG_MASK_NULL;
         }
     }
     return result;
@@ -322,12 +320,12 @@ uint8_t *smaug_i64_eq(const smaug_series_i64_t *s, int64_t threshold,
     }
 
     for (size_t i = 0; i < s->size; i++) {
-        if (VALID(s, i)) {
+        if (SMAUG_VALID(s->null_mask, i)) {
             result[i] = s->data[i] == threshold ? 1 : 0;
-            if (mask) mask[i] = 0xFF;
+            if (mask) mask[i] = SMAUG_MASK_VALID;
         } else {
             result[i] = 0;
-            if (mask) mask[i] = 0x00;
+            if (mask) mask[i] = SMAUG_MASK_NULL;
         }
     }
     return result;
@@ -345,12 +343,12 @@ uint8_t *smaug_i64_ge(const smaug_series_i64_t *s, int64_t threshold,
         *out_mask = mask;
     }
     for (size_t i = 0; i < s->size; i++) {
-        if (VALID(s, i)) {
+        if (SMAUG_VALID(s->null_mask, i)) {
             result[i] = s->data[i] >= threshold ? 1 : 0;
-            if (mask) mask[i] = 0xFF;
+            if (mask) mask[i] = SMAUG_MASK_VALID;
         } else {
             result[i] = 0;
-            if (mask) mask[i] = 0x00;
+            if (mask) mask[i] = SMAUG_MASK_NULL;
         }
     }
     return result;
@@ -368,12 +366,12 @@ uint8_t *smaug_i64_le(const smaug_series_i64_t *s, int64_t threshold,
         *out_mask = mask;
     }
     for (size_t i = 0; i < s->size; i++) {
-        if (VALID(s, i)) {
+        if (SMAUG_VALID(s->null_mask, i)) {
             result[i] = s->data[i] <= threshold ? 1 : 0;
-            if (mask) mask[i] = 0xFF;
+            if (mask) mask[i] = SMAUG_MASK_VALID;
         } else {
             result[i] = 0;
-            if (mask) mask[i] = 0x00;
+            if (mask) mask[i] = SMAUG_MASK_NULL;
         }
     }
     return result;
@@ -391,12 +389,12 @@ uint8_t *smaug_i64_ne(const smaug_series_i64_t *s, int64_t threshold,
         *out_mask = mask;
     }
     for (size_t i = 0; i < s->size; i++) {
-        if (VALID(s, i)) {
+        if (SMAUG_VALID(s->null_mask, i)) {
             result[i] = s->data[i] != threshold ? 1 : 0;
-            if (mask) mask[i] = 0xFF;
+            if (mask) mask[i] = SMAUG_MASK_VALID;
         } else {
             result[i] = 0;
-            if (mask) mask[i] = 0x00;
+            if (mask) mask[i] = SMAUG_MASK_NULL;
         }
     }
     return result;
@@ -425,7 +423,7 @@ size_t *smaug_i64_argsort(const smaug_series_i64_t *s, bool ascending) {
     if (!s) return NULL;
 
     for (size_t i = 0; i < s->size; i++) {
-        if (INVALID(s, i)) return NULL;
+        if (SMAUG_NULL(s->null_mask, i)) return NULL;
     }
 
     i64_entry_t *entries = malloc(s->size * sizeof(i64_entry_t));
@@ -467,7 +465,7 @@ size_t smaug_i64_count_nonnull(const smaug_series_i64_t *s) {
     if (!s) return 0;
     size_t count = 0;
     for (size_t i = 0; i < s->size; i++) {
-        if (VALID(s, i)) count++;
+        if (SMAUG_VALID(s->null_mask, i)) count++;
     }
     return count;
 }
@@ -503,12 +501,12 @@ smaug_series_i64_t *smaug_i64_cumsum(const smaug_series_i64_t *s) {
     int64_t acc = 0;
     int null_seen = 0;
     for (size_t i = 0; i < s->size; i++) {
-        if (null_seen || INVALID(s, i)) {
+        if (null_seen || SMAUG_NULL(s->null_mask, i)) {
             null_seen = 1;
         } else {
             acc += s->data[i];   /* wrap-around intencional (contrato i64) */
             r->data[i]      = acc;
-            r->null_mask[i] = 0xFF;
+            r->null_mask[i] = SMAUG_MASK_VALID;
         }
     }
     return r;
@@ -521,12 +519,12 @@ smaug_series_i64_t *smaug_i64_cumprod(const smaug_series_i64_t *s) {
     int64_t acc = 1;
     int null_seen = 0;
     for (size_t i = 0; i < s->size; i++) {
-        if (null_seen || INVALID(s, i)) {
+        if (null_seen || SMAUG_NULL(s->null_mask, i)) {
             null_seen = 1;
         } else {
             acc *= s->data[i];   /* wrap-around intencional */
             r->data[i]      = acc;
-            r->null_mask[i] = 0xFF;
+            r->null_mask[i] = SMAUG_MASK_VALID;
         }
     }
     return r;
@@ -539,11 +537,11 @@ smaug_series_i64_t *smaug_i64_cummin(const smaug_series_i64_t *s) {
     int has_val = 0;
     int64_t cur = 0;
     for (size_t i = 0; i < s->size; i++) {
-        if (INVALID(s, i)) continue;
+        if (SMAUG_NULL(s->null_mask, i)) continue;
         int64_t v = s->data[i];
         if (!has_val || v < cur) { cur = v; has_val = 1; }
         r->data[i]      = cur;
-        r->null_mask[i] = 0xFF;
+        r->null_mask[i] = SMAUG_MASK_VALID;
     }
     return r;
 }
@@ -555,11 +553,11 @@ smaug_series_i64_t *smaug_i64_cummax(const smaug_series_i64_t *s) {
     int has_val = 0;
     int64_t cur = 0;
     for (size_t i = 0; i < s->size; i++) {
-        if (INVALID(s, i)) continue;
+        if (SMAUG_NULL(s->null_mask, i)) continue;
         int64_t v = s->data[i];
         if (!has_val || v > cur) { cur = v; has_val = 1; }
         r->data[i]      = cur;
-        r->null_mask[i] = 0xFF;
+        r->null_mask[i] = SMAUG_MASK_VALID;
     }
     return r;
 }
@@ -569,9 +567,9 @@ smaug_series_i64_t *smaug_i64_diff(const smaug_series_i64_t *s, size_t periods) 
     smaug_series_i64_t *r = alloc_result(s->size);
     if (!r) return NULL;
     for (size_t i = periods; i < s->size; i++) {
-        if (VALID(s, i) && VALID(s, i - periods)) {
+        if (SMAUG_VALID(s->null_mask, i) && SMAUG_VALID(s->null_mask, i - periods)) {
             r->data[i]      = s->data[i] - s->data[i - periods];
-            r->null_mask[i] = 0xFF;
+            r->null_mask[i] = SMAUG_MASK_VALID;
         }
     }
     return r;
@@ -596,8 +594,8 @@ smaug_series_i64_t *smaug_i64_ffill(const smaug_series_i64_t *s) {
     int has_last = 0;
     int64_t last = 0;
     for (size_t i = 0; i < s->size; i++) {
-        if (VALID(s, i)) { last = s->data[i]; has_last = 1; }
-        if (has_last) { r->data[i] = last; r->null_mask[i] = 0xFF; }
+        if (SMAUG_VALID(s->null_mask, i)) { last = s->data[i]; has_last = 1; }
+        if (has_last) { r->data[i] = last; r->null_mask[i] = SMAUG_MASK_VALID; }
     }
     return r;
 }
@@ -609,8 +607,8 @@ smaug_series_i64_t *smaug_i64_bfill(const smaug_series_i64_t *s) {
     int has_next = 0;
     int64_t next = 0;
     for (size_t i = s->size; i-- > 0; ) {
-        if (VALID(s, i)) { next = s->data[i]; has_next = 1; }
-        if (has_next) { r->data[i] = next; r->null_mask[i] = 0xFF; }
+        if (SMAUG_VALID(s->null_mask, i)) { next = s->data[i]; has_next = 1; }
+        if (has_next) { r->data[i] = next; r->null_mask[i] = SMAUG_MASK_VALID; }
     }
     return r;
 }
@@ -620,7 +618,7 @@ size_t smaug_i64_argmin(const smaug_series_i64_t *s) {
     size_t best_i = SIZE_MAX;
     int64_t best_v = 0;
     for (size_t i = 0; i < s->size; i++) {
-        if (VALID(s, i)) {
+        if (SMAUG_VALID(s->null_mask, i)) {
             if (best_i == SIZE_MAX || s->data[i] < best_v) {
                 best_v = s->data[i]; best_i = i;
             }
@@ -634,7 +632,7 @@ size_t smaug_i64_argmax(const smaug_series_i64_t *s) {
     size_t best_i = SIZE_MAX;
     int64_t best_v = 0;
     for (size_t i = 0; i < s->size; i++) {
-        if (VALID(s, i)) {
+        if (SMAUG_VALID(s->null_mask, i)) {
             if (best_i == SIZE_MAX || s->data[i] > best_v) {
                 best_v = s->data[i]; best_i = i;
             }
@@ -681,7 +679,7 @@ int64_t *smaug_i64_sorted_nonnull(const smaug_series_i64_t *s, size_t *out_n) {
     if (!s || !out_n) return NULL;
     size_t n = 0;
     for (size_t i = 0; i < s->size; i++) {
-        if (VALID(s, i)) n++;
+        if (SMAUG_VALID(s->null_mask, i)) n++;
     }
     *out_n = n;
     if (n == 0) return NULL;
@@ -691,7 +689,7 @@ int64_t *smaug_i64_sorted_nonnull(const smaug_series_i64_t *s, size_t *out_n) {
 
     size_t j = 0;
     for (size_t i = 0; i < s->size; i++) {
-        if (VALID(s, i)) arr[j++] = s->data[i];
+        if (SMAUG_VALID(s->null_mask, i)) arr[j++] = s->data[i];
     }
     qsort(arr, n, sizeof(int64_t), cmp_i64);
     return arr;
@@ -719,7 +717,7 @@ double *smaug_i64_rank(const smaug_series_i64_t *s, int method) {
 
     size_t m = 0;
     for (size_t i = 0; i < n; i++) {
-        if (VALID(s, i)) m++;
+        if (SMAUG_VALID(s->null_mask, i)) m++;
     }
     if (m == 0) return result;
 
@@ -728,7 +726,7 @@ double *smaug_i64_rank(const smaug_series_i64_t *s, int method) {
 
     size_t j = 0;
     for (size_t i = 0; i < n; i++) {
-        if (VALID(s, i)) {
+        if (SMAUG_VALID(s->null_mask, i)) {
             pairs[j].val = s->data[i];
             pairs[j].idx = i;
             j++;

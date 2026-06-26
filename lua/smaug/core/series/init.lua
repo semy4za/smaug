@@ -52,6 +52,16 @@ local C   = require("smaug.ffi_loader")
 -- Sentinelas globais (usados por múltiplos módulos)
 local NAN     = 0 / 0
 local I64_MIN = -9223372036854775807LL - 1LL
+-- ^ I64_MIN: sentinela i64/datetime. Escrito como (-MAX - 1) porque o literal
+--   mais-negativo não é representável diretamente. Tem DOIS contextos distintos:
+--     1. Leitura de elemento (get): o C devolve 0 + status SMG_NULL_VALUE para
+--        NULL. O 0 NÃO é sentinela (0 é valor i64 válido); quem sinaliza é o
+--        status, e a fronteira Lua converte para nil.
+--     2. Redução posicional (sum/min/max sobre vazio/all-null): o C devolve
+--        I64_MIN como sentinela de resultado (canal único, sem status). É
+--        detectado por is_int_sentinel (ver reduce_num em _core.lua) → nil.
+--   Toda comparação com este sentinela passa pelo predicado is_int_sentinel;
+--   nunca por literal cru (vira double e bate por coerção frágil).
 
 local function is_nan(v) return v ~= v end
 

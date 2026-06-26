@@ -1,7 +1,7 @@
 -- lua/smaug/core/series/_factories.lua
 --
 -- Factories públicas da Series.
--- Recebe I com: I.Series, I.DTYPES, I.wrap, I.is_na, I.NA
+-- Recebe I com: I.Series, I.DTYPES, I.wrap, I.is_na, I.is_nan, I.NA
 -- Contribui: Series.new, Series.float64, Series.int64, Series.string,
 --            Series.datetime, Series.full, Series.from_table (base, sem categorical),
 --            Series.infer_dtype, I.infer_dtype, I.infer_dtype_from_value
@@ -13,6 +13,7 @@ return function(I)
     local DTYPES = I.DTYPES
     local wrap   = I.wrap
     local is_na  = I.is_na
+    local is_nan = I.is_nan
     local NA     = I.NA
 
     -- =====================================================================
@@ -28,7 +29,7 @@ return function(I)
         if t == "boolean" then return "bool" end
         if t == "string"  then return "string" end
         if t == "number" then
-            if v ~= v or v % 1 ~= 0 then return "float64" end  -- NaN ou fracionário
+            if is_nan(v) or v % 1 ~= 0 then return "float64" end  -- NaN ou fracionário
             return "int64"
         end
         return nil

@@ -185,7 +185,7 @@ return function(I)
                         out:set_null(i)
                     end
                 else
-                    if v ~= v or v == math.huge or v == -math.huge then
+                    if is_nan(v) or v == math.huge or v == -math.huge then
                         out:set_null(i)
                     else
                         out:set(i, trunc_to_int(v))
@@ -217,7 +217,7 @@ return function(I)
                 if num == nil then
                     out:set_null(i)
                 elseif dtype == "int64" then
-                    if num ~= num or num == math.huge or num == -math.huge then
+                    if is_nan(num) or num == math.huge or num == -math.huge then
                         out:set_null(i)
                     else
                         out:set(i, trunc_to_int(num))
@@ -228,7 +228,7 @@ return function(I)
             elseif dtype == "string" and src ~= "string" then
                 out:set(i, tostring(v))
             elseif dtype == "int64" and src ~= "int64" then
-                if v ~= v or v == math.huge or v == -math.huge then
+                if is_nan(v) or v == math.huge or v == -math.huge then
                     out:set_null(i)
                 else
                     out:set(i, trunc_to_int(v))

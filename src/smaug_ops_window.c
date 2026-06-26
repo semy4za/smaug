@@ -199,17 +199,17 @@ smaug_series_f64_t *smaug_f64_rolling_sum(const smaug_series_f64_t *s,
 
     for (size_t i = 0; i < s->size; i++) {
         /* adiciona elemento que entra */
-        if (s->null_mask[i] == 0xFF) { sum += s->data[i]; cnt++; }
+        if (SMAUG_VALID(s->null_mask, i)) { sum += s->data[i]; cnt++; }
         /* remove elemento que sai (fora da janela) */
         if (i >= window) {
             size_t out = i - window;
-            if (s->null_mask[out] == 0xFF) { sum -= s->data[out]; cnt--; }
+            if (SMAUG_VALID(s->null_mask, out)) { sum -= s->data[out]; cnt--; }
         }
         /* janela incompleta → NA */
         if (i + 1 < window) continue;
         if (cnt == 0) continue;  /* janela toda nula → NA */
         r->data[i]      = sum;
-        r->null_mask[i] = 0xFF;
+        r->null_mask[i] = SMAUG_MASK_VALID;
     }
     return r;
 }
@@ -227,15 +227,15 @@ smaug_series_f64_t *smaug_f64_rolling_mean(const smaug_series_f64_t *s,
     size_t cnt = 0;
 
     for (size_t i = 0; i < s->size; i++) {
-        if (s->null_mask[i] == 0xFF) { sum += s->data[i]; cnt++; }
+        if (SMAUG_VALID(s->null_mask, i)) { sum += s->data[i]; cnt++; }
         if (i >= window) {
             size_t out = i - window;
-            if (s->null_mask[out] == 0xFF) { sum -= s->data[out]; cnt--; }
+            if (SMAUG_VALID(s->null_mask, out)) { sum -= s->data[out]; cnt--; }
         }
         if (i + 1 < window) continue;
         if (cnt == 0) continue;
         r->data[i]      = sum / (double)cnt;
-        r->null_mask[i] = 0xFF;
+        r->null_mask[i] = SMAUG_MASK_VALID;
     }
     return r;
 }
@@ -253,7 +253,7 @@ smaug_series_f64_t *smaug_f64_rolling_min(const smaug_series_f64_t *s,
     if (!deque_init(&dq, window + 1)) { smaug_f64_free(r); return NULL; }
 
     for (size_t i = 0; i < s->size; i++) {
-        if (s->null_mask[i] != 0xFF) {
+        if (SMAUG_NULL(s->null_mask, i)) {
             /* nulo: não entra na deque; verifica se janela completa tem válidos */
             if (i + 1 >= window && !deque_empty(&dq) &&
                 deque_front(&dq) + window <= i) {
@@ -277,7 +277,7 @@ smaug_series_f64_t *smaug_f64_rolling_min(const smaug_series_f64_t *s,
             deque_pop_front(&dq);
         if (deque_empty(&dq)) continue;
         r->data[i]      = s->data[deque_front(&dq)];
-        r->null_mask[i] = 0xFF;
+        r->null_mask[i] = SMAUG_MASK_VALID;
     }
 
     deque_free(&dq);
@@ -297,7 +297,7 @@ smaug_series_f64_t *smaug_f64_rolling_max(const smaug_series_f64_t *s,
     if (!deque_init(&dq, window + 1)) { smaug_f64_free(r); return NULL; }
 
     for (size_t i = 0; i < s->size; i++) {
-        if (s->null_mask[i] != 0xFF) {
+        if (SMAUG_NULL(s->null_mask, i)) {
             if (i + 1 >= window && !deque_empty(&dq) &&
                 deque_front(&dq) + window <= i) {
                 deque_pop_front(&dq);
@@ -317,7 +317,7 @@ smaug_series_f64_t *smaug_f64_rolling_max(const smaug_series_f64_t *s,
             deque_pop_front(&dq);
         if (deque_empty(&dq)) continue;
         r->data[i]      = s->data[deque_front(&dq)];
-        r->null_mask[i] = 0xFF;
+        r->null_mask[i] = SMAUG_MASK_VALID;
     }
 
     deque_free(&dq);
@@ -338,14 +338,14 @@ smaug_series_i64_t *smaug_i64_rolling_sum(const smaug_series_i64_t *s,
     size_t  cnt = 0;
 
     for (size_t i = 0; i < s->size; i++) {
-        if (s->null_mask[i] == 0xFF) { sum += s->data[i]; cnt++; }
+        if (SMAUG_VALID(s->null_mask, i)) { sum += s->data[i]; cnt++; }
         if (i >= window) {
             size_t out = i - window;
-            if (s->null_mask[out] == 0xFF) { sum -= s->data[out]; cnt--; }
+            if (SMAUG_VALID(s->null_mask, out)) { sum -= s->data[out]; cnt--; }
         }
         if (i + 1 < window || cnt == 0) continue;
         r->data[i]      = sum;
-        r->null_mask[i] = 0xFF;
+        r->null_mask[i] = SMAUG_MASK_VALID;
     }
     return r;
 }
@@ -360,14 +360,14 @@ smaug_series_f64_t *smaug_i64_rolling_mean(const smaug_series_i64_t *s,
     size_t  cnt = 0;
 
     for (size_t i = 0; i < s->size; i++) {
-        if (s->null_mask[i] == 0xFF) { sum += s->data[i]; cnt++; }
+        if (SMAUG_VALID(s->null_mask, i)) { sum += s->data[i]; cnt++; }
         if (i >= window) {
             size_t out = i - window;
-            if (s->null_mask[out] == 0xFF) { sum -= s->data[out]; cnt--; }
+            if (SMAUG_VALID(s->null_mask, out)) { sum -= s->data[out]; cnt--; }
         }
         if (i + 1 < window || cnt == 0) continue;
         r->data[i]      = (double)sum / (double)cnt;
-        r->null_mask[i] = 0xFF;
+        r->null_mask[i] = SMAUG_MASK_VALID;
     }
     return r;
 }
@@ -382,7 +382,7 @@ smaug_series_i64_t *smaug_i64_rolling_min(const smaug_series_i64_t *s,
     if (!deque_init(&dq, window + 1)) { smaug_i64_free(r); return NULL; }
 
     for (size_t i = 0; i < s->size; i++) {
-        if (s->null_mask[i] != 0xFF) { goto next_i64_min; }
+        if (SMAUG_NULL(s->null_mask, i)) { goto next_i64_min; }
         while (!deque_empty(&dq) && deque_front(&dq) + window <= i)
             deque_pop_front(&dq);
         while (!deque_empty(&dq) && s->data[deque_back(&dq)] >= s->data[i])
@@ -395,7 +395,7 @@ smaug_series_i64_t *smaug_i64_rolling_min(const smaug_series_i64_t *s,
             deque_pop_front(&dq);
         if (deque_empty(&dq)) continue;
         r->data[i]      = s->data[deque_front(&dq)];
-        r->null_mask[i] = 0xFF;
+        r->null_mask[i] = SMAUG_MASK_VALID;
     }
 
     deque_free(&dq);
@@ -412,7 +412,7 @@ smaug_series_i64_t *smaug_i64_rolling_max(const smaug_series_i64_t *s,
     if (!deque_init(&dq, window + 1)) { smaug_i64_free(r); return NULL; }
 
     for (size_t i = 0; i < s->size; i++) {
-        if (s->null_mask[i] != 0xFF) { goto next_i64_max; }
+        if (SMAUG_NULL(s->null_mask, i)) { goto next_i64_max; }
         while (!deque_empty(&dq) && deque_front(&dq) + window <= i)
             deque_pop_front(&dq);
         while (!deque_empty(&dq) && s->data[deque_back(&dq)] <= s->data[i])
@@ -425,7 +425,7 @@ smaug_series_i64_t *smaug_i64_rolling_max(const smaug_series_i64_t *s,
             deque_pop_front(&dq);
         if (deque_empty(&dq)) continue;
         r->data[i]      = s->data[deque_front(&dq)];
-        r->null_mask[i] = 0xFF;
+        r->null_mask[i] = SMAUG_MASK_VALID;
     }
 
     deque_free(&dq);

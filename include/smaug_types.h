@@ -29,9 +29,40 @@ typedef enum {
 /* Tipo opaque para hash table (uso futuro: GroupBy/joins) */
 typedef struct smaug_hash_table smaug_hash_table_t;
 
-/* Máscara de nulos: array paralelo (1 byte por valor).
-   Convenção: 0xFF = válido, 0x00 = NA/NULL */
+/* Máscara de nulos: array paralelo (1 byte por valor). */
 typedef uint8_t smaug_mask_t;
+
+/* Valores do byte de máscara — o ÚNICO lugar onde os bytes crus aparecem.
+   Toda escrita de máscara usa estes símbolos; nenhum literal 0xFF/0x00
+   de máscara deve existir em outro arquivo. */
+#define SMAUG_MASK_VALID 0xFF
+#define SMAUG_MASK_NULL  0x00
+
+/* ===================================================================
+   Convenção de nulidade — fonte única dos TESTES de máscara
+   -------------------------------------------------------------------
+   Byte de máscara: SMAUG_MASK_VALID = válido, SMAUG_MASK_NULL = NA.
+
+   Existem DOIS contratos distintos, por design, não por descuido.
+   NÃO os unifique num macro permissivo: esconder uma máscara ausente
+   em código de Series mascararia bug de programação
+   (falha visível > acerto adivinhado).
+
+     SMAUG_VALID / SMAUG_NULL
+         Exigem máscara válida (presente). Passar NULL é erro de
+         programação e deve falhar, nunca ser silenciado.
+
+     SMAUG_OPTIONAL_VALID
+         Só para APIs cujo contrato aceita explicitamente máscara NULL
+         significando "todos os valores são válidos" (funções livres
+         do bool: smaug_bool_*).
+
+   SMAUG_NULL é, por construção, a negação de SMAUG_VALID — não podem
+   divergir.
+   =================================================================== */
+#define SMAUG_VALID(mask, i)          ((mask)[(i)] == SMAUG_MASK_VALID)
+#define SMAUG_NULL(mask, i)           (!SMAUG_VALID((mask), (i)))
+#define SMAUG_OPTIONAL_VALID(mask, i) ((mask) == NULL || SMAUG_VALID((mask), (i)))
 
 /* Metadados comuns a toda série (qualquer dtype). */
 typedef struct {

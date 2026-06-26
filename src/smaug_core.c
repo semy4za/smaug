@@ -88,7 +88,7 @@ smaug_series_f64_t *smaug_f64_create_with_capacity(size_t size, size_t capacity)
         s->null_mask = malloc(capacity * sizeof(smaug_mask_t));
         if (!s->null_mask) { free(s->data); free(s); return NULL; }
 
-        memset(s->null_mask, 0x00, capacity);          /* tudo NULL por padrão */
+        memset(s->null_mask, SMAUG_MASK_NULL, capacity);          /* tudo NULL por padrão */
         memset(s->data,      0,    size * sizeof(double));
     }
 
@@ -112,7 +112,7 @@ smaug_series_f64_t *smaug_f64_create_from_array(const double *array, size_t len)
     if (!s) return NULL;
 
     memcpy(s->data, array, len * sizeof(double));
-    memset(s->null_mask, 0xFF, len);   /* todos os elementos são válidos */
+    memset(s->null_mask, SMAUG_MASK_VALID, len);   /* todos os elementos são válidos */
     return s;
 }
 
@@ -196,7 +196,7 @@ static int f64_cow_detach(smaug_series_f64_t *s) {
 double smaug_f64_get(const smaug_series_f64_t *s, size_t idx, smaug_status_t *status) {
     if (!s)             { if (status) *status = SMG_ERR_ARGUMENT; return NAN; }
     if (idx >= s->size) { if (status) *status = SMG_ERR_OOB;      return NAN; }
-    if (s->null_mask[idx] != 0xFF) { if (status) *status = SMG_NULL_VALUE; return NAN; }
+    if (SMAUG_NULL(s->null_mask, idx)) { if (status) *status = SMG_NULL_VALUE; return NAN; }
     if (status) *status = SMG_OK;
     return s->data[idx];
 }
@@ -206,7 +206,7 @@ smaug_status_t smaug_f64_set(smaug_series_f64_t *s, size_t idx, double val) {
     if (idx >= s->size) return SMG_ERR_OOB;
     if (f64_cow_detach(s) != 0) return SMG_ERR_NOMEM;
     s->data[idx]      = val;
-    s->null_mask[idx] = 0xFF;
+    s->null_mask[idx] = SMAUG_MASK_VALID;
     return SMG_OK;
 }
 
@@ -214,14 +214,14 @@ smaug_status_t smaug_f64_set_null(smaug_series_f64_t *s, size_t idx) {
     if (!s)             return SMG_ERR_ARGUMENT;
     if (idx >= s->size) return SMG_ERR_OOB;
     if (f64_cow_detach(s) != 0) return SMG_ERR_NOMEM;
-    s->null_mask[idx] = 0x00;
+    s->null_mask[idx] = SMAUG_MASK_NULL;
     s->data[idx]      = 0.0;   /* limpa o dado (opcional, mas consistente) */
     return SMG_OK;
 }
 
 bool smaug_f64_is_null(smaug_series_f64_t *s, size_t idx) {
     if (!s || idx >= s->size) return true;
-    return s->null_mask[idx] != 0xFF;
+    return SMAUG_NULL(s->null_mask, idx);
 }
 
 /* --- Append dinâmico --- */
@@ -235,7 +235,7 @@ int smaug_f64_append(smaug_series_f64_t *s, double val) {
     }
 
     s->data[s->size]      = val;
-    s->null_mask[s->size] = 0xFF;
+    s->null_mask[s->size] = SMAUG_MASK_VALID;
     s->size++;
     return 0;
 }
@@ -249,7 +249,7 @@ int smaug_f64_append_null(smaug_series_f64_t *s) {
     }
 
     s->data[s->size]      = 0.0;
-    s->null_mask[s->size] = 0x00;
+    s->null_mask[s->size] = SMAUG_MASK_NULL;
     s->size++;
     return 0;
 }
@@ -275,7 +275,7 @@ smaug_series_i64_t *smaug_i64_create_with_capacity(size_t size, size_t capacity)
         s->null_mask = malloc(capacity * sizeof(smaug_mask_t));
         if (!s->null_mask) { free(s->data); free(s); return NULL; }
 
-        memset(s->null_mask, 0x00, capacity);
+        memset(s->null_mask, SMAUG_MASK_NULL, capacity);
         memset(s->data,      0,    size * sizeof(int64_t));
     }
 
@@ -299,7 +299,7 @@ smaug_series_i64_t *smaug_i64_create_from_array(const int64_t *array, size_t len
     if (!s) return NULL;
 
     memcpy(s->data, array, len * sizeof(int64_t));
-    memset(s->null_mask, 0xFF, len);
+    memset(s->null_mask, SMAUG_MASK_VALID, len);
     return s;
 }
 
@@ -377,7 +377,7 @@ static int i64_cow_detach(smaug_series_i64_t *s) {
 int64_t smaug_i64_get(const smaug_series_i64_t *s, size_t idx, smaug_status_t *status) {
     if (!s)             { if (status) *status = SMG_ERR_ARGUMENT; return 0; }
     if (idx >= s->size) { if (status) *status = SMG_ERR_OOB;      return 0; }
-    if (s->null_mask[idx] != 0xFF) { if (status) *status = SMG_NULL_VALUE; return 0; }
+    if (SMAUG_NULL(s->null_mask, idx)) { if (status) *status = SMG_NULL_VALUE; return 0; }
     if (status) *status = SMG_OK;
     return s->data[idx];
 }
@@ -387,7 +387,7 @@ smaug_status_t smaug_i64_set(smaug_series_i64_t *s, size_t idx, int64_t val) {
     if (idx >= s->size) return SMG_ERR_OOB;
     if (i64_cow_detach(s) != 0) return SMG_ERR_NOMEM;
     s->data[idx]      = val;
-    s->null_mask[idx] = 0xFF;
+    s->null_mask[idx] = SMAUG_MASK_VALID;
     return SMG_OK;
 }
 
@@ -395,14 +395,14 @@ smaug_status_t smaug_i64_set_null(smaug_series_i64_t *s, size_t idx) {
     if (!s)             return SMG_ERR_ARGUMENT;
     if (idx >= s->size) return SMG_ERR_OOB;
     if (i64_cow_detach(s) != 0) return SMG_ERR_NOMEM;
-    s->null_mask[idx] = 0x00;
+    s->null_mask[idx] = SMAUG_MASK_NULL;
     s->data[idx]      = 0;
     return SMG_OK;
 }
 
 bool smaug_i64_is_null(smaug_series_i64_t *s, size_t idx) {
     if (!s || idx >= s->size) return true;
-    return s->null_mask[idx] != 0xFF;
+    return SMAUG_NULL(s->null_mask, idx);
 }
 
 /* --- Append dinâmico --- */
@@ -416,7 +416,7 @@ int smaug_i64_append(smaug_series_i64_t *s, int64_t val) {
     }
 
     s->data[s->size]      = val;
-    s->null_mask[s->size] = 0xFF;
+    s->null_mask[s->size] = SMAUG_MASK_VALID;
     s->size++;
     return 0;
 }
@@ -430,7 +430,7 @@ int smaug_i64_append_null(smaug_series_i64_t *s) {
     }
 
     s->data[s->size]      = 0;
-    s->null_mask[s->size] = 0x00;
+    s->null_mask[s->size] = SMAUG_MASK_NULL;
     s->size++;
     return 0;
 }
@@ -479,7 +479,7 @@ smaug_series_bool_t *smaug_bool_create_with_capacity(size_t size, size_t capacit
         s->null_mask = malloc(capacity * sizeof(smaug_mask_t));
         if (!s->null_mask) { free(s->data); free(s); return NULL; }
 
-        memset(s->null_mask, 0x00, capacity);
+        memset(s->null_mask, SMAUG_MASK_NULL, capacity);
         memset(s->data,      0,    size * sizeof(uint8_t));
     }
 
@@ -504,7 +504,7 @@ smaug_series_bool_t *smaug_bool_create_from_array(const uint8_t *array, size_t l
 
     /* normaliza qualquer não-zero para 1 (data é booleano canônico) */
     for (size_t i = 0; i < len; i++) s->data[i] = array[i] ? 1 : 0;
-    memset(s->null_mask, 0xFF, len);
+    memset(s->null_mask, SMAUG_MASK_VALID, len);
     return s;
 }
 
@@ -579,7 +579,7 @@ static int bool_cow_detach(smaug_series_bool_t *s) {
 uint8_t smaug_bool_get(const smaug_series_bool_t *s, size_t idx, smaug_status_t *status) {
     if (!s)             { if (status) *status = SMG_ERR_ARGUMENT; return 0; }
     if (idx >= s->size) { if (status) *status = SMG_ERR_OOB;      return 0; }
-    if (s->null_mask[idx] != 0xFF) { if (status) *status = SMG_NULL_VALUE; return 0; }
+    if (SMAUG_NULL(s->null_mask, idx)) { if (status) *status = SMG_NULL_VALUE; return 0; }
     if (status) *status = SMG_OK;
     return s->data[idx];
 }
@@ -589,7 +589,7 @@ smaug_status_t smaug_bool_set(smaug_series_bool_t *s, size_t idx, uint8_t val) {
     if (idx >= s->size) return SMG_ERR_OOB;
     if (bool_cow_detach(s) != 0) return SMG_ERR_NOMEM;
     s->data[idx]      = val ? 1 : 0;   /* normaliza para booleano canônico */
-    s->null_mask[idx] = 0xFF;
+    s->null_mask[idx] = SMAUG_MASK_VALID;
     return SMG_OK;
 }
 
@@ -597,14 +597,14 @@ smaug_status_t smaug_bool_set_null(smaug_series_bool_t *s, size_t idx) {
     if (!s)             return SMG_ERR_ARGUMENT;
     if (idx >= s->size) return SMG_ERR_OOB;
     if (bool_cow_detach(s) != 0) return SMG_ERR_NOMEM;
-    s->null_mask[idx] = 0x00;
+    s->null_mask[idx] = SMAUG_MASK_NULL;
     s->data[idx]      = 0;
     return SMG_OK;
 }
 
 bool smaug_bool_is_null(smaug_series_bool_t *s, size_t idx) {
     if (!s || idx >= s->size) return true;
-    return s->null_mask[idx] != 0xFF;
+    return SMAUG_NULL(s->null_mask, idx);
 }
 
 /* --- Append dinâmico --- */
@@ -618,7 +618,7 @@ int smaug_bool_append(smaug_series_bool_t *s, uint8_t val) {
     }
 
     s->data[s->size]      = val ? 1 : 0;
-    s->null_mask[s->size] = 0xFF;
+    s->null_mask[s->size] = SMAUG_MASK_VALID;
     s->size++;
     return 0;
 }
@@ -632,7 +632,7 @@ int smaug_bool_append_null(smaug_series_bool_t *s) {
     }
 
     s->data[s->size]      = 0;
-    s->null_mask[s->size] = 0x00;
+    s->null_mask[s->size] = SMAUG_MASK_NULL;
     s->size++;
     return 0;
 }

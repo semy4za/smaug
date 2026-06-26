@@ -39,7 +39,7 @@ smaug_series_str_t *smaug_str_create_with_capacity(size_t size, size_t buffer_ca
     } else {
         s->null_mask = malloc(size * sizeof(smaug_mask_t));
         if (!s->null_mask) { free(s->offsets); free(s); return NULL; }
-        memset(s->null_mask, 0x00, size);   /* tudo NULL por padrão */
+        memset(s->null_mask, SMAUG_MASK_NULL, size);   /* tudo NULL por padrão */
     }
 
     /* Buffer de bytes. Mesmo com size>0, as strings começam todas NULL (0 bytes
@@ -105,7 +105,7 @@ void smaug_str_free(smaug_series_str_t *s) {
    =================================================================== */
 
 /* Cria a partir de um array de C-strings. Cada array[i]:
-     - ponteiro NULL  -> elemento NULL (null_mask = 0x00)
+     - ponteiro NULL  -> elemento NULL (null_mask = SMAUG_MASK_NULL)
      - ""             -> string vazia VÁLIDA (distinta de NULL)
      - "texto"        -> string válida (comprimento via strlen; o conteúdo é
                           tratado como bytes — um \0 interno encerraria a
@@ -138,9 +138,9 @@ smaug_series_str_t *smaug_str_create_from_array(const char *const *array, size_t
             size_t l = strlen(array[i]);
             if (l > 0) memcpy(s->buffer + pos, array[i], l);
             pos += l;
-            s->null_mask[i] = 0xFF;          /* válido (inclui "" de comprimento 0) */
+            s->null_mask[i] = SMAUG_MASK_VALID;          /* válido (inclui "" de comprimento 0) */
         } else {
-            s->null_mask[i] = 0x00;          /* NULL */
+            s->null_mask[i] = SMAUG_MASK_NULL;          /* NULL */
         }
         s->offsets[i + 1] = pos;             /* fim da string i = início da i+1 */
     }
@@ -155,7 +155,7 @@ smaug_series_str_t *smaug_str_create_from_array(const char *const *array, size_t
 const char *smaug_str_get(const smaug_series_str_t *s, size_t idx, size_t *out_len) {
     if (out_len) *out_len = 0;
     if (!s || idx >= s->size) return NULL;
-    if (s->null_mask[idx] == 0x00) return NULL;   /* elemento NULL */
+    if (SMAUG_NULL(s->null_mask, idx)) return NULL;   /* elemento NULL */
 
     size_t start = s->offsets[idx];
     size_t end   = s->offsets[idx + 1];
@@ -167,7 +167,7 @@ const char *smaug_str_get(const smaug_series_str_t *s, size_t idx, size_t *out_l
 
 bool smaug_str_is_null(const smaug_series_str_t *s, size_t idx) {
     if (!s || idx >= s->size) return true;        /* fora dos limites = "nulo" */
-    return s->null_mask[idx] == 0x00;
+    return SMAUG_NULL(s->null_mask, idx);
 }
 
 /* ===================================================================
@@ -271,7 +271,7 @@ smaug_status_t smaug_str_set(smaug_series_str_t *s, size_t idx, const char *str,
         if (len > 0) memcpy(s->buffer + start, str, len);
     }
 
-    s->null_mask[idx] = 0xFF;       /* set sempre torna válido */
+    s->null_mask[idx] = SMAUG_MASK_VALID;       /* set sempre torna válido */
     return SMG_OK;
 }
 
@@ -288,7 +288,7 @@ smaug_status_t smaug_str_set_null(smaug_series_str_t *s, size_t idx) {
        legado devolve -1 só em !s/idx inválido/OOM, todos impossíveis aqui). */
     smaug_status_t rc = smaug_str_set(s, idx, "", 0);
     if (rc != SMG_OK) return rc;   /* propaga (na prática impossível após validação acima); COV-EXCL-BR: rc sempre SMG_OK neste ponto (validacao acima ja garante) */
-    s->null_mask[idx] = 0x00;       /* e marca NULL (set deixou 0xFF) */
+    s->null_mask[idx] = SMAUG_MASK_NULL;       /* e marca NULL (set deixou SMAUG_MASK_VALID) */
     return SMG_OK;
 }
 
@@ -305,7 +305,7 @@ int smaug_str_append(smaug_series_str_t *s, const char *str, size_t len) {
     if (len > 0) memcpy(s->buffer + start, str, len);
 
     s->offsets[s->size + 1] = start + len;   /* novo marcador final */
-    s->null_mask[s->size]   = 0xFF;          /* válido */
+    s->null_mask[s->size]   = SMAUG_MASK_VALID;          /* válido */
     s->size       += 1;
     s->buffer_len += len;
     return 0;
@@ -318,7 +318,7 @@ int smaug_str_append_null(smaug_series_str_t *s) {
     /* NULL: comprimento zero — o offset final repete o anterior. */
     size_t start = s->offsets[s->size];
     s->offsets[s->size + 1] = start;         /* [start, start) = 0 bytes */
-    s->null_mask[s->size]   = 0x00;          /* NULL */
+    s->null_mask[s->size]   = SMAUG_MASK_NULL;          /* NULL */
     s->size += 1;
     return 0;
 }
@@ -331,6 +331,6 @@ size_t smaug_str_count_nonnull(const smaug_series_str_t *s) {
     if (!s) return 0;
     size_t n = 0;
     for (size_t i = 0; i < s->size; i++)
-        if (s->null_mask[i] != 0x00) n++;
+        if (SMAUG_VALID(s->null_mask, i)) n++;
     return n;
 }

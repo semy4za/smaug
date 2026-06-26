@@ -107,8 +107,16 @@ frágil). Correção cirúrgica: fazer o infrator consumir o central.
 - 2.2 `_dt.lua` usa `is_int_sentinel` em vez de comparar com literal
 - 2.3 sentinela i64: nomear (não `INT64_MIN` cru) e documentar os dois contextos
   (`get` retorna 0, reduções retornam `INT64_MIN`)
-- 2.4 NaN: prover constante central para produzir (hoje só há `is_nan` para testar;
-  `_stat_adv.lua` usa `0/0` cru)
+- 2.4 NaN: centralizar produção E teste.
+  - Produção: a constante central `I.NAN` **já existe** (init.lua) — correção é
+    consumi-la, não criá-la. `_stat_adv.lua` troca os `0/0` crus (linhas 51, 66, 78).
+  - Teste: o predicado central `is_nan` é reinventado inline (`v ~= v`) em
+    `_transform.lua` (188, 220, 231 — que inclusive já importa `is_nan` e não usa),
+    `_stat_adv.lua` (167) e `_factories.lua` (31). Consumir o central nesses sites.
+    (achado da varredura ampla de sentinelas — mesma natureza, fora do mapa original)
+  - Fora de escopo (lacuna registrada, não infração): não há `is_inf`/`is_finite`
+    central; as checagens `== math.huge` seguem inline por falta de quem consumir.
+    Eventual helper futuro, não bloqueia.
 
 ## 3. bool_view  [Windows]
 

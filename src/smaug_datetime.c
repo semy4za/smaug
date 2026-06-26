@@ -102,8 +102,6 @@ static bool is_valid_date(int y, int m, int d) {
    Helpers internos de alocação — mesmos padrões de smaug_core.c
    =================================================================== */
 
-#define VALID_DT(s, i)  ((s)->null_mask[(i)] == 0xFF)
-#define INVALID_DT(s,i) ((s)->null_mask[(i)] != 0xFF)
 
 static int dt_grow(smaug_series_dt_t *s) {
     size_t new_cap = s->capacity ? (s->capacity + (s->capacity >> 1)) : 4;
@@ -163,7 +161,7 @@ smaug_series_dt_t *smaug_dt_create_with_capacity(size_t size, size_t capacity) {
         s->null_mask = malloc(capacity * sizeof(smaug_mask_t));
         if (!s->null_mask) { free(s->data); free(s); return NULL; }  /* COV-EXCL-BR: OOM em malloc(null_mask) — coberto por test_allocfail */
 
-        memset(s->null_mask, 0x00, capacity);
+        memset(s->null_mask, SMAUG_MASK_NULL, capacity);
         memset(s->data,      0,    size * sizeof(int64_t));
     }
 
@@ -185,7 +183,7 @@ smaug_series_dt_t *smaug_dt_create_from_array(const int64_t *array, size_t len) 
     smaug_series_dt_t *s = smaug_dt_create_with_capacity(len, len);
     if (!s) return NULL;  /* COV-EXCL-BR: OOM em create — coberto por test_allocfail */
     memcpy(s->data, array, len * sizeof(int64_t));
-    memset(s->null_mask, 0xFF, len);
+    memset(s->null_mask, SMAUG_MASK_VALID, len);
     return s;
 }
 
@@ -233,7 +231,7 @@ int64_t smaug_dt_get(const smaug_series_dt_t *s, size_t idx,
                       smaug_status_t *status) {
     if (!s)             { if (status) *status = SMG_ERR_ARGUMENT; return DT_SENTINEL; }
     if (idx >= s->size) { if (status) *status = SMG_ERR_OOB;      return DT_SENTINEL; }
-    if (INVALID_DT(s, idx)) { if (status) *status = SMG_NULL_VALUE; return DT_SENTINEL; }
+    if (SMAUG_NULL(s->null_mask, idx)) { if (status) *status = SMG_NULL_VALUE; return DT_SENTINEL; }
     if (status) *status = SMG_OK;
     return s->data[idx];
 }
@@ -243,7 +241,7 @@ smaug_status_t smaug_dt_set(smaug_series_dt_t *s, size_t idx, int64_t epoch_ms) 
     if (idx >= s->size) return SMG_ERR_OOB;
     if (dt_cow_detach(s) != 0) return SMG_ERR_NOMEM;
     s->data[idx]      = epoch_ms;
-    s->null_mask[idx] = 0xFF;
+    s->null_mask[idx] = SMAUG_MASK_VALID;
     return SMG_OK;
 }
 
@@ -251,14 +249,14 @@ smaug_status_t smaug_dt_set_null(smaug_series_dt_t *s, size_t idx) {
     if (!s)             return SMG_ERR_ARGUMENT;
     if (idx >= s->size) return SMG_ERR_OOB;
     if (dt_cow_detach(s) != 0) return SMG_ERR_NOMEM;
-    s->null_mask[idx] = 0x00;
+    s->null_mask[idx] = SMAUG_MASK_NULL;
     s->data[idx]      = 0;
     return SMG_OK;
 }
 
 bool smaug_dt_is_null(const smaug_series_dt_t *s, size_t idx) {
     if (!s || idx >= s->size) return true;
-    return s->null_mask[idx] != 0xFF;
+    return SMAUG_NULL(s->null_mask, idx);
 }
 
 int smaug_dt_append(smaug_series_dt_t *s, int64_t epoch_ms) {
@@ -268,7 +266,7 @@ int smaug_dt_append(smaug_series_dt_t *s, int64_t epoch_ms) {
         if (dt_grow(s) != 0) return -1;
     }
     s->data[s->size]      = epoch_ms;
-    s->null_mask[s->size] = 0xFF;
+    s->null_mask[s->size] = SMAUG_MASK_VALID;
     s->size++;
     return 0;
 }
@@ -280,7 +278,7 @@ int smaug_dt_append_null(smaug_series_dt_t *s) {
         if (dt_grow(s) != 0) return -1;
     }
     s->data[s->size]      = 0;
-    s->null_mask[s->size] = 0x00;
+    s->null_mask[s->size] = SMAUG_MASK_NULL;
     s->size++;
     return 0;
 }
@@ -638,11 +636,11 @@ uint8_t* smaug_dt_##name(const smaug_series_dt_t *s, int64_t threshold,    \
     smaug_mask_t *mask = malloc(s->size * sizeof(smaug_mask_t));              \
     if (!mask) { free(result); return NULL; }                                 \
     for (size_t i = 0; i < s->size; i++) {                                   \
-        if (INVALID_DT(s, i)) {                                               \
-            result[i] = 0; mask[i] = 0x00;                                   \
+        if (SMAUG_NULL(s->null_mask, i)) {                                               \
+            result[i] = 0; mask[i] = SMAUG_MASK_NULL;                                   \
         } else {                                                              \
             result[i] = (s->data[i] op threshold) ? 1 : 0;                  \
-            mask[i]   = 0xFF;                                                 \
+            mask[i]   = SMAUG_MASK_VALID;                                                 \
         }                                                                     \
     }                                                                         \
     if (out_mask) *out_mask = mask; else free(mask);                          \
@@ -677,7 +675,7 @@ static int cmp_dt_desc(const void *a, const void *b) {
 size_t *smaug_dt_argsort(const smaug_series_dt_t *s, bool ascending) {
     if (!s) return NULL;
     for (size_t i = 0; i < s->size; i++) {
-        if (INVALID_DT(s, i)) return NULL;
+        if (SMAUG_NULL(s->null_mask, i)) return NULL;
     }
 
     dt_entry_t *entries = malloc(s->size * sizeof(dt_entry_t));
@@ -716,7 +714,7 @@ size_t smaug_dt_count_nonnull(const smaug_series_dt_t *s) {
     if (!s) return 0;
     size_t count = 0;
     for (size_t i = 0; i < s->size; i++) {
-        if (VALID_DT(s, i)) count++;
+        if (SMAUG_VALID(s->null_mask, i)) count++;
     }
     return count;
 }
@@ -728,7 +726,7 @@ smaug_series_dt_t *smaug_dt_take(const smaug_series_dt_t *s,
     if (!result) return NULL;
     for (size_t i = 0; i < len; i++) {
         if (idx[i] >= s->size) {
-            result->null_mask[i] = 0x00;
+            result->null_mask[i] = SMAUG_MASK_NULL;
             result->data[i]      = 0;
         } else {
             result->data[i]      = s->data[idx[i]];

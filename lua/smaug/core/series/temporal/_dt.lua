@@ -3,7 +3,8 @@
 -- SeriesDT: accessor .dt para Series<datetime>. Base + F.3 estendido.
 -- SeriesAt: proxy at/iat.
 -- Helpers públicos: Series.dt_parse, Series.dt_format, Series.dt_from_parts.
--- Recebe I com: I.Series, I.methods, I.C, I.ffi, I.NA, I.wrap
+-- Recebe I com: I.Series, I.methods, I.C, I.ffi, I.NA, I.wrap,
+--               I.I64_MIN, I.DTYPES (para is_int_sentinel de datetime)
 -- Produz em I: I.SeriesDT, I.SeriesAt
 
 return function(I)
@@ -13,6 +14,12 @@ return function(I)
     local ffi     = I.ffi
     local NA      = I.NA
     local wrap    = I.wrap
+
+    -- Sentinela i64 central (init.lua). Operações de datetime do Ring 0 devolvem
+    -- I64_MIN como valor inválido/overflow; is_int_sentinel é o predicado canônico
+    -- (mesmo idioma de reduce_num em _core.lua). Nada de literal cru aqui.
+    local I64_MIN         = I.I64_MIN
+    local is_int_sentinel = I.DTYPES.datetime.is_int_sentinel
 
     -- =====================================================================
     -- SeriesDT
@@ -99,7 +106,7 @@ return function(I)
                 vals[i] = NA
             else
                 local r = C.smaug_dt_truncate(v, u)
-                vals[i] = (r == -9223372036854775808) and NA or tonumber(r)
+                vals[i] = is_int_sentinel(r) and NA or tonumber(r)
             end
         end
         return Series.from_table(vals, "datetime", s._name)
@@ -137,7 +144,7 @@ return function(I)
                 vals[i] = NA
             else
                 local r = C.smaug_dt_add_ms(v, delta_ms)
-                vals[i] = (r == -9223372036854775808) and NA or tonumber(r)
+                vals[i] = is_int_sentinel(r) and NA or tonumber(r)
             end
         end
         return Series.from_table(vals, "datetime", s._name)
@@ -152,7 +159,6 @@ return function(I)
     -- F.3 — .dt estendido: predicados, nomes, arredondamento
     -- =====================================================================
 
-    local DT_SENTINEL = -9223372036854775808LL
 
     local MONTH_NAMES = {
         "January", "February", "March", "April", "May", "June",
@@ -246,7 +252,7 @@ return function(I)
         elseif unit == "m" then return C.smaug_dt_add_ms(floor_ms, 60000)
         elseif unit == "s" then return C.smaug_dt_add_ms(floor_ms, 1000)
         end
-        return DT_SENTINEL
+        return I64_MIN
     end
 
     local VALID_UNITS = { s=true, m=true, h=true, D=true, W=true, M=true, Q=true, Y=true }
@@ -258,10 +264,10 @@ return function(I)
         local u = string.byte(unit)
         return dt_map(self, function(v)
             local floor = C.smaug_dt_truncate(v, u)
-            if floor == DT_SENTINEL then return nil end
+            if is_int_sentinel(floor) then return nil end
             if floor == v then return tonumber(v) end
             local nxt = next_period(floor, unit)
-            if nxt == DT_SENTINEL then return nil end
+            if is_int_sentinel(nxt) then return nil end
             return tonumber(nxt)
         end, "datetime")
     end
@@ -273,9 +279,9 @@ return function(I)
         local u = string.byte(unit)
         return dt_map(self, function(v)
             local floor = C.smaug_dt_truncate(v, u)
-            if floor == DT_SENTINEL then return nil end
+            if is_int_sentinel(floor) then return nil end
             local nxt = next_period(floor, unit)
-            if nxt == DT_SENTINEL then return nil end
+            if is_int_sentinel(nxt) then return nil end
             local to_floor = tonumber(C.smaug_dt_diff_ms(v, floor))
             local to_next  = tonumber(C.smaug_dt_diff_ms(nxt, v))
             if to_floor < to_next then
@@ -368,7 +374,7 @@ return function(I)
     function Series.dt_from_parts(year, month, day, hour, minute, second, ms)
         hour = hour or 0; minute = minute or 0; second = second or 0; ms = ms or 0
         local r = C.smaug_dt_from_parts(year, month, day, hour, minute, second, ms)
-        if r == -9223372036854775808 then return nil end
+        if is_int_sentinel(r) then return nil end
         return tonumber(r)
     end
 

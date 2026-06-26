@@ -5,6 +5,67 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-06-26 — Timeline item 2: sentinela único na camada Lua
+
+### Refatoração (consumo do central — sem mudança de comportamento)
+- **`_dt.lua` consome o sentinela i64 central** em vez de reinventá-lo. Removidos
+  o literal cru `-9223372036854775808` (sem `LL`, virava double e batia por
+  coerção frágil) em três sites e o `DT_SENTINEL` local. Produção usa `I.I64_MIN`;
+  detecção usa `is_int_sentinel` (mesmo idioma de `reduce_num` em `_core.lua`).
+- **Sentinela i64 documentado** na definição central (`series/init.lua`): os dois
+  contextos — leitura de elemento (C devolve 0 + status `SMG_NULL_VALUE`; o 0 não
+  é sentinela) vs. redução posicional (C devolve `I64_MIN`, detectado por
+  `is_int_sentinel`).
+- **NaN centralizado — produção e teste:**
+  - Produção: `I.NAN` já existia; `_stat_adv.lua` passou a consumi-lo (três `0/0`
+    crus removidos). O roadmap supunha que faltava criar a constante — só faltava
+    consumir.
+  - Teste: o predicado central `is_nan` era reinventado inline (`v ~= v`) em
+    `_transform.lua` (que já o importava sem usar), `_stat_adv.lua` e
+    `_factories.lua`. Todos passam a consumir o central. (achado de uma varredura
+    ampla de sentinelas pedida em sessão; mesma natureza do item 2, registrado e
+    incorporado ao 2.4.)
+- **Garantia verificada:** varredura completa da camada Lua — os literais/predicados
+  de sentinela (`I64_MIN`, `NAN`, `is_nan`) agora nascem em um único lugar
+  (`series/init.lua`); todo o resto consome. Nenhuma outra reinvenção.
+- **Lacuna registrada (não infração):** não há `is_inf`/`is_finite` central; checagens
+  `== math.huge` seguem inline por falta de quem consumir. Eventual helper futuro.
+- **Prova:** suíte completa verde, contadores idênticos ao baseline, parity 12/12
+  (eixo 09 sentinels incluso). Item `[Windows]`, Lua puro — sem impacto em memória
+  C (Valgrind n/a) nem cobertura C (gcov n/a).
+
+---
+## 2026-06-26 — Timeline item 1: fonte única de nulidade no Ring 0
+
+### Refatoração (interna — sem mudança de contrato público)
+- **Centralização da convenção de máscara de nulos em `smaug_types.h`.** Antes,
+  o invariante mais central do motor (válido / NA) era testado por quatro macros
+  divergentes (`VALID` em ops_f64/i64 baseada na série; `VALID_DT` em datetime;
+  `VALID(m,i)` em ops_bool com assinatura *e* semântica diferentes) e por testes
+  crus `== 0xFF`/`== 0x00` espalhados em core, str, ops_window e ops_str. Passou a
+  existir uma fonte única.
+- **Símbolos no lugar dos literais:** `SMAUG_MASK_VALID`/`SMAUG_MASK_NULL`. Toda
+  escrita de máscara (`= 0xFF`, `memset`, ternários) passou a usá-los; nenhum
+  literal cru de máscara permanece em código.
+- **Dois contratos, por design, não por descuido:**
+  - `SMAUG_VALID(mask,i)` / `SMAUG_NULL(mask,i)` — máscara presente exigida; passar
+    NULL é bug e deve falhar (não silenciar). Usado por f64/i64/dt/str e pelos
+    testes antes crus.
+  - `SMAUG_OPTIONAL_VALID(mask,i)` — máscara opcional (NULL = "todos válidos"),
+    contrato exclusivo das funções livres do bool (`smaug_bool_*`). O guard de
+    NULL que o ops_bool reinventava virou esse macro nomeado. A unificação num
+    único macro permissivo foi recusada: esconderia máscara ausente em código de
+    Series (falha visível > acerto adivinhado).
+  - `SMAUG_NULL` é, por construção, a negação de `SMAUG_VALID` — não podem divergir.
+- **Escopo:** item trata dos *testes* de nulidade (1.3); incluiu ops_window/ops_str
+  além de core/str (o roadmap citava os dois como exemplo, não lista exaustiva).
+  Escritas ganharam o símbolo, mas **não** um setter (`SMAUG_SET_*`) — abstração
+  fora de escopo, eventual subitem futuro.
+- **Prova de pureza:** suíte completa verde com contadores idênticos ao baseline,
+  8 arquivos tocados compilam com `-Wall -Wextra -Werror`. Confirmação final
+  (Valgrind-clean + cobertura) pendente no Fedora, conforme critério `[Fedora]`.
+
+---
 ## 2026-06-23 
 - docs(roadmap): sincroniza métricas reais (cobertura 95.83%, checks por suíte), enxuga Blocos H/E, adiciona Bloco I (fechamento de coerência pré-v1.0) e registra achados da auditoria código-vs-código (dt_view, rank i64, rolling-dup, I3/I4)
 

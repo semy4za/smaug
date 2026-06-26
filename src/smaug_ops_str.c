@@ -58,9 +58,9 @@ static uint8_t *str_compare(const smaug_series_str_t *s, const char *target,
     }
 
     for (size_t i = 0; i < s->size; i++) {
-        if (s->null_mask[i] == 0x00) {        /* NULL -> indefinido */
+        if (SMAUG_NULL(s->null_mask, i)) {        /* NULL -> indefinido */
             result[i] = 0;
-            if (mask) mask[i] = 0x00;
+            if (mask) mask[i] = SMAUG_MASK_NULL;
             continue;
         }
         int r;
@@ -86,7 +86,7 @@ static uint8_t *str_compare(const smaug_series_str_t *s, const char *target,
             }
         }
         result[i] = (uint8_t)r;
-        if (mask) mask[i] = 0xFF;
+        if (mask) mask[i] = SMAUG_MASK_VALID;
     }
     return result;
 }
@@ -147,7 +147,7 @@ smaug_series_str_t *smaug_str_filter(const smaug_series_str_t *s,
     for (size_t i = 0; i < s->size; i++) {
         if (!mask[i]) continue;
         int rc;
-        if (s->null_mask[i] == 0x00) {
+        if (SMAUG_NULL(s->null_mask, i)) {
             rc = smaug_str_append_null(r);
         } else {
             size_t start = s->offsets[i];
@@ -179,7 +179,7 @@ smaug_series_str_t *smaug_str_take(const smaug_series_str_t *s,
     for (size_t k = 0; k < len; k++) {
         size_t i = idx[k];
         int rc;
-        if (s->null_mask[i] == 0x00) {
+        if (SMAUG_NULL(s->null_mask, i)) {
             rc = smaug_str_append_null(r);
         } else {
             size_t start = s->offsets[i];
@@ -227,7 +227,7 @@ size_t *smaug_str_argsort(const smaug_series_str_t *s, bool ascending) {
 
     /* recusa se houver qualquer NULL (coerente com os numéricos) */
     for (size_t i = 0; i < s->size; i++)
-        if (s->null_mask[i] == 0x00) return NULL;
+        if (SMAUG_NULL(s->null_mask, i)) return NULL;
 
     size_t *idx = malloc((s->size ? s->size : 1) * sizeof(size_t));
     if (!idx) return NULL;

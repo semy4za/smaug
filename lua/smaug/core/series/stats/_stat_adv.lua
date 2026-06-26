@@ -2,7 +2,7 @@
 --
 -- Estatísticas avançadas: cov, corr, autocorr, dot, pct_change, rank, pct_rank,
 -- skew, kurtosis, mad, sem.
--- Recebe I com: I.methods, I.Series, I.C, I.ffi, I.NA,
+-- Recebe I com: I.methods, I.Series, I.C, I.ffi, I.NA, I.NAN, I.is_nan,
 --               I.c_sorted_nonnull, I.median_of_sorted, I.median_sorted
 -- Contribui: methods.cov, corr, autocorr, dot, pct_change, rank, pct_rank,
 --            skew, kurtosis, mad, sem
@@ -13,6 +13,8 @@ return function(I)
     local C                = I.C
     local ffi              = I.ffi
     local NA               = I.NA
+    local NAN              = I.NAN      -- produção central de NaN (não 0/0 cru)
+    local is_nan           = I.is_nan   -- teste central de NaN (não v ~= v cru)
     local c_sorted_nonnull = I.c_sorted_nonnull
     local median_of_sorted = I.median_of_sorted
     local median_sorted    = I.median_sorted
@@ -48,7 +50,7 @@ return function(I)
             error("smaug: cov() requer dtype numérico, não '"..self._dtype.."'", 2)
         end
         local xs, ys, m = paired_nonnull(self, other)
-        if m < 2 then return 0/0 end
+        if m < 2 then return NAN end
         local mx, my = 0, 0
         for i = 1, m do mx = mx + xs[i]; my = my + ys[i] end
         mx = mx / m; my = my / m
@@ -63,7 +65,7 @@ return function(I)
             error("smaug: corr() requer dtype numérico, não '"..self._dtype.."'", 2)
         end
         local xs, ys, m = paired_nonnull(self, other)
-        if m < 2 then return 0/0 end
+        if m < 2 then return NAN end
         local mx, my = 0, 0
         for i = 1, m do mx = mx + xs[i]; my = my + ys[i] end
         mx = mx / m; my = my / m
@@ -75,7 +77,7 @@ return function(I)
             syy = syy + dy * dy
         end
         local denom = math.sqrt(sxx * syy)
-        if denom == 0 then return 0/0 end
+        if denom == 0 then return NAN end
         return sxy / denom
     end
 
@@ -164,7 +166,7 @@ return function(I)
         local out = Series.new("float64", n, self._name)
         for i = 0, n - 1 do
             local v = tonumber(raw[i])
-            if v ~= v then  -- NAN → null
+            if is_nan(v) then  -- NAN → null
                 out:set_null(i + 1)
             else
                 out:set(i + 1, v)
