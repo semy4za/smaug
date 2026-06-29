@@ -234,12 +234,24 @@ do parity (83 assimetrias: 51 só-Series, 32 só-DataSet, 44 em ambos):
 ## 7. Completude do motor (Ring 0)  [Fedora]
 
 O motor foi construído numérico-primeiro. Operações agnósticas a tipo e de tipo
-ordenável só existem em f64/i64. Depende do item 1 (nulidade coerente) já pronto.
+ordenável só existem em f64/i64 no C; para os demais dtypes a Lua reimplementa via
+fallback element-wise. Depende do item 1 (nulidade coerente) já pronto.
+
+> **Meta-decisão (D7, 2026-06-29):** tudo do item 7 vai pro **C (Anel 0)**, a Lua
+> apenas delega — **sem fallback**. É responsabilidade do Anel 0 (dono do buffer e
+> da máscara). Elimina a duplicação Lua↔C (mesma tese do item 8). Levantamento
+> confirmou no fonte: shift/ffill/bfill já funcionam via fallback Lua (mover);
+> min/max/rank erram em str/dt (preencher); argmin/argmax erram em str mas dt já
+> tem fallback Lua (mover+preencher); eq/ne existem em f64/i64/dt/str, só bool não
+> (preencher). String NÃO é bloqueio: a limitação do COW.md é sobre `view`
+> (zero-copy), não sobre cópia — `str_take`/`clone`/`filter` já reconstroem buffer.
 
 - 7.1 shift/ffill/bfill em bool/str/dt (agnósticas a tipo) — **[Fedora]**, 🟥 do inventário
-- 7.2 min/max/argmin/argmax em ordenáveis (dt/str têm sort/gt/lt)
-- 7.3 rank em dt/str
-- 7.4 bool eq/ne (único dtype sem igualdade)
+- 7.2 min/max/argmin/argmax em ordenáveis (dt/str têm sort/gt/lt) — fecha a
+  incoerência atual `dt:argmin` ✓ vs `dt:min` ✗
+- 7.3 rank em dt/str (lexicográfico/cronológico)
+- 7.4 ✅ bool eq/ne no C (único dtype sem igualdade). C+header+cdef+wrapper Lua,
+  teste C (+11), Lua (+6), allocfail (+20 → 1632). Aguarda Fedora p/ Valgrind+cobertura.
 
 ## 8. Rolling → Ring 0  [Windows+Fedora]
 

@@ -291,6 +291,40 @@ static int test_sort(void) {
     return 0;
 }
 
+/* 7.4 — comparação de igualdade (único dtype que faltava) */
+static int test_eq_ne(void) {
+    smaug_series_bool_t *b = mk("10N");   /* true, false, NA */
+    smaug_mask_t *om = NULL;
+
+    uint8_t *r = smaug_bool_eq(b, 1, &om);          /* == true */
+    OK(r != NULL && om != NULL, "eq retorna resultado e mascara");
+    OK(r[0] == 1 && SMAUG_VALID(om, 0), "eq: true==true -> 1 valido");
+    OK(r[1] == 0 && SMAUG_VALID(om, 1), "eq: false==true -> 0 valido");
+    OK(SMAUG_NULL(om, 2), "eq: NA -> NA na out_mask");
+    smaug_free(r); smaug_free(om); om = NULL;
+
+    r = smaug_bool_ne(b, 1, &om);                   /* != true */
+    OK(r[0] == 0 && r[1] == 1, "ne: inverso de eq nos validos");
+    OK(SMAUG_NULL(om, 2), "ne: NA -> NA");
+    smaug_free(r); smaug_free(om); om = NULL;
+
+    r = smaug_bool_eq(b, 0, &om);                   /* == false */
+    OK(r[0] == 0 && r[1] == 1, "eq false: false==false -> 1");
+    OK(SMAUG_NULL(om, 2), "eq false: NA -> NA");
+    smaug_free(r); smaug_free(om); om = NULL;
+
+    /* threshold nao-normalizado (qualquer != 0 = true) */
+    r = smaug_bool_eq(b, 42, &om);
+    OK(r[0] == 1, "eq: threshold 42 normaliza para true");
+    smaug_free(r); smaug_free(om); om = NULL;
+
+    OK(smaug_bool_eq(NULL, 1, &om) == NULL, "eq(NULL) -> NULL");
+    OK(smaug_bool_ne(NULL, 1, &om) == NULL, "ne(NULL) -> NULL");
+
+    smaug_bool_free(b);
+    return 0;
+}
+
 int main(void) {
     if (test_lifecycle())  return 1;
     if (test_guards())     return 1;
@@ -300,6 +334,7 @@ int main(void) {
     if (test_agg())        return 1;
     if (test_selection())  return 1;
     if (test_sort())       return 1;
+    if (test_eq_ne())      return 1;
     printf("PASS: bool lifecycle (%d checks)\n", n_checks);
     return 0;
 }

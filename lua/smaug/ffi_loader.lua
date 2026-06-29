@@ -254,6 +254,8 @@ ffi.cdef([[
     smaug_series_bool_t* smaug_bool_series_or (const smaug_series_bool_t *a, const smaug_series_bool_t *b);
     smaug_series_bool_t* smaug_bool_series_xor(const smaug_series_bool_t *a, const smaug_series_bool_t *b);
     smaug_series_bool_t* smaug_bool_series_not(const smaug_series_bool_t *a);
+    uint8_t* smaug_bool_eq(const smaug_series_bool_t *s, uint8_t threshold, smaug_mask_t **out_mask);
+    uint8_t* smaug_bool_ne(const smaug_series_bool_t *s, uint8_t threshold, smaug_mask_t **out_mask);
 
     /* --- Ordenacao: false < true; recusa NULL --- */
     size_t*              smaug_bool_argsort(const smaug_series_bool_t *s, bool ascending);

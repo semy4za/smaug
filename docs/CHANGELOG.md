@@ -5,7 +5,22 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
-## 2026-06-29 — Item 6: paridade Series↔DataSet + auditor classificado
+## 2026-06-29 — Item 7.4: bool eq/ne no Ring 0
+
+Meta-decisão D7: todo o item 7 vai pro C (Anel 0), Lua só delega, sem fallback —
+coerência de arquitetura (o engine é dono do buffer e da máscara).
+
+- 7.4: bool era o único dtype sem igualdade (`eq`/`ne`). f64/i64/dt/str já tinham
+  no C. Adicionado `smaug_bool_eq`/`smaug_bool_ne` (espelham `smaug_f64_eq`:
+  compara com escalar 0/1 → máscara uint8_t + out_mask; NA → 0 com máscara NULL,
+  preservando a nulidade). Wiring: header, cdef FFI, `cmp_eq`/`cmp_ne` no descritor
+  bool (`_types.lua`, converte `true/false`→`1/0`).
+- Testes: C bool lifecycle 154→165 (incl. NA, threshold não-normalizado, NULL
+  series); Lua selection 21→27 (Kleene: comparar com NA → NA); allocfail +20 (1632)
+  varrendo os ramos de malloc de eq/ne — para a cobertura fechar no Fedora.
+- `[Fedora]`: aguarda Valgrind + cobertura no Fedora para `[Done]`.
+
+
 
 Levantamento a partir do output real do parity (terra firme): 83 assimetrias
 classificadas em 3 baldes — intencional (dimensionalidade 1-D vs 2-D), par de nome,

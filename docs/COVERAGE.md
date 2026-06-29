@@ -3,9 +3,9 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `9e8418c`  |  Data: 2026-06-26 17:23:54 -0300
+- Commit medido: `384ea12`  |  Data: 2026-06-29 10:59:40 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `3107/3348 = 92.80%` -- 99 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- **Branch-bruto** (todos os ramos): `3133/3380 = 92.69%` -- 99 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 | Arquivo | Linhas | Branch-alvo (taken) |
@@ -13,14 +13,14 @@
 | `smaug_core.c` | `402/402 = 100.00%` `[██████████]` | `290/290 = 100.00%` `[██████████]` |
 | `smaug_ops_f64.c` | `461/461 = 100.00%` `[██████████]` | `457/458 = 99.78%` `[██████████]` |
 | `smaug_ops_i64.c` | `449/452 = 99.34%` `[█████████░]` | `451/460 = 98.04%` `[█████████░]` |
-| `smaug_ops_bool.c` | `165/165 = 100.00%` `[██████████]` | `239/239 = 100.00%` `[██████████]` |
+| `smaug_ops_bool.c` | `199/199 = 100.00%` `[██████████]` | `265/271 = 97.79%` `[█████████░]` |
 | `smaug_str.c` | `162/164 = 98.78%` `[█████████░]` | `132/132 = 100.00%` `[██████████]` |
 | `smaug_ops_str.c` | `115/116 = 99.14%` `[█████████░]` | `115/115 = 100.00%` `[██████████]` |
 | `smaug_csv.c` | `304/312 = 97.44%` `[█████████░]` | `349/387 = 90.18%` `[█████████░]` |
 | `smaug_json.c` | `347/360 = 96.39%` `[█████████░]` | `414/461 = 89.80%` `[█████████░]` |
 | `smaug_datetime.c` | `396/399 = 99.25%` `[█████████░]` | `421/458 = 91.92%` `[█████████░]` |
 | `smaug_ops_window.c` | `226/231 = 97.84%` `[█████████░]` | `239/249 = 95.98%` `[█████████░]` |
-| **TOTAL** | `3027/3062 = 98.86%` `[█████████░]` | `3107/3249 = 95.63%` `[█████████░]` |
+| **TOTAL** | `3061/3096 = 98.87%` `[█████████░]` | `3133/3281 = 95.49%` `[█████████░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
@@ -37,6 +37,14 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_ops_i64.c:687` — if (n == 0) return NULL;
 - `smaug_ops_i64.c:724` — if (m == 0) return result;
 - `smaug_ops_i64.c:750` — switch (method) {
+
+**`smaug_ops_bool.c`** — 6 linha(s) com ramo descoberto:
+- `smaug_ops_bool.c:203` — if (out_mask) {
+- `smaug_ops_bool.c:212` — if (mask) mask[i] = SMAUG_MASK_VALID;
+- `smaug_ops_bool.c:215` — if (mask) mask[i] = SMAUG_MASK_NULL;
+- `smaug_ops_bool.c:227` — if (out_mask) {
+- `smaug_ops_bool.c:236` — if (mask) mask[i] = SMAUG_MASK_VALID;
+- `smaug_ops_bool.c:239` — if (mask) mask[i] = SMAUG_MASK_NULL;
 
 **`smaug_csv.c`** — 28 linha(s) com ramo descoberto:
 - `smaug_csv.c:112` — if (errno || *end != '\0') return 0;

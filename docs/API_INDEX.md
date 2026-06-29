@@ -70,6 +70,7 @@ reimplementação e deriva.
 | `smaug_bool_and/or/xor(a, am, b, bm, n, &out)` | lógica de 3 valores |
 | `smaug_bool_not(a, am, n, &out)` | negação Kleene |
 | `smaug_bool_count_true(a, am, n)` | conta trues (NA ignorado) |
+| `smaug_bool_eq/ne(s, threshold, &out_mask)` | comparação com escalar → máscara (NA preservado) |
 | `smaug_bool_any/all(a, am, n)` | agregações (NA ignorado) |
 
 ### String (`smaug_string.h`)

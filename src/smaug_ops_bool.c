@@ -192,6 +192,56 @@ smaug_series_bool_t *smaug_bool_series_not(const smaug_series_bool_t *a) {
     return bool_series_from_pair(r, om, a->size);
 }
 
+/* --- Comparação com escalar → máscara uint8_t (espelha f64_eq).
+   NA → resultado 0, out_mask NULL. threshold normalizado a 0/1. --- */
+uint8_t *smaug_bool_eq(const smaug_series_bool_t *s, uint8_t threshold,
+                        smaug_mask_t **out_mask) {
+    if (!s) return NULL;
+    uint8_t      *result = malloc(s->size * sizeof(uint8_t));
+    smaug_mask_t *mask   = NULL;
+    if (!result) return NULL;
+    if (out_mask) {
+        mask = malloc(s->size * sizeof(smaug_mask_t));
+        if (!mask) { free(result); return NULL; }
+        *out_mask = mask;
+    }
+    uint8_t t = threshold ? 1 : 0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            result[i] = ((s->data[i] ? 1 : 0) == t) ? 1 : 0;
+            if (mask) mask[i] = SMAUG_MASK_VALID;
+        } else {
+            result[i] = 0;
+            if (mask) mask[i] = SMAUG_MASK_NULL;
+        }
+    }
+    return result;
+}
+
+uint8_t *smaug_bool_ne(const smaug_series_bool_t *s, uint8_t threshold,
+                        smaug_mask_t **out_mask) {
+    if (!s) return NULL;
+    uint8_t      *result = malloc(s->size * sizeof(uint8_t));
+    smaug_mask_t *mask   = NULL;
+    if (!result) return NULL;
+    if (out_mask) {
+        mask = malloc(s->size * sizeof(smaug_mask_t));
+        if (!mask) { free(result); return NULL; }
+        *out_mask = mask;
+    }
+    uint8_t t = threshold ? 1 : 0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            result[i] = ((s->data[i] ? 1 : 0) != t) ? 1 : 0;
+            if (mask) mask[i] = SMAUG_MASK_VALID;
+        } else {
+            result[i] = 0;
+            if (mask) mask[i] = SMAUG_MASK_NULL;
+        }
+    }
+    return result;
+}
+
 /* --- Agregações struct-based (reusam as raw) --- */
 size_t smaug_bool_series_count_true(const smaug_series_bool_t *s) {
     if (!s) return 0;

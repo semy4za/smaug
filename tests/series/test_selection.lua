@@ -87,4 +87,22 @@ check(ife:get(4) == 4.0, "ifelse[4]=4 (verdadeiro)")
 
 -- ================================================================
 
+-- ================================================================
+-- 7.4 — bool eq/ne (único dtype que faltava igualdade)
+-- ================================================================
+do
+    local b = S.from_table({true, false, NA}, "bool")
+    local function show(r) local o = {}; for i = 1, r:len() do o[i] = r:is_null(i) and "NA" or tostring(r:get(i)) end; return table.concat(o, ",") end
+
+    check(show(b:eq(true)) == "true,false,NA", "7.4 bool eq(true)")
+    check(show(b:eq(false)) == "false,true,NA", "7.4 bool eq(false)")
+    check(show(b:ne(true)) == "false,true,NA", "7.4 bool ne(true)")
+    check(b:eq(true):is_null(3), "7.4 bool eq: NA preservado (Kleene)")
+    check(b:eq(true):dtype() == "bool", "7.4 bool eq retorna Series<bool>")
+    -- erro de tipo orientado
+    local ok = pcall(function() return b:eq(1) end)
+    check(not ok, "7.4 bool eq(número) erra (espera true/false)")
+end
+
+
 print(string.format("OK — %d checks passaram (Series: at/iat, where, mask, ifelse, isna/notna)", n_ok))

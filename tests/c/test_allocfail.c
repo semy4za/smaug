@@ -1292,6 +1292,26 @@ static void af_bool_series_not(void) {
     }
     smaug_bool_free(x);
 }
+/* 7.4 — varre os mallocs de bool_eq/bool_ne (result + out_mask) */
+static void af_bool_eq_ne(void) {
+    uint8_t a[3] = {1, 0, 1};
+    reset(-1);
+    smaug_series_bool_t *x = smaug_bool_create_from_array(a, 3);
+    assert(x);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *m = NULL;
+        uint8_t *r = smaug_bool_eq(x, 1, &m);
+        if (r) { OK(m != NULL, "bool eq mask junto"); free(r); free(m); }
+    }
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *m = NULL;
+        uint8_t *r = smaug_bool_ne(x, 1, &m);
+        if (r) { OK(m != NULL, "bool ne mask junto"); free(r); free(m); }
+    }
+    smaug_bool_free(x);
+}
 /* COW em view de bool: set, set_null, append, append_null */
 static void af_bool_cow_set(void) {
     uint8_t arr[4] = {1, 0, 1, 0};
@@ -2141,6 +2161,7 @@ int main(void) {
     af_bool_series_or();
     af_bool_series_xor();
     af_bool_series_not();
+    af_bool_eq_ne();
     af_bool_cow_set();
     af_bool_cow_set_null();
     af_bool_cow_append();

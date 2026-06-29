@@ -218,6 +218,8 @@ return function(I)
             view    = C.smaug_bool_view,   -- bool é mutável (tem set); view + COW idênticos a f64/i64/dt
             sort    = C.smaug_bool_sort,
             argsort = C.smaug_bool_argsort,
+            cmp_eq = function(c, t, om) if type(t)~="boolean" then error("smaug: comparação bool espera true/false",4) end return C.smaug_bool_eq(c, t and 1 or 0, om) end,
+            cmp_ne = function(c, t, om) if type(t)~="boolean" then error("smaug: comparação bool espera true/false",4) end return C.smaug_bool_ne(c, t and 1 or 0, om) end,
             is_int_sentinel = function(_) return false end,
         },
     }

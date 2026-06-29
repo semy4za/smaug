@@ -1,8 +1,7 @@
 # Smaug — Relatório de Paridade
 
-> Arquivo gerado por `bash scripts/parity/parity.sh` ou `powershell scripts/parity/parity.ps1`.
-> **Não editar à mão.** Decisões conscientes de não-paridade ficam em
-> `scripts/parity/exceptions.txt`.
+> Arquivo gerado por `bash scripts/parity/parity.sh`. **Não editar à mão.**
+> Decisões conscientes de não-paridade ficam em `scripts/parity/exceptions.txt`.
 
 Convenção de status:
 
@@ -11,7 +10,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-06-29 13:31:03 UTC
+Gerado em: 2026-06-29 18:44:58 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -652,7 +651,7 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 226/226 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 228/228 erros com prefixo `smaug:` (100.0%)
 - `dataset.lua`: 92/92 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
@@ -696,7 +695,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `series/test_stat` | 70 | 6 | 12 | — | 9 | — | — |
 | `series/test_window` | 64 | 5 | 6 | — | 1 | — | — |
 | `series/test_predicates` | 155 | 6 | 42 | 3 | 11 | — | — |
-| `series/test_selection` | 23 | 3 | 1 | — | 1 | — | — |
+| `series/test_selection` | 29 | 3 | 1 | 2 | 1 | — | — |
 | `series/test_str` | 274 | 4 | 9 | 1 | 51 | — | — |
 | `series/test_dt` | 272 | 3 | 6 | 2 | 12 | 62 | — |
 | `series/test_categorical` | 295 | 7 | 7 | 8 | 5 | 13 | 57 |
@@ -709,7 +708,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 67 | 18 | 2 | — | — | — | — |
 
-**Total de checks:** 2384
+**Total de checks:** 2390
 
 ### Menções totais por dtype (toda a suite)
 
@@ -717,7 +716,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | :--- | :-: |
 | float64 | 171 |
 | int64 | 293 |
-| bool | 50 |
+| bool | 52 |
 | string | 188 |
 | datetime | 75 |
 | categorical | 58 |

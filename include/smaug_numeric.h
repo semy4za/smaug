@@ -142,6 +142,12 @@ smaug_series_bool_t* smaug_bool_series_or (const smaug_series_bool_t *a, const s
 smaug_series_bool_t* smaug_bool_series_xor(const smaug_series_bool_t *a, const smaug_series_bool_t *b);
 smaug_series_bool_t* smaug_bool_series_not(const smaug_series_bool_t *a);
 
+/* Comparação com escalar bool (0/1) → máscara uint8_t + out_mask de nulidade.
+   NA → 0 com out_mask NULL. Completa eq/ne para bool (único dtype sem igualdade
+   até o item 7). Caller libera result e *out_mask com smaug_free. */
+uint8_t* smaug_bool_eq(const smaug_series_bool_t *s, uint8_t threshold, smaug_mask_t **out_mask);
+uint8_t* smaug_bool_ne(const smaug_series_bool_t *s, uint8_t threshold, smaug_mask_t **out_mask);
+
 /* Ordenação: false < true. Recusam série com qualquer NULL (retornam NULL),
    como os demais dtypes — posição de NA é indefinida. ascending controla a
    direção. Estável (preserva ordem relativa de iguais). */
