@@ -80,7 +80,12 @@ Legenda de ambiente:
 
 ---
 
-## 1. Fonte única de nulidade no Ring 0  [Fedora]
+## 1. Fonte única de nulidade no Ring 0  [Fedora]  [Done]
+
+> **Concluído (2026-06-28).** Verificado no Fedora: suíte verde com contadores
+> idênticos ao baseline, **Valgrind-clean** nos 12 binários
+> (`ERROR SUMMARY: 0 errors`, incluindo allocfail e stress), cobertura
+> Linha 98.86% / Branch-alvo 95.63%, parity 12/12. Refatoração pura confirmada.
 
 O invariante mais central do motor (válido = `0xFF`, nulo = `0x00`) é hoje testado
 por quatro macros incompatíveis e teste cru espalhado. Funciona por convenção, não
@@ -96,7 +101,17 @@ nulidade coerente.
 toda a suíte permanece verde e Valgrind-clean após a centralização (refatoração
 pura).
 
-## 2. Sentinela único na camada Lua  [Windows]
+## 2. Sentinela único na camada Lua  [Windows]  [Done — via Fedora]
+
+> **Concluído (2026-06-28), com ressalva de verificação.** Item Lua puro (nenhum
+> byte de C tocado). Critério `[Windows]` **suprido por validação Fedora**: 18
+> suítes Lua verdes (mesmo LuaJIT que o Windows), parity eixo 09 (sentinels) OK,
+> e o ponto sensível — carregamento do `_dt.lua` com `is_int_sentinel` — foi
+> exercitado de fato (chegou a regredir e foi corrigido). O risco conhecido do
+> MSYS2 (flush de `.gcda` via FFI) não se aplica: item 2 não tem cobertura-C.
+> **Follow-up leve:** rodar `windows_build.ps1` como confirmação; reabrir se
+> acusar algo. Esta equivalência vale SÓ por ser Lua puro — não vira regra para
+> itens `[Windows]` que expõem C novo (ex.: item 3).
 
 O `_dt.lua` ignora o `I64_MIN` central do `init.lua` e reinventa o sentinela de
 três formas, incluindo literal cru sem `LL` (vira double, bate por coerção —
@@ -118,7 +133,18 @@ frágil). Correção cirúrgica: fazer o infrator consumir o central.
     central; as checagens `== math.huge` seguem inline por falta de quem consumir.
     Eventual helper futuro, não bloqueia.
 
-## 3. bool_view  [Windows]
+## 3. bool_view  [Windows]  [Done — via Fedora]
+
+> **Concluído (2026-06-28), com ressalva de verificação.** Reavaliação de risco:
+> item 3 **não tocou C** (só `.lua`/`.txt`/`.md`); `smaug_bool_view` já existia e
+> já estava no cdef do FFI (`ffi_loader.lua`), com ABI idêntica à de
+> `smaug_f64_view`, que já roda no Windows. Logo é a mesma categoria Lua-pura do
+> item 2 — **não** expõe C novo. Critério `[Windows]` suprido por validação
+> Fedora: suíte Lua verde (incl. teste bool view+COW), parity 12/12 (eixos 1 e 10
+> coerentes com bool=view), Valgrind-clean (nenhuma regressão de memória).
+> **Follow-up leve:** confirmar com `windows_build.ps1`; reabrir se acusar algo.
+> A regra "itens que expõem C novo não fecham por equivalência" segue válida —
+> item 3 simplesmente não se enquadra nela.
 
 O C tem `smaug_bool_view` + `bool_cow_detach` (bool é mutável, tem `set`), mas a
 camada Lua não expõe. As exceções do parity se contradizem (eixo 1 pergunta "bool
@@ -132,7 +158,15 @@ Decisão tomada: **expor**. Demonstrado rodando (view + COW idênticos a f64/i64
 - 3.4 teste Lua: bool view + COW
 - 3.5 COW.md: bool → ✅
 
-## 4. NA relacional unificado + Contrato 7  [Windows]
+## 4. NA relacional unificado + Contrato 7  [Windows]  [Done — via Fedora]
+
+> **Concluído (2026-06-28), com ressalva de verificação.** Lua puro (nenhum C
+> tocado — política relacional é Anel 2). É **mudança de comportamento** + contrato
+> novo, então o guard são os testes: 8 novos cobrindo os quatro caminhos (simples,
+> composta, dois lados do join, NA em valores não dispara). Critério `[Windows]`
+> suprido por validação Fedora: suíte Lua verde, parity 12/12, Valgrind-clean.
+> **Follow-up leve:** confirmar com `windows_build.ps1`; reabrir se acusar algo.
+> Nota: documentado como **Contrato 8** (o nº 7 já existe — "índices 1-based").
 
 Hoje join (casa NA com NA), groupby (erro) e pivot_table (aceita) tratam NA na
 chave de três formas. Viola o Contrato 6 (NA = ausência que não participa). Decisão
@@ -143,27 +177,40 @@ tomada: **erro orientado nas três**, alinhado ao groupby (que já está certo).
 - 4.2 join: NA na chave deixa de casar → erro
 - 4.3 groupby: ajustar mensagem ao padrão (mencionar fillna além de dropna)
 - 4.4 pivot_table: NA no índice/coluna deixa de ser aceito → erro
-- 4.5 documentar **Contrato 7** — NA em chave relacional
+- 4.5 documentar **Contrato 8** — NA em chave relacional (o nº 7 já existe:
+  "índices são 1-based"; corrigido na implementação)
 - 4.6 testes guardando as três operações (chave simples e composta)
 
 *Padrão da mensagem:* `smaug: <op> — <chave/coluna> 'X' contém NA; trate com fillna
 ou dropna antes`. NA em qualquer coluna da chave composta dispara.
 
-## 5. Reduções + element-wise no DataSet  [Windows]
+## 5. Reduções + element-wise no DataSet  [Windows] [Fedora: 5.0]  [Done — via Fedora]
 
-O DataSet não tem reduções diretas (`df.sum()`) nem operações element-wise. O
-usuário itera colunas na mão, e o GroupBy reimplementa reduções por não ter a quem
-delegar. Maior bloco de paridade; destrava o item 5.4.
+> **Concluído (2026-06-28).** 5.0 valida no Fedora (Anel 0: Valgrind-clean,
+> cobertura 101→99 exclusões fechando no ramo n<2). 5.1–5.5 são Lua-puro sobre a
+> 5.0 → fecham por equivalência Fedora; follow-up `windows_build.ps1`. **Decisões:**
+> D1 = DataSet 1-linha; Opção A = std/var amostrais (ddof=1); D4 = (i) element-wise
+> numérico erra em coluna não-numérica, (A) astype por mapa.
 
-- 5.1 reduções por coluna → Series de resultado: sum, mean, min, max, std, var,
-  median, prod, quantile, skew, kurtosis, mad, sem, count_nonnull
-- 5.2 element-wise → DataSet: abs, round, clip, cumsum, cummin, cummax, cumprod
-- 5.3 transformações: ffill, bfill, shift, diff, astype, isna, notna
-- 5.4 GroupBy delega às reduções da Series/coluna (elimina a duplicação inline)
-- 5.5 `min_count` em sum/prod (Series e DataSet) — opt-in. Default preserva o
-  comportamento atual (soma de conjunto vazio = 0, neutro matemático);
-  `min_count=N` exige N não-nulos, senão NA. Semântica já decidida, e este é o
-  momento natural por estarmos construindo as reduções agora
+O DataSet não tinha reduções diretas (`df.sum()`) nem element-wise. O GroupBy
+reimplementava reduções por não ter a quem delegar. Maior bloco de paridade.
+
+- 5.0 ✅ **[fundação]** `ddof` de `std`/`var` reconciliado. Era incoerente: Series
+  std/var **populacionais** (÷N, no C), mas `cov`/`skew`/`kurtosis`, o GroupBy
+  (÷n-1) e o pandas **amostrais** (÷N-1). Sem isso, 5.4 impossível. **Opção A:**
+  tudo amostral (ddof=1), NaN para n<2. Anel 0 (`smaug_f64_var`/`smaug_i64_var`)
+  → `[Fedora]`. C ajustado, 3 testes recalculados, docs atualizados.
+- 5.1 ✅ reduções → **DataSet 1-linha** (D1: cada coluna mantém seu dtype): sum,
+  mean, min, max, std, var, median, prod, quantile, skew, kurtosis, mad, sem,
+  count_nonnull. Helper `reduce_frame` delega às reduções da Series.
+- 5.2 ✅ element-wise → DataSet mesma forma: abs, round, clip, cumsum, cummin,
+  cummax, cumprod. D4-i: erra em coluna não-numérica.
+- 5.3 ✅ transforms: ffill/bfill/shift (qualquer dtype), diff (numérico),
+  isna/notna (mask bool, qualquer dtype), astype (mapa `{col=dtype}`, D4-A).
+- 5.4 ✅ GroupBy delega às reduções da Series (`col:take(idx):<redução>()`);
+  duplicação inline eliminada; behavior-preserving (possível após a 5.0).
+- 5.5 ✅ `min_count` opt-in em sum/prod (Series e DataSet). Default preserva o
+  atual (soma de vazio = 0); `min_count=N` exige N não-nulos, senão NA.
 
 ## 6. Paridade Series↔DataSet e auditor  [Windows]
 
@@ -221,6 +268,12 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
 - 10.4 D4 — categorical hash via `tostring` (cosmético)
 - 10.5 I3 — `g_sort_series` global em `ops_str` (single-thread: sem bug)
 - 10.6 I4 — `get_value` passa `nil` como status (assimetria; sem bug)
+- 10.7 `tests/series/test_constructors.lua` re-declara `local n_ok` por seção
+  (linhas 14/25/394/616) mas só imprime uma vez no fim → o headline "98 checks"
+  subconta o real (~328 `check()` rodam de fato; cada um aborta em falha, então a
+  cobertura é real, só o número impresso engana). Achado durante o item 3.
+  Corrigir o relato (um contador único ou um print por seção) — cosmético, não
+  afeta validação.
 
 ## 11. Reescrita de exemplos + docstrings  [Windows]
 

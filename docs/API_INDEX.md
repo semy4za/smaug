@@ -50,7 +50,7 @@ reimplementação e deriva.
 | `smaug_<t>_sum(s, ignore_na)` | f64→double, i64→int64 |
 | `smaug_<t>_mean(s, ignore_na)` | double |
 | `smaug_<t>_min/max(s, ignore_na)` | f64→double, i64→int64 |
-| `smaug_<t>_var/std(s, ignore_na)` | double, populacional (÷N) |
+| `smaug_<t>_var/std(s, ignore_na)` | double, amostral (÷ N-1; <2 → NaN) |
 | `smaug_<t>_count_nonnull(s)` | size_t |
 
 ### Comparações e ordenação (`smaug_numeric.h`)
@@ -141,8 +141,8 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `:mean([ignore_na])` | média |
 | `:min([ignore_na])` | mínimo |
 | `:max([ignore_na])` | máximo |
-| `:var([ignore_na])` | variância populacional (÷N) |
-| `:std([ignore_na])` | desvio padrão populacional (÷N) |
+| `:var([ignore_na])` | variância amostral (÷ N-1; <2 → NaN) |
+| `:std([ignore_na])` | desvio padrão amostral (÷ N-1; <2 → NaN) |
 | `:count_nonnull()` | nº de não-nulos |
 | `:clone()` | cópia independente |
 | `:sort(asc)` / `:argsort(asc)` | ordenar / permutação |
@@ -472,6 +472,30 @@ com `nil` no meio (limitação do `#` do Lua).
 | `:to_markdown()` | tabela em Markdown (GitHub-flavored), todas as linhas |
 | `:to_string([opts])` | render texto plano; `opts.max_rows` limita linhas |
 | `:describe()` / `:to_table([na])` | inspeção |
+
+**Reduções por coluna → DataSet de 1 linha** (só colunas numéricas; cada coluna
+mantém seu dtype de resultado). Erro se nenhuma coluna numérica.
+
+| Método | Resultado |
+|---|---|
+| `:sum([min_count])` / `:prod([min_count])` | redução; `min_count` opt-in (default 0 → soma de vazio = 0) |
+| `:mean()` / `:median()` / `:std()` / `:var()` | `std`/`var` **amostrais** (ddof=1; <2 → NA) → float64 |
+| `:min()` / `:max()` | preservam dtype |
+| `:quantile(q)` / `:skew()` / `:kurtosis()` / `:mad()` / `:sem()` | → float64 |
+| `:count_nonnull()` | → int64 |
+
+**Element-wise / transforms → DataSet de mesma forma.** Operações numéricas
+(`abs`, `round`, `clip`, `cum*`, `diff`) **erram** se houver coluna não-numérica
+(selecione as numéricas antes).
+
+| Método | Resultado |
+|---|---|
+| `:abs()` / `:round([nd])` / `:clip(lo, hi)` | element-wise numérico → mesma forma |
+| `:cumsum()` / `:cummin()` / `:cummax()` / `:cumprod()` | acumulado por coluna (numérico) |
+| `:diff()` | diferença sucessiva (numérico) |
+| `:ffill()` / `:bfill()` / `:shift([p])` | propagação/deslocamento (qualquer dtype) |
+| `:isna()` / `:notna()` | máscara de nulidade por coluna (qualquer dtype) → DataSet bool |
+| `:astype({col=dtype})` | conversão por mapa; colunas fora do mapa inalteradas |
 
 **Operações relacionais (Anel 2):**
 

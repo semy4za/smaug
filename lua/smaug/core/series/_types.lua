@@ -215,6 +215,7 @@ return function(I)
             count_nonnull = C.smaug_bool_count_nonnull,
             filter  = C.smaug_bool_filter,
             take    = C.smaug_bool_take,
+            view    = C.smaug_bool_view,   -- bool é mutável (tem set); view + COW idênticos a f64/i64/dt
             sort    = C.smaug_bool_sort,
             argsort = C.smaug_bool_argsort,
             is_int_sentinel = function(_) return false end,

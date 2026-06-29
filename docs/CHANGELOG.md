@@ -5,6 +5,183 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-06-28 — Item 5 completo: element-wise + transforms (5.2/5.3)
+
+### 5.2 element-wise → DataSet mesma forma
+- `df:abs/round/clip/cumsum/cummin/cummax/cumprod`. Helper `map_frame` aplica a
+  redução da Series a cada coluna (fonte única). **D4-i:** operação numérica
+  **erra** se houver coluna não-numérica, nomeando-a ("selecione as numéricas
+  antes"). Contraste com 5.1: reduções mudam a forma → pulam não-numéricas;
+  element-wise preserva a forma → não dá pra descartar/passar em silêncio.
+### 5.3 transforms
+- `df:ffill/bfill/shift` (qualquer dtype), `df:diff` (numérico, D4-i).
+- `df:isna/notna` → DataSet **bool**, todas as colunas. Construído via `is_null`
+  por índice (Series:isna é escalar por índice, não vetorizado — observação
+  registrada; o DataSet não depende dele).
+- `df:astype({col=dtype})` (**D4-A**, mapa explícito); colunas fora do mapa seguem
+  inalteradas (compartilhadas; Series são COW). Erro em coluna inexistente ou se o
+  argumento não for mapa.
+- Tudo Lua-puro sobre a 5.0 (Anel 0 já validado no Fedora). DataSet stat: 49→90
+  checks. **Item 5 fecha** por equivalência Fedora; follow-up `windows_build.ps1`.
+
+---
+## 2026-06-28 — Item 5: reduções DataSet (5.1), min_count (5.5), delegação GroupBy (5.4)
+
+### 5.1 — reduções por coluna → DataSet 1-linha (D1)
+- `df:sum/mean/min/max/std/var/median/prod/quantile/skew/kurtosis/mad/sem/
+  count_nonnull` → DataSet de **1 linha**. Cada coluna mantém SEU dtype de
+  resultado (sum de i64→i64 e mean→f64 convivem — por isso 1-linha, não Series
+  posicional; decisão D1). Só colunas numéricas; sem numérica → erro. Helper
+  `reduce_frame` delega às reduções da Series (fonte única).
+### 5.5 — min_count opt-in em sum/prod (Series e DataSet)
+- `Series:sum(ignore_na, min_count)` / `:prod(...)`; `DataSet:sum(min_count)` /
+  `:prod(...)`. Default (0) preserva o atual (sum de vazio/all-null = 0).
+  `min_count=N` exige N não-nulos, senão NA.
+### 5.4 — GroupBy delega às reduções da Series (elimina duplicação)
+- `agg_sum/mean/min/max/std/var/median/prod/nunique` deixaram de reimplementar
+  inline — agora `col:take(idx):<redução>()`. Behavior-preserving (groupby 60
+  checks intactos): possível só após a 5.0 reconciliar ddof (std/var amostrais nos
+  dois lados). `first`/`last` seguem inline (posicionais, sem redução-Series).
+- Tudo Lua-puro sobre a fundação 5.0 já validada no Fedora. Falta 5.2 (element-wise)
+  e 5.3 (transforms), pendentes de decisão D4 (não-numéricas).
+
+---
+## 2026-06-28 — Item 5 (fundação 5.0): reconciliação de ddof em std/var
+
+### Achado em sessão (bloqueava o item 5)
+- O `ddof` estava **incoerente em três vias**: `Series:std/var` eram populacionais
+  (÷N, no C `smaug_f64_var`/`smaug_i64_var`, comentado "populacional"), mas
+  `cov`/`skew`/`kurtosis`, o GroupBy (`agg_std`/`agg_var` ÷ n-1) e o pandas são
+  amostrais (÷ N-1). A delegação do 5.4 era impossível: `groupby:std` (amostral)
+  não pode chamar `Series:std` (populacional) — números diferentes.
+- Um D2 inicial (alinhar Series→nil em n<2 assumindo amostral) foi tentado e
+  **revertido** — partia da premissa errada; os testes "var populacional" pegaram.
+  Bom exemplo de "behavior-identical exige prova": a suíte é o guard.
+
+### Decisão (Opção A) e implementação
+- **Tudo amostral (ddof=1).** C `smaug_f64_var`/`smaug_i64_var`: ÷(n-1), NaN para
+  n<2 (std = sqrt herda). Removidos 2 `COV-EXCL-BR` (o ramo n<2 agora é alcançável
+  via n=1). Alinha Series com cov/skew/kurtosis, GroupBy e pandas.
+- 3 asserções recalculadas (var de {10,20,30}: 200/3→200/2=100; std→10; var/std de
+  1 elemento: 0→NA) em test_constructors e test_access.
+- Docs: API_INDEX e API_Reference de "populacional (÷N)" para "amostral (÷ N-1;
+  <2 → NaN)".
+- **Toca Anel 0 → `[Fedora]`:** precisa de Valgrind + cobertura para fechar. Build
+  Linux verde (suíte idêntica fora os 3 valores recalculados).
+
+---
+## 2026-06-28 — Timeline item 4: NA relacional unificado + Contrato 8
+
+### Política (mudança de comportamento — adição de contrato, não refatoração)
+- **Contrato 8: NA em chave relacional é erro.** Antes, três tratamentos
+  divergentes: join **casava** NA com NA (`key_to_str(nil)="\0NULL\0"`), groupby
+  **errava** (correto), pivot/pivot_table **descartavam a linha em silêncio**
+  (`if iv ~= nil and cv ~= nil` — perda de dado calada, pior que "aceitar"; o
+  roadmap subdescreveu como "aceita"). Agora os quatro erram de forma orientada.
+- **Helper central `validate_keys_no_na(named_cols, op_name)`** (local em
+  `_relational.lua`, onde vivem os consumidores). Valida **só** colunas-chave,
+  nunca a coluna de valores. Mensagem única:
+  `smaug: <op> — coluna 'X' contém NA; trate com fillna ou dropna antes`.
+- Aplicado eagermente no corpo de cada método público (join/groupby/pivot/
+  pivot_table), nível de erro uniforme. groupby: check inline removido do
+  `multi_argsort` (que é exclusivo de groupby) e centralizado no `methods.groupby`;
+  mensagem antiga ("tem nulos; use dropna primeiro") trocada pela padrão (agora
+  menciona fillna).
+- **Coerência:** validar chave relacional é conceito de **Anel 2**; o C (Anel 0)
+  segue genérico. Nenhum C tocado — política mora na camada Lua, mantendo a
+  separação de anéis e alinhando o Anel 2 ao Contrato 6.
+
+### Decisões e achados
+- **Os dois pivots:** roadmap nomeou só `pivot_table`; `pivot` tinha o mesmo
+  silent-drop. Incluídos ambos (senão a incoerência persistiria).
+- **Número do contrato:** roadmap dizia "Contrato 7", mas 7 já existe ("índices
+  1-based"). Documentado como **Contrato 8**; referência do roadmap corrigida.
+- **Sem quebra de teste existente:** o comportamento antigo (join casa NA, pivot
+  descarta) estava **sem cobertura** — foi por isso que derivou. O teste de
+  groupby-NA só checava `not ok` (sobreviveu à troca de mensagem). 8 testes novos
+  (4.6) travam os quatro: chave simples, NA na coluna `columns` do pivot, composta
+  no groupby, validação dos dois lados no join, e NA em coluna de valores NÃO
+  dispara.
+- **Observação (não acionada):** join não expressa chave composta multi-coluna
+  via lista de strings — `{"a","b"}` é a forma par-renomeado `{chave_esq,
+  chave_dir}`, não composta. Quirk pré-existente da API de join, fora do escopo
+  do item 4. Registro para eventual avaliação futura.
+
+### Fechamento
+- `[Windows]` Lua-puro, mesma categoria dos itens 2/3 (nenhum C tocado). Build
+  Linux verde, parity 12/12. **Mudança de comportamento** + contrato novo, então
+  os testes são o guard. Fecha por equivalência Fedora com confirmação do
+  `windows_build.ps1`.
+
+---
+## 2026-06-28 — Timeline item 3: bool_view (exposição na camada Lua)
+
+### Exposição (C já existia e estava testado)
+- **`bool_view` exposto** no descritor bool (`_types.lua`): uma linha
+  `view = C.smaug_bool_view`. O C já tinha `smaug_bool_view` + COW interno, com
+  cobertura completa em `test_allocfail.c` (view, cow_set/set_null/append/
+  append_null + OOM). Item 3 é exposição + coerência de docs, não comportamento C novo.
+- **Justificativa "imutável" derrubada:** BoolSeries tem `set`/`set_null`, é
+  mutável; view + COW idênticos a f64/i64/dt.
+- **Exceptions contraditórias removidas** (`parity/exceptions.txt`): `1:view/bool`
+  ("bool tem view?") e `10:view/bool` ("imutável... nada a destacar"). As de string
+  e categorical permanecem.
+- **Mensagem de erro do `view()` por razão correta (3.3):** string → "ainda não
+  suportado (planejado)"; categorical → "não se aplica (sem buffer compartilhável)".
+  *Correção durante a implementação:* a primeira tentativa pôs o branch de
+  categorical em `methods.view`, que CategoricalSeries nunca alcança (metatable
+  própria) — era código morto, dava o erro cru `attempt to call method 'view'`.
+  Movido para um stub `CategoricalSeries:view()`.
+- **Teste Lua (3.4):** bool view + COW (reflexo da pai, detach em set/set_null/
+  append, OOB) + asserções das mensagens de erro de string/categorical.
+- **COW.md (3.5):** bool → ✅ view / ✅ COW; removidas as frases falsas de
+  imutabilidade; bool adicionado às tabelas de funções C.
+
+### Achado registrado (10.7)
+- `test_constructors.lua` re-declara `local n_ok` por seção e imprime só no fim:
+  headline "98 checks" subconta o real (~328 rodam). Cobertura é real (cada
+  `check` aborta em falha); só o número engana. Registrado no item 10, não tocado
+  (fora de escopo do item 3).
+
+### Fechamento (Done — via Fedora)
+- **Reavaliação de risco:** classifiquei o item como "expõe C, precisa de Windows",
+  mas estava errado — item 3 **não tocou C** (só `.lua`/`.txt`/`.md`), e
+  `smaug_bool_view` já estava no cdef do FFI com ABI idêntica à de `smaug_f64_view`
+  (já provada no Windows). É a mesma categoria Lua-pura do item 2, não expõe C novo.
+- Fechado por equivalência Fedora: suíte Lua verde (incl. bool view+COW), parity
+  12/12 (eixos 1 e 10 coerentes), Valgrind-clean. Follow-up leve: confirmar no
+  `windows_build.ps1`. A regra "C novo não fecha por equivalência" segue válida;
+  o item só não se enquadra nela.
+
+---
+## 2026-06-28 — Fechamento dos itens 1 e 2 + recuperação de regressão no entry point
+
+### Itens fechados
+- **Item 1 (Done, Fedora):** Valgrind-clean nos 12 binários (`ERROR SUMMARY: 0
+  errors`, incl. allocfail e stress), suíte idêntica ao baseline, cobertura
+  Linha 98.86% / Branch-alvo 95.63%. Refatoração pura de nulidade confirmada.
+- **Item 2 (Done via Fedora):** Lua puro, sem C tocado. Critério `[Windows]`
+  suprido por validação Fedora (mesmo LuaJIT; parity eixo 09 OK; ponto sensível
+  do `_dt.lua` exercitado de fato). Follow-up leve: confirmar com
+  `windows_build.ps1`. **Equivalência vale só por ser Lua puro — não é regra.**
+
+### Incidente: `lua/smaug/init.lua` (entry point) sobrescrito
+- Na aplicação do item 2, o orquestrador da Series (`core/series/init.lua`) foi
+  parar no entry point de topo (`lua/smaug/init.lua`), deixando os dois idênticos
+  e ambos com `return Series`. Efeito: `require("smaug")` devolvia a Series
+  achatada, sem o campo `.Series` — **todas** as 18 suítes Lua morriam na primeira
+  linha, e o `build.sh` (`set -euo pipefail`) abortava no 1º teste Lua sem
+  imprimir o erro. Não era específico do Fedora; reproduzia em qualquer lugar.
+- **Causa:** dois arquivos distintos chamados `init.lua` em caminhos diferentes;
+  na aplicação manual, um sobrescreveu o outro.
+- **Correção:** entry point restaurado a partir do estado pré-regressão (não
+  reconstruído de memória). Itens 1 e 2 nunca tocaram esse arquivo.
+- **Aprendizado:** ao entregar/aplicar arquivos `init.lua`, sempre conferir o
+  caminho completo e que `lua/smaug/init.lua` (termina em `return smaug`) e
+  `lua/smaug/core/series/init.lua` (termina em `return Series`) permaneçam
+  distintos. Se ficarem idênticos, o sintoma é `attempt to index ... 'Series'`.
+
+---
 ## 2026-06-26 — Timeline item 2: sentinela único na camada Lua
 
 ### Refatoração (consumo do central — sem mudança de comportamento)

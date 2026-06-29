@@ -97,6 +97,24 @@ return function(I)
         return table.concat(parts, "\1")
     end
 
+    -- Política de NA em chave relacional (Contrato 8): NA = ausência que não
+    -- participa. join/groupby/pivot/pivot_table erram em vez de casar NA com NA,
+    -- agrupar por NA ou descartar a linha em silêncio. "Falha visível > acerto
+    -- adivinhado": o usuário trata com fillna/dropna na pipeline.
+    -- named_cols: lista de { name = <string>, col = <Series> }. Valida SÓ colunas
+    -- de chave — nunca a coluna de valores (valores podem ser NA, são dado).
+    local function validate_keys_no_na(named_cols, op_name)
+        for _, nc in ipairs(named_cols) do
+            local col, n = nc.col, nc.col:len()
+            for i = 1, n do
+                if col:is_null(i) then
+                    error("smaug: "..op_name.." — coluna '"..nc.name..
+                          "' contém NA; trate com fillna ou dropna antes", 3)
+                end
+            end
+        end
+    end
+
     local function resolve_names(left_names, right_names, join_keys_set, suffixes)
         local sl, sr = suffixes[1] or "_left", suffixes[2] or "_right"
         local right_non_key = {}
@@ -179,6 +197,15 @@ return function(I)
         local left_key_cols, right_key_cols = {}, {}
         for _, k in ipairs(left_key_names)  do left_key_cols[#left_key_cols+1]   = self:column(k)  end
         for _, k in ipairs(right_key_names) do right_key_cols[#right_key_cols+1] = other:column(k) end
+
+        -- Contrato 8: NA em chave de join não casa — erro orientado.
+        do
+            local named = {}
+            for i, k in ipairs(left_key_names)  do named[#named+1] = { name = k, col = left_key_cols[i]  } end
+            for i, k in ipairs(right_key_names) do named[#named+1] = { name = k, col = right_key_cols[i] } end
+            validate_keys_no_na(named, "join")
+        end
+
         local join_keys_set = {}
         for _, k in ipairs(left_key_names)  do join_keys_set[k] = true end
         for _, k in ipairs(right_key_names) do join_keys_set[k] = true end
@@ -290,12 +317,8 @@ return function(I)
         local cols_lua = {}
         for _, name in ipairs(key_names) do
             local col = ds:column(name)
-            for i = 1, n do
-                if col:is_null(i) then
-                    error("smaug: groupby — coluna '"..name.."' tem nulos"
-                          .." (use dropna primeiro)", 4)
-                end
-            end
+            -- NA na chave já foi rejeitado por validate_keys_no_na em methods.groupby
+            -- (Contrato 8). multi_argsort só é alcançado por build_groups/groupby.
             cols_lua[#cols_lua+1] = col
         end
         local all_c = true
@@ -373,59 +396,19 @@ return function(I)
     end
 
     -- Funções de agregação
-    local function agg_sum(col, idx)
-        local s = 0
-        for _, i in ipairs(idx) do local v = col:get(i); if v ~= nil then s = s + v end end
-        return s
-    end
-    local function agg_mean(col, idx)
-        local s, n = 0, 0
-        for _, i in ipairs(idx) do local v = col:get(i); if v ~= nil then s = s + v; n = n + 1 end end
-        return n > 0 and (s / n) or nil
-    end
-    local function agg_min(col, idx)
-        local m = nil
-        for _, i in ipairs(idx) do
-            local v = col:get(i)
-            if v ~= nil and (m == nil or v < m) then m = v end
-        end
-        return m
-    end
-    local function agg_max(col, idx)
-        local m = nil
-        for _, i in ipairs(idx) do
-            local v = col:get(i)
-            if v ~= nil and (m == nil or v > m) then m = v end
-        end
-        return m
-    end
-    local function agg_std(col, idx)
-        local vals = {}
-        for _, i in ipairs(idx) do local v = col:get(i); if v ~= nil then vals[#vals+1] = v end end
-        local n = #vals
-        if n < 2 then return nil end
-        local mean = 0; for _, v in ipairs(vals) do mean = mean + v end; mean = mean / n
-        local s = 0; for _, v in ipairs(vals) do local d = v - mean; s = s + d*d end
-        return math.sqrt(s / (n - 1))
-    end
-    local function agg_var(col, idx)
-        local vals = {}
-        for _, i in ipairs(idx) do local v = col:get(i); if v ~= nil then vals[#vals+1] = v end end
-        local n = #vals
-        if n < 2 then return nil end
-        local mean = 0; for _, v in ipairs(vals) do mean = mean + v end; mean = mean / n
-        local s = 0; for _, v in ipairs(vals) do local d = v - mean; s = s + d*d end
-        return s / (n - 1)
-    end
-    local function agg_median(col, idx)
-        local vals = {}
-        for _, i in ipairs(idx) do local v = col:get(i); if v ~= nil then vals[#vals+1] = v end end
-        local n = #vals
-        if n == 0 then return nil end
-        table.sort(vals)
-        local m = math.floor(n / 2)
-        return (n % 2 == 1) and vals[m+1] or (vals[m] + vals[m+1]) / 2
-    end
+    -- 5.4: agregações delegam às reduções da Series (fonte única). Materializam a
+    -- sub-coluna do grupo via take(idx) e chamam a redução — mesma semântica
+    -- (skip NA, ddof=1 amostral em std/var após 5.0). build_result controla o dtype.
+    local function agg_sum(col, idx)    return col:take(idx):sum()    end
+    local function agg_mean(col, idx)   return col:take(idx):mean()   end
+    local function agg_min(col, idx)    return col:take(idx):min()    end
+    local function agg_max(col, idx)    return col:take(idx):max()    end
+    local function agg_std(col, idx)    return col:take(idx):std()    end
+    local function agg_var(col, idx)    return col:take(idx):var()    end
+    local function agg_median(col, idx) return col:take(idx):median() end
+    local function agg_prod(col, idx)   return col:take(idx):prod()   end
+    local function agg_nunique(col, idx) return col:take(idx):nunique() end
+    -- first/last são posicionais por grupo, não reduções da Series → seguem inline.
     local function agg_first(col, idx)
         for _, i in ipairs(idx) do local v = col:get(i); if v ~= nil then return v end end
         return nil
@@ -434,22 +417,6 @@ return function(I)
         local last = nil
         for _, i in ipairs(idx) do local v = col:get(i); if v ~= nil then last = v end end
         return last
-    end
-    local function agg_nunique(col, idx)
-        local seen, cnt = {}, 0
-        for _, i in ipairs(idx) do
-            local v = col:get(i)
-            if v ~= nil then
-                local k = tostring(v)
-                if not seen[k] then seen[k] = true; cnt = cnt + 1 end
-            end
-        end
-        return cnt
-    end
-    local function agg_prod(col, idx)
-        local p, n = 1, 0
-        for _, i in ipairs(idx) do local v = col:get(i); if v ~= nil then p = p * v; n = n + 1 end end
-        return n > 0 and p or nil
     end
 
     local function build_result(gb, agg_fn, col_names, out_dtype_override)
@@ -699,6 +666,12 @@ return function(I)
                 error("smaug: groupby — coluna '"..k.."' não existe", 2)
             end
         end
+        -- Contrato 8: NA em chave de groupby não agrupa — erro orientado.
+        do
+            local named = {}
+            for _, k in ipairs(key_names) do named[#named+1] = { name = k, col = self:column(k) } end
+            validate_keys_no_na(named, "groupby")
+        end
         local key_set = {}
         for _, k in ipairs(key_names) do key_set[k] = true end
         local groups = build_groups(self, key_names)
@@ -728,6 +701,8 @@ return function(I)
         local idx_col = self:column(index)
         local col_col = self:column(columns)
         local val_col = self:column(values)
+        -- Contrato 8: NA em index/columns do pivot não é descartado em silêncio — erro.
+        validate_keys_no_na({ { name = index, col = idx_col }, { name = columns, col = col_col } }, "pivot")
         local idx_vals, idx_seen = {}, {}
         local col_vals, col_seen = {}, {}
         for i = 1, n do
@@ -844,6 +819,8 @@ return function(I)
         local col_col = self:column(columns)
         local val_col = self:column(values)
         local n       = self:nrows()
+        -- Contrato 8: NA em index/columns do pivot_table não é descartado em silêncio — erro.
+        validate_keys_no_na({ { name = index, col = idx_col }, { name = columns, col = col_col } }, "pivot_table")
         local idx_vals, idx_seen = {}, {}
         local col_vals, col_seen = {}, {}
         for i = 1, n do

@@ -77,9 +77,9 @@ do
     check(one:sum() == 42, "1-elem: sum 42")
     check(one:mean() == 42, "1-elem: mean 42")
     check(one:min() == 42 and one:max() == 42, "1-elem: min==max==42")
-    -- variância/desvio populacional de 1 elemento = 0
-    check(one:std() == 0, "1-elem: std 0 (populacional)")
-    check(one:var() == 0, "1-elem: var 0")
+    -- variância/desvio amostral (ddof=1) de 1 elemento = NA (n<2 indefinido)
+    check(one:std() == nil, "1-elem: std NA (amostral, n<2)")
+    check(one:var() == nil, "1-elem: var NA")
     check(one:sort():get(1) == 42, "1-elem: sort")
     check(one:clone():get(1) == 42, "1-elem: clone")
     check(one:head(5):len() == 1, "1-elem: head(5) limita a 1")
@@ -144,7 +144,7 @@ do
     check(n:max() == nil, "i64 toda-nula: max nil")
 
     local one = S.from_table({7}, "int64")
-    check(one:sum() == 7 and one:std() == 0, "i64 1-elem: sum/std")
+    check(one:sum() == 7 and one:std() == nil, "i64 1-elem: sum=7, std=NA (amostral)")
 end
 
 -- ===================================================================

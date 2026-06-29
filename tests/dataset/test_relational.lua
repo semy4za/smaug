@@ -587,4 +587,67 @@ local ok4, _ = pcall(function() pedidos:join(clientes, "cliente", "bad") end)
 check(not ok4,                                 "erro: how inválido")
 
 
+-- =====================================================================
+-- Contrato 8 — NA em chave relacional é erro (join/groupby/pivot/pivot_table)
+-- =====================================================================
+local function msg_of(fn)
+    local ok, e = pcall(fn)
+    return (not ok) and tostring(e) or nil
+end
+
+-- join: NA na chave simples → erro orientado (não casa NA com NA)
+local jL = smaug.DataSet({{"k", {"x", NA, "y"}, "string"}, {"v", {1,2,3}, "int64"}})
+local jR = smaug.DataSet({{"k", {"x", "y"}, "string"},     {"w", {9,8},    "int64"}})
+local mj = msg_of(function() return jL:join(jR, "k") end)
+check(mj ~= nil and mj:match("join") and mj:match("'k'") and mj:match("contém NA")
+      and mj:match("fillna") and mj:match("dropna"), "C8 join: erro com mensagem padrão")
+
+-- groupby: NA na chave → erro (mensagem padrão, agora menciona fillna)
+local mg = msg_of(function() return jL:groupby("k"):count() end)
+check(mg ~= nil and mg:match("groupby") and mg:match("'k'") and mg:match("contém NA")
+      and mg:match("fillna"), "C8 groupby: erro com mensagem padrão (fillna)")
+
+-- pivot e pivot_table: NA no index → erro (não descarta linha em silêncio)
+local pv = smaug.DataSet({
+    {"i", {"a", NA},   "string"},
+    {"c", {"m", "n"},  "string"},
+    {"v", {1, 2},      "int64"},
+})
+local mp = msg_of(function() return pv:pivot("i", "c", "v") end)
+check(mp ~= nil and mp:match("pivot") and mp:match("'i'") and mp:match("contém NA"),
+      "C8 pivot: erro com mensagem padrão")
+local mpt = msg_of(function() return pv:pivot_table("i", "c", "v", "sum") end)
+check(mpt ~= nil and mpt:match("pivot_table") and mpt:match("'i'") and mpt:match("contém NA"),
+      "C8 pivot_table: erro com mensagem padrão")
+
+-- NA na COLUNA (não no index) do pivot também dispara
+local pv2 = smaug.DataSet({
+    {"i", {"a", "b"},  "string"},
+    {"c", {"m", NA},   "string"},
+    {"v", {1, 2},      "int64"},
+})
+local mp2 = msg_of(function() return pv2:pivot("i", "c", "v") end)
+check(mp2 ~= nil and mp2:match("'c'"), "C8 pivot: NA na coluna 'columns' dispara")
+
+-- chave COMPOSTA: NA em qualquer coluna da chave dispara, nomeando-a
+local cmp = smaug.DataSet({
+    {"k1", {"x", "y"}, "string"},
+    {"k2", {"a", NA},  "string"},
+    {"v",  {1, 2},     "int64"},
+})
+local mc = msg_of(function() return cmp:groupby({"k1", "k2"}):count() end)
+check(mc ~= nil and mc:match("'k2'"), "C8 composta: nomeia a coluna culpada (k2)")
+-- join valida AMBOS os lados: NA na chave do lado direito (forma {chave_esq, chave_dir})
+local jLok = smaug.DataSet({{"kl", {"x", "y"}, "string"}, {"v", {1, 2}, "int64"}})
+local jRna = smaug.DataSet({{"kr", {"x", NA},  "string"}, {"w", {9, 8}, "int64"}})
+local mcj = msg_of(function() return jLok:join(jRna, {"kl", "kr"}) end)
+check(mcj ~= nil and mcj:match("'kr'"), "C8 join: valida chave do lado direito (kr)")
+
+-- a coluna de VALORES pode conter NA (não é chave) — join com valor NA funciona
+local vL = smaug.DataSet({{"k", {"x", "y"}, "string"}, {"v", {1, NA}, "int64"}})
+local vR = smaug.DataSet({{"k", {"x", "y"}, "string"}, {"w", {9, 8}, "int64"}})
+local okv = pcall(function() return vL:join(vR, "k") end)
+check(okv, "C8: NA em coluna de valores (não-chave) não dispara")
+
+
 print(string.format("OK — %d checks passaram (DataSet: groupby, concat, join)", n_ok))

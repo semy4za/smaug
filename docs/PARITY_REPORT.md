@@ -1,8 +1,7 @@
 # Smaug — Relatório de Paridade
 
-> Arquivo gerado por `bash scripts/parity/parity.sh` ou `powershell scripts/parity/parity.ps1`.
-> **Não editar à mão.** Decisões conscientes de não-paridade ficam em
-> `scripts/parity/exceptions.txt`.
+> Arquivo gerado por `bash scripts/parity/parity.sh`. **Não editar à mão.**
+> Decisões conscientes de não-paridade ficam em `scripts/parity/exceptions.txt`.
 
 Convenção de status:
 
@@ -11,7 +10,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-06-26 19:30:43 UTC
+Gerado em: 2026-06-29 04:35:23 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -113,10 +112,10 @@ Cada linha = um método rastreado em `Series.methods` ou `CategoricalSeries`. Co
 | `unique` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
 | `value_counts` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
 | `var` | 🟩 | 🟩 | ⬜ | ⬜ | ⬜ | ⬜ |
-| `view` | 🟩 | 🟩 | ⬜ | ⬜ | 🟨 | ⬜ |
+| `view` | 🟩 | 🟩 | 🟨 | ⬜ | 🟨 | 🟩 |
 | `where` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
 
-**Sumário Eixo 1:** 96 métodos × 6 dtypes = 576 células · 🟩 267 (46.4%) · ⬜ 143 (24.8%) · 🟨 166 (28.8%)
+**Sumário Eixo 1:** 96 métodos × 6 dtypes = 576 células · 🟩 268 (46.5%) · ⬜ 141 (24.5%) · 🟨 167 (29.0%)
 
 ## Eixo 2 — Paridade Series ↔ DataSet
 
@@ -124,7 +123,7 @@ Métodos que existem em cada lado. Algumas assimetrias são intencionais (ex: `S
 
 | método | Series | DataSet | nota |
 | :--- | :-: | :-: | :-: |
-| `abs` | 🟩 | — | só em Series |
+| `abs` | 🟩 | 🟩 |  |
 | `add_column` | — | 🟩 | só em DataSet |
 | `all` | 🟩 | — | só em Series |
 | `any` | 🟩 | — | só em Series |
@@ -133,12 +132,12 @@ Métodos que existem em cada lado. Algumas assimetrias são intencionais (ex: `S
 | `argmin` | 🟩 | — | só em Series |
 | `argsort` | 🟩 | — | só em Series |
 | `assign` | — | 🟩 | só em DataSet |
-| `astype` | 🟩 | — | só em Series |
+| `astype` | 🟩 | 🟩 |  |
 | `at` | — | 🟩 | só em DataSet |
 | `autocorr` | 🟩 | — | só em Series |
 | `between` | 🟩 | — | só em Series |
-| `bfill` | 🟩 | — | só em Series |
-| `clip` | 🟩 | — | só em Series |
+| `bfill` | 🟩 | 🟩 |  |
+| `clip` | 🟩 | 🟩 |  |
 | `clone` | 🟩 | — | só em Series |
 | `column` | — | 🟩 | só em DataSet |
 | `columns` | — | 🟩 | só em DataSet |
@@ -146,15 +145,15 @@ Métodos que existem em cada lado. Algumas assimetrias são intencionais (ex: `S
 | `compare` | 🟩 | 🟩 |  |
 | `concat` | — | 🟩 | só em DataSet |
 | `corr` | 🟩 | 🟩 |  |
-| `count_nonnull` | 🟩 | — | só em Series |
+| `count_nonnull` | 🟩 | 🟩 |  |
 | `count_true` | 🟩 | — | só em Series |
 | `cov` | 🟩 | 🟩 |  |
-| `cummax` | 🟩 | — | só em Series |
-| `cummin` | 🟩 | — | só em Series |
-| `cumprod` | 🟩 | — | só em Series |
-| `cumsum` | 🟩 | — | só em Series |
+| `cummax` | 🟩 | 🟩 |  |
+| `cummin` | 🟩 | 🟩 |  |
+| `cumprod` | 🟩 | 🟩 |  |
+| `cumsum` | 🟩 | 🟩 |  |
 | `describe` | 🟩 | 🟩 |  |
-| `diff` | 🟩 | — | só em Series |
+| `diff` | 🟩 | 🟩 |  |
 | `dot` | 🟩 | — | só em Series |
 | `drop_column` | — | 🟩 | só em DataSet |
 | `drop_duplicates` | 🟩 | 🟩 |  |
@@ -165,7 +164,7 @@ Métodos que existem em cada lado. Algumas assimetrias são intencionais (ex: `S
 | `equals` | 🟩 | 🟩 |  |
 | `expanding` | 🟩 | — | só em Series |
 | `explode` | — | 🟩 | só em DataSet |
-| `ffill` | 🟩 | — | só em Series |
+| `ffill` | 🟩 | 🟩 |  |
 | `fillna` | 🟩 | 🟩 |  |
 | `filter` | 🟩 | 🟩 |  |
 | `first_valid_index` | 🟩 | — | só em Series |
@@ -185,9 +184,9 @@ Métodos que existem em cada lado. Algumas assimetrias são intencionais (ex: `S
 | `is_null` | 🟩 | — | só em Series |
 | `is_unique` | 🟩 | — | só em Series |
 | `isin` | 🟩 | — | só em Series |
-| `isna` | 🟩 | — | só em Series |
+| `isna` | 🟩 | 🟩 |  |
 | `join` | — | 🟩 | só em DataSet |
-| `kurtosis` | 🟩 | — | só em Series |
+| `kurtosis` | 🟩 | 🟩 |  |
 | `land` | 🟩 | — | só em Series |
 | `last_valid_index` | 🟩 | — | só em Series |
 | `le` | 🟩 | — | só em Series |
@@ -196,19 +195,19 @@ Métodos que existem em cada lado. Algumas assimetrias são intencionais (ex: `S
 | `lor` | 🟩 | — | só em Series |
 | `lt` | 🟩 | — | só em Series |
 | `lxor` | 🟩 | — | só em Series |
-| `mad` | 🟩 | — | só em Series |
+| `mad` | 🟩 | 🟩 |  |
 | `map` | 🟩 | — | só em Series |
 | `mask` | 🟩 | — | só em Series |
-| `max` | 🟩 | — | só em Series |
-| `mean` | 🟩 | — | só em Series |
-| `median` | 🟩 | — | só em Series |
+| `max` | 🟩 | 🟩 |  |
+| `mean` | 🟩 | 🟩 |  |
+| `median` | 🟩 | 🟩 |  |
 | `melt` | — | 🟩 | só em DataSet |
-| `min` | 🟩 | — | só em Series |
+| `min` | 🟩 | 🟩 |  |
 | `mode` | 🟩 | — | só em Series |
 | `ncols` | — | 🟩 | só em DataSet |
 | `ne` | 🟩 | — | só em Series |
 | `nlargest` | 🟩 | — | só em Series |
-| `notna` | 🟩 | — | só em Series |
+| `notna` | 🟩 | 🟩 |  |
 | `nrows` | — | 🟩 | só em DataSet |
 | `nsmallest` | 🟩 | — | só em Series |
 | `nunique` | 🟩 | 🟩 |  |
@@ -216,28 +215,28 @@ Métodos que existem em cada lado. Algumas assimetrias são intencionais (ex: `S
 | `pct_rank` | 🟩 | — | só em Series |
 | `pivot` | — | 🟩 | só em DataSet |
 | `pivot_table` | — | 🟩 | só em DataSet |
-| `prod` | 🟩 | — | só em Series |
-| `quantile` | 🟩 | — | só em Series |
+| `prod` | 🟩 | 🟩 |  |
+| `quantile` | 🟩 | 🟩 |  |
 | `rank` | 🟩 | — | só em Series |
 | `rename` | — | 🟩 | só em DataSet |
 | `rename_column` | — | 🟩 | só em DataSet |
 | `rep_each` | 🟩 | — | só em Series |
 | `rolling` | 🟩 | 🟩 |  |
-| `round` | 🟩 | — | só em Series |
+| `round` | 🟩 | 🟩 |  |
 | `row` | — | 🟩 | só em DataSet |
 | `sample` | — | 🟩 | só em DataSet |
 | `searchsorted` | 🟩 | — | só em Series |
 | `select` | — | 🟩 | só em DataSet |
-| `sem` | 🟩 | — | só em Series |
+| `sem` | 🟩 | 🟩 |  |
 | `set` | 🟩 | — | só em Series |
 | `set_null` | 🟩 | — | só em Series |
-| `shift` | 🟩 | — | só em Series |
-| `skew` | 🟩 | — | só em Series |
+| `shift` | 🟩 | 🟩 |  |
+| `skew` | 🟩 | 🟩 |  |
 | `sort` | 🟩 | — | só em Series |
 | `sort_by` | — | 🟩 | só em DataSet |
 | `stack` | — | 🟩 | só em DataSet |
-| `std` | 🟩 | — | só em Series |
-| `sum` | 🟩 | — | só em Series |
+| `std` | 🟩 | 🟩 |  |
+| `sum` | 🟩 | 🟩 |  |
 | `tail` | 🟩 | 🟩 |  |
 | `take` | 🟩 | 🟩 |  |
 | `to_dict` | — | 🟩 | só em DataSet |
@@ -248,11 +247,11 @@ Métodos que existem em cada lado. Algumas assimetrias são intencionais (ex: `S
 | `unstack` | — | 🟩 | só em DataSet |
 | `update_column` | — | 🟩 | só em DataSet |
 | `value_counts` | 🟩 | — | só em Series |
-| `var` | 🟩 | — | só em Series |
+| `var` | 🟩 | 🟩 |  |
 | `view` | 🟩 | — | só em Series |
 | `where` | 🟩 | — | só em Series |
 
-**Sumário Eixo 2:** 16 métodos em ambos · 79 só em Series · 32 só em DataSet
+**Sumário Eixo 2:** 44 métodos em ambos · 51 só em Series · 32 só em DataSet
 
 ## Eixo 3 — Espelhamento C ↔ Lua
 
@@ -390,7 +389,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `or` | 🟨 |  |
 | `set` | 🟩 |  |
 | `set_null` | 🟩 |  |
-| `view` | 🟨 |  |
+| `view` | 🟩 |  |
 | `xor` | 🟨 |  |
 
 
@@ -608,9 +607,9 @@ Grupos de nomes que devem seguir convenções claras. Aliases declarados via `me
 | **Tamanho** | `len` | 🟩 | — | DataSet: alias de `nrows` |
 | **Tamanho** | `size` | — | — | Series: alias de `len` |
 | **Nulidade — predicados** | `is_null` | 🟩 | — |  |
-| **Nulidade — predicados** | `isna` | 🟩 | — |  |
-| **Nulidade — predicados** | `notna` | 🟩 | — |  |
-| **Contagem** | `count_nonnull` | 🟩 | — |  |
+| **Nulidade — predicados** | `isna` | 🟩 | 🟩 |  |
+| **Nulidade — predicados** | `notna` | 🟩 | 🟩 |  |
+| **Contagem** | `count_nonnull` | 🟩 | 🟩 |  |
 | **Contagem** | `count_true` | 🟩 | — |  |
 | **Lógica Kleene** | `land` | 🟩 | — |  |
 | **Lógica Kleene** | `lor` | 🟩 | — |  |
@@ -647,8 +646,8 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 224/224 erros com prefixo `smaug:` (100.0%)
-- `dataset.lua`: 88/88 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 226/226 erros com prefixo `smaug:` (100.0%)
+- `dataset.lua`: 92/92 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
 
@@ -674,7 +673,7 @@ Cada dtype com backend C deve oferecer o mesmo conjunto de operações de lifecy
 
 | função | f64 | i64 | bool | str | dt |
 | :--- | :-: | :-: | :-: | :-: | :-: |
-| `view` | 🟩 | 🟩 | ⬜ | ⬜ | 🟩 |
+| `view` | 🟩 | 🟩 | 🟩 | ⬜ | 🟩 |
 
 ## Eixo 11 — Cobertura de testes proporcional
 
@@ -685,10 +684,10 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 
 | arquivo | checks | float64 | int64 | bool | string | datetime | categorical |
 | :--- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| `series/test_constructors` | 311 | 36 | 55 | 18 | 10 | — | — |
+| `series/test_constructors` | 330 | 36 | 55 | 19 | 11 | — | 1 |
 | `series/test_access` | 92 | 13 | 4 | — | 2 | — | — |
-| `series/test_reduce` | 38 | 7 | — | — | — | — | — |
-| `series/test_stat` | 136 | 30 | 15 | — | 5 | — | — |
+| `series/test_reduce` | 44 | 7 | 2 | — | — | — | — |
+| `series/test_stat` | 70 | 6 | 12 | — | 9 | — | — |
 | `series/test_window` | 64 | 5 | 6 | — | 1 | — | — |
 | `series/test_predicates` | 155 | 6 | 42 | 3 | 11 | — | — |
 | `series/test_selection` | 23 | 3 | 1 | — | 1 | — | — |
@@ -696,26 +695,26 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `series/test_dt` | 272 | 3 | 6 | 2 | 12 | 62 | — |
 | `series/test_categorical` | 295 | 7 | 7 | 8 | 5 | 13 | 57 |
 | `dataset/test_core` | 208 | 26 | 27 | 8 | 11 | — | — |
-| `dataset/test_relational` | 164 | 10 | 41 | 4 | 22 | — | — |
-| `dataset/test_stat` | 50 | 3 | 6 | — | 7 | — | — |
+| `dataset/test_relational` | 172 | 10 | 50 | 4 | 34 | — | — |
+| `dataset/test_stat` | 91 | 10 | 16 | 1 | 13 | — | — |
 | `dataset/test_io_support` | 44 | 2 | 13 | 1 | 6 | — | — |
 | `io/test_csv` | 101 | 2 | 3 | 2 | 9 | — | — |
 | `io/test_json` | 28 | 1 | 1 | 1 | 2 | — | — |
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 67 | 18 | 2 | — | — | — | — |
 
-**Total de checks:** 2362
+**Total de checks:** 2370
 
 ### Menções totais por dtype (toda a suite)
 
 | dtype | menções |
 | :--- | :-: |
-| float64 | 186 |
-| int64 | 270 |
-| bool | 48 |
-| string | 162 |
+| float64 | 169 |
+| int64 | 288 |
+| bool | 50 |
+| string | 185 |
 | datetime | 75 |
-| categorical | 57 |
+| categorical | 58 |
 
 ## Eixo 12 — Sincronização docs ↔ código
 
@@ -725,9 +724,9 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 | categoria | total | documentados | faltam | % | detalhe |
 | :--- | :-: | :-: | :-: | :-: | :-: |
 | `Series.methods` | 95 | 95 | 0 | 100% | 🟩 completo |
-| `DataSet.methods` | 48 | 48 | 0 | 100% | 🟩 completo |
+| `DataSet.methods` | 76 | 76 | 0 | 100% | 🟩 completo |
 | `GroupBy:*` | 15 | 15 | 0 | 100% | 🟩 completo |
-| `CategoricalSeries:*` | 41 | 41 | 0 | 100% | 🟩 completo |
+| `CategoricalSeries:*` | 42 | 42 | 0 | 100% | 🟩 completo |
 | `CatProxy:*` (.cat) | 6 | 6 | 0 | 100% | 🟩 completo |
 | `StrProxy:*` (.str) | 28 | 28 | 0 | 100% | 🟩 completo |
 | `SeriesDT:*` (.dt) | 33 | 33 | 0 | 100% | 🟩 completo |
@@ -739,8 +738,8 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 856
-- ⬜ exceção registrada: 149
+- 🟩 paridade: 890
+- ⬜ exceção registrada: 146
 - 🟨 suspeita (revisar): 242
 - 🟥 inconsistência clara: 11
 

@@ -202,6 +202,15 @@ return function(I)
         return cat_new(codes, levels, lmap, #idx, self._name)
     end
 
+    -- view() não se aplica a categorical: é Lua puro (codes + dicionário), sem
+    -- buffer C compartilhável. Stub explícito para dar a razão correta em vez do
+    -- erro cru "attempt to call method 'view' (a nil value)".
+    function CategoricalSeries:view()
+        error("smaug: view() não se aplica a dtype 'categorical' "..
+              "(sem buffer compartilhável); use :take(idx) ou :head(n)/:tail(n) "..
+              "para uma cópia", 2)
+    end
+
     function CategoricalSeries:filter(mask)
         if type(mask) ~= "table" or mask._dtype ~= "bool" then
             error("smaug: filter espera Series<bool>", 2)

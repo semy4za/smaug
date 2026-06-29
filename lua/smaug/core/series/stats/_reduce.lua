@@ -8,7 +8,11 @@ return function(I)
     local methods    = I.methods
     local reduce_num = I.reduce_num
 
-    function methods.sum(self, ignore_na)  return reduce_num(self, "sum",  ignore_na) end
+    function methods.sum(self, ignore_na, min_count)
+        -- 5.5: min_count opt-in. Default (0) preserva soma de vazio/all-null = 0.
+        if min_count and min_count > 0 and self:count_nonnull() < min_count then return nil end
+        return reduce_num(self, "sum",  ignore_na)
+    end
     function methods.mean(self, ignore_na) return reduce_num(self, "mean", ignore_na) end
     function methods.min(self, ignore_na)  return reduce_num(self, "min",  ignore_na) end
     function methods.max(self, ignore_na)  return reduce_num(self, "max",  ignore_na) end

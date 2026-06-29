@@ -95,7 +95,6 @@
 # Lifecycle / armazenamento
 1:view/string          string não suporta view (decisão registrada em COW.md)
 1:view/categorical     CategoricalSeries é Lua puro, sem buffer C compartilhável
-1:view/bool            registrar status — bool tem view?
 
 # Métodos Kleene são exclusivos de bool
 1:land/f64             exclusivo Kleene/bool
@@ -199,7 +198,6 @@
 # ===================================================================
 10:view/str           sem suporte — offset-based, rebasing adiado (COW.md)
 10:view/categorical   Lua puro
-10:view/bool          BoolSeries imutável por construção (resultado de comparação); não há mutação a destacar
 
 # ===================================================================
 # Eixo 6 — Tipos de retorno

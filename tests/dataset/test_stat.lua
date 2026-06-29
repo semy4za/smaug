@@ -192,4 +192,115 @@ check(ddl:at(1, "b") == "x",        "DataSet drop a last: última a=1 tem b=x")
 -- ================================================================
 
 
+-- ================================================================
+-- 5.1 — reduções por coluna → DataSet 1-linha
+-- ================================================================
+do
+    local df = smaug.DataSet({
+        {"a", {10, 20, 30}, "int64"},
+        {"b", {1.0, 2.0, 3.0}, "float64"},
+        {"nome", {"x", "y", "z"}, "string"},
+    })
+
+    -- forma: 1 linha, só colunas numéricas, string excluída
+    local r = df:sum()
+    check(r:nrows() == 1, "5.1 sum: 1 linha")
+    check(#r._col_names == 2 and r:has_column("a") and r:has_column("b"), "5.1 sum: só numéricas")
+    check(not r:has_column("nome"), "5.1 sum: string excluída")
+
+    -- sum preserva dtype (i64→i64, f64→f64); valores
+    check(r:column("a"):get(1) == 60 and r:column("a")._dtype == "int64", "5.1 sum a=60 int64")
+    check(approx(r:column("b"):get(1), 6.0) and r:column("b")._dtype == "float64", "5.1 sum b=6 float64")
+
+    -- mean/std/var amostrais → float64
+    check(approx(df:mean():column("a"):get(1), 20.0), "5.1 mean a=20")
+    check(approx(df:std():column("a"):get(1), 10.0), "5.1 std a=10 (amostral)")
+    check(approx(df:var():column("a"):get(1), 100.0), "5.1 var a=100 (amostral)")
+    check(df:mean():column("a")._dtype == "float64", "5.1 mean dtype float64")
+
+    -- min/max preservam dtype; median/quantile
+    check(df:min():column("a"):get(1) == 10 and df:max():column("a"):get(1) == 30, "5.1 min/max")
+    check(approx(df:median():column("b"):get(1), 2.0), "5.1 median b=2")
+    check(approx(df:quantile(0.5):column("a"):get(1), 20.0), "5.1 quantile 0.5 a=20")
+
+    -- count_nonnull → int64
+    local cnn = df:count_nonnull()
+    check(cnn:column("a"):get(1) == 3 and cnn:column("a")._dtype == "int64", "5.1 count_nonnull=3 int64")
+
+    -- prod
+    check(df:prod():column("a"):get(1) == 6000, "5.1 prod a=6000")
+
+    -- NA quando a coluna não tem dados suficientes (var de 1 não-nulo = NA amostral)
+    local dfsmall = smaug.DataSet({{"a", {5, NA}, "int64"}})
+    check(dfsmall:var():column("a"):is_null(1), "5.1 var de 1 não-nulo = NA (amostral)")
+    check(dfsmall:sum():column("a"):get(1) == 5, "5.1 sum ignora NA")
+
+    -- erro: nenhuma coluna numérica
+    local oknn = pcall(function() return smaug.DataSet({{"x", {"a"}, "string"}}):sum() end)
+    check(not oknn, "5.1 erro sem coluna numérica")
+
+    -- 5.5: min_count opt-in em sum (DataSet)
+    local dfmc = smaug.DataSet({{"a", {10, NA, NA}, "int64"}, {"b", {1, 2, 3}, "int64"}})
+    check(dfmc:sum():column("a"):get(1) == 10, "5.5 sum default: NA ignorado (a=10)")
+    local mc = dfmc:sum(2)
+    check(mc:column("a"):is_null(1), "5.5 sum(min_count=2): a tem 1 não-nulo → NA")
+    check(mc:column("b"):get(1) == 6, "5.5 sum(min_count=2): b tem 3 não-nulos → 6")
+end
+
+-- ================================================================
+-- 5.2 / 5.3 — element-wise e transforms → DataSet mesma forma
+-- ================================================================
+do
+    local df = smaug.DataSet({{"a", {-1, 2, -3}, "int64"}, {"b", {1.5, 2.5, 3.5}, "float64"}})
+
+    -- forma preservada
+    local r = df:abs()
+    check(r:nrows() == 3 and #r._col_names == 2, "5.2 abs: mesma forma")
+    check(r:column("a"):get(1) == 1 and r:column("a"):get(3) == 3, "5.2 abs valores")
+
+    -- cumsum acumula por coluna
+    local cs = df:cumsum()
+    check(cs:column("a"):get(3) == -2, "5.2 cumsum a[3]=-2")
+    check(approx(cs:column("b"):get(3), 7.5), "5.2 cumsum b[3]=7.5")
+
+    -- round / clip com argumentos
+    check(df:round(0):column("b"):get(2) == 3, "5.2 round(0) b[2]=3")
+    check(df:clip(0, 2):column("a"):get(1) == 0, "5.2 clip(0,2) a[1]=0")
+    check(df:cumprod():column("a"):get(2) == -2, "5.2 cumprod a[2]=-2")
+
+    -- shift desloca (NA na borda); diff
+    check(df:shift(1):column("a"):is_null(1), "5.3 shift(1): a[1]=NA")
+    check(df:diff():column("a"):get(2) == 3, "5.3 diff a[2]=3")
+
+    -- D4-i: element-wise numérico erra com coluna não-numérica
+    local dfs = smaug.DataSet({{"a", {1, 2}, "int64"}, {"nome", {"x", "y"}, "string"}})
+    local oke = pcall(function() return dfs:abs() end)
+    check(not oke, "5.2 D4-i: abs erra com coluna string")
+    local okc = pcall(function() return dfs:cumsum() end)
+    check(not okc, "5.2 D4-i: cumsum erra com coluna string")
+
+    -- ffill/bfill/shift funcionam em qualquer dtype (string incluída)
+    local dff = smaug.DataSet({{"s", {"a", NA, "c"}, "string"}})
+    check(dff:ffill():column("s"):get(2) == "a", "5.3 ffill em string")
+    check(dff:shift(1):column("s"):is_null(1), "5.3 shift em string: borda NA")
+
+    -- isna/notna → DataSet bool, todas as colunas (qualquer dtype)
+    local dfm = smaug.DataSet({{"x", {1, NA}, "int64"}, {"nome", {"a", NA}, "string"}})
+    local na = dfm:isna()
+    check(na:column("x")._dtype == "bool", "5.3 isna: dtype bool")
+    check(na:column("x"):get(2) == true and na:column("nome"):get(2) == true, "5.3 isna: linha 2 nula")
+    check(na:column("x"):get(1) == false, "5.3 isna: linha 1 não-nula")
+    check(dfm:notna():column("nome"):get(1) == true, "5.3 notna: inverso de isna")
+
+    -- astype mapa { coluna = dtype } (D4-A); coluna fora do mapa inalterada
+    local at = dfm:astype({x = "float64"})
+    check(at:column("x")._dtype == "float64", "5.3 astype: x → float64")
+    check(at:column("nome")._dtype == "string", "5.3 astype: coluna fora do mapa inalterada")
+    local oka = pcall(function() return dfm:astype({zzz = "int64"}) end)
+    check(not oka, "5.3 astype: erro em coluna inexistente")
+    local okt = pcall(function() return dfm:astype("float64") end)
+    check(not okt, "5.3 astype: erro se não for mapa")
+end
+
+
 print(string.format("OK — %d checks passaram (DataSet: corr/cov, equals, compare, duplicated, drop_duplicates)", n_ok))

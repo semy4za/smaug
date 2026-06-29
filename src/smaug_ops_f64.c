@@ -224,7 +224,8 @@ double smaug_f64_max(const smaug_series_f64_t *s, bool ignore_na) {
     return result;
 }
 
-/* Variância populacional: Σ(xi - mean)² / n  (dois passos, numericamente estável) */
+/* Variância amostral (ddof=1): Σ(xi - mean)² / (n-1); NaN para n<2.
+   Dois passos, numericamente estável. Alinha com cov/skew/groupby e pandas. */
 double smaug_f64_var(const smaug_series_f64_t *s, bool ignore_na) {
     if (!s || s->size == 0) return NAN;
 
@@ -242,7 +243,7 @@ double smaug_f64_var(const smaug_series_f64_t *s, bool ignore_na) {
         }
     }
 
-    return count ? sum_sq / (double)count : NAN;  /* COV-EXCL-BR: count==0 inalcancavel: mean nao-NaN implica count>0 */
+    return count >= 2 ? sum_sq / (double)(count - 1) : NAN;  /* amostral: n<2 indefinido */
 }
 
 double smaug_f64_std(const smaug_series_f64_t *s, bool ignore_na) {

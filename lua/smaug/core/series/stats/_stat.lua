@@ -173,10 +173,12 @@ return function(I)
     -- =====================================================================
 
     -- prod([ignore_na]): produto de todos os valores.
-    function methods.prod(self, ignore_na)
+    function methods.prod(self, ignore_na, min_count)
         if self._dtype ~= "float64" and self._dtype ~= "int64" then
             error("smaug: prod() requer dtype numérico, não '"..self._dtype.."'", 2)
         end
+        -- 5.5: min_count opt-in. Default (0) preserva o comportamento atual.
+        if min_count and min_count > 0 and self:count_nonnull() < min_count then return nil end
         ignore_na = (ignore_na == nil) and true or ignore_na
         local p, n = 1, 0
         for i = 1, self:len() do

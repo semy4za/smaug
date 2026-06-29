@@ -211,8 +211,9 @@ Regra do `ignore_na`:
   do i64); **`INT64_MIN`** nas funções i64 que retornam `int64_t` (`sum`, `min`,
   `max`), já que `int64_t` não tem como representar NAN.
 
-`var`/`std` são **populacionais** (dividem por N, não N-1). Para amostral,
-multiplique a variância por `N/(N-1)`. `mean` de série vazia ou só-nulos → NAN.
+`var`/`std` são **amostrais** (ddof=1: dividem por N-1). Para n<2 retornam NaN
+(variância amostral indefinida). Coerente com `cov`/`skew`/`kurtosis` e com o
+`groupby`. `mean` de série vazia ou só-nulos → NAN.
 `min`/`max` retornam NAN (f64) ou `INT64_MIN` (i64) se nenhum elemento válido.
 
 > ⚠️ **Sentinela ambíguo no i64.** Como `INT64_MIN` é um inteiro válido, uma

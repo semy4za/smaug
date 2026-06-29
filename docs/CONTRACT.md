@@ -203,6 +203,41 @@ Toda API pública Lua usa índices 1-based (convenção Lua). A conversão
 
 ---
 
+### Contrato 8 — `NA` em chave relacional é erro
+
+```lua
+local smaug = require("smaug")
+
+local a = smaug.DataSet({
+    {"cliente", {"A", smaug.Series.NA, "B"}, "string"},
+    {"valor",   {10, 20, 30},               "int64"},
+})
+local b = smaug.DataSet({
+    {"cliente", {"A", "B"}, "string"},
+    {"cidade",  {"SP", "RJ"}, "string"},
+})
+
+a:join(b, "cliente")          -- erro
+a:groupby("cliente"):count()  -- erro
+a:pivot("cliente", "x", "valor")        -- erro (idem pivot_table)
+```
+
+```
+smaug: join — coluna 'cliente' contém NA; trate com fillna ou dropna antes
+smaug: groupby — coluna 'cliente' contém NA; trate com fillna ou dropna antes
+smaug: pivot — coluna 'cliente' contém NA; trate com fillna ou dropna antes
+```
+
+`NA` é ausência que não participa (mesma filosofia do Contrato 6). Em chave
+relacional — `join` (`on`), `groupby` (`by`), `pivot`/`pivot_table`
+(`index`/`columns`) — `NA` **nunca** casa com `NA`, agrupa por `NA`, nem é
+descartado em silêncio: a operação erra de forma orientada. "Falha visível >
+acerto adivinhado" — o usuário decide com `fillna`/`dropna` na pipeline. Em chave
+composta, `NA` em **qualquer** coluna da chave dispara, nomeando-a. A coluna de
+**valores** não é chave e pode conter `NA` normalmente.
+
+---
+
 ## Ring 0 — Backend C
 
 ### Princípio: o engine não confia no caller

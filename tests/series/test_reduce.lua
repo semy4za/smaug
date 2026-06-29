@@ -167,4 +167,17 @@ do
 end
 
 
+-- 5.5 — min_count opt-in em sum/prod (Series)
+do
+    local c = Series.from_table({10, NA, NA}, "int64")
+    check(c:sum() == 10, "5.5 Series sum default ignora NA = 10")
+    check(c:sum(nil, 2) == nil, "5.5 Series sum(min_count=2): 1 não-nulo → NA")
+    check(c:sum(nil, 1) == 10, "5.5 Series sum(min_count=1): 1 não-nulo → 10")
+    local an = Series.from_table({NA, NA}, "int64")
+    check(an:sum() == 0, "5.5 Series sum all-null default = 0 (preservado)")
+    check(an:sum(nil, 1) == nil, "5.5 Series sum all-null min_count=1 → NA")
+    check(c:prod(nil, 2) == nil, "5.5 Series prod(min_count=2) → NA")
+end
+
+
 print(string.format("OK — %d checks passaram (Series: reduções, valores especiais f64)", n_ok))

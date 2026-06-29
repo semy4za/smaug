@@ -154,6 +154,52 @@ local vw_clone = vw3:clone()
 vw_clone:set(1, -1.0)
 check(vw_clone:get(1) == -1.0 and vw3:get(1) == 99.0, "clone de view é independente/mutável")
 
+-- ---- bool: view zero-copy + COW (bool é mutável, tem set; mecânica idêntica a f64) ----
+local bbase = Series.from_table({true, false, true, false, true}, "bool", "bbase")
+local bvw = bbase:view(2, 3)                       -- [false, true, false]
+check(bvw:len() == 3, "bool view len")
+check(bvw:get(1) == false and bvw:get(2) == true, "bool view valores")
+check(bvw._c.meta.is_view == true, "bool view marcada como view no struct C")
+
+-- enquanto não escrita, reflete mutações da pai (zero-copy)
+bbase:set(2, true)
+check(bvw:get(1) == true, "bool view reflete mutação da pai antes do detach")
+
+-- COW: set na view destaca o buffer, preserva a pai
+local bvw_cow_ok = pcall(function() bvw:set(1, false) end)
+check(bvw_cow_ok,                    "bool set em view via COW não dá erro")
+check(bvw._c.meta.is_view == false,  "bool view detachada após primeiro set")
+check(bvw:get(1) == false,           "bool set em view gravou o valor correto")
+check(bbase:get(2) == true,          "pai bool preservada pelo COW")
+
+-- COW: append em view fresca destaca e adiciona
+local bvw2 = bbase:view(1, 2)
+local bvw_ap_ok = pcall(function() bvw2:append(true) end)
+check(bvw_ap_ok,                     "bool append em view via COW não dá erro")
+check(bvw2._c.meta.is_view == false, "bool view detachada após append")
+check(bvw2:len() == 3,               "bool append em view incrementou o tamanho")
+check(bvw2:get(3) == true,           "bool append em view gravou o valor correto")
+
+-- COW: set_null em view fresca destaca e grava NA (bool tem nulos)
+local bvw3 = bbase:view(1, 3)
+local bvw_sn_ok = pcall(function() bvw3:set_null(1) end)
+check(bvw_sn_ok,                     "bool set_null em view via COW não dá erro")
+check(bvw3._c.meta.is_view == false, "bool view detachada após set_null")
+check(bvw3:get(1) == nil,            "bool set_null em view gravou NA")
+check(bbase:get(1) == true,          "pai bool preservada após set_null COW")
+
+-- view de bool fora dos limites dá erro
+local bvw_oob = pcall(function() return bbase:view(4, 5) end)
+check(not bvw_oob, "bool view fora dos limites dá erro")
+
+-- view() em dtypes sem suporte: mensagem com a razão correta por dtype (3.3)
+local ok_sv, e_sv = pcall(function() return Series.from_table({"a","b"}, "string"):view(1,1) end)
+check(not ok_sv and e_sv:match("'string'") and e_sv:match("planejado"),
+      "view string: erro com razão correta (planejado)")
+local ok_cv, e_cv = pcall(function() return Series.from_table({"x","y"}, "categorical"):view(1,1) end)
+check(not ok_cv and e_cv:match("'categorical'") and e_cv:match("sem buffer"),
+      "view categorical: erro com razão correta (Lua puro)")
+
 -- ---- take: seleção por índices (cópia independente) ----
 local src = Series.from_table({100, 200, 300, 400}, "float64")
 local tk = src:take({4, 1, 3})
@@ -423,9 +469,9 @@ do
     check(a:min() == 10, "i64 min")
     check(a:max() == 30, "i64 max")
     check(approx(a:mean(), 20.0), "i64 mean")
-    -- var populacional: ((10-20)²+(20-20)²+(30-20)²)/3 = 200/3 ≈ 66.6667
-    check(approx(a:var(), 200.0/3.0), "i64 var populacional")
-    check(approx(a:std(), math.sqrt(200.0/3.0)), "i64 std populacional")
+    -- var amostral (ddof=1): ((10-20)²+(20-20)²+(30-20)²)/(3-1) = 200/2 = 100
+    check(approx(a:var(), 100.0), "i64 var amostral")
+    check(approx(a:std(), 10.0), "i64 std amostral")
 
     -- reduções ignoram NA por padrão
     local k = S.from_table({10, smaug.NA, 30}, "int64")
@@ -442,7 +488,7 @@ end
 do
     local one = S.from_table({42}, "int64")
     check(one:sum() == 42 and one:min() == 42 and one:max() == 42, "i64 reduções 1-elemento")
-    check(approx(one:var(), 0.0), "i64 var de 1 elemento = 0")
+    check(one:var() == nil, "i64 var de 1 elemento = NA (amostral, n<2)")
 
     local allnull = S.from_table({smaug.NA, smaug.NA}, "int64")
     check(allnull:sum() == 0, "i64 sum toda-nula = 0")
