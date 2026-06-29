@@ -158,7 +158,7 @@ Decisão tomada: **expor**. Demonstrado rodando (view + COW idênticos a f64/i64
 - 3.4 teste Lua: bool view + COW
 - 3.5 COW.md: bool → ✅
 
-## 4. NA relacional unificado + Contrato 7  [Windows]  [Done — via Fedora]
+## 4. NA relacional unificado + Contrato 7  [Windows]  [Done]
 
 > **Concluído (2026-06-28), com ressalva de verificação.** Lua puro (nenhum C
 > tocado — política relacional é Anel 2). É **mudança de comportamento** + contrato
@@ -184,11 +184,11 @@ tomada: **erro orientado nas três**, alinhado ao groupby (que já está certo).
 *Padrão da mensagem:* `smaug: <op> — <chave/coluna> 'X' contém NA; trate com fillna
 ou dropna antes`. NA em qualquer coluna da chave composta dispara.
 
-## 5. Reduções + element-wise no DataSet  [Windows] [Fedora: 5.0]  [Done — via Fedora]
+## 5. Reduções + element-wise no DataSet  [Windows] [Fedora: 5.0]  [Done]
 
-> **Concluído (2026-06-28).** 5.0 valida no Fedora (Anel 0: Valgrind-clean,
-> cobertura 101→99 exclusões fechando no ramo n<2). 5.1–5.5 são Lua-puro sobre a
-> 5.0 → fecham por equivalência Fedora; follow-up `windows_build.ps1`. **Decisões:**
+> **Concluído (2026-06-29).** 5.0 valida no Fedora (Anel 0: Valgrind-clean,
+> cobertura 101→99 exclusões fechando no ramo n<2). 5.1–5.5 (Lua-puro) verdes no
+> Fedora **e no Windows** (`windows_build.ps1`, MSYS2-UCRT64). **Decisões:**
 > D1 = DataSet 1-linha; Opção A = std/var amostrais (ddof=1); D4 = (i) element-wise
 > numérico erra em coluna não-numérica, (A) astype por mapa.
 
