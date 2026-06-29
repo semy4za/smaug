@@ -316,4 +316,30 @@ do
 end
 
 
+-- ================================================================
+-- Item 6 — pares Series↔DataSet: dtype (6.1), sample/to_string/to_markdown (6.3)
+-- ================================================================
+do
+    -- 6.1 dtype singular (par de DataSet:dtypes)
+    check(S.from_table({1, 2}, "int64"):dtype() == "int64", "6.1 dtype int64")
+    check(S.from_table({1.0}, "float64"):dtype() == "float64", "6.1 dtype float64")
+    check(S.from_table({"a"}, "string"):dtype() == "string", "6.1 dtype string")
+
+    -- 6.3 sample: n elementos, sem reposição, determinístico com seed
+    local x = S.from_table({10, 20, 30, 40, 50}, "int64")
+    local sm = x:sample(3, 1)
+    check(sm:len() == 3, "6.3 sample: tamanho n")
+    check(x:sample(3, 1):to_table()[1] == sm:to_table()[1], "6.3 sample: determinístico com seed")
+    check(x:sample(99):len() == 5, "6.3 sample: n > len limita a len")
+
+    -- 6.3 to_string / to_markdown (1 coluna, NA legível)
+    local y = S.from_table({1, NA}, "int64")
+    local ts = y:to_string()
+    check(ts:find("NA") ~= nil, "6.3 to_string mostra NA")
+    local md = y:to_markdown()
+    check(md:find("|") ~= nil and md:find("%-%-") ~= nil, "6.3 to_markdown tem cabeçalho/separador")
+    check(select(2, md:gsub("\n", "\n")) == 3, "6.3 to_markdown: 4 linhas (header+sep+2 dados)")
+end
+
+
 print(string.format("OK — %d checks passaram (Series: acesso, edge cases, fillna)", n_ok))

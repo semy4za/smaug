@@ -5,6 +5,29 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-06-29 — Item 6: paridade Series↔DataSet + auditor classificado
+
+Levantamento a partir do output real do parity (terra firme): 83 assimetrias
+classificadas em 3 baldes — intencional (dimensionalidade 1-D vs 2-D), par de nome,
+gap real. Nada suposto; cada par/gap aterrado no fonte.
+
+- 6.1 `Series:dtype()` — string do dtype (par singular de `DataSet:dtypes`).
+- 6.2 `sort`/`sort_by`: mantidos os dois (Series ordena valores; DataSet ordena
+  linhas por coluna — assinaturas diferentes por natureza). Sem rename; pareados
+  no auditor.
+- 6.3 `Series:sample(n,[seed])`, `:to_string([opts])`, `:to_markdown()` — pares do
+  DataSet (sample espelha take; render em 1 coluna).
+- 6.4 **eixo 02 reescrito** de diff de presença para **paridade classificada**:
+  pares de nome (len↔nrows, dtype↔dtypes, sort↔sort_by) tratados no script; 74
+  assimetrias intencionais registradas em `exceptions.txt` (agrupadas por
+  categoria); **falha (os.exit) em gap real não-registrado** — vira guard como os
+  outros eixos. O `expected_pairs` morto virou lógica viva.
+  Resultado: 48 ambos · 6 pares · 74 intencionais · **0 gaps reais**.
+- 6.5 `DataSet:clone()` — cópia profunda (par de `Series:clone`); gap achado no
+  levantamento. Cada coluna clonada; nome/ordem preservados.
+- Tudo Lua-puro. Testes: Series acesso 25→34, DataSet core 207→212. Docs
+  (API_INDEX) atualizados. Parity 12/12. Aguarda Fedora + Windows para `[Done]`.
+
 ## 2026-06-28 — Item 5 completo: element-wise + transforms (5.2/5.3)
 
 ### 5.2 element-wise → DataSet mesma forma

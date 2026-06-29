@@ -68,6 +68,9 @@ return function(I)
     function methods.len(self) return tonumber(self._c.size) end
     methods.size = methods.len
 
+    -- 6.1: dtype singular (par de DataSet:dtypes). Retorna a string do dtype.
+    function methods.dtype(self) return self._dtype end
+
     function methods.clone(self)
         return wrap(self._d.clone(self._c), self._dtype, self._name)
     end

@@ -137,6 +137,7 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `:is_null(i)` / `:set_null(i)` | nulos |
 | `:append(v)` | adiciona ao fim (chainable) |
 | `:len()` / `:size()` | tamanho |
+| `:dtype()` | string do dtype (par singular de `DataSet:dtypes`) |
 | `:sum([ignore_na])` | soma; ignore_na=true por padrão |
 | `:mean([ignore_na])` | média |
 | `:min([ignore_na])` | mínimo |
@@ -152,6 +153,8 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `:astype(dtype)` | conversão tolerante por elemento (inconversíveis → null); exceto `bool` numérico, que é rígido (só 0/1, resto orienta para `:map`) |
 | `:fillna(value)` | nova Series com NULLs→value; NaN intacto |
 | `:to_table([na])` | → tabela Lua |
+| `:sample(n, [seed])` | amostra n elementos sem reposição (par de `DataSet:sample`) |
+| `:to_string([opts])` / `:to_markdown()` | render texto plano / Markdown (1 coluna) |
 | `:describe()` | resumo estatístico |
 | `:gt(k)` / `:lt(k)` | maior / menor que k → `Series<bool>` |
 | `:eq(k)` / `:ne(k)` | igual / diferente de k → `Series<bool>` |
@@ -448,9 +451,10 @@ com `nil` no meio (limitação do `#` do Lua).
 | `:has_column(nome)` / `:columns()` | metadados |
 | `:ncols()` / `:nrows()` / `:len()` | dimensões |
 | `:dtypes()` / `:row(i, [na])` | tipos por coluna / linha como tabela |
+| `:clone()` | cópia profunda (par de `Series:clone`); cada coluna clonada |
 | `:filter(mask)` | `Series<bool>` → novo DataSet; `df[mask]` é açúcar |
 | `:fillna(value)` / `:fillna({col=value})` | preenche NULLs → novo DataSet |
-| `:sort_by(col, asc)` | ordena todas as colunas pela chave |
+| `:sort_by(col, asc)` | ordena todas as colunas pela chave (par de `Series:sort`) |
 | `:head(n)` / `:tail(n)` / `:iloc(start, stop)` / `:take(idx)` | fatias |
 | `:sample(n, [seed])` | amostra aleatória |
 | `:select(nomes)` | subconjunto/reordenação de colunas |

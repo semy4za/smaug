@@ -215,3 +215,100 @@
 # Eixo 8 — Nomenclatura
 # ===================================================================
 # (vazio — preencher após primeira rodada)
+
+# ===================================================================
+# Eixo 2 — Paridade Series ↔ DataSet
+# Formato: 2:método  razão
+# Series é 1-D, DataSet é 2-D. Assimetrias estruturais são intencionais.
+# Pares de nome (len↔nrows, dtype↔dtypes, sort↔sort_by) são tratados no
+# script (não são não-paridade, são paridade sob outro nome).
+# Gap real NÃO listado aqui faz o eixo 2 FALHAR.
+# ===================================================================
+
+# --- Só-Series: acesso a elemento (1-D); DataSet usa at/iat/row/column ---
+2:get          acesso a elemento individual (1-D)
+2:set          escrita de elemento individual (1-D)
+2:set_null     marca elemento individual como NA (1-D)
+2:is_null      nulidade de elemento individual (1-D); DataSet usa isna (vetorizado)
+
+# --- Só-Series: lógica/comparação element-wise de uma coluna (1-D) ---
+2:all          redução booleana de uma coluna (1-D)
+2:any          redução booleana de uma coluna (1-D)
+2:count_true   contagem booleana de uma coluna (1-D)
+2:land         lógica Kleene element-wise (1-D)
+2:lor          lógica Kleene element-wise (1-D)
+2:lnot         lógica Kleene element-wise (1-D)
+2:lxor         lógica Kleene element-wise (1-D)
+2:eq           comparação element-wise → máscara (1-D)
+2:ne           comparação element-wise → máscara (1-D)
+2:gt           comparação element-wise → máscara (1-D)
+2:ge           comparação element-wise → máscara (1-D)
+2:lt           comparação element-wise → máscara (1-D)
+2:le           comparação element-wise → máscara (1-D)
+2:isin         pertencimento element-wise → máscara (1-D)
+2:between      faixa element-wise → máscara (1-D)
+2:where        seleção condicional element-wise (1-D)
+2:mask         mascaramento condicional element-wise (1-D)
+
+# --- Só-Series: análise 1-D (posição/ordem/forma de uma sequência) ---
+2:dot          produto escalar entre duas séries (1-D)
+2:searchsorted busca binária em série ordenada (1-D)
+2:autocorr     autocorrelação de uma sequência (1-D)
+2:argsort      permutação de ordenação (1-D)
+2:argmin       índice do mínimo (1-D)
+2:argmax       índice do máximo (1-D)
+2:first_valid_index   primeiro índice não-NA (1-D)
+2:last_valid_index    último índice não-NA (1-D)
+2:is_monotonic_increasing   monotonicidade de uma sequência (1-D)
+2:is_monotonic_decreasing   monotonicidade de uma sequência (1-D)
+2:is_unique    unicidade dos valores de uma coluna (1-D)
+2:expanding    janela expansível sobre uma sequência (1-D)
+2:rep_each     repetição element-wise (1-D)
+2:map          transformação valor-a-valor de uma coluna (1-D); DataSet usa assign
+2:view         buffer compartilhado de uma coluna (1-D); DataSet não tem buffer único
+2:append       concatenação de séries (1-D); DataSet usa concat
+
+# --- Só-Series: candidatos a versão 2-D por coluna — gap deferido (pós-1.0) ---
+2:idxmin       por-coluna no DataSet faz sentido — escopo futuro
+2:idxmax       por-coluna no DataSet faz sentido — escopo futuro
+2:rank         por-coluna no DataSet faz sentido — escopo futuro
+2:pct_rank     por-coluna no DataSet faz sentido — escopo futuro
+2:pct_change   por-coluna no DataSet faz sentido — escopo futuro
+2:mode         por-coluna no DataSet faz sentido — escopo futuro
+2:value_counts por-coluna no DataSet faz sentido — escopo futuro
+2:unique       por-coluna no DataSet faz sentido — escopo futuro
+2:nlargest     por-coluna no DataSet faz sentido — escopo futuro
+2:nsmallest    por-coluna no DataSet faz sentido — escopo futuro
+2:combine_first por-coluna no DataSet faz sentido — escopo futuro
+
+# --- Só-DataSet: gerência de coluna (2-D); Series não tem colunas ---
+2:add_column     gerência de coluna (2-D)
+2:drop_column    gerência de coluna (2-D)
+2:rename_column  gerência de coluna (2-D)
+2:update_column  gerência de coluna (2-D)
+2:rename         renomeio de colunas em lote (2-D)
+2:column         acesso a coluna por nome (2-D)
+2:columns        lista de nomes de coluna (2-D)
+2:has_column     existência de coluna (2-D)
+2:select         projeção de colunas (2-D)
+2:insert         inserção de coluna em posição (2-D)
+2:assign         coluna calculada (2-D)
+2:ncols          número de colunas (2-D); Series é uma coluna
+
+# --- Só-DataSet: operação relacional/tabular (2-D) ---
+2:groupby      agregação por chave (2-D)
+2:join         junção por chave (2-D)
+2:concat       concatenação de frames (2-D)
+2:pivot        pivoteamento (2-D)
+2:pivot_table  pivoteamento com agregação (2-D)
+2:melt         desempilhamento largo→longo (2-D)
+2:stack        empilhamento de colunas (2-D)
+2:unstack      desempilhamento (2-D)
+2:explode      explosão de coluna-lista (2-D)
+
+# --- Só-DataSet: acesso a célula/linha (2-D); Series usa get/take ---
+2:at           célula por (linha, nome) (2-D)
+2:iat          célula por (linha, índice de coluna) (2-D)
+2:iloc         linha por posição (2-D)
+2:row          linha como tabela (2-D)
+2:to_dict      export coluna→lista (2-D); Series usa to_table

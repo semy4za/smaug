@@ -11,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-06-29 12:10:16 UTC
+Gerado em: 2026-06-29 13:31:03 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -47,6 +47,7 @@ Cada linha = um método rastreado em `Series.methods` ou `CategoricalSeries`. Co
 | `dot` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟨 |
 | `drop_duplicates` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 | `dropna` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
+| `dtype` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟨 |
 | `duplicated` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 | `eq` | 🟨 | 🟨 | 🟩 | 🟨 | 🟨 | 🟩 |
 | `equals` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
@@ -97,6 +98,7 @@ Cada linha = um método rastreado em `Series.methods` ou `CategoricalSeries`. Co
 | `rep_each` | 🟨 | 🟨 | 🟩 | 🟨 | 🟨 | 🟨 |
 | `rolling` | 🟩 | 🟩 | ⬜ | ⬜ | ⬜ | ⬜ |
 | `round` | 🟩 | 🟩 | ⬜ | ⬜ | ⬜ | ⬜ |
+| `sample` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟨 |
 | `searchsorted` | 🟩 | 🟩 | 🟨 | 🟩 | 🟩 | 🟨 |
 | `sem` | 🟩 | 🟩 | ⬜ | ⬜ | ⬜ | ⬜ |
 | `set` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
@@ -109,6 +111,8 @@ Cada linha = um método rastreado em `Series.methods` ou `CategoricalSeries`. Co
 | `sum` | 🟩 | 🟩 | ⬜ | ⬜ | ⬜ | ⬜ |
 | `tail` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
 | `take` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
+| `to_markdown` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟨 |
+| `to_string` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟨 |
 | `to_table` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
 | `unique` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
 | `value_counts` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
@@ -116,143 +120,144 @@ Cada linha = um método rastreado em `Series.methods` ou `CategoricalSeries`. Co
 | `view` | 🟩 | 🟩 | 🟨 | ⬜ | 🟨 | 🟩 |
 | `where` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
 
-**Sumário Eixo 1:** 96 métodos × 6 dtypes = 576 células · 🟩 268 (46.5%) · ⬜ 141 (24.5%) · 🟨 167 (29.0%)
+**Sumário Eixo 1:** 100 métodos × 6 dtypes = 600 células · 🟩 276 (46.0%) · ⬜ 141 (23.5%) · 🟨 183 (30.5%)
 
-## Eixo 2 — Paridade Series ↔ DataSet
+## Eixo 2 — Paridade Series ↔ DataSet (classificada)
 
-Métodos que existem em cada lado. Algumas assimetrias são intencionais (ex: `Series:len` vs `DataSet:nrows/ncols`). Outras podem ser gaps reais.
+Cada assimetria é classificada: 🟩 ambos · 🟦 par de nome · ⬜ intencional (exceptions.txt) · 🟥 gap real. Series é 1-D, DataSet é 2-D.
 
-| método | Series | DataSet | nota |
+| método | Series | DataSet | classificação |
 | :--- | :-: | :-: | :-: |
-| `abs` | 🟩 | 🟩 |  |
-| `add_column` | — | 🟩 | só em DataSet |
-| `all` | 🟩 | — | só em Series |
-| `any` | 🟩 | — | só em Series |
-| `append` | 🟩 | — | só em Series |
-| `argmax` | 🟩 | — | só em Series |
-| `argmin` | 🟩 | — | só em Series |
-| `argsort` | 🟩 | — | só em Series |
-| `assign` | — | 🟩 | só em DataSet |
-| `astype` | 🟩 | 🟩 |  |
-| `at` | — | 🟩 | só em DataSet |
-| `autocorr` | 🟩 | — | só em Series |
-| `between` | 🟩 | — | só em Series |
-| `bfill` | 🟩 | 🟩 |  |
-| `clip` | 🟩 | 🟩 |  |
-| `clone` | 🟩 | — | só em Series |
-| `column` | — | 🟩 | só em DataSet |
-| `columns` | — | 🟩 | só em DataSet |
-| `combine_first` | 🟩 | — | só em Series |
-| `compare` | 🟩 | 🟩 |  |
-| `concat` | — | 🟩 | só em DataSet |
-| `corr` | 🟩 | 🟩 |  |
-| `count_nonnull` | 🟩 | 🟩 |  |
-| `count_true` | 🟩 | — | só em Series |
-| `cov` | 🟩 | 🟩 |  |
-| `cummax` | 🟩 | 🟩 |  |
-| `cummin` | 🟩 | 🟩 |  |
-| `cumprod` | 🟩 | 🟩 |  |
-| `cumsum` | 🟩 | 🟩 |  |
-| `describe` | 🟩 | 🟩 |  |
-| `diff` | 🟩 | 🟩 |  |
-| `dot` | 🟩 | — | só em Series |
-| `drop_column` | — | 🟩 | só em DataSet |
-| `drop_duplicates` | 🟩 | 🟩 |  |
-| `dropna` | 🟩 | 🟩 |  |
-| `dtypes` | — | 🟩 | só em DataSet |
-| `duplicated` | 🟩 | 🟩 |  |
-| `eq` | 🟩 | — | só em Series |
-| `equals` | 🟩 | 🟩 |  |
-| `expanding` | 🟩 | — | só em Series |
-| `explode` | — | 🟩 | só em DataSet |
-| `ffill` | 🟩 | 🟩 |  |
-| `fillna` | 🟩 | 🟩 |  |
-| `filter` | 🟩 | 🟩 |  |
-| `first_valid_index` | 🟩 | — | só em Series |
-| `ge` | 🟩 | — | só em Series |
-| `get` | 🟩 | — | só em Series |
-| `groupby` | — | 🟩 | só em DataSet |
-| `gt` | 🟩 | — | só em Series |
-| `has_column` | — | 🟩 | só em DataSet |
-| `head` | 🟩 | 🟩 |  |
-| `iat` | — | 🟩 | só em DataSet |
-| `idxmax` | 🟩 | — | só em Series |
-| `idxmin` | 🟩 | — | só em Series |
-| `iloc` | — | 🟩 | só em DataSet |
-| `insert` | — | 🟩 | só em DataSet |
-| `is_monotonic_decreasing` | 🟩 | — | só em Series |
-| `is_monotonic_increasing` | 🟩 | — | só em Series |
-| `is_null` | 🟩 | — | só em Series |
-| `is_unique` | 🟩 | — | só em Series |
-| `isin` | 🟩 | — | só em Series |
-| `isna` | 🟩 | 🟩 |  |
-| `join` | — | 🟩 | só em DataSet |
-| `kurtosis` | 🟩 | 🟩 |  |
-| `land` | 🟩 | — | só em Series |
-| `last_valid_index` | 🟩 | — | só em Series |
-| `le` | 🟩 | — | só em Series |
-| `len` | 🟩 | — | só em Series |
-| `lnot` | 🟩 | — | só em Series |
-| `lor` | 🟩 | — | só em Series |
-| `lt` | 🟩 | — | só em Series |
-| `lxor` | 🟩 | — | só em Series |
-| `mad` | 🟩 | 🟩 |  |
-| `map` | 🟩 | — | só em Series |
-| `mask` | 🟩 | — | só em Series |
-| `max` | 🟩 | 🟩 |  |
-| `mean` | 🟩 | 🟩 |  |
-| `median` | 🟩 | 🟩 |  |
-| `melt` | — | 🟩 | só em DataSet |
-| `min` | 🟩 | 🟩 |  |
-| `mode` | 🟩 | — | só em Series |
-| `ncols` | — | 🟩 | só em DataSet |
-| `ne` | 🟩 | — | só em Series |
-| `nlargest` | 🟩 | — | só em Series |
-| `notna` | 🟩 | 🟩 |  |
-| `nrows` | — | 🟩 | só em DataSet |
-| `nsmallest` | 🟩 | — | só em Series |
-| `nunique` | 🟩 | 🟩 |  |
-| `pct_change` | 🟩 | — | só em Series |
-| `pct_rank` | 🟩 | — | só em Series |
-| `pivot` | — | 🟩 | só em DataSet |
-| `pivot_table` | — | 🟩 | só em DataSet |
-| `prod` | 🟩 | 🟩 |  |
-| `quantile` | 🟩 | 🟩 |  |
-| `rank` | 🟩 | — | só em Series |
-| `rename` | — | 🟩 | só em DataSet |
-| `rename_column` | — | 🟩 | só em DataSet |
-| `rep_each` | 🟩 | — | só em Series |
-| `rolling` | 🟩 | 🟩 |  |
-| `round` | 🟩 | 🟩 |  |
-| `row` | — | 🟩 | só em DataSet |
-| `sample` | — | 🟩 | só em DataSet |
-| `searchsorted` | 🟩 | — | só em Series |
-| `select` | — | 🟩 | só em DataSet |
-| `sem` | 🟩 | 🟩 |  |
-| `set` | 🟩 | — | só em Series |
-| `set_null` | 🟩 | — | só em Series |
-| `shift` | 🟩 | 🟩 |  |
-| `skew` | 🟩 | 🟩 |  |
-| `sort` | 🟩 | — | só em Series |
-| `sort_by` | — | 🟩 | só em DataSet |
-| `stack` | — | 🟩 | só em DataSet |
-| `std` | 🟩 | 🟩 |  |
-| `sum` | 🟩 | 🟩 |  |
-| `tail` | 🟩 | 🟩 |  |
-| `take` | 🟩 | 🟩 |  |
-| `to_dict` | — | 🟩 | só em DataSet |
-| `to_markdown` | — | 🟩 | só em DataSet |
-| `to_string` | — | 🟩 | só em DataSet |
-| `to_table` | 🟩 | 🟩 |  |
-| `unique` | 🟩 | — | só em Series |
-| `unstack` | — | 🟩 | só em DataSet |
-| `update_column` | — | 🟩 | só em DataSet |
-| `value_counts` | 🟩 | — | só em Series |
-| `var` | 🟩 | 🟩 |  |
-| `view` | 🟩 | — | só em Series |
-| `where` | 🟩 | — | só em Series |
+| `abs` | 🟩 | 🟩 | 🟩  |
+| `add_column` | — | 🟩 | ⬜ gerência de coluna (2-D) |
+| `all` | 🟩 | — | ⬜ redução booleana de uma coluna (1-D) |
+| `any` | 🟩 | — | ⬜ redução booleana de uma coluna (1-D) |
+| `append` | 🟩 | — | ⬜ concatenação de séries (1-D); DataSet usa concat |
+| `argmax` | 🟩 | — | ⬜ índice do máximo (1-D) |
+| `argmin` | 🟩 | — | ⬜ índice do mínimo (1-D) |
+| `argsort` | 🟩 | — | ⬜ permutação de ordenação (1-D) |
+| `assign` | — | 🟩 | ⬜ coluna calculada (2-D) |
+| `astype` | 🟩 | 🟩 | 🟩  |
+| `at` | — | 🟩 | ⬜ célula por (linha, nome) (2-D) |
+| `autocorr` | 🟩 | — | ⬜ autocorrelação de uma sequência (1-D) |
+| `between` | 🟩 | — | ⬜ faixa element-wise → máscara (1-D) |
+| `bfill` | 🟩 | 🟩 | 🟩  |
+| `clip` | 🟩 | 🟩 | 🟩  |
+| `clone` | 🟩 | 🟩 | 🟩  |
+| `column` | — | 🟩 | ⬜ acesso a coluna por nome (2-D) |
+| `columns` | — | 🟩 | ⬜ lista de nomes de coluna (2-D) |
+| `combine_first` | 🟩 | — | ⬜ por-coluna no DataSet faz sentido — escopo futuro |
+| `compare` | 🟩 | 🟩 | 🟩  |
+| `concat` | — | 🟩 | ⬜ concatenação de frames (2-D) |
+| `corr` | 🟩 | 🟩 | 🟩  |
+| `count_nonnull` | 🟩 | 🟩 | 🟩  |
+| `count_true` | 🟩 | — | ⬜ contagem booleana de uma coluna (1-D) |
+| `cov` | 🟩 | 🟩 | 🟩  |
+| `cummax` | 🟩 | 🟩 | 🟩  |
+| `cummin` | 🟩 | 🟩 | 🟩  |
+| `cumprod` | 🟩 | 🟩 | 🟩  |
+| `cumsum` | 🟩 | 🟩 | 🟩  |
+| `describe` | 🟩 | 🟩 | 🟩  |
+| `diff` | 🟩 | 🟩 | 🟩  |
+| `dot` | 🟩 | — | ⬜ produto escalar entre duas séries (1-D) |
+| `drop_column` | — | 🟩 | ⬜ gerência de coluna (2-D) |
+| `drop_duplicates` | 🟩 | 🟩 | 🟩  |
+| `dropna` | 🟩 | 🟩 | 🟩  |
+| `dtype` | 🟩 | — | 🟦 par de `dtypes` |
+| `dtypes` | — | 🟩 | 🟦 par de `dtype` |
+| `duplicated` | 🟩 | 🟩 | 🟩  |
+| `eq` | 🟩 | — | ⬜ comparação element-wise → máscara (1-D) |
+| `equals` | 🟩 | 🟩 | 🟩  |
+| `expanding` | 🟩 | — | ⬜ janela expansível sobre uma sequência (1-D) |
+| `explode` | — | 🟩 | ⬜ explosão de coluna-lista (2-D) |
+| `ffill` | 🟩 | 🟩 | 🟩  |
+| `fillna` | 🟩 | 🟩 | 🟩  |
+| `filter` | 🟩 | 🟩 | 🟩  |
+| `first_valid_index` | 🟩 | — | ⬜ primeiro índice não-NA (1-D) |
+| `ge` | 🟩 | — | ⬜ comparação element-wise → máscara (1-D) |
+| `get` | 🟩 | — | ⬜ acesso a elemento individual (1-D) |
+| `groupby` | — | 🟩 | ⬜ agregação por chave (2-D) |
+| `gt` | 🟩 | — | ⬜ comparação element-wise → máscara (1-D) |
+| `has_column` | — | 🟩 | ⬜ existência de coluna (2-D) |
+| `head` | 🟩 | 🟩 | 🟩  |
+| `iat` | — | 🟩 | ⬜ célula por (linha, índice de coluna) (2-D) |
+| `idxmax` | 🟩 | — | ⬜ por-coluna no DataSet faz sentido — escopo futuro |
+| `idxmin` | 🟩 | — | ⬜ por-coluna no DataSet faz sentido — escopo futuro |
+| `iloc` | — | 🟩 | ⬜ linha por posição (2-D) |
+| `insert` | — | 🟩 | ⬜ inserção de coluna em posição (2-D) |
+| `is_monotonic_decreasing` | 🟩 | — | ⬜ monotonicidade de uma sequência (1-D) |
+| `is_monotonic_increasing` | 🟩 | — | ⬜ monotonicidade de uma sequência (1-D) |
+| `is_null` | 🟩 | — | ⬜ nulidade de elemento individual (1-D); DataSet usa isna (vetorizado) |
+| `is_unique` | 🟩 | — | ⬜ unicidade dos valores de uma coluna (1-D) |
+| `isin` | 🟩 | — | ⬜ pertencimento element-wise → máscara (1-D) |
+| `isna` | 🟩 | 🟩 | 🟩  |
+| `join` | — | 🟩 | ⬜ junção por chave (2-D) |
+| `kurtosis` | 🟩 | 🟩 | 🟩  |
+| `land` | 🟩 | — | ⬜ lógica Kleene element-wise (1-D) |
+| `last_valid_index` | 🟩 | — | ⬜ último índice não-NA (1-D) |
+| `le` | 🟩 | — | ⬜ comparação element-wise → máscara (1-D) |
+| `len` | 🟩 | — | 🟦 par de `nrows` |
+| `lnot` | 🟩 | — | ⬜ lógica Kleene element-wise (1-D) |
+| `lor` | 🟩 | — | ⬜ lógica Kleene element-wise (1-D) |
+| `lt` | 🟩 | — | ⬜ comparação element-wise → máscara (1-D) |
+| `lxor` | 🟩 | — | ⬜ lógica Kleene element-wise (1-D) |
+| `mad` | 🟩 | 🟩 | 🟩  |
+| `map` | 🟩 | — | ⬜ transformação valor-a-valor de uma coluna (1-D); DataSet usa assign |
+| `mask` | 🟩 | — | ⬜ mascaramento condicional element-wise (1-D) |
+| `max` | 🟩 | 🟩 | 🟩  |
+| `mean` | 🟩 | 🟩 | 🟩  |
+| `median` | 🟩 | 🟩 | 🟩  |
+| `melt` | — | 🟩 | ⬜ desempilhamento largo→longo (2-D) |
+| `min` | 🟩 | 🟩 | 🟩  |
+| `mode` | 🟩 | — | ⬜ por-coluna no DataSet faz sentido — escopo futuro |
+| `ncols` | — | 🟩 | ⬜ número de colunas (2-D); Series é uma coluna |
+| `ne` | 🟩 | — | ⬜ comparação element-wise → máscara (1-D) |
+| `nlargest` | 🟩 | — | ⬜ por-coluna no DataSet faz sentido — escopo futuro |
+| `notna` | 🟩 | 🟩 | 🟩  |
+| `nrows` | — | 🟩 | 🟦 par de `len` |
+| `nsmallest` | 🟩 | — | ⬜ por-coluna no DataSet faz sentido — escopo futuro |
+| `nunique` | 🟩 | 🟩 | 🟩  |
+| `pct_change` | 🟩 | — | ⬜ por-coluna no DataSet faz sentido — escopo futuro |
+| `pct_rank` | 🟩 | — | ⬜ por-coluna no DataSet faz sentido — escopo futuro |
+| `pivot` | — | 🟩 | ⬜ pivoteamento (2-D) |
+| `pivot_table` | — | 🟩 | ⬜ pivoteamento com agregação (2-D) |
+| `prod` | 🟩 | 🟩 | 🟩  |
+| `quantile` | 🟩 | 🟩 | 🟩  |
+| `rank` | 🟩 | — | ⬜ por-coluna no DataSet faz sentido — escopo futuro |
+| `rename` | — | 🟩 | ⬜ renomeio de colunas em lote (2-D) |
+| `rename_column` | — | 🟩 | ⬜ gerência de coluna (2-D) |
+| `rep_each` | 🟩 | — | ⬜ repetição element-wise (1-D) |
+| `rolling` | 🟩 | 🟩 | 🟩  |
+| `round` | 🟩 | 🟩 | 🟩  |
+| `row` | — | 🟩 | ⬜ linha como tabela (2-D) |
+| `sample` | 🟩 | 🟩 | 🟩  |
+| `searchsorted` | 🟩 | — | ⬜ busca binária em série ordenada (1-D) |
+| `select` | — | 🟩 | ⬜ projeção de colunas (2-D) |
+| `sem` | 🟩 | 🟩 | 🟩  |
+| `set` | 🟩 | — | ⬜ escrita de elemento individual (1-D) |
+| `set_null` | 🟩 | — | ⬜ marca elemento individual como NA (1-D) |
+| `shift` | 🟩 | 🟩 | 🟩  |
+| `skew` | 🟩 | 🟩 | 🟩  |
+| `sort` | 🟩 | — | 🟦 par de `sort_by` |
+| `sort_by` | — | 🟩 | 🟦 par de `sort` |
+| `stack` | — | 🟩 | ⬜ empilhamento de colunas (2-D) |
+| `std` | 🟩 | 🟩 | 🟩  |
+| `sum` | 🟩 | 🟩 | 🟩  |
+| `tail` | 🟩 | 🟩 | 🟩  |
+| `take` | 🟩 | 🟩 | 🟩  |
+| `to_dict` | — | 🟩 | ⬜ export coluna→lista (2-D); Series usa to_table |
+| `to_markdown` | 🟩 | 🟩 | 🟩  |
+| `to_string` | 🟩 | 🟩 | 🟩  |
+| `to_table` | 🟩 | 🟩 | 🟩  |
+| `unique` | 🟩 | — | ⬜ por-coluna no DataSet faz sentido — escopo futuro |
+| `unstack` | — | 🟩 | ⬜ desempilhamento (2-D) |
+| `update_column` | — | 🟩 | ⬜ gerência de coluna (2-D) |
+| `value_counts` | 🟩 | — | ⬜ por-coluna no DataSet faz sentido — escopo futuro |
+| `var` | 🟩 | 🟩 | 🟩  |
+| `view` | 🟩 | — | ⬜ buffer compartilhado de uma coluna (1-D); DataSet não tem buffer único |
+| `where` | 🟩 | — | ⬜ seleção condicional element-wise (1-D) |
 
-**Sumário Eixo 2:** 44 métodos em ambos · 51 só em Series · 32 só em DataSet
+**Sumário Eixo 2:** 48 em ambos · 6 pares de nome · 74 intencionais · 0 gaps reais
 
 ## Eixo 3 — Espelhamento C ↔ Lua
 
@@ -686,7 +691,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | arquivo | checks | float64 | int64 | bool | string | datetime | categorical |
 | :--- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
 | `series/test_constructors` | 330 | 36 | 55 | 19 | 11 | — | 1 |
-| `series/test_access` | 92 | 13 | 4 | — | 2 | — | — |
+| `series/test_access` | 101 | 15 | 8 | — | 4 | — | — |
 | `series/test_reduce` | 44 | 7 | 2 | — | — | — | — |
 | `series/test_stat` | 70 | 6 | 12 | — | 9 | — | — |
 | `series/test_window` | 64 | 5 | 6 | — | 1 | — | — |
@@ -695,7 +700,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `series/test_str` | 274 | 4 | 9 | 1 | 51 | — | — |
 | `series/test_dt` | 272 | 3 | 6 | 2 | 12 | 62 | — |
 | `series/test_categorical` | 295 | 7 | 7 | 8 | 5 | 13 | 57 |
-| `dataset/test_core` | 208 | 26 | 27 | 8 | 11 | — | — |
+| `dataset/test_core` | 213 | 26 | 28 | 8 | 12 | — | — |
 | `dataset/test_relational` | 172 | 10 | 50 | 4 | 34 | — | — |
 | `dataset/test_stat` | 91 | 10 | 16 | 1 | 13 | — | — |
 | `dataset/test_io_support` | 44 | 2 | 13 | 1 | 6 | — | — |
@@ -704,16 +709,16 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 67 | 18 | 2 | — | — | — | — |
 
-**Total de checks:** 2370
+**Total de checks:** 2384
 
 ### Menções totais por dtype (toda a suite)
 
 | dtype | menções |
 | :--- | :-: |
-| float64 | 169 |
-| int64 | 288 |
+| float64 | 171 |
+| int64 | 293 |
 | bool | 50 |
-| string | 185 |
+| string | 188 |
 | datetime | 75 |
 | categorical | 58 |
 
@@ -724,8 +729,8 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 | categoria | total | documentados | faltam | % | detalhe |
 | :--- | :-: | :-: | :-: | :-: | :-: |
-| `Series.methods` | 95 | 95 | 0 | 100% | 🟩 completo |
-| `DataSet.methods` | 76 | 76 | 0 | 100% | 🟩 completo |
+| `Series.methods` | 99 | 99 | 0 | 100% | 🟩 completo |
+| `DataSet.methods` | 77 | 77 | 0 | 100% | 🟩 completo |
 | `GroupBy:*` | 15 | 15 | 0 | 100% | 🟩 completo |
 | `CategoricalSeries:*` | 42 | 42 | 0 | 100% | 🟩 completo |
 | `CatProxy:*` (.cat) | 6 | 6 | 0 | 100% | 🟩 completo |
@@ -739,10 +744,10 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 890
-- ⬜ exceção registrada: 146
-- 🟨 suspeita (revisar): 242
-- 🟥 inconsistência clara: 11
+- 🟩 paridade: 952
+- ⬜ exceção registrada: 221
+- 🟨 suspeita (revisar): 258
+- 🟥 inconsistência clara: 12
 
 
 ## Como usar este relatório

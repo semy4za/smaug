@@ -132,6 +132,16 @@ return function(I)
         return t
     end
 
+    -- 6.5: clone profundo (par de Series:clone). Cada coluna é clonada;
+    -- preserva nome e ordem. DataSet vazio → novo DataSet vazio de mesmo nome.
+    function methods.clone(self)
+        local copy = DataSet.new(self._name)
+        for _, name in ipairs(self._col_names) do
+            copy:add_column(name, self._columns[name]:clone())
+        end
+        return copy
+    end
+
     function methods.row(self, i, na_value)
         if type(i) ~= "number" or i < 1 or i > self:nrows() then
             error("smaug: linha "..tostring(i).." fora dos limites [1, "..self:nrows().."]", 2)

@@ -1,6 +1,8 @@
 -- scripts/parity/02_series_dataset.lua
--- Eixo 2: paridade entre Series e DataSet.
--- Métodos que aparecem em ambos devem ter semântica e assinatura comparáveis.
+-- Eixo 2: paridade Series ↔ DataSet, CLASSIFICADA.
+-- Cada método: (1) em ambos, (2) par de nome conhecido, (3) assimetria
+-- intencional registrada em exceptions.txt, ou (4) GAP REAL não-registrado → falha.
+-- Series é 1-D, DataSet é 2-D: a maioria das assimetrias é estrutural e intencional.
 
 local C = dofile("scripts/parity/common.lua")
 
@@ -10,61 +12,68 @@ local dataset = C.read_dataset_lua()
 local series_set  = C.set(C.extract_lua_methods(series,  "function methods%.([%w_]+)"))
 local dataset_set = C.set(C.extract_lua_methods(dataset, "function methods%.([%w_]+)"))
 
--- Universo: métodos esperados em ambos (lista intencional)
--- Estes são os métodos que conceitualmente fazem sentido nos dois lados.
-local expected_pairs = {
-    -- introspecção
-    "len", "ncols", "nrows", "describe", "to_table", "head", "tail",
-    "iloc", "take", "sample", "clone",
-    -- manipulação
-    "filter", "sort", "dropna", "fillna", "select",
-    -- info
-    "has_column", "columns", "dtypes",
+-- Pares de nome: mesmo conceito, nome diferente pela dimensionalidade.
+-- Paridade sob outro nome — não é não-paridade.
+local pairs_map = {
+    len = "nrows", nrows = "len",
+    dtype = "dtypes", dtypes = "dtype",
+    sort = "sort_by", sort_by = "sort",
 }
 
--- Renome conhecidos (Series → DataSet)
--- ex: Series:len() ↔ DataSet:nrows() (ambos são "tamanho")
--- Não trato como mismatch — anoto.
-
-local in_both, only_series, only_dataset = {}, {}, {}
+local exc = C.load_exceptions()["2"] or {}
 
 local all = {}
-for k in pairs(series_set) do all[k] = true end
+for k in pairs(series_set)  do all[k] = true end
 for k in pairs(dataset_set) do all[k] = true end
 local sorted = {}
 for k in pairs(all) do sorted[#sorted+1] = k end
 table.sort(sorted)
 
 local rows = {}
+local gaps = {}
+local n_both, n_pair, n_exc = 0, 0, 0
+
 for _, m in ipairs(sorted) do
-    local s = series_set[m]  and "🟩" or "—"
-    local d = dataset_set[m] and "🟩" or "—"
-    local note = ""
-    if series_set[m] and not dataset_set[m] then
-        note = "só em Series"
-    elseif dataset_set[m] and not series_set[m] then
-        note = "só em DataSet"
+    local in_s, in_d = series_set[m], dataset_set[m]
+    local s_mark = in_s and "🟩" or "—"
+    local d_mark = in_d and "🟩" or "—"
+    local cls, note
+    if in_s and in_d then
+        cls, note = "🟩", ""
+        n_both = n_both + 1
+    else
+        local partner = pairs_map[m]
+        local paired = partner and ((in_s and dataset_set[partner]) or (in_d and series_set[partner]))
+        if paired then
+            cls, note = "🟦", "par de `"..partner.."`"
+            n_pair = n_pair + 1
+        elseif exc[m] then
+            cls, note = "⬜", exc[m]
+            n_exc = n_exc + 1
+        else
+            cls, note = "🟥", "GAP REAL não-registrado"
+            gaps[#gaps+1] = m .. (in_s and " (só Series)" or " (só DataSet)")
+        end
     end
-    rows[#rows+1] = { "`"..m.."`", s, d, note }
+    rows[#rows+1] = { "`"..m.."`", s_mark, d_mark, cls.." "..note }
 end
 
-local header = { "método", "Series", "DataSet", "nota" }
-local section = C.section(2, "Paridade Series ↔ DataSet",
-    "Métodos que existem em cada lado. Algumas assimetrias são intencionais "
-    .. "(ex: `Series:len` vs `DataSet:nrows/ncols`). Outras podem ser gaps reais.")
+local header = { "método", "Series", "DataSet", "classificação" }
+local section = C.section(2, "Paridade Series ↔ DataSet (classificada)",
+    "Cada assimetria é classificada: 🟩 ambos · 🟦 par de nome · ⬜ intencional "
+    .. "(exceptions.txt) · 🟥 gap real. Series é 1-D, DataSet é 2-D.")
 
 local out = { section, C.render_table(header, rows), "" }
-
--- Sumário e listagem de assimetrias
-local s_only, d_only, both = {}, {}, {}
-for _, m in ipairs(sorted) do
-    if series_set[m] and dataset_set[m] then both[#both+1] = m
-    elseif series_set[m] then s_only[#s_only+1] = m
-    else d_only[#d_only+1] = m end
-end
-
-out[#out+1] = string.format("**Sumário Eixo 2:** %d métodos em ambos · %d só em Series · %d só em DataSet",
-    #both, #s_only, #d_only)
+out[#out+1] = string.format(
+    "**Sumário Eixo 2:** %d em ambos · %d pares de nome · %d intencionais · %d gaps reais",
+    n_both, n_pair, n_exc, #gaps)
 out[#out+1] = ""
 
 io.write(table.concat(out, "\n"))
+
+if #gaps > 0 then
+    io.stderr:write("Eixo 2 — GAPS REAIS nao-registrados:\n")
+    for _, g in ipairs(gaps) do io.stderr:write("  - "..g.."\n") end
+    io.stderr:write("Registre em exceptions.txt (intencional) ou Roadmap (gap real).\n")
+    os.exit(1)
+end

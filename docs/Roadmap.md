@@ -212,15 +212,24 @@ reimplementava reduções por não ter a quem delegar. Maior bloco de paridade.
 - 5.5 ✅ `min_count` opt-in em sum/prod (Series e DataSet). Default preserva o
   atual (soma de vazio = 0); `min_count=N` exige N não-nulos, senão NA.
 
-## 6. Paridade Series↔DataSet e auditor  [Windows]
+## 6. Paridade Series↔DataSet e auditor  [Windows]  [Done]
 
-Fecha as assimetrias restantes e ensina o parity a pegar a classe que escapou
-(pares singular↔plural — o caso `dtype`/`dtypes` que abriu a auditoria).
+Fecha as assimetrias restantes e transforma o eixo 02 do parity de **diff de
+presença** em **paridade classificada**: cada assimetria é (1) intencional
+(dimensionalidade — Series 1-D, DataSet 2-D), (2) par de nome conhecido, ou (3)
+gap real. Decisões da sessão de levantamento (2026-06-29), a partir do output real
+do parity (83 assimetrias: 51 só-Series, 32 só-DataSet, 44 em ambos):
 
-- 6.1 `Series:dtype()` (DataSet tem `dtypes`, Series não tinha o singular)
-- 6.2 reconciliar `sort` (Series) vs `sort_by` (DataSet) — definir nome canônico
-- 6.3 avaliar sample/to_markdown/to_string na Series (decidir quais fazem sentido)
-- 6.4 ensinar o parity a parear singular↔plural (`dtype`↔`dtypes`, `len`↔`nrows`)
+- 6.1 ✅ `Series:dtype()` — singular que faltava. **D6.1.**
+- 6.2 ✅ `sort`/`sort_by`: mantidos os dois; pareados no auditor (sem rename). **D6.2.**
+- 6.3 ✅ `Series:sample/to_markdown/to_string` adicionados. **D6.3.**
+- 6.4 ✅ eixo 02 reescrito: pares de nome + 74 intencionais em `exceptions.txt` +
+  **falha em gap real** (os.exit). 48 ambos · 6 pares · 74 intencionais · 0 gaps. **D6.4.**
+- 6.5 ✅ `DataSet:clone()` (cópia profunda). **D6.5.**
+
+> **Concluído (2026-06-29), Lua-puro.** Windows verde (`windows_build.ps1`,
+> Series acesso 34, DataSet core 212); equivalência Fedora de praxe para Lua-puro.
+> Build verde, parity 12/12.
 
 ## 7. Completude do motor (Ring 0)  [Fedora]
 

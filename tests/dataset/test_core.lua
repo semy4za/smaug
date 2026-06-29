@@ -693,4 +693,21 @@ check(expl:nrows() == 3,           "explode escalar: nrows=3")
 check(expl:col("val"):get(1) == 1.0, "explode escalar: val[1]=1.0")
 
 
+-- ================================================================
+-- 6.5 — DataSet:clone() (par de Series:clone; cópia profunda)
+-- ================================================================
+do
+    local df = smaug.DataSet({{"a", {1, 2}, "int64"}, {"b", {"x", "y"}, "string"}})
+    local cp = df:clone()
+    check(#cp:to_dict().a == 2 and cp:column("a"):get(1) == 1, "6.5 clone: valores copiados")
+    check(table.concat(cp._col_names, ",") == "a,b", "6.5 clone: nomes e ordem preservados")
+    -- cópia PROFUNDA: mutar o clone não afeta o original
+    cp:column("a"):set(1, 99)
+    check(df:column("a"):get(1) == 1, "6.5 clone: profundo (original intacto)")
+    check(cp:column("a"):get(1) == 99, "6.5 clone: mutação isolada no clone")
+    -- DataSet vazio
+    check(smaug.DataSet.new("vazio"):clone():ncols() == 0, "6.5 clone: DataSet vazio")
+end
+
+
 print(string.format("OK — %d checks passaram (DataSet: core, ops, rename, pivot_table, stack, unstack, explode)", n_ok))

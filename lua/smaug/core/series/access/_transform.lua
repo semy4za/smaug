@@ -125,6 +125,70 @@ return function(I)
     end
 
     -- =====================================================================
+    -- 6.3 — pares do DataSet: sample / to_string / to_markdown
+    -- =====================================================================
+
+    -- sample(n, [seed]): amostra n elementos sem reposição (Fisher-Yates parcial).
+    -- Espelha DataSet:sample (take de índices), com len no lugar de nrows.
+    function methods.sample(self, n, seed)
+        local total = self:len()
+        n = math.min(n or 1, total)
+        if seed ~= nil then math.randomseed(seed) end
+        local perm = {}
+        for i = 1, total do perm[i] = i end
+        for i = 1, n do
+            local j = math.random(i, total)
+            perm[i], perm[j] = perm[j], perm[i]
+        end
+        local idx = {}
+        for i = 1, n do idx[i] = perm[i] end
+        return self:take(idx)
+    end
+
+    local function cell_str(v) return v == nil and "NA" or tostring(v) end
+
+    -- to_string([opts]): texto plano, índice + valor. opts.max_rows limita.
+    -- Espelha DataSet:to_string (que mostra índice de linha), em 1 coluna.
+    function methods.to_string(self, opts)
+        opts = opts or {}
+        local n     = self:len()
+        local name  = self._name or "value"
+        local limit = opts.max_rows and math.min(n, opts.max_rows) or n
+        local w     = #name
+        local cells = {}
+        for i = 1, limit do
+            local s = cell_str(self:get(i)); cells[i] = s
+            if #s > w then w = #s end
+        end
+        local idxw = math.max(#tostring(limit > 0 and limit or 1), 1)
+        local function pad(s, ww) return s .. string.rep(" ", ww - #s) end
+        local out = { pad("", idxw) .. "  " .. name }
+        for i = 1, limit do
+            out[#out + 1] = pad(tostring(i), idxw) .. "  " .. pad(cells[i], w)
+        end
+        if n > limit then out[#out + 1] = "... ("..(n - limit).." linhas a mais)" end
+        return table.concat(out, "\n")
+    end
+
+    -- to_markdown(): tabela Markdown de 1 coluna (sem índice, como DataSet:to_markdown).
+    function methods.to_markdown(self)
+        local n    = self:len()
+        local name = self._name or "value"
+        local w    = #name
+        local cells = {}
+        for i = 1, n do
+            local s = cell_str(self:get(i)); cells[i] = s
+            if #s > w then w = #s end
+        end
+        local function pad(s, ww) return s .. string.rep(" ", ww - #s) end
+        local out = {}
+        out[#out + 1] = "| " .. pad(name, w) .. " |"
+        out[#out + 1] = "| " .. string.rep("-", w) .. " |"
+        for i = 1, n do out[#out + 1] = "| " .. pad(cells[i], w) .. " |" end
+        return table.concat(out, "\n")
+    end
+
+    -- =====================================================================
     -- astype
     -- =====================================================================
 
