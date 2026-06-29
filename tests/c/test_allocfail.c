@@ -754,6 +754,58 @@ static void af_str_take(void) {
     }
     smaug_str_free(s);
 }
+static void af_str_ffill(void) {
+    /* série com NA no meio e nas bordas, exercita append/append_null
+       e (no bfill) o malloc(src). */
+    reset(-1);
+    smaug_series_str_t *s = smaug_str_create(5);
+    assert(s);
+    smaug_str_set(s, 0, "a", 1);
+    smaug_str_set(s, 2, "ccc", 3);
+    /* idx 1, 3, 4 ficam null */
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_str_t *r = smaug_str_ffill(s);
+        if (r) { OK(r->size == 5, "str ffill size"); smaug_str_free(r); }
+    }
+    smaug_str_free(s);
+}
+static void af_str_bfill(void) {
+    reset(-1);
+    smaug_series_str_t *s = smaug_str_create(5);
+    assert(s);
+    smaug_str_set(s, 1, "bb", 2);
+    smaug_str_set(s, 3, "dddd", 4);
+    /* idx 0, 2, 4 null → exercita o malloc(src) e append/append_null */
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_str_t *r = smaug_str_bfill(s);
+        if (r) { OK(r->size == 5, "str bfill size"); smaug_str_free(r); }
+    }
+    smaug_str_free(s);
+}
+static void af_str_shift(void) {
+    reset(-1);
+    smaug_series_str_t *s = smaug_str_create(5);
+    assert(s);
+    smaug_str_set(s, 0, "a", 1);
+    smaug_str_set(s, 2, "ccc", 3);
+    smaug_str_set(s, 4, "ee", 2);
+    /* idx 1,3 null; shift(2) move e cria nulls nas bordas, exercitando
+       create_with_capacity + append/append_null. */
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_str_t *r = smaug_str_shift(s, 2);
+        if (r) { OK(r->size == 5, "str shift size"); smaug_str_free(r); }
+    }
+    /* negativo também */
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_str_t *r = smaug_str_shift(s, -2);
+        if (r) { OK(r->size == 5, "str shift(-) size"); smaug_str_free(r); }
+    }
+    smaug_str_free(s);
+}
 static void af_str_argsort(void) {
     const char *arr[] = {"MG", "AC", "SP"};
     reset(-1);
@@ -1212,6 +1264,45 @@ static void af_bool_filter(void) {
         reset(k);
         smaug_series_bool_t *f = smaug_bool_filter(s, mask);
         if (f) { OK(f->size == 3, "bool filter size"); smaug_bool_free(f); }
+    }
+    smaug_bool_free(s);
+}
+static void af_bool_shift(void) {
+    reset(-1);
+    smaug_series_bool_t *s = smaug_bool_create(4);
+    assert(s);
+    smaug_bool_set(s, 0, 1); smaug_bool_set(s, 1, 0); smaug_bool_set(s, 2, 1);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_bool_t *r = smaug_bool_shift(s, -1);
+        if (r) { OK(r->size == 4, "bool shift size"); smaug_bool_free(r); }
+    }
+    smaug_bool_free(s);
+}
+static void af_bool_ffill(void) {
+    reset(-1);
+    smaug_series_bool_t *s = smaug_bool_create(5);
+    assert(s);
+    smaug_bool_set(s, 0, 1);
+    smaug_bool_set(s, 3, 0);
+    /* idx 1,2,4 null */
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_bool_t *r = smaug_bool_ffill(s);
+        if (r) { OK(r->size == 5, "bool ffill size"); smaug_bool_free(r); }
+    }
+    smaug_bool_free(s);
+}
+static void af_bool_bfill(void) {
+    reset(-1);
+    smaug_series_bool_t *s = smaug_bool_create(5);
+    assert(s);
+    smaug_bool_set(s, 1, 1);
+    smaug_bool_set(s, 4, 0);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_bool_t *r = smaug_bool_bfill(s);
+        if (r) { OK(r->size == 5, "bool bfill size"); smaug_bool_free(r); }
     }
     smaug_bool_free(s);
 }
@@ -1979,6 +2070,33 @@ static void af_dt_filter(void) {
     }
     smaug_dt_free(base);
 }
+static void af_dt_ffill(void) {
+    smaug_series_dt_t *base = mk_dt_gapped(); assert(base);  /* NAs em 1 e 3 */
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_dt_t *r = smaug_dt_ffill(base);
+        if (r) { OK(r->size == 6, "dt ffill size"); smaug_dt_free(r); }
+    }
+    smaug_dt_free(base);
+}
+static void af_dt_bfill(void) {
+    smaug_series_dt_t *base = mk_dt_gapped(); assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_dt_t *r = smaug_dt_bfill(base);
+        if (r) { OK(r->size == 6, "dt bfill size"); smaug_dt_free(r); }
+    }
+    smaug_dt_free(base);
+}
+static void af_dt_shift(void) {
+    smaug_series_dt_t *base = mk_dt_gapped(); assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_dt_t *r = smaug_dt_shift(base, -2);
+        if (r) { OK(r->size == 6, "dt shift size"); smaug_dt_free(r); }
+    }
+    smaug_dt_free(base);
+}
 
 /* dt setters sob OOM: dt_set/set_null/append fazem dt_cow_detach (e append
  * faz dt_grow) — esses caminhos de NOMEM (L244/253/266/278/280) só são
@@ -2130,6 +2248,9 @@ int main(void) {
     af_str_ne();
     af_str_filter();
     af_str_take();
+    af_str_ffill();
+    af_str_bfill();
+    af_str_shift();
     af_str_argsort();
     af_str_sort();
 
@@ -2155,6 +2276,9 @@ int main(void) {
     af_bool_append_grow();
     af_bool_take();
     af_bool_filter();
+    af_bool_ffill();
+    af_bool_bfill();
+    af_bool_shift();
     af_bool_argsort();
     af_bool_sort();
     af_bool_series_and();
@@ -2195,6 +2319,7 @@ int main(void) {
     /* Frente B fase 2 — datetime (lifecycle + argsort/sort/take/filter) */
     af_dt_create(); af_dt_create_from_array(); af_dt_clone(); af_dt_view();
     af_dt_append_grow(); af_dt_argsort(); af_dt_sort(); af_dt_take(); af_dt_filter();
+    af_dt_ffill(); af_dt_bfill(); af_dt_shift();
     af_dt_setters();
     af_dt_compare();
 

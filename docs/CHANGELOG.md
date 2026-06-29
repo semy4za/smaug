@@ -5,6 +5,66 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-06-29 — Item 7.1b: shift com sinal no Ring 0 (todos os dtypes)
+
+Fecha o 7.1. Move o shift inteiro pro C — incluindo o sentido negativo, que
+até aqui era tratado por fallback Lua e (achado) NÃO tinha cobertura em lugar
+nenhum.
+
+- **Mudança de ABI** (a parte sensível, por isso isolada do 7.1a): assinatura de
+  `smaug_f64_shift`/`smaug_i64_shift` passou de `size_t periods` para
+  `int64_t periods`. Os testes C antigos só exercitavam positivos (1, 0, ≥size),
+  então sobreviveram sem alteração. Header + cdef FFI atualizados.
+- Fórmula unificada para os dois sentidos: para cada posição i de saída, a fonte
+  é `src = (int64_t)i - periods`; fora de `[0, size)` → NA. periods>0 desloca p/
+  baixo, <0 p/ cima — mesma semântica que o fallback Lua tinha (preservada).
+- Short-circuit `|periods| >= size → toda NA`: além de atalho do caso comum, evita
+  overflow em `(int64_t)i - periods` quando `periods` está perto de `INT64_MIN`.
+- shift novo em bool/dt (buffer plano, idêntico a f64) e str (offset-based,
+  reconstruído por append — mesmo padrão de ffill/bfill, não view). Descritores
+  bool/str/dt ligam `shift`.
+- Fallback Lua **removido por inteiro** de `_cumulative.lua`: `methods.shift` só
+  valida `periods` inteiro e delega ao C (guard defensivo se dtype sem shift).
+  Categorical tem shift próprio (sobre codes) e já tratava negativo — agora
+  Series/DataSet/categorical têm a MESMA semântica de sinal em todos os caminhos.
+- Testes: C +29 (test_ops_window 285→314: shift negativo de f64/i64 — antes sem
+  cobertura — e shift em bool/str/dt nos dois sentidos, com NA, bordas, all-NA);
+  Lua +13 (test_window 80→93); allocfail +28 (1677→1705, incl. `str_shift` sob
+  OOM nos dois sentidos). DataSet 5.3 shift negativo confirmado (delega ao C).
+- `[Fedora]`: aguarda Valgrind + cobertura no Fedora para `[Done]`. Atenção ao
+  ramo `|periods|>=size` e ao `str_shift` sob OOM na cobertura.
+
+---
+## 2026-06-29 — Item 7.1a: ffill/bfill no Ring 0 (bool/str/dt)
+
+Continuação da meta-decisão D7 (item 7 vai pro C, sem fallback). Recorte: o 7.1
+foi dividido em **7.1a (ffill/bfill)** e **7.1b (shift com sinal)** — separar a
+adição pura (ffill/bfill, sem mudança de ABI) da mudança de ABI do shift facilita
+bissectar se o Valgrind/cobertura do Fedora acusar algo.
+
+- 7.1a: `ffill`/`bfill` agora no C para bool/str/dt (antes: fallback Lua
+  element-wise em `_cumulative.lua`). bool/dt são buffer plano → idênticos a f64.
+  **str é offset-based**: a série nova é reconstruída por `append`/`append_null`,
+  reusando o padrão de `smaug_str_take` (gather posicional). NÃO usa `view`, então
+  a limitação de view-em-string do COW.md não se aplica (produz cópia completa).
+- Wiring: protótipos nos headers (`smaug_numeric.h` bool, `smaug_datetime.h`,
+  `smaug_string.h`), cdef FFI, e `ffill`/`bfill` ligados nos descritores bool/str/dt
+  (`_types.lua`).
+- Fallback Lua **removido** de `_cumulative.lua`: `methods.ffill`/`bfill` agora só
+  delegam ao C, com guard defensivo (erro orientado se um dtype sem ffill chegar —
+  bug de programação, fail-fast em vez de fallback silencioso). Categorical tem
+  implementação própria (opera sobre codes) e NÃO passa por aqui — intacto.
+- Testes: C +41 (test_ops_window 244→285: bool/str/dt com NA, bordas, all-null,
+  string vazia válida e multibyte); Lua +18 (test_window 62→80); allocfail +45
+  (1632→1677) varrendo todos os ramos de OOM dos novos ffill/bfill (incl. o
+  `malloc(src)` do `str_bfill`). O teste DataSet "5.3 ffill em string" passou a
+  exercitar o C novo — vira guard da migração de graça.
+- Coerência: shift negativo segue sem cobertura em lugar nenhum (será coberto no
+  7.1b, quando mover pro C). Eixo 1 do parity não tinha exceptions de ffill/bfill
+  (a mudança foi interna Lua→C, invisível à paridade de API).
+- `[Fedora]`: aguarda Valgrind + cobertura no Fedora para `[Done]`.
+
+---
 ## 2026-06-29 — Item 7.4: bool eq/ne no Ring 0
 
 Meta-decisão D7: todo o item 7 vai pro C (Anel 0), Lua só delega, sem fallback —

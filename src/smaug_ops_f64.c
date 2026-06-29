@@ -598,17 +598,28 @@ smaug_series_f64_t *smaug_f64_diff(const smaug_series_f64_t *s, size_t periods) 
     return r;
 }
 
-/* shift(periods): desloca a série. periods > 0 → desloca para baixo
-   (primeiros `periods` viram null); periods == 0 → clone.
-   Série deslocada para além do tamanho → toda null. */
-smaug_series_f64_t *smaug_f64_shift(const smaug_series_f64_t *s, size_t periods) {
+/* shift(periods): desloca a série por `periods` posições, com sinal.
+   periods > 0 → desloca para baixo (as primeiras `periods` posições viram NA);
+   periods < 0 → desloca para cima (as últimas |periods| posições viram NA);
+   periods == 0 → cópia. Para cada posição i, a fonte é (i - periods); fora do
+   intervalo [0, size) o resultado é NA. |periods| >= size → série toda NA.
+   (Item 7.1b: unifica os dois sentidos no Anel 0; antes o negativo era Lua.) */
+smaug_series_f64_t *smaug_f64_shift(const smaug_series_f64_t *s, int64_t periods) {
     if (!s) return NULL;
     smaug_series_f64_t *r = alloc_result(s->size);
     if (!r) return NULL;
-    if (periods >= s->size) return r;  /* toda null */
-    for (size_t i = periods; i < s->size; i++) {
-        r->data[i]      = s->data[i - periods];
-        r->null_mask[i] = s->null_mask[i - periods];
+    /* |periods| >= size → toda fonte cai fora do intervalo: série toda NA.
+       Tratado à parte para evitar overflow em (int64_t)i - periods com
+       `periods` próximo de INT64_MIN, e como atalho do caso comum. */
+    if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
+    /* create já inicializa null_mask como NULL; só preenchemos as posições
+       cuja fonte cai no intervalo válido. */
+    for (size_t i = 0; i < s->size; i++) {
+        int64_t src = (int64_t)i - periods;
+        if (src >= 0 && (size_t)src < s->size) {
+            r->data[i]      = s->data[src];
+            r->null_mask[i] = s->null_mask[src];
+        }
     }
     return r;
 }

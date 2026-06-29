@@ -249,3 +249,126 @@ smaug_series_str_t *smaug_str_sort(const smaug_series_str_t *s, bool ascending) 
     free(idx);
     return r;
 }
+
+/* ===================================================================
+   Movimentação de dados agnóstica a tipo (item 7.1): ffill / bfill
+   para string. Diferente de f64/i64/bool/dt (buffer plano), a string é
+   offset-based: a série nova é reconstruída por append, reusando o mesmo
+   padrão de smaug_str_take (gather posicional). NÃO é view — produz cópia
+   completa, então a limitação de view-em-string (ver COW.md) não se aplica.
+   =================================================================== */
+
+/* ffill: cada posição recebe a string da última posição válida anterior
+   (incluindo ela mesma, se válida). Posições antes do primeiro válido → NA. */
+smaug_series_str_t *smaug_str_ffill(const smaug_series_str_t *s) {
+    if (!s) return NULL;
+
+    /* passo 1: para cada posição, o índice-fonte (última válida até aqui),
+       e soma de bytes do resultado. SIZE_MAX = sem fonte (permanece NA). */
+    size_t bytes = 0, last = SIZE_MAX;
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) last = i;
+        if (last != SIZE_MAX)
+            bytes += s->offsets[last + 1] - s->offsets[last];
+    }
+
+    smaug_series_str_t *r = smaug_str_create_with_capacity(0, bytes ? bytes : 1);
+    if (!r) return NULL;
+
+    /* passo 2: append na ordem, repetindo a última válida */
+    last = SIZE_MAX;
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) last = i;
+        int rc;
+        if (last == SIZE_MAX) {
+            rc = smaug_str_append_null(r);
+        } else {
+            size_t start = s->offsets[last];
+            size_t l     = s->offsets[last + 1] - start;
+            rc = smaug_str_append(r, s->buffer + start, l);
+        }
+        if (rc != 0) { smaug_str_free(r); return NULL; }
+    }
+    return r;
+}
+
+/* bfill: cada posição recebe a string da próxima posição válida seguinte
+   (incluindo ela mesma, se válida). Posições após o último válido → NA. */
+smaug_series_str_t *smaug_str_bfill(const smaug_series_str_t *s) {
+    if (!s) return NULL;
+
+    /* passo 1: soma de bytes percorrendo de trás para frente */
+    size_t bytes = 0, next = SIZE_MAX;
+    for (size_t i = s->size; i-- > 0; ) {
+        if (SMAUG_VALID(s->null_mask, i)) next = i;
+        if (next != SIZE_MAX)
+            bytes += s->offsets[next + 1] - s->offsets[next];
+    }
+
+    smaug_series_str_t *r = smaug_str_create_with_capacity(0, bytes ? bytes : 1);
+    if (!r) return NULL;
+
+    /* passo 2: precisa preencher na ordem natural (append é sequencial),
+       então recalcula a próxima-válida para cada i da esquerda p/ direita.
+       Pré-computa o índice-fonte de cada posição num passo reverso. */
+    size_t *src = malloc((s->size ? s->size : 1) * sizeof(size_t));
+    if (!src) { smaug_str_free(r); return NULL; }
+    next = SIZE_MAX;
+    for (size_t i = s->size; i-- > 0; ) {
+        if (SMAUG_VALID(s->null_mask, i)) next = i;
+        src[i] = next;
+    }
+
+    for (size_t i = 0; i < s->size; i++) {
+        int rc;
+        if (src[i] == SIZE_MAX) {
+            rc = smaug_str_append_null(r);
+        } else {
+            size_t start = s->offsets[src[i]];
+            size_t l     = s->offsets[src[i] + 1] - start;
+            rc = smaug_str_append(r, s->buffer + start, l);
+        }
+        if (rc != 0) { free(src); smaug_str_free(r); return NULL; }
+    }
+    free(src);
+    return r;
+}
+
+/* shift(periods): desloca por `periods` posições, com sinal. Offset-based,
+   reconstruído por append (mesmo padrão de ffill/bfill). Para cada posição i a
+   fonte é (i - periods); fora de [0, size) → NA. (Item 7.1b.) */
+smaug_series_str_t *smaug_str_shift(const smaug_series_str_t *s, int64_t periods) {
+    if (!s) return NULL;
+
+    size_t n = s->size;
+    /* |periods| >= size → toda NA: série de n nulls. */
+    int all_null = (periods <= -(int64_t)n || periods >= (int64_t)n);
+
+    /* passo 1: soma de bytes do resultado (só posições com fonte válida e não-NA) */
+    size_t bytes = 0;
+    if (!all_null) {
+        for (size_t i = 0; i < n; i++) {
+            int64_t src = (int64_t)i - periods;
+            if (src >= 0 && (size_t)src < n && SMAUG_VALID(s->null_mask, src))
+                bytes += s->offsets[src + 1] - s->offsets[src];
+        }
+    }
+
+    smaug_series_str_t *r = smaug_str_create_with_capacity(0, bytes ? bytes : 1);
+    if (!r) return NULL;
+
+    /* passo 2: append na ordem das posições de saída */
+    for (size_t i = 0; i < n; i++) {
+        int rc;
+        int64_t src = all_null ? -1 : (int64_t)i - periods;
+        if (src < 0 || (size_t)src >= n || SMAUG_NULL(s->null_mask, src)) {
+            rc = smaug_str_append_null(r);
+        } else {
+            size_t start = s->offsets[src];
+            size_t l     = s->offsets[src + 1] - start;
+            rc = smaug_str_append(r, s->buffer + start, l);
+        }
+        if (rc != 0) { smaug_str_free(r); return NULL; }
+    }
+    return r;
+}

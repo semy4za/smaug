@@ -246,7 +246,17 @@ fallback element-wise. Depende do item 1 (nulidade coerente) já pronto.
 > (preencher). String NÃO é bloqueio: a limitação do COW.md é sobre `view`
 > (zero-copy), não sobre cópia — `str_take`/`clone`/`filter` já reconstroem buffer.
 
-- 7.1 shift/ffill/bfill em bool/str/dt (agnósticas a tipo) — **[Fedora]**, 🟥 do inventário
+- 7.1 ✅ shift/ffill/bfill em bool/str/dt (agnósticas a tipo) — **[Fedora]**, era 🟥 do inventário
+  - 7.1a ✅ **ffill/bfill** no C (bool/str/dt) + descritor liga, fallback Lua removido.
+    str é offset-based (reconstrói por append, padrão de `str_take` — não view).
+    Teste C +41 (test_ops_window 244→285), Lua +18 (test_window 62→80),
+    allocfail +45 → 1677. Fedora: Valgrind-clean, cobertura 98.97%, 97 exclusões.
+  - 7.1b ✅ **shift com sinal** (`int64_t`): negativo tratado no C (fórmula única
+    `src = i - periods`), short-circuit `|periods|>=size` evita overflow. ABI de
+    `smaug_f64_shift`/`smaug_i64_shift` mudou (size_t→int64_t); shift novo em
+    bool/str/dt. Fallback Lua removido por inteiro. Cobriu shift negativo que NÃO
+    tinha teste em lugar nenhum. Teste C +29 (285→314), Lua +13 (80→93),
+    allocfail +28 → 1705. Aguarda Fedora p/ Valgrind+cobertura.
 - 7.2 min/max/argmin/argmax em ordenáveis (dt/str têm sort/gt/lt) — fecha a
   incoerência atual `dt:argmin` ✓ vs `dt:min` ✗
 - 7.3 rank em dt/str (lexicográfico/cronológico)

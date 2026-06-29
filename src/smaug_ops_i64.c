@@ -577,14 +577,19 @@ smaug_series_i64_t *smaug_i64_diff(const smaug_series_i64_t *s, size_t periods) 
     return r;
 }
 
-smaug_series_i64_t *smaug_i64_shift(const smaug_series_i64_t *s, size_t periods) {
+smaug_series_i64_t *smaug_i64_shift(const smaug_series_i64_t *s, int64_t periods) {
     if (!s) return NULL;
     smaug_series_i64_t *r = alloc_result(s->size);
     if (!r) return NULL;
-    if (periods >= s->size) return r;
-    for (size_t i = periods; i < s->size; i++) {
-        r->data[i]      = s->data[i - periods];
-        r->null_mask[i] = s->null_mask[i - periods];
+    /* create já zera null_mask; |periods| >= size → série toda NA (evita
+       overflow e atalha o caso comum). Ver smaug_f64_shift p/ semântica. */
+    if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
+    for (size_t i = 0; i < s->size; i++) {
+        int64_t src = (int64_t)i - periods;
+        if (src >= 0 && (size_t)src < s->size) {
+            r->data[i]      = s->data[src];
+            r->null_mask[i] = s->null_mask[src];
+        }
     }
     return r;
 }

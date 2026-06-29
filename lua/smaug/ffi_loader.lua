@@ -108,7 +108,7 @@ ffi.cdef([[
     smaug_series_f64_t* smaug_f64_cummin (const smaug_series_f64_t *s);
     smaug_series_f64_t* smaug_f64_cummax (const smaug_series_f64_t *s);
     smaug_series_f64_t* smaug_f64_diff   (const smaug_series_f64_t *s, size_t periods);
-    smaug_series_f64_t* smaug_f64_shift  (const smaug_series_f64_t *s, size_t periods);
+    smaug_series_f64_t* smaug_f64_shift  (const smaug_series_f64_t *s, int64_t periods);
     smaug_series_f64_t* smaug_f64_ffill  (const smaug_series_f64_t *s);
     smaug_series_f64_t* smaug_f64_bfill  (const smaug_series_f64_t *s);
     size_t              smaug_f64_argmin  (const smaug_series_f64_t *s);
@@ -192,7 +192,7 @@ ffi.cdef([[
     smaug_series_i64_t* smaug_i64_cummin (const smaug_series_i64_t *s);
     smaug_series_i64_t* smaug_i64_cummax (const smaug_series_i64_t *s);
     smaug_series_i64_t* smaug_i64_diff   (const smaug_series_i64_t *s, size_t periods);
-    smaug_series_i64_t* smaug_i64_shift  (const smaug_series_i64_t *s, size_t periods);
+    smaug_series_i64_t* smaug_i64_shift  (const smaug_series_i64_t *s, int64_t periods);
     smaug_series_i64_t* smaug_i64_ffill  (const smaug_series_i64_t *s);
     smaug_series_i64_t* smaug_i64_bfill  (const smaug_series_i64_t *s);
     size_t              smaug_i64_argmin  (const smaug_series_i64_t *s);
@@ -261,6 +261,11 @@ ffi.cdef([[
     size_t*              smaug_bool_argsort(const smaug_series_bool_t *s, bool ascending);
     smaug_series_bool_t* smaug_bool_sort   (const smaug_series_bool_t *s, bool ascending);
 
+    /* --- Movimentação de dados (item 7.1): ffill/bfill --- */
+    smaug_series_bool_t* smaug_bool_ffill  (const smaug_series_bool_t *s);
+    smaug_series_bool_t* smaug_bool_bfill  (const smaug_series_bool_t *s);
+    smaug_series_bool_t* smaug_bool_shift  (const smaug_series_bool_t *s, int64_t periods);
+
     /* ===================================================================
        Operações Boolean (BoolSeries) — lógica de três valores (Kleene)
        =================================================================== */
@@ -327,6 +332,11 @@ ffi.cdef([[
     /* --- Ordenação --- */
     size_t*             smaug_str_argsort(const smaug_series_str_t *s, bool ascending);
     smaug_series_str_t* smaug_str_sort(const smaug_series_str_t *s, bool ascending);
+
+    /* --- Movimentação de dados (item 7.1): ffill/bfill (offset-based, cópia) --- */
+    smaug_series_str_t* smaug_str_ffill  (const smaug_series_str_t *s);
+    smaug_series_str_t* smaug_str_bfill  (const smaug_series_str_t *s);
+    smaug_series_str_t* smaug_str_shift  (const smaug_series_str_t *s, int64_t periods);
 
     /* ===================================================================
        Anel 3 — I/O (CSV + JSON)
@@ -451,6 +461,11 @@ ffi.cdef([[
     smaug_series_dt_t* smaug_dt_sort   (const smaug_series_dt_t *s, bool ascending);
     smaug_series_dt_t* smaug_dt_take   (const smaug_series_dt_t *s, const size_t *idx, size_t len);
     smaug_series_dt_t* smaug_dt_filter (const smaug_series_dt_t *s, const uint8_t *mask);
+
+    /* --- Movimentação de dados (item 7.1): ffill/bfill --- */
+    smaug_series_dt_t* smaug_dt_ffill  (const smaug_series_dt_t *s);
+    smaug_series_dt_t* smaug_dt_bfill  (const smaug_series_dt_t *s);
+    smaug_series_dt_t* smaug_dt_shift  (const smaug_series_dt_t *s, int64_t periods);
 
     /* ===================================================================
        Grupo C (Fase 3 Ring 0): multi_argsort e rolling ops

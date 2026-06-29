@@ -10,7 +10,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-06-29 18:44:58 UTC
+Gerado em: 2026-06-29 23:26:12 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -398,19 +398,21 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `xor` | 🟨 |  |
 
 
-### str — 22 funções C
+### str — 25 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
 | `append` | 🟩 |  |
 | `append_null` | 🟩 |  |
 | `argsort` | 🟩 |  |
+| `bfill` | 🟩 |  |
 | `clone` | 🟩 |  |
 | `count_nonnull` | 🟩 |  |
 | `create` | 🟩 |  |
 | `create_from_array` | 🟨 |  |
 | `create_with_capacity` | 🟨 |  |
 | `eq` | 🟩 |  |
+| `ffill` | 🟩 |  |
 | `filter` | 🟩 |  |
 | `free` | 🟩 |  |
 | `ge` | 🟩 |  |
@@ -422,11 +424,12 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `ne` | 🟩 |  |
 | `set` | 🟩 |  |
 | `set_null` | 🟩 |  |
+| `shift` | 🟩 |  |
 | `sort` | 🟩 |  |
 | `take` | 🟩 |  |
 
 
-### dt — 40 funções C
+### dt — 43 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -434,6 +437,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `append` | 🟩 |  |
 | `append_null` | 🟩 |  |
 | `argsort` | 🟩 |  |
+| `bfill` | 🟩 |  |
 | `clone` | 🟩 |  |
 | `count_nonnull` | 🟩 |  |
 | `create` | 🟩 |  |
@@ -442,6 +446,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `day` | 🟩 |  |
 | `diff_ms` | 🟩 |  |
 | `eq` | 🟩 |  |
+| `ffill` | 🟩 |  |
 | `filter` | 🟩 |  |
 | `format` | 🟩 |  |
 | `free` | 🟩 |  |
@@ -462,6 +467,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `second` | 🟩 |  |
 | `set` | 🟩 |  |
 | `set_null` | 🟩 |  |
+| `shift` | 🟩 |  |
 | `sort` | 🟩 |  |
 | `take` | 🟩 |  |
 | `truncate` | 🟩 |  |
@@ -651,7 +657,7 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 228/228 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 231/231 erros com prefixo `smaug:` (100.0%)
 - `dataset.lua`: 92/92 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
@@ -693,7 +699,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `series/test_access` | 101 | 15 | 8 | — | 4 | — | — |
 | `series/test_reduce` | 44 | 7 | 2 | — | — | — | — |
 | `series/test_stat` | 70 | 6 | 12 | — | 9 | — | — |
-| `series/test_window` | 64 | 5 | 6 | — | 1 | — | — |
+| `series/test_window` | 95 | 7 | 7 | 2 | 5 | 2 | — |
 | `series/test_predicates` | 155 | 6 | 42 | 3 | 11 | — | — |
 | `series/test_selection` | 29 | 3 | 1 | 2 | 1 | — | — |
 | `series/test_str` | 274 | 4 | 9 | 1 | 51 | — | — |
@@ -708,17 +714,17 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 67 | 18 | 2 | — | — | — | — |
 
-**Total de checks:** 2390
+**Total de checks:** 2421
 
 ### Menções totais por dtype (toda a suite)
 
 | dtype | menções |
 | :--- | :-: |
-| float64 | 171 |
-| int64 | 293 |
-| bool | 52 |
-| string | 188 |
-| datetime | 75 |
+| float64 | 173 |
+| int64 | 294 |
+| bool | 54 |
+| string | 192 |
+| datetime | 77 |
 | categorical | 58 |
 
 ## Eixo 12 — Sincronização docs ↔ código
@@ -743,7 +749,7 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 952
+- 🟩 paridade: 958
 - ⬜ exceção registrada: 221
 - 🟨 suspeita (revisar): 258
 - 🟥 inconsistência clara: 12

@@ -328,3 +328,70 @@ smaug_series_bool_t *smaug_bool_sort(const smaug_series_bool_t *s, bool ascendin
     smaug_free(indices);
     return r;
 }
+
+/* ===================================================================
+   Movimentação de dados agnóstica a tipo (item 7.1): ffill / bfill.
+   Padrão idêntico a f64/i64 — copia valor + máscara por posição.
+   smaug_bool_create já inicializa a máscara como NULL, então posições
+   não preenchidas permanecem NA sem ação extra.
+   =================================================================== */
+
+/* ffill: preenche NA com o último valor válido anterior.
+   NAs antes do primeiro válido permanecem NA. */
+smaug_series_bool_t *smaug_bool_ffill(const smaug_series_bool_t *s) {
+    if (!s) return NULL;
+    smaug_series_bool_t *r = smaug_bool_create(s->size);
+    if (!r) return NULL;
+    int     has_last = 0;
+    uint8_t last     = 0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            last = s->data[i];
+            has_last = 1;
+        }
+        if (has_last) {
+            r->data[i]      = last;
+            r->null_mask[i] = SMAUG_MASK_VALID;
+        }
+    }
+    return r;
+}
+
+/* bfill: preenche NA com o próximo valor válido seguinte.
+   NAs após o último válido permanecem NA. */
+smaug_series_bool_t *smaug_bool_bfill(const smaug_series_bool_t *s) {
+    if (!s) return NULL;
+    smaug_series_bool_t *r = smaug_bool_create(s->size);
+    if (!r) return NULL;
+    int     has_next = 0;
+    uint8_t next     = 0;
+    for (size_t i = s->size; i-- > 0; ) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            next = s->data[i];
+            has_next = 1;
+        }
+        if (has_next) {
+            r->data[i]      = next;
+            r->null_mask[i] = SMAUG_MASK_VALID;
+        }
+    }
+    return r;
+}
+
+/* shift(periods): desloca por `periods` posições, com sinal.
+   Mesma semântica de smaug_f64_shift (item 7.1b). Para cada posição i a
+   fonte é (i - periods); fora de [0, size) → NA. */
+smaug_series_bool_t *smaug_bool_shift(const smaug_series_bool_t *s, int64_t periods) {
+    if (!s) return NULL;
+    smaug_series_bool_t *r = smaug_bool_create(s->size);
+    if (!r) return NULL;
+    if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
+    for (size_t i = 0; i < s->size; i++) {
+        int64_t src = (int64_t)i - periods;
+        if (src >= 0 && (size_t)src < s->size) {
+            r->data[i]      = s->data[src];
+            r->null_mask[i] = s->null_mask[src];
+        }
+    }
+    return r;
+}

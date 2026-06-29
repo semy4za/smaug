@@ -70,6 +70,63 @@ static int i64_null(const smaug_series_i64_t *s, size_t i) {
     return st == SMG_NULL_VALUE;
 }
 
+/* Cria série bool a partir de string-padrão: '1'=true, '0'=false, 'N'=null. */
+static smaug_series_bool_t *bool_from(const char *pat) {
+    size_t n = strlen(pat);
+    smaug_series_bool_t *s = smaug_bool_create(n);
+    if (!s) return NULL;
+    for (size_t i = 0; i < n; i++) {
+        if (pat[i] == 'N') smaug_bool_set_null(s, i);
+        else               smaug_bool_set(s, i, pat[i] == '1' ? 1 : 0);
+    }
+    return s;
+}
+static int bool_get(const smaug_series_bool_t *s, size_t i) {
+    smaug_status_t st;
+    return smaug_bool_get(s, i, &st);
+}
+static int bool_null(const smaug_series_bool_t *s, size_t i) {
+    smaug_status_t st;
+    smaug_bool_get(s, i, &st);
+    return st == SMG_NULL_VALUE;
+}
+
+/* Cria série dt; INT64_MIN indica null (epoch ms cru). */
+static smaug_series_dt_t *dt_from(const int64_t *arr, size_t n) {
+    smaug_series_dt_t *s = smaug_dt_create(n);
+    if (!s) return NULL;
+    for (size_t i = 0; i < n; i++) {
+        if (arr[i] == INT64_MIN) smaug_dt_set_null(s, i);
+        else                     smaug_dt_set(s, i, arr[i]);
+    }
+    return s;
+}
+static int64_t dt_get(const smaug_series_dt_t *s, size_t i) {
+    smaug_status_t st;
+    return smaug_dt_get(s, i, &st);
+}
+static int dt_null(const smaug_series_dt_t *s, size_t i) {
+    smaug_status_t st;
+    smaug_dt_get(s, i, &st);
+    return st != SMG_OK;
+}
+
+/* Lê string na posição i; preenche *is_null. Retorna ponteiro (não-terminado),
+   use com *len. */
+static const char *str_get(const smaug_series_str_t *s, size_t i, size_t *len, int *is_null) {
+    const char *p = smaug_str_get(s, i, len);
+    *is_null = (p == NULL);
+    return p;
+}
+/* Compara string na posição i com literal c (NUL-terminado). */
+static int str_eq_at(const smaug_series_str_t *s, size_t i, const char *c) {
+    size_t len; int isn;
+    const char *p = str_get(s, i, &len, &isn);
+    if (isn) return 0;
+    size_t cl = strlen(c);
+    return len == cl && (cl == 0 || memcmp(p, c, cl) == 0);
+}
+
 /* =====================================================================
    cumsum
    ===================================================================== */
@@ -317,6 +374,28 @@ static void test_f64_shift(void) {
     CHECK(r4 && f64_null(r4, 2),               "f64 shift null [2]=null (null deslocado)");
     smaug_f64_free(r4); smaug_f64_free(s4);
 
+    /* periods NEGATIVO (item 7.1b): [1,2,3] shift(-1) → [2,3,null] */
+    smaug_series_f64_t *s5 = f64_from(arr, 3);
+    smaug_series_f64_t *r5 = smaug_f64_shift(s5, -1);
+    CHECK(r5 && APPROX(f64_get(r5, 0), 2.0), "f64 shift(-1) [0]=2");
+    CHECK(r5 && APPROX(f64_get(r5, 1), 3.0), "f64 shift(-1) [1]=3");
+    CHECK(r5 && f64_null(r5, 2),             "f64 shift(-1) [2]=null (borda final)");
+    smaug_f64_free(r5); smaug_f64_free(s5);
+
+    /* periods <= -size: toda null */
+    smaug_series_f64_t *s6 = f64_from(arr, 3);
+    smaug_series_f64_t *r6 = smaug_f64_shift(s6, -5);
+    CHECK(r6 && f64_null(r6, 0) && f64_null(r6, 2), "f64 shift(-5): toda null");
+    smaug_f64_free(r6); smaug_f64_free(s6);
+
+    /* shift negativo com null preservado: [1,NA,3] shift(-1) → [NA,3,NA] */
+    smaug_series_f64_t *s7 = f64_from(arr4, 3);
+    smaug_series_f64_t *r7 = smaug_f64_shift(s7, -1);
+    CHECK(r7 && f64_null(r7, 0),             "f64 shift(-1) null [0]=null (NA deslocado)");
+    CHECK(r7 && APPROX(f64_get(r7, 1), 3.0), "f64 shift(-1) null [1]=3");
+    CHECK(r7 && f64_null(r7, 2),             "f64 shift(-1) null [2]=null (borda)");
+    smaug_f64_free(r7); smaug_f64_free(s7);
+
     CHECK(smaug_f64_shift(NULL, 1) == NULL, "f64 shift NULL input");
 }
 
@@ -327,8 +406,83 @@ static void test_i64_shift(void) {
     CHECK(r && i64_null(r, 0),       "i64 shift [0]=null");
     CHECK(r && i64_get(r, 1) == 10,  "i64 shift [1]=10");
     CHECK(r && i64_get(r, 2) == 20,  "i64 shift [2]=20");
-    smaug_i64_free(r); smaug_i64_free(s);
+    smaug_i64_free(r);
+    /* negativo (item 7.1b): [10,20,30] shift(-1) → [20,30,null] */
+    smaug_series_i64_t *rn = smaug_i64_shift(s, -1);
+    CHECK(rn && i64_get(rn, 0) == 20, "i64 shift(-1) [0]=20");
+    CHECK(rn && i64_get(rn, 1) == 30, "i64 shift(-1) [1]=30");
+    CHECK(rn && i64_null(rn, 2),      "i64 shift(-1) [2]=null");
+    smaug_i64_free(rn);
+    /* shift(0) = clone */
+    smaug_series_i64_t *r0 = smaug_i64_shift(s, 0);
+    CHECK(r0 && i64_get(r0, 0) == 10 && i64_get(r0, 2) == 30, "i64 shift(0)=clone");
+    smaug_i64_free(r0);
+    smaug_i64_free(s);
     CHECK(smaug_i64_shift(NULL, 1) == NULL, "i64 shift NULL input");
+}
+
+/* shift em bool/str/dt (item 7.1b: motor agnóstico, com sinal) */
+static void test_typed_shift(void) {
+    /* bool: "101" shift(1) → [NA,1,0] ; shift(-1) → [0,1,NA] */
+    smaug_series_bool_t *b = bool_from("101");
+    smaug_series_bool_t *bp = smaug_bool_shift(b, 1);
+    CHECK(bp && bool_null(bp, 0) && bool_get(bp, 1) == 1 && bool_get(bp, 2) == 0,
+          "bool shift(1)");
+    smaug_bool_free(bp);
+    smaug_series_bool_t *bn = smaug_bool_shift(b, -1);
+    CHECK(bn && bool_get(bn, 0) == 0 && bool_get(bn, 1) == 1 && bool_null(bn, 2),
+          "bool shift(-1)");
+    smaug_bool_free(bn);
+    smaug_bool_free(b);
+    CHECK(smaug_bool_shift(NULL, 1) == NULL, "bool shift NULL");
+
+    /* dt: [100,200,300] shift(1) → [NA,100,200] ; shift(-1) → [200,300,NA] */
+    int64_t da[] = {100, 200, 300};
+    smaug_series_dt_t *d = dt_from(da, 3);
+    smaug_series_dt_t *dp = smaug_dt_shift(d, 1);
+    CHECK(dp && dt_null(dp, 0) && dt_get(dp, 1) == 100 && dt_get(dp, 2) == 200,
+          "dt shift(1)");
+    smaug_dt_free(dp);
+    smaug_series_dt_t *dn = smaug_dt_shift(d, -1);
+    CHECK(dn && dt_get(dn, 0) == 200 && dt_get(dn, 2 - 1) == 300 && dt_null(dn, 2),
+          "dt shift(-1)");
+    smaug_dt_free(dn);
+    smaug_dt_free(d);
+    CHECK(smaug_dt_shift(NULL, 1) == NULL, "dt shift NULL");
+
+    /* str: ["a","b","c"] shift(1) → [NA,a,b] ; shift(-2) → [c,NA,NA] */
+    smaug_series_str_t *s = smaug_str_create(3);
+    smaug_str_set(s, 0, "a", 1);
+    smaug_str_set(s, 1, "b", 1);
+    smaug_str_set(s, 2, "c", 1);
+    smaug_series_str_t *sp = smaug_str_shift(s, 1);
+    size_t len; int isn;
+    str_get(sp, 0, &len, &isn);
+    CHECK(isn,                     "str shift(1) [0]=null");
+    CHECK(str_eq_at(sp, 1, "a"),   "str shift(1) [1]=a");
+    CHECK(str_eq_at(sp, 2, "b"),   "str shift(1) [2]=b");
+    smaug_str_free(sp);
+    smaug_series_str_t *sn = smaug_str_shift(s, -2);
+    CHECK(str_eq_at(sn, 0, "c"),   "str shift(-2) [0]=c");
+    str_get(sn, 1, &len, &isn); CHECK(isn, "str shift(-2) [1]=null");
+    str_get(sn, 2, &len, &isn); CHECK(isn, "str shift(-2) [2]=null");
+    smaug_str_free(sn);
+    /* |shift| >= size → toda null */
+    smaug_series_str_t *sbig = smaug_str_shift(s, 9);
+    str_get(sbig, 0, &len, &isn); CHECK(isn, "str shift(9) all-null [0]");
+    str_get(sbig, 2, &len, &isn); CHECK(isn, "str shift(9) all-null [2]");
+    smaug_str_free(sbig);
+    /* str shift com NA na fonte: [a,NA,c] shift(1) → [NA,a,NA] */
+    smaug_series_str_t *s2 = smaug_str_create(3);
+    smaug_str_set(s2, 0, "a", 1);
+    smaug_str_set(s2, 2, "c", 1);
+    smaug_series_str_t *s2p = smaug_str_shift(s2, 1);
+    str_get(s2p, 0, &len, &isn); CHECK(isn, "str shift(1) NA [0]=null");
+    CHECK(str_eq_at(s2p, 1, "a"),               "str shift(1) NA [1]=a");
+    str_get(s2p, 2, &len, &isn); CHECK(isn, "str shift(1) NA [2]=null (NA deslocado)");
+    smaug_str_free(s2p); smaug_str_free(s2);
+    smaug_str_free(s);
+    CHECK(smaug_str_shift(NULL, 1) == NULL, "str shift NULL");
 }
 
 /* =====================================================================
@@ -386,6 +540,120 @@ static void test_i64_bfill(void) {
     CHECK(r && i64_null(r, 2),       "i64 bfill [2]=null");
     smaug_i64_free(r); smaug_i64_free(s);
     CHECK(smaug_i64_bfill(NULL) == NULL, "i64 bfill NULL input");
+}
+
+/* ----- ffill/bfill em bool/str/dt (item 7.1: motor agnóstico a tipo) ----- */
+
+static void test_bool_ffill_bfill(void) {
+    /* "1NN0N" → ffill: 1,1,1,0,0 ; bfill: 1,0,0,0,NA */
+    smaug_series_bool_t *s = bool_from("1NN0N");
+    smaug_series_bool_t *rf = smaug_bool_ffill(s);
+    CHECK(rf && bool_get(rf, 0) == 1, "bool ffill [0]=true");
+    CHECK(rf && bool_get(rf, 1) == 1, "bool ffill [1]=true (preenchido)");
+    CHECK(rf && bool_get(rf, 2) == 1, "bool ffill [2]=true (preenchido)");
+    CHECK(rf && bool_get(rf, 3) == 0, "bool ffill [3]=false");
+    CHECK(rf && bool_get(rf, 4) == 0, "bool ffill [4]=false (preenchido)");
+    smaug_bool_free(rf);
+
+    smaug_series_bool_t *rb = smaug_bool_bfill(s);
+    CHECK(rb && bool_get(rb, 0) == 1, "bool bfill [0]=true");
+    CHECK(rb && bool_get(rb, 1) == 0, "bool bfill [1]=false (preenchido)");
+    CHECK(rb && bool_get(rb, 3) == 0, "bool bfill [3]=false");
+    CHECK(rb && bool_null(rb, 4),     "bool bfill [4]=null (sem seguinte)");
+    smaug_bool_free(rb);
+
+    /* ffill com NA na borda inicial: "N1" → NA,true */
+    smaug_series_bool_t *s2 = bool_from("N1");
+    smaug_series_bool_t *r2 = smaug_bool_ffill(s2);
+    CHECK(r2 && bool_null(r2, 0),     "bool ffill borda [0]=null (sem anterior)");
+    CHECK(r2 && bool_get(r2, 1) == 1, "bool ffill borda [1]=true");
+    smaug_bool_free(r2); smaug_bool_free(s2);
+
+    /* toda nula */
+    smaug_series_bool_t *s3 = bool_from("NNN");
+    smaug_series_bool_t *r3 = smaug_bool_ffill(s3);
+    CHECK(r3 && bool_null(r3, 0) && bool_null(r3, 2), "bool ffill all-null: tudo null");
+    smaug_bool_free(r3); smaug_bool_free(s3);
+
+    smaug_bool_free(s);
+    CHECK(smaug_bool_ffill(NULL) == NULL, "bool ffill NULL input");
+    CHECK(smaug_bool_bfill(NULL) == NULL, "bool bfill NULL input");
+}
+
+static void test_dt_ffill_bfill(void) {
+    /* [NA, 100, NA, 300, NA] (epoch ms) */
+    int64_t arr[] = {INT64_MIN, 100, INT64_MIN, 300, INT64_MIN};
+    smaug_series_dt_t *s = dt_from(arr, 5);
+
+    smaug_series_dt_t *rf = smaug_dt_ffill(s);
+    CHECK(rf && dt_null(rf, 0),          "dt ffill [0]=null (sem anterior)");
+    CHECK(rf && dt_get(rf, 1) == 100,    "dt ffill [1]=100");
+    CHECK(rf && dt_get(rf, 2) == 100,    "dt ffill [2]=100 (preenchido)");
+    CHECK(rf && dt_get(rf, 3) == 300,    "dt ffill [3]=300");
+    CHECK(rf && dt_get(rf, 4) == 300,    "dt ffill [4]=300 (preenchido)");
+    smaug_dt_free(rf);
+
+    smaug_series_dt_t *rb = smaug_dt_bfill(s);
+    CHECK(rb && dt_get(rb, 0) == 100,    "dt bfill [0]=100 (preenchido)");
+    CHECK(rb && dt_get(rb, 2) == 300,    "dt bfill [2]=300 (preenchido)");
+    CHECK(rb && dt_null(rb, 4),          "dt bfill [4]=null (sem seguinte)");
+    smaug_dt_free(rb);
+
+    smaug_dt_free(s);
+    CHECK(smaug_dt_ffill(NULL) == NULL, "dt ffill NULL input");
+    CHECK(smaug_dt_bfill(NULL) == NULL, "dt bfill NULL input");
+}
+
+static void test_str_ffill_bfill(void) {
+    /* ["a", NA, "", NA, "héllo"] — "" é valor válido distinto de NA;
+       "héllo" exercita multibyte. */
+    smaug_series_str_t *s = smaug_str_create(5);
+    smaug_str_set(s, 0, "a", 1);
+    /* idx 1 fica null (create já zera) */
+    smaug_str_set(s, 2, "", 0);
+    /* idx 3 null */
+    smaug_str_set(s, 4, "h\xc3\xa9llo", 6);
+
+    smaug_series_str_t *rf = smaug_str_ffill(s);
+    CHECK(rf && str_eq_at(rf, 0, "a"),       "str ffill [0]=a");
+    CHECK(rf && str_eq_at(rf, 1, "a"),       "str ffill [1]=a (preenchido)");
+    CHECK(rf && str_eq_at(rf, 2, ""),        "str ffill [2]= (vazia, válida)");
+    CHECK(rf && str_eq_at(rf, 3, ""),        "str ffill [3]= (preenchido c/ vazia)");
+    CHECK(rf && str_eq_at(rf, 4, "h\xc3\xa9llo"), "str ffill [4]=héllo");
+    smaug_str_free(rf);
+
+    smaug_series_str_t *rb = smaug_str_bfill(s);
+    CHECK(rb && str_eq_at(rb, 0, "a"),       "str bfill [0]=a");
+    CHECK(rb && str_eq_at(rb, 1, ""),        "str bfill [1]= (preenchido c/ vazia seguinte)");
+    CHECK(rb && str_eq_at(rb, 3, "h\xc3\xa9llo"), "str bfill [3]=héllo (preenchido)");
+    CHECK(rb && str_eq_at(rb, 4, "h\xc3\xa9llo"), "str bfill [4]=héllo");
+    smaug_str_free(rb);
+
+    /* borda: [NA, "x", NA] */
+    smaug_series_str_t *s2 = smaug_str_create(3);
+    smaug_str_set(s2, 1, "x", 1);
+    smaug_series_str_t *r2f = smaug_str_ffill(s2);
+    size_t len; int isn;
+    str_get(r2f, 0, &len, &isn);
+    CHECK(isn,                       "str ffill borda [0]=null (sem anterior)");
+    CHECK(str_eq_at(r2f, 2, "x"),    "str ffill borda [2]=x (preenchido)");
+    smaug_str_free(r2f);
+    smaug_series_str_t *r2b = smaug_str_bfill(s2);
+    str_get(r2b, 2, &len, &isn);
+    CHECK(isn,                       "str bfill borda [2]=null (sem seguinte)");
+    CHECK(str_eq_at(r2b, 0, "x"),    "str bfill borda [0]=x (preenchido)");
+    smaug_str_free(r2b); smaug_str_free(s2);
+
+    /* toda nula */
+    smaug_series_str_t *s3 = smaug_str_create(3);
+    smaug_series_str_t *r3 = smaug_str_ffill(s3);
+    str_get(r3, 0, &len, &isn); CHECK(isn, "str ffill all-null [0]=null");
+    str_get(r3, 2, &len, &isn); CHECK(isn, "str ffill all-null [2]=null");
+    smaug_str_free(r3); smaug_str_free(s3);
+
+    smaug_str_free(s);
+    CHECK(smaug_str_ffill(NULL) == NULL, "str ffill NULL input");
+    CHECK(smaug_str_bfill(NULL) == NULL, "str bfill NULL input");
 }
 
 /* =====================================================================
@@ -931,10 +1199,14 @@ int main(void) {
     test_i64_diff();
     test_f64_shift();
     test_i64_shift();
+    test_typed_shift();
     test_f64_ffill();
     test_f64_bfill();
     test_i64_ffill();
     test_i64_bfill();
+    test_bool_ffill_bfill();
+    test_dt_ffill_bfill();
+    test_str_ffill_bfill();
     test_f64_argmin_argmax();
     test_i64_argmin_argmax();
     test_f64_sorted_nonnull();

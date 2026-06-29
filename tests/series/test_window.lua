@@ -188,4 +188,91 @@ check(approx(estd:get(2), 0.7071067811865476, 1e-9), "expanding std[2]")
 local emd = exp_s:expanding():median()
 check(approx(emd:get(2), 1.5), "expanding median[2]=1.5")
 
+-- ===================================================================
+-- ffill/bfill agnósticos a tipo (item 7.1): bool, string, datetime
+-- delegam ao C; antes só numéricos tinham C, o resto era fallback Lua.
+-- ===================================================================
+
+-- bool
+local sb  = S.from_table({true, NA, NA, false, NA}, "bool")
+local sbf = sb:ffill()
+check(sbf:get(1) == true  and sbf:get(3) == true,  "bool ffill: carry true")
+check(sbf:get(4) == false and sbf:get(5) == false, "bool ffill: carry false")
+local sbb = sb:bfill()
+check(sbb:get(2) == false and sbb:get(1) == true,  "bool bfill: carry")
+check(sbb:is_null(5),                              "bool bfill: borda final NA")
+
+-- string (com vazia válida e multibyte)
+local ss  = S.from_table({"a", NA, "", NA, "héllo"}, "string")
+local ssf = ss:ffill()
+check(ssf:get(2) == "a",      "str ffill: [2]=a (carry)")
+check(ssf:get(3) == "",       "str ffill: [3]= (vazia válida)")
+check(ssf:get(4) == "",       "str ffill: [4]= (carry vazia)")
+check(ssf:get(5) == "héllo",  "str ffill: [5]=héllo (multibyte)")
+local ssb = ss:bfill()
+check(ssb:get(1) == "a",      "str bfill: [1]=a")
+check(ssb:get(2) == "",       "str bfill: [2]= (carry vazia seguinte)")
+check(ssb:get(4) == "héllo",  "str bfill: [4]=héllo")
+-- bordas sem fonte permanecem NA
+local ss2 = S.from_table({NA, "x", NA}, "string")
+check(ss2:ffill():is_null(1), "str ffill: borda inicial NA")
+check(ss2:bfill():is_null(3), "str bfill: borda final NA")
+
+-- datetime
+local sd  = S.from_table({"2020-01-01", NA, NA, "2020-06-15"}, "datetime")
+local sdf = sd:ffill()
+check(sdf:count_nonnull() == 4,        "dt ffill: preenche 4")
+check(sdf:get(2) == sdf:get(1),        "dt ffill: [2] carrega [1]")
+local sdb = sd:bfill()
+check(sdb:get(3) == sdb:get(4),        "dt bfill: [3] carrega [4]")
+
+-- série toda nula permanece toda nula
+local sn = S.from_table({NA, NA, NA}, "string")
+check(sn:ffill():count_nonnull() == 0, "str ffill all-null: 0 válidos")
+check(sn:bfill():count_nonnull() == 0, "str bfill all-null: 0 válidos")
+
+-- ===================================================================
+-- shift com sinal (item 7.1b): negativo agora vem do C (antes era Lua,
+-- e sem cobertura em lugar nenhum). Testa os dois sentidos em todos os dtypes.
+-- ===================================================================
+
+-- f64 positivo e negativo
+local nf = S.from_table({1.0, 2.0, 3.0, 4.0}, "float64")
+local nfp = nf:shift(1)   -- [NA,1,2,3]
+check(nfp:is_null(1) and nfp:get(2) == 1 and nfp:get(4) == 3, "f64 shift(1)")
+local nfn = nf:shift(-1)  -- [2,3,4,NA]
+check(nfn:get(1) == 2 and nfn:get(3) == 4 and nfn:is_null(4), "f64 shift(-1)")
+check(nf:shift(0):get(1) == 1 and nf:shift(0):get(4) == 4,    "f64 shift(0)=clone")
+check(nf:shift(10):count_nonnull() == 0,                      "f64 shift(>=size)=all-NA")
+check(nf:shift(-10):count_nonnull() == 0,                     "f64 shift(<=-size)=all-NA")
+
+-- f64 com NA preservado no deslocamento
+local nfna = S.from_table({1.0, NA, 3.0}, "float64")
+check(nfna:shift(-1):is_null(1) and nfna:shift(-1):get(2) == 3, "f64 shift(-1) preserva NA")
+
+-- i64 negativo
+local ni = S.from_table({10, 20, 30}, "int64")
+check(ni:shift(-1):get(1) == 20 and ni:shift(-1):is_null(3), "i64 shift(-1)")
+
+-- string negativo (offset-based)
+local nss = S.from_table({"a", "b", "c", "d"}, "string")
+local nssn = nss:shift(-2)  -- [c,d,NA,NA]
+check(nssn:get(1) == "c" and nssn:get(2) == "d", "str shift(-2): valores")
+check(nssn:is_null(3) and nssn:is_null(4),       "str shift(-2): bordas NA")
+local nssp = nss:shift(2)   -- [NA,NA,a,b]
+check(nssp:is_null(1) and nssp:get(3) == "a" and nssp:get(4) == "b", "str shift(2)")
+
+-- bool negativo
+local nb = S.from_table({true, false, true}, "bool")
+local nbn = nb:shift(-1)  -- [false,true,NA]
+check(nbn:get(1) == false and nbn:get(2) == true and nbn:is_null(3), "bool shift(-1)")
+
+-- datetime negativo
+local nd = S.from_table({"2020-01-01", "2020-02-01", "2020-03-01"}, "datetime")
+local ndn = nd:shift(-1)
+check(ndn:count_nonnull() == 2 and ndn:get(1) == nd:get(2), "dt shift(-1)")
+
+-- validação de entrada mantida
+check(not pcall(function() return nf:shift(1.5) end), "shift(1.5) erra (não-inteiro)")
+
 print(string.format("OK — %d checks passaram (Series: rolling, expanding, cumsum, cummin, cummax, diff, shift, ffill, bfill, argmin, argmax)", n_ok))

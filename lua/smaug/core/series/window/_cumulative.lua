@@ -62,68 +62,44 @@ return function(I)
         return wrap(r, self._dtype, self._name)
     end
 
-    -- shift(periods): desloca os valores `periods` posições.
-    -- periods > 0: C (caso comum). periods <= 0: Lua.
+    -- shift(periods): desloca os valores `periods` posições, com sinal.
+    -- Item 7.1b: movimentação de dados é responsabilidade do Anel 0; o C
+    -- trata ambos os sentidos (periods>0 p/ baixo, <0 p/ cima). A Lua valida
+    -- a entrada e delega — sem fallback.
     function methods.shift(self, periods)
         periods = periods or 1
         if type(periods) ~= "number" or periods % 1 ~= 0 then
             error("smaug: shift() requer periods inteiro", 2)
         end
-        if periods > 0 and self._d.shift then
-            local r = self._d.shift(self._c, periods)
-            if r == nil then error("smaug: shift falhou (OOM)", 2) end
-            return wrap(r, self._dtype, self._name)
+        if not self._d.shift then
+            error("smaug: shift() não suportado para dtype '"..self._dtype.."'", 2)
         end
-        -- Lua: periods <= 0 ou dtype sem C (datetime/string/bool)
-        local n    = self:len()
-        local vals = {}
-        for i = 1, n do
-            local src = i - periods
-            if src < 1 or src > n then
-                vals[i] = NA
-            else
-                local v = self:get(src)
-                vals[i] = (v == nil) and NA or v
-            end
-        end
-        return Series.from_table(vals, self._dtype, self._name)
+        local r = self._d.shift(self._c, periods)
+        if r == nil then error("smaug: shift falhou (OOM)", 2) end
+        return wrap(r, self._dtype, self._name)
     end
 
     -- ffill(): preenche nulos com o último valor válido anterior.
-    -- Numérico: C. Outros dtypes: Lua.
+    -- Item 7.1: movimentação de dados é responsabilidade do Anel 0.
+    -- Todos os dtypes têm ffill no C; a Lua apenas delega.
     function methods.ffill(self)
-        if self._d.ffill then
-            local r = self._d.ffill(self._c)
-            if r == nil then error("smaug: ffill falhou (OOM)", 2) end
-            return wrap(r, self._dtype, self._name)
+        if not self._d.ffill then
+            error("smaug: ffill() não suportado para dtype '"..self._dtype.."'", 2)
         end
-        local n    = self:len()
-        local vals = {}
-        local last = NA
-        for i = 1, n do
-            local v = self:get(i)
-            if v ~= nil then last = v end
-            vals[i] = last
-        end
-        return Series.from_table(vals, self._dtype, self._name)
+        local r = self._d.ffill(self._c)
+        if r == nil then error("smaug: ffill falhou (OOM)", 2) end
+        return wrap(r, self._dtype, self._name)
     end
 
     -- bfill(): preenche nulos com o próximo valor válido seguinte.
+    -- Item 7.1: idem ffill — delega ao Anel 0.
     function methods.bfill(self)
-        if self._d.bfill then
-            local r = self._d.bfill(self._c)
-            if r == nil then error("smaug: bfill falhou (OOM)", 2) end
-            return wrap(r, self._dtype, self._name)
+        if not self._d.bfill then
+            error("smaug: bfill() não suportado para dtype '"..self._dtype.."'", 2)
         end
-        local n        = self:len()
-        local vals     = {}
-        local next_val = NA
-        for i = n, 1, -1 do
-            local v = self:get(i)
-            if v ~= nil then next_val = v end
-            vals[i] = next_val
-        end
-        return Series.from_table(vals, self._dtype, self._name)
+        local r = self._d.bfill(self._c)
+        if r == nil then error("smaug: bfill falhou (OOM)", 2) end
+        return wrap(r, self._dtype, self._name)
     end
 
     -- cummin(): mínimo cumulativo. Numérico → C. Datetime → Lua.

@@ -56,7 +56,7 @@ smaug_series_f64_t* smaug_f64_cumprod(const smaug_series_f64_t *s);
 smaug_series_f64_t* smaug_f64_cummin (const smaug_series_f64_t *s);
 smaug_series_f64_t* smaug_f64_cummax (const smaug_series_f64_t *s);
 smaug_series_f64_t* smaug_f64_diff   (const smaug_series_f64_t *s, size_t periods);
-smaug_series_f64_t* smaug_f64_shift  (const smaug_series_f64_t *s, size_t periods);
+smaug_series_f64_t* smaug_f64_shift  (const smaug_series_f64_t *s, int64_t periods);
 smaug_series_f64_t* smaug_f64_ffill  (const smaug_series_f64_t *s);
 smaug_series_f64_t* smaug_f64_bfill  (const smaug_series_f64_t *s);
 size_t              smaug_f64_argmin  (const smaug_series_f64_t *s);  /* 0-based; SIZE_MAX se vazia/toda-null */
@@ -111,7 +111,7 @@ smaug_series_i64_t* smaug_i64_cumprod(const smaug_series_i64_t *s);
 smaug_series_i64_t* smaug_i64_cummin (const smaug_series_i64_t *s);
 smaug_series_i64_t* smaug_i64_cummax (const smaug_series_i64_t *s);
 smaug_series_i64_t* smaug_i64_diff   (const smaug_series_i64_t *s, size_t periods);
-smaug_series_i64_t* smaug_i64_shift  (const smaug_series_i64_t *s, size_t periods);
+smaug_series_i64_t* smaug_i64_shift  (const smaug_series_i64_t *s, int64_t periods);
 smaug_series_i64_t* smaug_i64_ffill  (const smaug_series_i64_t *s);
 smaug_series_i64_t* smaug_i64_bfill  (const smaug_series_i64_t *s);
 size_t              smaug_i64_argmin  (const smaug_series_i64_t *s);  /* 0-based; SIZE_MAX se vazia/toda-null */
@@ -153,5 +153,15 @@ uint8_t* smaug_bool_ne(const smaug_series_bool_t *s, uint8_t threshold, smaug_ma
    direção. Estável (preserva ordem relativa de iguais). */
 size_t*              smaug_bool_argsort(const smaug_series_bool_t *s, bool ascending);
 smaug_series_bool_t* smaug_bool_sort   (const smaug_series_bool_t *s, bool ascending);
+
+/* Movimentação de dados agnóstica a tipo (item 7.1): preenche NA com o
+   último (ffill) / próximo (bfill) valor válido. Série nova; NA nas bordas
+   sem fonte permanecem NA. */
+smaug_series_bool_t* smaug_bool_ffill  (const smaug_series_bool_t *s);
+smaug_series_bool_t* smaug_bool_bfill  (const smaug_series_bool_t *s);
+
+/* shift(periods): desloca por `periods` posições, com sinal (item 7.1b).
+   periods>0 p/ baixo, <0 p/ cima; fonte fora de [0,size) → NA. */
+smaug_series_bool_t* smaug_bool_shift  (const smaug_series_bool_t *s, int64_t periods);
 
 #endif /* SMAUG_NUMERIC_H */

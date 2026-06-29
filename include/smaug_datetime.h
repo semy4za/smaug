@@ -145,4 +145,13 @@ smaug_series_dt_t* smaug_dt_take  (const smaug_series_dt_t *s,
 smaug_series_dt_t* smaug_dt_filter(const smaug_series_dt_t *s,
                                     const uint8_t *mask);
 
+/* Movimentação de dados agnóstica a tipo (item 7.1): preenche NA com o
+   último (ffill) / próximo (bfill) valor válido. Série nova; NA nas bordas
+   sem fonte permanecem NA. */
+smaug_series_dt_t* smaug_dt_ffill (const smaug_series_dt_t *s);
+smaug_series_dt_t* smaug_dt_bfill (const smaug_series_dt_t *s);
+
+/* shift(periods): desloca por `periods` posições, com sinal (item 7.1b). */
+smaug_series_dt_t* smaug_dt_shift (const smaug_series_dt_t *s, int64_t periods);
+
 #endif /* SMAUG_DATETIME_H */

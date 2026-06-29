@@ -3,48 +3,53 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `384ea12`  |  Data: 2026-06-29 10:59:40 -0300
+- Commit medido: `dc5d220`  |  Data: 2026-06-29 15:45:40 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `3133/3380 = 92.69%` -- 99 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- **Branch-bruto** (todos os ramos): `3286/3538 = 92.88%` -- 97 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 | Arquivo | Linhas | Branch-alvo (taken) |
 | :--- | :--- | :--- |
 | `smaug_core.c` | `402/402 = 100.00%` `[██████████]` | `290/290 = 100.00%` `[██████████]` |
-| `smaug_ops_f64.c` | `461/461 = 100.00%` `[██████████]` | `457/458 = 99.78%` `[██████████]` |
-| `smaug_ops_i64.c` | `449/452 = 99.34%` `[█████████░]` | `451/460 = 98.04%` `[█████████░]` |
-| `smaug_ops_bool.c` | `199/199 = 100.00%` `[██████████]` | `265/271 = 97.79%` `[█████████░]` |
-| `smaug_str.c` | `162/164 = 98.78%` `[█████████░]` | `132/132 = 100.00%` `[██████████]` |
-| `smaug_ops_str.c` | `115/116 = 99.14%` `[█████████░]` | `115/115 = 100.00%` `[██████████]` |
+| `smaug_ops_f64.c` | `463/463 = 100.00%` `[██████████]` | `463/464 = 99.78%` `[██████████]` |
+| `smaug_ops_i64.c` | `451/454 = 99.34%` `[█████████░]` | `456/466 = 97.85%` `[█████████░]` |
+| `smaug_ops_bool.c` | `237/237 = 100.00%` `[██████████]` | `297/305 = 97.38%` `[█████████░]` |
+| `smaug_str.c` | `164/164 = 100.00%` `[██████████]` | `134/134 = 100.00%` `[██████████]` |
+| `smaug_ops_str.c` | `178/179 = 99.44%` `[█████████░]` | `191/193 = 98.96%` `[█████████░]` |
 | `smaug_csv.c` | `304/312 = 97.44%` `[█████████░]` | `349/387 = 90.18%` `[█████████░]` |
 | `smaug_json.c` | `347/360 = 96.39%` `[█████████░]` | `414/461 = 89.80%` `[█████████░]` |
-| `smaug_datetime.c` | `396/399 = 99.25%` `[█████████░]` | `421/458 = 91.92%` `[█████████░]` |
+| `smaug_datetime.c` | `434/437 = 99.31%` `[█████████░]` | `453/492 = 92.07%` `[█████████░]` |
 | `smaug_ops_window.c` | `226/231 = 97.84%` `[█████████░]` | `239/249 = 95.98%` `[█████████░]` |
-| **TOTAL** | `3061/3096 = 98.87%` `[█████████░]` | `3133/3281 = 95.49%` `[█████████░]` |
+| **TOTAL** | `3206/3239 = 98.98%` `[█████████░]` | `3286/3441 = 95.50%` `[█████████░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
 Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 
 **`smaug_ops_f64.c`** — 1 linha(s) com ramo descoberto:
-- `smaug_ops_f64.c:714` — if (!s || !out_n) return NULL;
+- `smaug_ops_f64.c:725` — if (!s || !out_n) return NULL;
 
 **`smaug_ops_i64.c`** — 7 linha(s) com ramo descoberto:
-- `smaug_ops_i64.c:584` — if (periods >= s->size) return r;
-- `smaug_ops_i64.c:619` — if (!s || s->size == 0) return SIZE_MAX;
-- `smaug_ops_i64.c:633` — if (!s || s->size == 0) return SIZE_MAX;
-- `smaug_ops_i64.c:681` — if (!s || !out_n) return NULL;
-- `smaug_ops_i64.c:687` — if (n == 0) return NULL;
-- `smaug_ops_i64.c:724` — if (m == 0) return result;
-- `smaug_ops_i64.c:750` — switch (method) {
+- `smaug_ops_i64.c:586` — if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
+- `smaug_ops_i64.c:624` — if (!s || s->size == 0) return SIZE_MAX;
+- `smaug_ops_i64.c:638` — if (!s || s->size == 0) return SIZE_MAX;
+- `smaug_ops_i64.c:686` — if (!s || !out_n) return NULL;
+- `smaug_ops_i64.c:692` — if (n == 0) return NULL;
+- `smaug_ops_i64.c:729` — if (m == 0) return result;
+- `smaug_ops_i64.c:755` — switch (method) {
 
-**`smaug_ops_bool.c`** — 6 linha(s) com ramo descoberto:
+**`smaug_ops_bool.c`** — 7 linha(s) com ramo descoberto:
 - `smaug_ops_bool.c:203` — if (out_mask) {
 - `smaug_ops_bool.c:212` — if (mask) mask[i] = SMAUG_MASK_VALID;
 - `smaug_ops_bool.c:215` — if (mask) mask[i] = SMAUG_MASK_NULL;
 - `smaug_ops_bool.c:227` — if (out_mask) {
 - `smaug_ops_bool.c:236` — if (mask) mask[i] = SMAUG_MASK_VALID;
 - `smaug_ops_bool.c:239` — if (mask) mask[i] = SMAUG_MASK_NULL;
+- `smaug_ops_bool.c:388` — if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
+
+**`smaug_ops_str.c`** — 2 linha(s) com ramo descoberto:
+- `smaug_ops_str.c:314` — size_t *src = malloc((s->size ? s->size : 1) * sizeof(size_t));
+- `smaug_ops_str.c:345` — int all_null = (periods <= -(int64_t)n || periods >= (int64_t)n);
 
 **`smaug_csv.c`** — 28 linha(s) com ramo descoberto:
 - `smaug_csv.c:112` — if (errno || *end != '\0') return 0;
@@ -115,7 +120,7 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_json.c:625` — if (!buf) return -1;
 - `smaug_json.c:629` — return (w == len) ? 0 : -1;
 
-**`smaug_datetime.c`** — 33 linha(s) com ramo descoberto:
+**`smaug_datetime.c`** — 34 linha(s) com ramo descoberto:
 - `smaug_datetime.c:232` — if (!s)             { if (status) *status = SMG_ERR_ARGUMENT; return DT_SENTINEL; }
 - `smaug_datetime.c:249` — if (!s)             return SMG_ERR_ARGUMENT;
 - `smaug_datetime.c:275` — if (!s) return -1;
@@ -149,6 +154,7 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_datetime.c:655` — DT_CMP_IMPL(ne, !=)
 - `smaug_datetime.c:682` — if (!entries) return NULL;
 - `smaug_datetime.c:693` — if (!indices) { free(entries); return NULL; }
+- `smaug_datetime.c:813` — if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
 
 **`smaug_ops_window.c`** — 8 linha(s) com ramo descoberto:
 - `smaug_ops_window.c:32` — switch (col->kind) {
@@ -178,8 +184,6 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_str.c:185` — overflow na soma buffer_len+extra; so com buffer_len ~ SIZE_MAX
 - `smaug_str.c:187` — buffer_capacity==0 inalcancavel via API publica (create garante bufcap>=INIT)
 - `smaug_str.c:205` — overflow ao dobrar capacity; so com capacity ~ SIZE_MAX
-- `smaug_str.c:216` — bloco de recuperacao de OOM de null_mask; inalcancavel na pratica (slots crescem atomicamente)
-- `smaug_str.c:218` — realloc de shrink falhando; defensivo
 - `smaug_str.c:218` — realloc de shrink falhando; defensivo
 - `smaug_str.c:250` — len==0 inalcancavel aqui (bloco len>old_len implica len>0)
 - `smaug_str.c:290` — rc sempre SMG_OK neste ponto (validacao acima ja garante)

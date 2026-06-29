@@ -100,6 +100,17 @@ smaug_series_str_t* smaug_str_take  (const smaug_series_str_t *s, const size_t *
 size_t*             smaug_str_argsort(const smaug_series_str_t *s, bool ascending);
 smaug_series_str_t* smaug_str_sort   (const smaug_series_str_t *s, bool ascending);
 
+/* Movimentação de dados agnóstica a tipo (item 7.1): preenche NA com a última
+   (ffill) / próxima (bfill) string válida. Série nova reconstruída por append
+   (offset-based), NÃO view — produz cópia. NA nas bordas sem fonte permanecem
+   NA. NULL em falha de alocação. */
+smaug_series_str_t* smaug_str_ffill  (const smaug_series_str_t *s);
+smaug_series_str_t* smaug_str_bfill  (const smaug_series_str_t *s);
+
+/* shift(periods): desloca por `periods` posições, com sinal (item 7.1b).
+   Offset-based, reconstruído por append (não view). */
+smaug_series_str_t* smaug_str_shift  (const smaug_series_str_t *s, int64_t periods);
+
 /* NOTA: comparações (eq/lt/gt) — ESTA peça. sort/argsort, take/filter e a
    evolução para dictionary encoding (via tipo `categorical`, Tier 2) são fases
    posteriores — ver Roadmap. */
