@@ -5,6 +5,65 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-06-29 — Item 7.2b: min/max em dt/str/bool no Ring 0 (7.2 completo)
+
+Segunda metade do 7.2. Fecha a outra metade da incoerência: `dt:min`/`dt:max`
+(e str/bool) passam a existir, retornando o **valor** do menor/maior (decisão
+D7.2-a opção ii). Agora `dt:min == get(dt:argmin)` — coerência total.
+
+- **dt** (`smaug_dt_min`/`max`): retorna int64 epoch, espelha `smaug_i64_min/max`.
+  INT64_MIN (= DT_SENTINEL) sinaliza vazia/toda-NA/(ignore_na=false) presença de
+  NA; a Lua detecta via `is_int_sentinel` → nil. Passa por `reduce_num` limpo
+  (já era o caminho dos numéricos).
+- **str** (`smaug_str_min`/`max`): retorna ponteiro+len para o elemento vencedor
+  (dentro do buffer de `s`), no padrão de `smaug_str_get` — NULL = vazia/toda-NA/
+  (ignore_na=false) NA; ptr!=NULL com len==0 = "" (distinta de NULL). Reusa
+  `argmin/argmax` (mesma comparação lexicográfica). Wrapper no descritor
+  materializa via `ffi.string`. NÃO aloca.
+- **bool** (`smaug_bool_min`/`max`): Shape 1 (valor + status), como `bool_get` —
+  não há valor fora de {0,1} para sentinela, então `SMG_NULL_VALUE` sinaliza
+  ausência. Wrapper no descritor lê o status (distingue `false` de ausência).
+- **Decisão de despacho** (`_reduce.lua`): `methods.min/max` ramifica —
+  str/bool usam o wrapper do descritor (retorna valor|nil), evitando `reduce_num`
+  (que faria `tonumber` e quebraria a string); f64/i64/dt seguem `reduce_num`.
+  O caminho numérico não foi tocado (preserva Valgrind-clean já validado).
+- `ignore_na` uniforme em todos os dtypes (default true: pula NA; false: NA
+  presente → nil). argmin/argmax seguem ignorando NA por natureza.
+- Testes: C +22 (test_ops_window 338→360: dt/str/bool min/max, "" válida, NA,
+  ignore_na false, toda-NA, NULL, status NULL-safe); Lua +14 (test_reduce 43→57).
+  min/max não alocam → allocfail inalterado (1705).
+- Achado registrado (não acionado): `df:min()`/`df:max()` no DataSet ainda
+  filtram só colunas numéricas (contrato D3 do item 5). Estender a str/dt/bool
+  (como pandas) é decisão de escopo do frame — fora do 7.2.
+- `[Fedora]`: aguarda Valgrind + cobertura. Atenção aos caminhos `str_min/max`
+  (ponteiro pra dentro do buffer) e às ramificações de status do bool.
+
+---
+## 2026-06-29 — Item 7.2a: argmin/argmax em str/bool/dt no Ring 0
+
+Primeira metade do 7.2. Fecha parte da incoerência `dt:argmin`✓/`dt:min`✗:
+o `dt:argmin` que funcionava via fallback Lua foi movido pro C, e str/bool —
+que erravam — ganharam a operação.
+
+- C novo: `smaug_dt_argmin/argmax` (cronológico), `smaug_bool_argmin/argmax`
+  (false<true), `smaug_str_argmin/argmax` (lexicográfico por bytes, via novo
+  helper `str_cmp_idx` — comparação índice-vs-índice, mesma ordem de sort/cmp).
+  Todos espelham `smaug_f64_argmin`: índice 0-based, SIZE_MAX se vazia/toda-NA,
+  ignoram NA. Decisão D7.2-b: bool incluído (era o único órfão; trivial).
+- `methods.argmin`/`argmax` (`_cumulative.lua`): o gate de dtype hardcoded
+  (numérico+datetime) virou gate por **capacidade** (`self._d.argmin` existe?),
+  e o fallback Lua foi removido. Erro orientado por dtype quando não há suporte.
+  `idxmin`/`idxmax` são aliases → herdam o suporte novo automaticamente.
+- Parity: removidas 4 exceptions agora **órfãs** (argmin/argmax × str/bool, antes
+  marcadas "gap"/"sem semântica"). Categorical permanece exceção (sem ordem total
+  estável — depende do encoding dos codes).
+- Testes: C +24 (test_ops_window 314→338: dt/str/bool com NA, vazia, toda-NA,
+  string vazia como menor, prefixo "ab"<"abc"); Lua +9 (test_window 93→102).
+  argmin/argmax não alocam → allocfail inalterado. Os testes de `dt:argmin` em
+  test_categorical passaram a exercitar o C (guard da migração de graça).
+- `[Fedora]`: aguarda Valgrind + cobertura para `[Done]`.
+
+---
 ## 2026-06-29 — Item 7.1b: shift com sinal no Ring 0 (todos os dtypes)
 
 Fecha o 7.1. Move o shift inteiro pro C — incluindo o sentido negativo, que

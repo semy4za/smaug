@@ -177,6 +177,35 @@ do
     check(an:sum() == 0, "5.5 Series sum all-null default = 0 (preservado)")
     check(an:sum(nil, 1) == nil, "5.5 Series sum all-null min_count=1 → NA")
     check(c:prod(nil, 2) == nil, "5.5 Series prod(min_count=2) → NA")
+
+    -- ===============================================================
+    -- min/max em dtypes ordenáveis não-numéricos (item 7.2b): retornam
+    -- VALOR (D7.2-a ii). Fecha a incoerência argmin✓/min✗ que havia em dt.
+    -- ===============================================================
+    local d = Series.from_table({"2020-03-01", "2020-01-01", "2020-06-15"}, "datetime")
+    check(d:min() == d:get(d:argmin()), "7.2b dt:min == get(argmin)")
+    check(d:max() == d:get(d:argmax()), "7.2b dt:max == get(argmax)")
+    check(type(d:min()) == "number",     "7.2b dt:min retorna número (epoch)")
+
+    local sm = Series.from_table({"banana", "abacaxi", "caju"}, "string")
+    check(sm:min() == "abacaxi", "7.2b str:min = abacaxi")
+    check(sm:max() == "caju",    "7.2b str:max = caju")
+    local sv = Series.from_table({"z", "", "m"}, "string")
+    check(sv:min() == "",       "7.2b str:min com vazia = '' (válida)")
+
+    local bm = Series.from_table({true, false, true}, "bool")
+    check(bm:min() == false, "7.2b bool:min = false")
+    check(bm:max() == true,  "7.2b bool:max = true")
+
+    check(Series.from_table({NA, NA}, "string"):min()   == nil, "7.2b str all-NA min = nil")
+    check(Series.from_table({NA, NA}, "bool"):min()     == nil, "7.2b bool all-NA min = nil")
+    check(Series.from_table({NA, NA}, "datetime"):min() == nil, "7.2b dt all-NA min = nil")
+
+    local smn = Series.from_table({"a", NA, "c"}, "string")
+    check(smn:min()      == "a",  "7.2b str:min default ignora NA")
+    check(smn:min(false) == nil,  "7.2b str:min(false) com NA = nil")
+    local bmn = Series.from_table({true, NA}, "bool")
+    check(bmn:min(false) == nil,  "7.2b bool:min(false) com NA = nil")
 end
 
 

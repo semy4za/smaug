@@ -10,7 +10,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-06-29 23:26:12 UTC
+Gerado em: 2026-06-30 00:13:26 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -398,12 +398,14 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `xor` | 🟨 |  |
 
 
-### str — 25 funções C
+### str — 29 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
 | `append` | 🟩 |  |
 | `append_null` | 🟩 |  |
+| `argmax` | 🟩 |  |
+| `argmin` | 🟩 |  |
 | `argsort` | 🟩 |  |
 | `bfill` | 🟩 |  |
 | `clone` | 🟩 |  |
@@ -421,6 +423,8 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `is_null` | 🟩 |  |
 | `le` | 🟩 |  |
 | `lt` | 🟩 |  |
+| `max` | 🟩 |  |
+| `min` | 🟩 |  |
 | `ne` | 🟩 |  |
 | `set` | 🟩 |  |
 | `set_null` | 🟩 |  |
@@ -429,13 +433,15 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `take` | 🟩 |  |
 
 
-### dt — 43 funções C
+### dt — 47 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
 | `add_ms` | 🟩 |  |
 | `append` | 🟩 |  |
 | `append_null` | 🟩 |  |
+| `argmax` | 🟩 |  |
+| `argmin` | 🟩 |  |
 | `argsort` | 🟩 |  |
 | `bfill` | 🟩 |  |
 | `clone` | 🟩 |  |
@@ -458,6 +464,8 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `is_null` | 🟩 |  |
 | `le` | 🟩 |  |
 | `lt` | 🟩 |  |
+| `max` | 🟩 |  |
+| `min` | 🟩 |  |
 | `minute` | 🟩 |  |
 | `month` | 🟩 |  |
 | `ms` | 🟩 |  |
@@ -657,7 +665,7 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 231/231 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 232/232 erros com prefixo `smaug:` (100.0%)
 - `dataset.lua`: 92/92 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
@@ -697,7 +705,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | :--- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
 | `series/test_constructors` | 330 | 36 | 55 | 19 | 11 | — | 1 |
 | `series/test_access` | 101 | 15 | 8 | — | 4 | — | — |
-| `series/test_reduce` | 44 | 7 | 2 | — | — | — | — |
+| `series/test_reduce` | 58 | 7 | 2 | 3 | 4 | 2 | — |
 | `series/test_stat` | 70 | 6 | 12 | — | 9 | — | — |
 | `series/test_window` | 95 | 7 | 7 | 2 | 5 | 2 | — |
 | `series/test_predicates` | 155 | 6 | 42 | 3 | 11 | — | — |
@@ -714,7 +722,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 67 | 18 | 2 | — | — | — | — |
 
-**Total de checks:** 2421
+**Total de checks:** 2435
 
 ### Menções totais por dtype (toda a suite)
 
@@ -722,9 +730,9 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | :--- | :-: |
 | float64 | 173 |
 | int64 | 294 |
-| bool | 54 |
-| string | 192 |
-| datetime | 77 |
+| bool | 57 |
+| string | 196 |
+| datetime | 79 |
 | categorical | 58 |
 
 ## Eixo 12 — Sincronização docs ↔ código
@@ -749,7 +757,7 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 958
+- 🟩 paridade: 966
 - ⬜ exceção registrada: 221
 - 🟨 suspeita (revisar): 258
 - 🟥 inconsistência clara: 12

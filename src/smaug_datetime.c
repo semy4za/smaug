@@ -820,3 +820,75 @@ smaug_series_dt_t *smaug_dt_shift(const smaug_series_dt_t *s, int64_t periods) {
     }
     return r;
 }
+
+/* argmin/argmax(): índice 0-based do menor/maior datetime não-NA.
+   SIZE_MAX se vazia ou toda-NA. Ordem cronológica (int64). (Item 7.2a;
+   antes era fallback Lua.) Espelha smaug_f64_argmin. */
+size_t smaug_dt_argmin(const smaug_series_dt_t *s) {
+    if (!s || s->size == 0) return SIZE_MAX;
+    size_t  best_i = SIZE_MAX;
+    int64_t best_v = 0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            if (best_i == SIZE_MAX || s->data[i] < best_v) {
+                best_v = s->data[i];
+                best_i = i;
+            }
+        }
+    }
+    return best_i;
+}
+size_t smaug_dt_argmax(const smaug_series_dt_t *s) {
+    if (!s || s->size == 0) return SIZE_MAX;
+    size_t  best_i = SIZE_MAX;
+    int64_t best_v = 0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            if (best_i == SIZE_MAX || s->data[i] > best_v) {
+                best_v = s->data[i];
+                best_i = i;
+            }
+        }
+    }
+    return best_i;
+}
+
+/* ===================================================================
+   min / max (item 7.2b): menor/maior epoch_ms (ordem cronológica).
+   Espelha smaug_i64_min/max — INT64_MIN (DT_SENTINEL) sinaliza
+   vazia / toda-NA / (com ignore_na=false) presença de NA. A Lua
+   detecta o sentinela via is_int_sentinel → nil.
+   =================================================================== */
+int64_t smaug_dt_min(const smaug_series_dt_t *s, bool ignore_na) {
+    if (!s || s->size == 0) return DT_SENTINEL;
+    int64_t result = 0;
+    bool    found  = false;
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            if (!found || s->data[i] < result) {
+                result = s->data[i];
+                found  = true;
+            }
+        } else if (!ignore_na) {
+            return DT_SENTINEL;
+        }
+    }
+    return found ? result : DT_SENTINEL;
+}
+
+int64_t smaug_dt_max(const smaug_series_dt_t *s, bool ignore_na) {
+    if (!s || s->size == 0) return DT_SENTINEL;
+    int64_t result = 0;
+    bool    found  = false;
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            if (!found || s->data[i] > result) {
+                result = s->data[i];
+                found  = true;
+            }
+        } else if (!ignore_na) {
+            return DT_SENTINEL;
+        }
+    }
+    return found ? result : DT_SENTINEL;
+}

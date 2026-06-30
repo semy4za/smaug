@@ -395,3 +395,83 @@ smaug_series_bool_t *smaug_bool_shift(const smaug_series_bool_t *s, int64_t peri
     }
     return r;
 }
+
+/* argmin/argmax(): índice 0-based do menor/maior bool não-NA (false < true).
+   SIZE_MAX se vazia ou toda-NA. (Item 7.2a.) */
+size_t smaug_bool_argmin(const smaug_series_bool_t *s) {
+    if (!s || s->size == 0) return SIZE_MAX;
+    size_t  best_i = SIZE_MAX;
+    uint8_t best_v = 0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            if (best_i == SIZE_MAX || s->data[i] < best_v) {
+                best_v = s->data[i];
+                best_i = i;
+            }
+        }
+    }
+    return best_i;
+}
+size_t smaug_bool_argmax(const smaug_series_bool_t *s) {
+    if (!s || s->size == 0) return SIZE_MAX;
+    size_t  best_i = SIZE_MAX;
+    uint8_t best_v = 0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            if (best_i == SIZE_MAX || s->data[i] > best_v) {
+                best_v = s->data[i];
+                best_i = i;
+            }
+        }
+    }
+    return best_i;
+}
+
+/* ===================================================================
+   min / max (item 7.2b): bool é ordenável (false < true). Shape 1
+   (valor + status), como smaug_bool_get — não há valor fora do domínio
+   {0,1} para servir de sentinela, então o status sinaliza ausência:
+   SMG_NULL_VALUE = vazia / toda-NA / (ignore_na=false) presença de NA;
+   SMG_OK = há valor. status pode ser NULL (caller ignora).
+   =================================================================== */
+uint8_t smaug_bool_min(const smaug_series_bool_t *s, bool ignore_na,
+                       smaug_status_t *status) {
+    if (!s || s->size == 0) {
+        if (status) *status = SMG_NULL_VALUE;
+        return 0;
+    }
+    uint8_t result = 1;   /* maior possível: qualquer false reduz */
+    bool    found  = false;
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            uint8_t v = s->data[i] ? 1 : 0;
+            if (!found || v < result) { result = v; found = true; }
+        } else if (!ignore_na) {
+            if (status) *status = SMG_NULL_VALUE;
+            return 0;
+        }
+    }
+    if (status) *status = found ? SMG_OK : SMG_NULL_VALUE;
+    return found ? result : 0;
+}
+
+uint8_t smaug_bool_max(const smaug_series_bool_t *s, bool ignore_na,
+                       smaug_status_t *status) {
+    if (!s || s->size == 0) {
+        if (status) *status = SMG_NULL_VALUE;
+        return 0;
+    }
+    uint8_t result = 0;   /* menor possível: qualquer true aumenta */
+    bool    found  = false;
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            uint8_t v = s->data[i] ? 1 : 0;
+            if (!found || v > result) { result = v; found = true; }
+        } else if (!ignore_na) {
+            if (status) *status = SMG_NULL_VALUE;
+            return 0;
+        }
+    }
+    if (status) *status = found ? SMG_OK : SMG_NULL_VALUE;
+    return found ? result : 0;
+}

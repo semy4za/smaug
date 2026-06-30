@@ -256,12 +256,29 @@ fallback element-wise. Depende do item 1 (nulidade coerente) já pronto.
     `smaug_f64_shift`/`smaug_i64_shift` mudou (size_t→int64_t); shift novo em
     bool/str/dt. Fallback Lua removido por inteiro. Cobriu shift negativo que NÃO
     tinha teste em lugar nenhum. Teste C +29 (285→314), Lua +13 (80→93),
-    allocfail +28 → 1705. Aguarda Fedora p/ Valgrind+cobertura.
-- 7.2 min/max/argmin/argmax em ordenáveis (dt/str têm sort/gt/lt) — fecha a
-  incoerência atual `dt:argmin` ✓ vs `dt:min` ✗
+    allocfail +28 → 1705. Fedora: Valgrind-clean, cobertura 98.98%, 97 exclusões.
+    **[Done]** — 7.1 fechado (toda movimentação agnóstica a tipo no Anel 0).
+- 7.2 min/max/argmin/argmax em ordenáveis (str/dt; bool incluído por D7.2-b)
+  - 7.2a ✅ **argmin/argmax** no C para str (lexicográfico), bool (false<true) e
+    dt (movido de fallback Lua → C). Fecha a incoerência `dt:argmin`✓/`dt:min`✗ pela
+    metade do argmin; gate na Lua passou a ser por capacidade (`self._d.argmin`),
+    sem fallback. Removidas 4 exceptions órfãs do parity (argmin/argmax × str/bool).
+    Teste C +24 (test_ops_window 314→338), Lua +9 (test_window 93→102). argmin/argmax
+    não alocam → allocfail inalterado. Aguarda Fedora p/ Valgrind+cobertura.
+  - 7.2b ✅ **min/max** em dt/str/bool (D7.2-a ii: retornam valor). dt → int64
+    (sentinela INT64_MIN, via reduce_num); str → ponteiro+len materializado por
+    wrapper no descritor (ffi.string), "" distinta de NULL; bool → Shape 1
+    (valor+status SMG_NULL_VALUE). `ignore_na` uniforme. Fecha a incoerência
+    `dt:min`✗ → agora `dt:min == get(argmin)`. Não alocam → allocfail inalterado.
+    Teste C +22 (test_ops_window 338→360), Lua +14 (test_reduce 43→57).
+    Aguarda Fedora p/ Valgrind+cobertura. **[7.2 completo]**
+    - Achado (não acionado): `df:min()`/`df:max()` no DataSet ainda filtram só
+      colunas numéricas (contrato D3 do item 5). Agora que a Series faz min/max em
+      str/dt/bool, estender o DataSet a essas colunas (como pandas) é decisão de
+      escopo do frame — registrado para avaliação futura, fora do 7.2.
 - 7.3 rank em dt/str (lexicográfico/cronológico)
 - 7.4 ✅ bool eq/ne no C (único dtype sem igualdade). C+header+cdef+wrapper Lua,
-  teste C (+11), Lua (+6), allocfail (+20 → 1632). Aguarda Fedora p/ Valgrind+cobertura.
+  teste C (+11), Lua (+6), allocfail (+20). Fedora-validado (Valgrind-clean + cobertura).
 
 ## 8. Rolling → Ring 0  [Windows+Fedora]
 

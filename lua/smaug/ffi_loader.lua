@@ -265,6 +265,10 @@ ffi.cdef([[
     smaug_series_bool_t* smaug_bool_ffill  (const smaug_series_bool_t *s);
     smaug_series_bool_t* smaug_bool_bfill  (const smaug_series_bool_t *s);
     smaug_series_bool_t* smaug_bool_shift  (const smaug_series_bool_t *s, int64_t periods);
+    size_t smaug_bool_argmin (const smaug_series_bool_t *s);
+    size_t smaug_bool_argmax (const smaug_series_bool_t *s);
+    uint8_t smaug_bool_min (const smaug_series_bool_t *s, bool ignore_na, smaug_status_t *status);
+    uint8_t smaug_bool_max (const smaug_series_bool_t *s, bool ignore_na, smaug_status_t *status);
 
     /* ===================================================================
        Operações Boolean (BoolSeries) — lógica de três valores (Kleene)
@@ -337,6 +341,10 @@ ffi.cdef([[
     smaug_series_str_t* smaug_str_ffill  (const smaug_series_str_t *s);
     smaug_series_str_t* smaug_str_bfill  (const smaug_series_str_t *s);
     smaug_series_str_t* smaug_str_shift  (const smaug_series_str_t *s, int64_t periods);
+    size_t smaug_str_argmin (const smaug_series_str_t *s);
+    size_t smaug_str_argmax (const smaug_series_str_t *s);
+    const char* smaug_str_min (const smaug_series_str_t *s, bool ignore_na, size_t *out_len);
+    const char* smaug_str_max (const smaug_series_str_t *s, bool ignore_na, size_t *out_len);
 
     /* ===================================================================
        Anel 3 — I/O (CSV + JSON)
@@ -466,6 +474,10 @@ ffi.cdef([[
     smaug_series_dt_t* smaug_dt_ffill  (const smaug_series_dt_t *s);
     smaug_series_dt_t* smaug_dt_bfill  (const smaug_series_dt_t *s);
     smaug_series_dt_t* smaug_dt_shift  (const smaug_series_dt_t *s, int64_t periods);
+    size_t smaug_dt_argmin (const smaug_series_dt_t *s);
+    size_t smaug_dt_argmax (const smaug_series_dt_t *s);
+    int64_t smaug_dt_min (const smaug_series_dt_t *s, bool ignore_na);
+    int64_t smaug_dt_max (const smaug_series_dt_t *s, bool ignore_na);
 
     /* ===================================================================
        Grupo C (Fase 3 Ring 0): multi_argsort e rolling ops

@@ -49,7 +49,7 @@ reimplementação e deriva.
 |--------|---------|
 | `smaug_<t>_sum(s, ignore_na)` | f64→double, i64→int64 |
 | `smaug_<t>_mean(s, ignore_na)` | double |
-| `smaug_<t>_min/max(s, ignore_na)` | f64→double, i64→int64 |
+| `smaug_<t>_min/max(s, ignore_na)` | f64→double, i64→int64, dt→int64 (epoch), bool→uint8+status, str→ptr+len |
 | `smaug_<t>_var/std(s, ignore_na)` | double, amostral (÷ N-1; <2 → NaN) |
 | `smaug_<t>_count_nonnull(s)` | size_t |
 
@@ -141,8 +141,8 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `:dtype()` | string do dtype (par singular de `DataSet:dtypes`) |
 | `:sum([ignore_na])` | soma; ignore_na=true por padrão |
 | `:mean([ignore_na])` | média |
-| `:min([ignore_na])` | mínimo |
-| `:max([ignore_na])` | máximo |
+| `:min([ignore_na])` | mínimo (ordenáveis: f64/i64 → número, datetime → epoch, string → lexicográfico, bool → false<true) |
+| `:max([ignore_na])` | máximo (mesmos dtypes; valor do maior elemento) |
 | `:var([ignore_na])` | variância amostral (÷ N-1; <2 → NaN) |
 | `:std([ignore_na])` | desvio padrão amostral (÷ N-1; <2 → NaN) |
 | `:count_nonnull()` | nº de não-nulos |
@@ -244,7 +244,7 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `Series.ifelse(cond, a, b)` | vetorizado: a onde cond=true, b senão |
 | `:nlargest(n)` | n maiores valores |
 | `:nsmallest(n)` | n menores valores |
-| `:argmin()` / `:argmax()` | índice (1-based) do mínimo/máximo; suporta f64, i64 e datetime |
+| `:argmin()` / `:argmax()` | índice (1-based) do mínimo/máximo; ordenáveis: f64, i64, datetime, string (lexicográfico), bool |
 
 **Janela temporal:**
 

@@ -708,6 +708,168 @@ static void test_i64_argmin_argmax(void) {
     CHECK(smaug_i64_argmax(NULL) == (size_t)-1, "i64 argmax NULL = SIZE_MAX");
 }
 
+/* argmin/argmax em dt/str/bool (item 7.2a: ordenáveis no Anel 0) */
+static void test_typed_argminmax(void) {
+    /* dt: cronológico. [300,100,600,100] → argmin=1, argmax=2 */
+    int64_t da[] = {300, 100, 600, 100};
+    smaug_series_dt_t *d = dt_from(da, 4);
+    CHECK(smaug_dt_argmin(d) == 1, "dt argmin = 1");
+    CHECK(smaug_dt_argmax(d) == 2, "dt argmax = 2");
+    smaug_dt_free(d);
+    /* dt com NA: ignora */
+    int64_t da2[] = {INT64_MIN, 50, INT64_MIN, 10};
+    smaug_series_dt_t *d2 = dt_from(da2, 4);
+    CHECK(smaug_dt_argmin(d2) == 3, "dt argmin null = 3");
+    CHECK(smaug_dt_argmax(d2) == 1, "dt argmax null = 1");
+    smaug_dt_free(d2);
+    /* dt toda-NA / vazia / NULL */
+    int64_t da3[] = {INT64_MIN, INT64_MIN};
+    smaug_series_dt_t *d3 = dt_from(da3, 2);
+    CHECK(smaug_dt_argmin(d3) == (size_t)-1, "dt argmin toda-NA = SIZE_MAX");
+    smaug_dt_free(d3);
+    smaug_series_dt_t *de = smaug_dt_create(0);
+    CHECK(smaug_dt_argmin(de) == (size_t)-1, "dt argmin vazia = SIZE_MAX");
+    smaug_dt_free(de);
+    CHECK(smaug_dt_argmin(NULL) == (size_t)-1, "dt argmin NULL = SIZE_MAX");
+    CHECK(smaug_dt_argmax(NULL) == (size_t)-1, "dt argmax NULL = SIZE_MAX");
+
+    /* str: lexicográfico por bytes. ["banana","abacaxi","caju"] →
+       argmin=1 (abacaxi), argmax=2 (caju) */
+    smaug_series_str_t *s = smaug_str_create(3);
+    smaug_str_set(s, 0, "banana", 6);
+    smaug_str_set(s, 1, "abacaxi", 7);
+    smaug_str_set(s, 2, "caju", 4);
+    CHECK(smaug_str_argmin(s) == 1, "str argmin = 1 (abacaxi)");
+    CHECK(smaug_str_argmax(s) == 2, "str argmax = 2 (caju)");
+    smaug_str_free(s);
+    /* str com vazia (menor de todas) e NA */
+    smaug_series_str_t *s2 = smaug_str_create(4);
+    smaug_str_set(s2, 0, "z", 1);
+    /* idx 1 = NA */
+    smaug_str_set(s2, 2, "", 0);
+    smaug_str_set(s2, 3, "m", 1);
+    CHECK(smaug_str_argmin(s2) == 2, "str argmin = 2 (vazia é a menor)");
+    CHECK(smaug_str_argmax(s2) == 0, "str argmax = 0 (z)");
+    smaug_str_free(s2);
+    /* str prefixo: "ab" < "abc" (mais curta antes) */
+    smaug_series_str_t *s3 = smaug_str_create(2);
+    smaug_str_set(s3, 0, "abc", 3);
+    smaug_str_set(s3, 1, "ab", 2);
+    CHECK(smaug_str_argmin(s3) == 1, "str argmin prefixo = 1 (ab)");
+    smaug_str_free(s3);
+    /* str toda-NA / vazia / NULL */
+    smaug_series_str_t *s4 = smaug_str_create(2);
+    CHECK(smaug_str_argmin(s4) == (size_t)-1, "str argmin toda-NA = SIZE_MAX");
+    smaug_str_free(s4);
+    smaug_series_str_t *se2 = smaug_str_create(0);
+    CHECK(smaug_str_argmin(se2) == (size_t)-1, "str argmin vazia = SIZE_MAX");
+    smaug_str_free(se2);
+    CHECK(smaug_str_argmin(NULL) == (size_t)-1, "str argmin NULL = SIZE_MAX");
+    CHECK(smaug_str_argmax(NULL) == (size_t)-1, "str argmax NULL = SIZE_MAX");
+
+    /* bool: false<true. "101" → argmin=1 (false), argmax=0 (true) */
+    smaug_series_bool_t *b = bool_from("101");
+    CHECK(smaug_bool_argmin(b) == 1, "bool argmin = 1 (false)");
+    CHECK(smaug_bool_argmax(b) == 0, "bool argmax = 0 (true)");
+    smaug_bool_free(b);
+    /* bool com NA: "N0N1" → argmin=1 (false), argmax=3 (true) */
+    smaug_series_bool_t *b2 = bool_from("N0N1");
+    CHECK(smaug_bool_argmin(b2) == 1, "bool argmin null = 1");
+    CHECK(smaug_bool_argmax(b2) == 3, "bool argmax null = 3");
+    smaug_bool_free(b2);
+    /* bool toda-NA / NULL */
+    smaug_series_bool_t *b3 = bool_from("NN");
+    CHECK(smaug_bool_argmin(b3) == (size_t)-1, "bool argmin toda-NA = SIZE_MAX");
+    smaug_bool_free(b3);
+    CHECK(smaug_bool_argmin(NULL) == (size_t)-1, "bool argmin NULL = SIZE_MAX");
+    CHECK(smaug_bool_argmax(NULL) == (size_t)-1, "bool argmax NULL = SIZE_MAX");
+}
+
+/* min/max em dt/str/bool (item 7.2b: valor do menor/maior, ordenáveis) */
+static void test_typed_minmax(void) {
+    /* dt: cronológico. [300,100,600] → min=100, max=600 */
+    int64_t da[] = {300, 100, 600};
+    smaug_series_dt_t *d = dt_from(da, 3);
+    CHECK(smaug_dt_min(d, true) == 100, "dt min = 100");
+    CHECK(smaug_dt_max(d, true) == 600, "dt max = 600");
+    smaug_dt_free(d);
+    /* dt com NA: ignore_na pula; senão sentinela */
+    int64_t da2[] = {300, INT64_MIN, 100};
+    smaug_series_dt_t *d2 = dt_from(da2, 3);
+    CHECK(smaug_dt_min(d2, true)  == 100,        "dt min ignore_na");
+    CHECK(smaug_dt_max(d2, true)  == 300,        "dt max ignore_na");
+    CHECK(smaug_dt_min(d2, false) == INT64_MIN,  "dt min(false) com NA = sentinela");
+    smaug_dt_free(d2);
+    /* dt vazia / toda-NA / NULL */
+    int64_t da3[] = {INT64_MIN, INT64_MIN};
+    smaug_series_dt_t *d3 = dt_from(da3, 2);
+    CHECK(smaug_dt_min(d3, true) == INT64_MIN, "dt min toda-NA = sentinela");
+    smaug_dt_free(d3);
+    CHECK(smaug_dt_min(NULL, true) == INT64_MIN, "dt min NULL = sentinela");
+
+    /* str: lexicográfico. ["banana","abacaxi","caju"] → min=abacaxi, max=caju */
+    smaug_series_str_t *s = smaug_str_create(3);
+    smaug_str_set(s, 0, "banana", 6);
+    smaug_str_set(s, 1, "abacaxi", 7);
+    smaug_str_set(s, 2, "caju", 4);
+    size_t len; const char *p;
+    p = smaug_str_min(s, true, &len);
+    CHECK(p && len == 7 && memcmp(p, "abacaxi", 7) == 0, "str min = abacaxi");
+    p = smaug_str_max(s, true, &len);
+    CHECK(p && len == 4 && memcmp(p, "caju", 4) == 0,    "str max = caju");
+    smaug_str_free(s);
+    /* str com "" válida: ["z","","m"] → min="" (len 0, ptr não-NULL) */
+    smaug_series_str_t *sv = smaug_str_create(3);
+    smaug_str_set(sv, 0, "z", 1);
+    smaug_str_set(sv, 1, "", 0);
+    smaug_str_set(sv, 2, "m", 1);
+    p = smaug_str_min(sv, true, &len);
+    CHECK(p != NULL && len == 0, "str min = '' (vazia válida, ptr não-NULL)");
+    smaug_str_free(sv);
+    /* str com NA: ignore_na pula; senão NULL */
+    smaug_series_str_t *sn = smaug_str_create(3);
+    smaug_str_set(sn, 0, "a", 1);
+    smaug_str_set(sn, 2, "c", 1);  /* idx 1 = NA */
+    p = smaug_str_min(sn, true, &len);
+    CHECK(p && len == 1 && p[0] == 'a',           "str min ignore_na = a");
+    p = smaug_str_min(sn, false, &len);
+    CHECK(p == NULL,                              "str min(false) com NA = NULL");
+    smaug_str_free(sn);
+    /* str toda-NA / vazia / NULL */
+    smaug_series_str_t *se = smaug_str_create(2);  /* tudo NA */
+    CHECK(smaug_str_min(se, true, &len) == NULL,  "str min toda-NA = NULL");
+    smaug_str_free(se);
+    CHECK(smaug_str_min(NULL, true, &len) == NULL, "str min NULL = NULL");
+
+    /* bool: false<true. "101" → min=false(0), max=true(1) */
+    smaug_status_t st;
+    smaug_series_bool_t *b = bool_from("101");
+    CHECK(smaug_bool_min(b, true, &st) == 0 && st == SMG_OK, "bool min = false");
+    CHECK(smaug_bool_max(b, true, &st) == 1 && st == SMG_OK, "bool max = true");
+    smaug_bool_free(b);
+    /* bool todos-true: "11" → min=true */
+    smaug_series_bool_t *bt = bool_from("11");
+    CHECK(smaug_bool_min(bt, true, &st) == 1 && st == SMG_OK, "bool min todos-true = true");
+    smaug_bool_free(bt);
+    /* bool com NA: ignore pula; senão NULL */
+    smaug_series_bool_t *bn = bool_from("1N0");
+    CHECK(smaug_bool_min(bn, true, &st) == 0 && st == SMG_OK,    "bool min ignore_na");
+    smaug_bool_min(bn, false, &st);
+    CHECK(st == SMG_NULL_VALUE,                                  "bool min(false) com NA = status NULL");
+    smaug_bool_free(bn);
+    /* bool toda-NA / NULL */
+    smaug_series_bool_t *be = bool_from("NN");
+    smaug_bool_min(be, true, &st);
+    CHECK(st == SMG_NULL_VALUE, "bool min toda-NA = status NULL");
+    smaug_bool_free(be);
+    smaug_bool_min(NULL, true, &st);
+    CHECK(st == SMG_NULL_VALUE, "bool min NULL = status NULL");
+    /* status NULL-safe (caller passa NULL) */
+    smaug_series_bool_t *bok = bool_from("10");
+    CHECK(smaug_bool_min(bok, true, NULL) == 0, "bool min status=NULL safe");
+    smaug_bool_free(bok);
+}
+
 /* =====================================================================
    sorted_nonnull
    ===================================================================== */
@@ -1209,6 +1371,8 @@ int main(void) {
     test_str_ffill_bfill();
     test_f64_argmin_argmax();
     test_i64_argmin_argmax();
+    test_typed_argminmax();
+    test_typed_minmax();
     test_f64_sorted_nonnull();
     test_i64_sorted_nonnull();
     test_f64_rank();

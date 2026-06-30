@@ -111,6 +111,18 @@ smaug_series_str_t* smaug_str_bfill  (const smaug_series_str_t *s);
    Offset-based, reconstruído por append (não view). */
 smaug_series_str_t* smaug_str_shift  (const smaug_series_str_t *s, int64_t periods);
 
+/* argmin/argmax(): índice 0-based da menor/maior string não-NA (lexicográfico
+   por bytes); SIZE_MAX se vazia/toda-NA (item 7.2a). */
+size_t smaug_str_argmin (const smaug_series_str_t *s);
+size_t smaug_str_argmax (const smaug_series_str_t *s);
+
+/* min/max (item 7.2b): menor/maior string (lexicográfico por bytes). Retorna
+   ponteiro+len para o elemento vencedor (dentro do buffer de `s`), no padrão de
+   smaug_str_get: NULL = vazia/toda-NA/(ignore_na=false) NA; ponteiro!=NULL com
+   *out_len==0 = "" (distinta de NULL). */
+const char* smaug_str_min (const smaug_series_str_t *s, bool ignore_na, size_t *out_len);
+const char* smaug_str_max (const smaug_series_str_t *s, bool ignore_na, size_t *out_len);
+
 /* NOTA: comparações (eq/lt/gt) — ESTA peça. sort/argsort, take/filter e a
    evolução para dictionary encoding (via tipo `categorical`, Tier 2) são fases
    posteriores — ver Roadmap. */

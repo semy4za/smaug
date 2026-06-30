@@ -143,6 +143,22 @@ return function(I)
             ffill   = C.smaug_str_ffill,
             bfill   = C.smaug_str_bfill,
             shift   = C.smaug_str_shift,
+            argmin  = C.smaug_str_argmin,
+            argmax  = C.smaug_str_argmax,
+            -- 7.2b: min/max retornam o valor (string) ou nil (vazia/toda-NA).
+            -- Wrapper materializa o ponteiro+len do C via ffi.string.
+            min = function(c, ignore_na)
+                local len = ffi.new("size_t[1]")
+                local p   = C.smaug_str_min(c, ignore_na, len)
+                if p == nil then return nil end
+                return ffi.string(p, len[0])
+            end,
+            max = function(c, ignore_na)
+                local len = ffi.new("size_t[1]")
+                local p   = C.smaug_str_max(c, ignore_na, len)
+                if p == nil then return nil end
+                return ffi.string(p, len[0])
+            end,
             is_int_sentinel = function(_) return false end,
         },
         datetime = {
@@ -188,6 +204,10 @@ return function(I)
             ffill   = C.smaug_dt_ffill,
             bfill   = C.smaug_dt_bfill,
             shift   = C.smaug_dt_shift,
+            argmin  = C.smaug_dt_argmin,
+            argmax  = C.smaug_dt_argmax,
+            min     = C.smaug_dt_min,
+            max     = C.smaug_dt_max,
             cmp_gt = function(c, t, om) if type(t)~="number" then error("smaug: comparação de datetime espera epoch_ms (número)",4) end return C.smaug_dt_gt(c, t, om) end,
             cmp_lt = function(c, t, om) if type(t)~="number" then error("smaug: comparação de datetime espera epoch_ms (número)",4) end return C.smaug_dt_lt(c, t, om) end,
             cmp_eq = function(c, t, om) if type(t)~="number" then error("smaug: comparação de datetime espera epoch_ms (número)",4) end return C.smaug_dt_eq(c, t, om) end,
@@ -227,6 +247,22 @@ return function(I)
             ffill   = C.smaug_bool_ffill,
             bfill   = C.smaug_bool_bfill,
             shift   = C.smaug_bool_shift,
+            argmin  = C.smaug_bool_argmin,
+            argmax  = C.smaug_bool_argmax,
+            -- 7.2b: min/max retornam o valor (bool) ou nil (vazia/toda-NA).
+            -- Wrapper lê o status (Shape 1) para distinguir false de ausência.
+            min = function(c, ignore_na)
+                local st = ffi.new("smaug_status_t[1]")
+                local v  = C.smaug_bool_min(c, ignore_na, st)
+                if st[0] ~= C.SMG_OK then return nil end
+                return v ~= 0
+            end,
+            max = function(c, ignore_na)
+                local st = ffi.new("smaug_status_t[1]")
+                local v  = C.smaug_bool_max(c, ignore_na, st)
+                if st[0] ~= C.SMG_OK then return nil end
+                return v ~= 0
+            end,
             cmp_eq = function(c, t, om) if type(t)~="boolean" then error("smaug: comparação bool espera true/false",4) end return C.smaug_bool_eq(c, t and 1 or 0, om) end,
             cmp_ne = function(c, t, om) if type(t)~="boolean" then error("smaug: comparação bool espera true/false",4) end return C.smaug_bool_ne(c, t and 1 or 0, om) end,
             is_int_sentinel = function(_) return false end,

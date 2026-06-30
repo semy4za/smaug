@@ -3,9 +3,9 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `dc5d220`  |  Data: 2026-06-29 15:45:40 -0300
+- Commit medido: `c200aa4`  |  Data: 2026-06-29 20:29:59 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `3286/3538 = 92.88%` -- 97 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- **Branch-bruto** (todos os ramos): `3433/3722 = 92.24%` -- 97 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 | Arquivo | Linhas | Branch-alvo (taken) |
@@ -13,14 +13,14 @@
 | `smaug_core.c` | `402/402 = 100.00%` `[██████████]` | `290/290 = 100.00%` `[██████████]` |
 | `smaug_ops_f64.c` | `463/463 = 100.00%` `[██████████]` | `463/464 = 99.78%` `[██████████]` |
 | `smaug_ops_i64.c` | `451/454 = 99.34%` `[█████████░]` | `456/466 = 97.85%` `[█████████░]` |
-| `smaug_ops_bool.c` | `237/237 = 100.00%` `[██████████]` | `297/305 = 97.38%` `[█████████░]` |
+| `smaug_ops_bool.c` | `281/286 = 98.25%` `[█████████░]` | `348/373 = 93.30%` `[█████████░]` |
 | `smaug_str.c` | `164/164 = 100.00%` `[██████████]` | `134/134 = 100.00%` `[██████████]` |
-| `smaug_ops_str.c` | `178/179 = 99.44%` `[█████████░]` | `191/193 = 98.96%` `[█████████░]` |
+| `smaug_ops_str.c` | `216/220 = 98.18%` `[█████████░]` | `237/253 = 93.68%` `[█████████░]` |
 | `smaug_csv.c` | `304/312 = 97.44%` `[█████████░]` | `349/387 = 90.18%` `[█████████░]` |
 | `smaug_json.c` | `347/360 = 96.39%` `[█████████░]` | `414/461 = 89.80%` `[█████████░]` |
-| `smaug_datetime.c` | `434/437 = 99.31%` `[█████████░]` | `453/492 = 92.07%` `[█████████░]` |
+| `smaug_datetime.c` | `475/479 = 99.16%` `[█████████░]` | `503/548 = 91.79%` `[█████████░]` |
 | `smaug_ops_window.c` | `226/231 = 97.84%` `[█████████░]` | `239/249 = 95.98%` `[█████████░]` |
-| **TOTAL** | `3206/3239 = 98.98%` `[█████████░]` | `3286/3441 = 95.50%` `[█████████░]` |
+| **TOTAL** | `3329/3371 = 98.75%` `[█████████░]` | `3433/3625 = 94.70%` `[█████████░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
@@ -38,7 +38,7 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_ops_i64.c:729` — if (m == 0) return result;
 - `smaug_ops_i64.c:755` — switch (method) {
 
-**`smaug_ops_bool.c`** — 7 linha(s) com ramo descoberto:
+**`smaug_ops_bool.c`** — 20 linha(s) com ramo descoberto:
 - `smaug_ops_bool.c:203` — if (out_mask) {
 - `smaug_ops_bool.c:212` — if (mask) mask[i] = SMAUG_MASK_VALID;
 - `smaug_ops_bool.c:215` — if (mask) mask[i] = SMAUG_MASK_NULL;
@@ -46,10 +46,34 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_ops_bool.c:236` — if (mask) mask[i] = SMAUG_MASK_VALID;
 - `smaug_ops_bool.c:239` — if (mask) mask[i] = SMAUG_MASK_NULL;
 - `smaug_ops_bool.c:388` — if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
+- `smaug_ops_bool.c:402` — if (!s || s->size == 0) return SIZE_MAX;
+- `smaug_ops_bool.c:416` — if (!s || s->size == 0) return SIZE_MAX;
+- `smaug_ops_bool.c:439` — if (!s || s->size == 0) {
+- `smaug_ops_bool.c:440` — if (status) *status = SMG_NULL_VALUE;
+- `smaug_ops_bool.c:450` — if (status) *status = SMG_NULL_VALUE;
+- `smaug_ops_bool.c:460` — if (!s || s->size == 0) {
+- `smaug_ops_bool.c:461` — if (status) *status = SMG_NULL_VALUE;
+- `smaug_ops_bool.c:467` — if (SMAUG_VALID(s->null_mask, i)) {
+- `smaug_ops_bool.c:469` — if (!found || v > result) { result = v; found = true; }
+- `smaug_ops_bool.c:470` — } else if (!ignore_na) {
+- `smaug_ops_bool.c:471` — if (status) *status = SMG_NULL_VALUE;
+- `smaug_ops_bool.c:475` — if (status) *status = found ? SMG_OK : SMG_NULL_VALUE;
+- `smaug_ops_bool.c:476` — return found ? result : 0;
 
-**`smaug_ops_str.c`** — 2 linha(s) com ramo descoberto:
+**`smaug_ops_str.c`** — 13 linha(s) com ramo descoberto:
 - `smaug_ops_str.c:314` — size_t *src = malloc((s->size ? s->size : 1) * sizeof(size_t));
 - `smaug_ops_str.c:345` — int all_null = (periods <= -(int64_t)n || periods >= (int64_t)n);
+- `smaug_ops_str.c:385` — if (la > lb) return  1;
+- `smaug_ops_str.c:403` — if (!s || s->size == 0) return SIZE_MAX;
+- `smaug_ops_str.c:424` — if (out_len) *out_len = 0;
+- `smaug_ops_str.c:425` — if (!s || s->size == 0) return NULL;
+- `smaug_ops_str.c:427` — for (size_t i = 0; i < s->size; i++)
+- `smaug_ops_str.c:437` — if (out_len) *out_len = 0;
+- `smaug_ops_str.c:438` — if (!s || s->size == 0) return NULL;
+- `smaug_ops_str.c:439` — if (!ignore_na) {
+- `smaug_ops_str.c:440` — for (size_t i = 0; i < s->size; i++)
+- `smaug_ops_str.c:441` — if (SMAUG_NULL(s->null_mask, i)) return NULL;
+- `smaug_ops_str.c:444` — if (idx == SIZE_MAX) return NULL;
 
 **`smaug_csv.c`** — 28 linha(s) com ramo descoberto:
 - `smaug_csv.c:112` — if (errno || *end != '\0') return 0;
@@ -120,7 +144,7 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_json.c:625` — if (!buf) return -1;
 - `smaug_json.c:629` — return (w == len) ? 0 : -1;
 
-**`smaug_datetime.c`** — 34 linha(s) com ramo descoberto:
+**`smaug_datetime.c`** — 39 linha(s) com ramo descoberto:
 - `smaug_datetime.c:232` — if (!s)             { if (status) *status = SMG_ERR_ARGUMENT; return DT_SENTINEL; }
 - `smaug_datetime.c:249` — if (!s)             return SMG_ERR_ARGUMENT;
 - `smaug_datetime.c:275` — if (!s) return -1;
@@ -155,6 +179,11 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_datetime.c:682` — if (!entries) return NULL;
 - `smaug_datetime.c:693` — if (!indices) { free(entries); return NULL; }
 - `smaug_datetime.c:813` — if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
+- `smaug_datetime.c:842` — if (!s || s->size == 0) return SIZE_MAX;
+- `smaug_datetime.c:863` — if (!s || s->size == 0) return DT_SENTINEL;
+- `smaug_datetime.c:880` — if (!s || s->size == 0) return DT_SENTINEL;
+- `smaug_datetime.c:889` — } else if (!ignore_na) {
+- `smaug_datetime.c:893` — return found ? result : DT_SENTINEL;
 
 **`smaug_ops_window.c`** — 8 linha(s) com ramo descoberto:
 - `smaug_ops_window.c:32` — switch (col->kind) {

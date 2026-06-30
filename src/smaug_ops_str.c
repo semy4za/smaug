@@ -372,3 +372,75 @@ smaug_series_str_t *smaug_str_shift(const smaug_series_str_t *s, int64_t periods
     }
     return r;
 }
+
+/* Compara as strings nas posições ia e ib (lexicográfico por bytes, mesma
+   ordem de str_cmp_at/sort). <0 se ia<ib, >0 se ia>ib, 0 se iguais. */
+static int str_cmp_idx(const smaug_series_str_t *s, size_t ia, size_t ib) {
+    size_t sa = s->offsets[ia], la = s->offsets[ia + 1] - sa;
+    size_t sb = s->offsets[ib], lb = s->offsets[ib + 1] - sb;
+    size_t mn = la < lb ? la : lb;
+    int c = (mn > 0) ? memcmp(s->buffer + sa, s->buffer + sb, mn) : 0;
+    if (c != 0) return c;
+    if (la < lb) return -1;
+    if (la > lb) return  1;
+    return 0;
+}
+
+/* argmin/argmax(): índice 0-based da menor/maior string não-NA (lexicográfico
+   por bytes). SIZE_MAX se vazia ou toda-NA. (Item 7.2a.) */
+size_t smaug_str_argmin(const smaug_series_str_t *s) {
+    if (!s || s->size == 0) return SIZE_MAX;
+    size_t best_i = SIZE_MAX;
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            if (best_i == SIZE_MAX || str_cmp_idx(s, i, best_i) < 0)
+                best_i = i;
+        }
+    }
+    return best_i;
+}
+size_t smaug_str_argmax(const smaug_series_str_t *s) {
+    if (!s || s->size == 0) return SIZE_MAX;
+    size_t best_i = SIZE_MAX;
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            if (best_i == SIZE_MAX || str_cmp_idx(s, i, best_i) > 0)
+                best_i = i;
+        }
+    }
+    return best_i;
+}
+
+/* ===================================================================
+   min / max (item 7.2b): menor/maior string em ordem lexicográfica por
+   bytes. Retorna ponteiro+len para o elemento vencedor (dentro do buffer
+   da própria série — válido enquanto `s` viver), no padrão de smaug_str_get:
+   NULL = vazia / toda-NA / (ignore_na=false) presença de NA;
+   ponteiro não-NULL com *out_len==0 = string vazia "" (distinta de NULL).
+   Reusa argmin/argmax (mesma comparação str_cmp_idx).
+   =================================================================== */
+const char *smaug_str_min(const smaug_series_str_t *s, bool ignore_na,
+                          size_t *out_len) {
+    if (out_len) *out_len = 0;
+    if (!s || s->size == 0) return NULL;
+    if (!ignore_na) {
+        for (size_t i = 0; i < s->size; i++)
+            if (SMAUG_NULL(s->null_mask, i)) return NULL;
+    }
+    size_t idx = smaug_str_argmin(s);
+    if (idx == SIZE_MAX) return NULL;          /* toda-NA */
+    return smaug_str_get(s, idx, out_len);
+}
+
+const char *smaug_str_max(const smaug_series_str_t *s, bool ignore_na,
+                          size_t *out_len) {
+    if (out_len) *out_len = 0;
+    if (!s || s->size == 0) return NULL;
+    if (!ignore_na) {
+        for (size_t i = 0; i < s->size; i++)
+            if (SMAUG_NULL(s->null_mask, i)) return NULL;
+    }
+    size_t idx = smaug_str_argmax(s);
+    if (idx == SIZE_MAX) return NULL;
+    return smaug_str_get(s, idx, out_len);
+}

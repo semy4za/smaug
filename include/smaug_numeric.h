@@ -164,4 +164,14 @@ smaug_series_bool_t* smaug_bool_bfill  (const smaug_series_bool_t *s);
    periods>0 p/ baixo, <0 p/ cima; fonte fora de [0,size) → NA. */
 smaug_series_bool_t* smaug_bool_shift  (const smaug_series_bool_t *s, int64_t periods);
 
+/* argmin/argmax(): índice 0-based do menor/maior bool não-NA (false<true);
+   SIZE_MAX se vazia/toda-NA (item 7.2a). */
+size_t smaug_bool_argmin (const smaug_series_bool_t *s);
+size_t smaug_bool_argmax (const smaug_series_bool_t *s);
+
+/* min/max (item 7.2b): bool é ordenável (false<true). Shape 1 (valor+status),
+   como smaug_bool_get; SMG_NULL_VALUE = vazia/toda-NA/(ignore_na=false) NA. */
+uint8_t smaug_bool_min (const smaug_series_bool_t *s, bool ignore_na, smaug_status_t *status);
+uint8_t smaug_bool_max (const smaug_series_bool_t *s, bool ignore_na, smaug_status_t *status);
+
 #endif /* SMAUG_NUMERIC_H */

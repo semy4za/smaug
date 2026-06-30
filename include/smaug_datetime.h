@@ -154,4 +154,14 @@ smaug_series_dt_t* smaug_dt_bfill (const smaug_series_dt_t *s);
 /* shift(periods): desloca por `periods` posições, com sinal (item 7.1b). */
 smaug_series_dt_t* smaug_dt_shift (const smaug_series_dt_t *s, int64_t periods);
 
+/* argmin/argmax(): índice 0-based do menor/maior datetime não-NA; SIZE_MAX se
+   vazia/toda-NA. Ordem cronológica (item 7.2a). */
+size_t smaug_dt_argmin (const smaug_series_dt_t *s);
+size_t smaug_dt_argmax (const smaug_series_dt_t *s);
+
+/* min/max (item 7.2b): menor/maior epoch_ms (cronológico). INT64_MIN
+   sinaliza vazia/toda-NA/(ignore_na=false) presença de NA (= sentinela dt). */
+int64_t smaug_dt_min (const smaug_series_dt_t *s, bool ignore_na);
+int64_t smaug_dt_max (const smaug_series_dt_t *s, bool ignore_na);
+
 #endif /* SMAUG_DATETIME_H */
