@@ -1,7 +1,8 @@
 -- lua/smaug/core/series/window/_rolling.lua
 --
 -- SeriesRolling e SeriesExpanding: janela deslizante e janela crescente.
--- Grupo C Ring 0 (sum/mean/min/max com C); std/var/count/median/quantile em Lua.
+-- Grupo C Ring 0 (item 8a): sum/mean/min/max/std/var/count delegam ao C com
+-- min_periods. median/quantile ficam em Lua (janela ordenada, via _agg).
 -- Recebe I com: I.methods, I.Series, I.wrap, I.NA, I.median_sorted
 -- Produz em I: I.SeriesRolling, I.SeriesExpanding
 -- Contribui: methods.rolling, methods.expanding
@@ -45,107 +46,52 @@ return function(I)
         return Series.from_table(vals, out_dtype or col._dtype, col._name)
     end
 
+    -- Item 8a: sum/mean/min/max/std/var/count delegam ao C com min_periods.
+    -- Convenção: _min_periods nil → 0 (modo janela-cheia, default do C);
+    -- setado → valor (modo parcial). Sem fallback Lua — fonte única no C.
+    -- O bug histórico (caminho C ignorava min_periods) morre aqui.
+    local function mp(self) return self._min_periods or 0 end
+
     function SeriesRolling:sum()
-        if self._s._d.rolling_sum then
-            local r = self._s._d.rolling_sum(self._s._c, self._window)
-            if r == nil then error("smaug: rolling:sum falhou (OOM)", 2) end
-            return wrap(r, self._s._dtype, self._s._name)
-        end
-        return self:_agg(function(vs)
-            local s = 0; for _, v in ipairs(vs) do s = s + v end; return s
-        end)
+        local r = self._s._d.rolling_sum(self._s._c, self._window, mp(self))
+        if r == nil then error("smaug: rolling:sum falhou (OOM)", 2) end
+        return wrap(r, self._s._dtype, self._s._name)
     end
 
     function SeriesRolling:mean()
-        if self._s._d.rolling_mean then
-            local r = self._s._d.rolling_mean(self._s._c, self._window)
-            if r == nil then error("smaug: rolling:mean falhou (OOM)", 2) end
-            return wrap(r, "float64", self._s._name)
-        end
-        local col = self._s
-        local n   = col:len()
-        local w   = self._window
-        local vals = {}
-        for i = 1, n do
-            if i < w then
-                vals[i] = NA
-            else
-                local wv = {}
-                for j = i - w + 1, i do
-                    local v = col:get(j)
-                    if v ~= nil then wv[#wv+1] = v end
-                end
-                if #wv == 0 then vals[i] = NA
-                else
-                    local s = 0; for _, v in ipairs(wv) do s = s + v end
-                    vals[i] = s / #wv
-                end
-            end
-        end
-        return Series.from_table(vals, "float64", col._name)
+        local r = self._s._d.rolling_mean(self._s._c, self._window, mp(self))
+        if r == nil then error("smaug: rolling:mean falhou (OOM)", 2) end
+        return wrap(r, "float64", self._s._name)
     end
 
     function SeriesRolling:min()
-        if self._s._d.rolling_min then
-            local r = self._s._d.rolling_min(self._s._c, self._window)
-            if r == nil then error("smaug: rolling:min falhou (OOM)", 2) end
-            return wrap(r, self._s._dtype, self._s._name)
-        end
-        return self:_agg(function(vs)
-            if #vs == 0 then return nil end
-            local m = vs[1]; for _, v in ipairs(vs) do if v < m then m = v end end
-            return m
-        end)
+        local r = self._s._d.rolling_min(self._s._c, self._window, mp(self))
+        if r == nil then error("smaug: rolling:min falhou (OOM)", 2) end
+        return wrap(r, self._s._dtype, self._s._name)
     end
 
     function SeriesRolling:max()
-        if self._s._d.rolling_max then
-            local r = self._s._d.rolling_max(self._s._c, self._window)
-            if r == nil then error("smaug: rolling:max falhou (OOM)", 2) end
-            return wrap(r, self._s._dtype, self._s._name)
-        end
-        return self:_agg(function(vs)
-            if #vs == 0 then return nil end
-            local m = vs[1]; for _, v in ipairs(vs) do if v > m then m = v end end
-            return m
-        end)
+        local r = self._s._d.rolling_max(self._s._c, self._window, mp(self))
+        if r == nil then error("smaug: rolling:max falhou (OOM)", 2) end
+        return wrap(r, self._s._dtype, self._s._name)
     end
 
     function SeriesRolling:std()
-        return self:_agg(function(vs)
-            local n = #vs
-            if n < 2 then return nil end
-            local mean = 0; for _, v in ipairs(vs) do mean = mean + v end; mean = mean / n
-            local s = 0; for _, v in ipairs(vs) do local d = v - mean; s = s + d*d end
-            return math.sqrt(s / (n - 1))
-        end, "float64")
+        local r = self._s._d.rolling_std(self._s._c, self._window, mp(self))
+        if r == nil then error("smaug: rolling:std falhou (OOM)", 2) end
+        return wrap(r, "float64", self._s._name)
     end
 
     function SeriesRolling:var()
-        return self:_agg(function(vs)
-            local n = #vs
-            if n < 2 then return nil end
-            local mean = 0; for _, v in ipairs(vs) do mean = mean + v end; mean = mean / n
-            local s = 0; for _, v in ipairs(vs) do local d = v - mean; s = s + d*d end
-            return s / (n - 1)
-        end, "float64")
+        local r = self._s._d.rolling_var(self._s._c, self._window, mp(self))
+        if r == nil then error("smaug: rolling:var falhou (OOM)", 2) end
+        return wrap(r, "float64", self._s._name)
     end
 
     function SeriesRolling:count()
-        local col, w = self._s, self._window
-        local n      = col:len()
-        local vals   = {}
-        for i = 1, n do
-            if i < w then vals[i] = NA
-            else
-                local cnt = 0
-                for j = i - w + 1, i do
-                    if col:get(j) ~= nil then cnt = cnt + 1 end
-                end
-                vals[i] = cnt
-            end
-        end
-        return Series.from_table(vals, "int64", col._name)
+        local r = self._s._d.rolling_count(self._s._c, self._window, mp(self))
+        if r == nil then error("smaug: rolling:count falhou (OOM)", 2) end
+        return wrap(r, "int64", self._s._name)
     end
 
     function SeriesRolling:median()
@@ -217,48 +163,24 @@ return function(I)
         return Series.from_table(vals, col._dtype, col._name)
     end
 
-    function SeriesExpanding:sum()
-        return self:_agg(function(vs) local s=0; for _,v in ipairs(vs) do s=s+v end; return s end)
+    -- Item 8b: expanding É rolling com janela = comprimento total e
+    -- min_periods >= 1 (janela [1,i] cresce a cada posição). Delega ao
+    -- rolling (que delega ao C) — fonte única, sem reimplementação.
+    -- median/quantile ficam Lua (via _agg, como no rolling).
+    local function exp_roll(self)
+        local n = self._s:len()
+        local w = (n > 0) and n or 1
+        return self._s:rolling(w):min_periods(self._min_periods or 1)
     end
-    function SeriesExpanding:mean()
-        return self:_agg(function(vs)
-            if #vs == 0 then return nil end
-            local s=0; for _,v in ipairs(vs) do s=s+v end; return s/#vs
-        end)
-    end
-    function SeriesExpanding:min()
-        return self:_agg(function(vs)
-            if #vs == 0 then return nil end
-            local m=vs[1]; for _,v in ipairs(vs) do if v<m then m=v end end; return m
-        end)
-    end
-    function SeriesExpanding:max()
-        return self:_agg(function(vs)
-            if #vs == 0 then return nil end
-            local m=vs[1]; for _,v in ipairs(vs) do if v>m then m=v end end; return m
-        end)
-    end
-    function SeriesExpanding:std()
-        return self:_agg(function(vs)
-            local n = #vs
-            if n < 2 then return nil end
-            local mean = 0; for _,v in ipairs(vs) do mean=mean+v end; mean=mean/n
-            local s = 0; for _,v in ipairs(vs) do local d=v-mean; s=s+d*d end
-            return math.sqrt(s / (n-1))
-        end)
-    end
-    function SeriesExpanding:var()
-        return self:_agg(function(vs)
-            local n = #vs
-            if n < 2 then return nil end
-            local mean = 0; for _,v in ipairs(vs) do mean=mean+v end; mean=mean/n
-            local s = 0; for _,v in ipairs(vs) do local d=v-mean; s=s+d*d end
-            return s / (n-1)
-        end)
-    end
-    function SeriesExpanding:count()
-        return self:_agg(function(vs) return #vs end)
-    end
+
+    function SeriesExpanding:sum()   return exp_roll(self):sum()   end
+    function SeriesExpanding:mean()  return exp_roll(self):mean()  end
+    function SeriesExpanding:min()   return exp_roll(self):min()   end
+    function SeriesExpanding:max()   return exp_roll(self):max()   end
+    function SeriesExpanding:std()   return exp_roll(self):std()   end
+    function SeriesExpanding:var()   return exp_roll(self):var()   end
+    function SeriesExpanding:count() return exp_roll(self):count() end
+
     function SeriesExpanding:median()
         return self:_agg(function(vs)
             local sv = {}; for _,v in ipairs(vs) do sv[#sv+1]=v end

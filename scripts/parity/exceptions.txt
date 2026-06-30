@@ -83,13 +83,7 @@
 1:clip/bool            sem semântica
 1:clip/datetime        semântica clara mas implementação pendente — registrar como gap real
 1:clip/categorical     sem semântica
-1:rank/string          ranking lexicográfico tem semântica mas não implementado — gap real
-1:rank/bool            sem semântica útil
-1:rank/datetime        ranking temporal tem semântica mas não implementado — gap real
 1:rank/categorical     sem semântica
-1:pct_rank/string      idem rank
-1:pct_rank/bool        sem semântica
-1:pct_rank/datetime    idem rank
 1:pct_rank/categorical sem semântica
 
 # Lifecycle / armazenamento

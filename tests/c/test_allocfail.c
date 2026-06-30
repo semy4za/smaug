@@ -806,6 +806,21 @@ static void af_str_shift(void) {
     }
     smaug_str_free(s);
 }
+static void af_str_rank(void) {
+    reset(-1);
+    smaug_series_str_t *s = smaug_str_create(5);
+    assert(s);
+    smaug_str_set(s, 0, "banana", 6);
+    smaug_str_set(s, 1, "abacaxi", 7);
+    smaug_str_set(s, 3, "abacaxi", 7);  /* empate; idx 2,4 null */
+    /* exercita malloc(result) + malloc(idx) + qsort */
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        double *r = smaug_str_rank(s, 0);
+        if (r) { OK(1, "str rank ok"); free(r); }
+    }
+    smaug_str_free(s);
+}
 static void af_str_argsort(void) {
     const char *arr[] = {"MG", "AC", "SP"};
     reset(-1);
@@ -1276,6 +1291,19 @@ static void af_bool_shift(void) {
         reset(k);
         smaug_series_bool_t *r = smaug_bool_shift(s, -1);
         if (r) { OK(r->size == 4, "bool shift size"); smaug_bool_free(r); }
+    }
+    smaug_bool_free(s);
+}
+static void af_bool_rank(void) {
+    reset(-1);
+    smaug_series_bool_t *s = smaug_bool_create(4);
+    assert(s);
+    smaug_bool_set(s, 0, 1); smaug_bool_set(s, 1, 0); smaug_bool_set(s, 2, 1);
+    /* idx 3 null; bool rank só aloca result (sem qsort) */
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        double *r = smaug_bool_rank(s, 0);
+        if (r) { OK(1, "bool rank ok"); free(r); }
     }
     smaug_bool_free(s);
 }
@@ -1929,17 +1957,32 @@ static void fnname(void) { \
     } \
     smaug_f64_free(base); \
 }
-AF_F64_ROLL(af_f64_rolling_sum,  smaug_f64_rolling_sum(base, 3))
-AF_F64_ROLL(af_f64_rolling_mean, smaug_f64_rolling_mean(base, 3))
-AF_F64_ROLL(af_f64_rolling_min,  smaug_f64_rolling_min(base, 3))
-AF_F64_ROLL(af_f64_rolling_max,  smaug_f64_rolling_max(base, 3))
+AF_F64_ROLL(af_f64_rolling_sum,  smaug_f64_rolling_sum(base, 3, 0))
+AF_F64_ROLL(af_f64_rolling_mean, smaug_f64_rolling_mean(base, 3, 0))
+AF_F64_ROLL(af_f64_rolling_min,  smaug_f64_rolling_min(base, 3, 0))
+AF_F64_ROLL(af_f64_rolling_max,  smaug_f64_rolling_max(base, 3, 0))
+/* item 8a: motor genérico (rolling_apply + pack_f64) e modo min_periods */
+AF_F64_ROLL(af_f64_rolling_std,  smaug_f64_rolling_std(base, 3, 0))
+AF_F64_ROLL(af_f64_rolling_var,  smaug_f64_rolling_var(base, 3, 0))
+AF_F64_ROLL(af_f64_rolling_mean_mp, smaug_f64_rolling_mean(base, 3, 1))
+AF_F64_ROLL(af_f64_rolling_min_mp,  smaug_f64_rolling_min(base, 3, 1))  /* rescan */
+/* count f64 → i64 */
+static void af_f64_rolling_count(void) {
+    smaug_series_f64_t *base = mk_f64_gapped(); assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_i64_t *r = smaug_f64_rolling_count(base, 3, 0);
+        if (r) { OK(r->size == base->size, "f64 rolling_count size"); smaug_i64_free(r); }
+    }
+    smaug_f64_free(base);
+}
 
 /* --- rolling i64 (sum/min/max → i64; mean → f64) --- */
 static void af_i64_rolling_sum(void) {
     smaug_series_i64_t *base = mk_i64_gapped(); assert(base);
     for (long k = 0; k < MAX_ALLOCS; k++) {
         reset(k);
-        smaug_series_i64_t *r = smaug_i64_rolling_sum(base, 3);
+        smaug_series_i64_t *r = smaug_i64_rolling_sum(base, 3, 0);
         if (r) { OK(r->size == base->size, "i64 rolling_sum size"); smaug_i64_free(r); }
     }
     smaug_i64_free(base);
@@ -1948,7 +1991,7 @@ static void af_i64_rolling_mean(void) {
     smaug_series_i64_t *base = mk_i64_gapped(); assert(base);
     for (long k = 0; k < MAX_ALLOCS; k++) {
         reset(k);
-        smaug_series_f64_t *r = smaug_i64_rolling_mean(base, 3);
+        smaug_series_f64_t *r = smaug_i64_rolling_mean(base, 3, 0);
         if (r) { OK(r->size == base->size, "i64 rolling_mean size"); smaug_f64_free(r); }
     }
     smaug_i64_free(base);
@@ -1957,7 +2000,7 @@ static void af_i64_rolling_min(void) {
     smaug_series_i64_t *base = mk_i64_gapped(); assert(base);
     for (long k = 0; k < MAX_ALLOCS; k++) {
         reset(k);
-        smaug_series_i64_t *r = smaug_i64_rolling_min(base, 3);
+        smaug_series_i64_t *r = smaug_i64_rolling_min(base, 3, 0);
         if (r) { OK(r->size == base->size, "i64 rolling_min size"); smaug_i64_free(r); }
     }
     smaug_i64_free(base);
@@ -1966,8 +2009,45 @@ static void af_i64_rolling_max(void) {
     smaug_series_i64_t *base = mk_i64_gapped(); assert(base);
     for (long k = 0; k < MAX_ALLOCS; k++) {
         reset(k);
-        smaug_series_i64_t *r = smaug_i64_rolling_max(base, 3);
+        smaug_series_i64_t *r = smaug_i64_rolling_max(base, 3, 0);
         if (r) { OK(r->size == base->size, "i64 rolling_max size"); smaug_i64_free(r); }
+    }
+    smaug_i64_free(base);
+}
+/* item 8a: i64 std/var (→f64, via i64_rolling_via_motor) e count (→i64) */
+static void af_i64_rolling_std(void) {
+    smaug_series_i64_t *base = mk_i64_gapped(); assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_f64_t *r = smaug_i64_rolling_std(base, 3, 0);
+        if (r) { OK(r->size == base->size, "i64 rolling_std size"); smaug_f64_free(r); }
+    }
+    smaug_i64_free(base);
+}
+static void af_i64_rolling_var(void) {
+    smaug_series_i64_t *base = mk_i64_gapped(); assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_f64_t *r = smaug_i64_rolling_var(base, 3, 0);
+        if (r) { OK(r->size == base->size, "i64 rolling_var size"); smaug_f64_free(r); }
+    }
+    smaug_i64_free(base);
+}
+static void af_i64_rolling_count(void) {
+    smaug_series_i64_t *base = mk_i64_gapped(); assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_i64_t *r = smaug_i64_rolling_count(base, 3, 0);
+        if (r) { OK(r->size == base->size, "i64 rolling_count size"); smaug_i64_free(r); }
+    }
+    smaug_i64_free(base);
+}
+static void af_i64_rolling_min_mp(void) {  /* rescan type-preserving */
+    smaug_series_i64_t *base = mk_i64_gapped(); assert(base);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_series_i64_t *r = smaug_i64_rolling_min(base, 3, 1);
+        if (r) { OK(r->size == base->size, "i64 rolling_min mp size"); smaug_i64_free(r); }
     }
     smaug_i64_free(base);
 }
@@ -2094,6 +2174,16 @@ static void af_dt_shift(void) {
         reset(k);
         smaug_series_dt_t *r = smaug_dt_shift(base, -2);
         if (r) { OK(r->size == 6, "dt shift size"); smaug_dt_free(r); }
+    }
+    smaug_dt_free(base);
+}
+static void af_dt_rank(void) {
+    smaug_series_dt_t *base = mk_dt_gapped(); assert(base);  /* NAs + empates */
+    /* exercita malloc(result) + malloc(pairs) + qsort */
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        double *r = smaug_dt_rank(base, 0);
+        if (r) { OK(1, "dt rank ok"); free(r); }
     }
     smaug_dt_free(base);
 }
@@ -2251,6 +2341,7 @@ int main(void) {
     af_str_ffill();
     af_str_bfill();
     af_str_shift();
+    af_str_rank();
     af_str_argsort();
     af_str_sort();
 
@@ -2279,6 +2370,7 @@ int main(void) {
     af_bool_ffill();
     af_bool_bfill();
     af_bool_shift();
+    af_bool_rank();
     af_bool_argsort();
     af_bool_sort();
     af_bool_series_and();
@@ -2314,12 +2406,15 @@ int main(void) {
     af_i64_diff(); af_i64_shift(); af_i64_ffill(); af_i64_bfill();
     af_i64_sorted_nonnull(); af_i64_rank();
     af_f64_rolling_sum(); af_f64_rolling_mean(); af_f64_rolling_min(); af_f64_rolling_max();
+    af_f64_rolling_std(); af_f64_rolling_var(); af_f64_rolling_count();
+    af_f64_rolling_mean_mp(); af_f64_rolling_min_mp();
+    af_i64_rolling_std(); af_i64_rolling_var(); af_i64_rolling_count(); af_i64_rolling_min_mp();
     af_i64_rolling_sum(); af_i64_rolling_mean(); af_i64_rolling_min(); af_i64_rolling_max();
 
     /* Frente B fase 2 — datetime (lifecycle + argsort/sort/take/filter) */
     af_dt_create(); af_dt_create_from_array(); af_dt_clone(); af_dt_view();
     af_dt_append_grow(); af_dt_argsort(); af_dt_sort(); af_dt_take(); af_dt_filter();
-    af_dt_ffill(); af_dt_bfill(); af_dt_shift();
+    af_dt_ffill(); af_dt_bfill(); af_dt_shift(); af_dt_rank();
     af_dt_setters();
     af_dt_compare();
 

@@ -1,6 +1,7 @@
 #include "../include/smaug_bool.h"
 #include <stdlib.h>
 #include <stddef.h>
+#include <math.h>
 
 /* ===================================================================
    Operações booleanas com lógica de três valores (Kleene).
@@ -474,4 +475,52 @@ uint8_t smaug_bool_max(const smaug_series_bool_t *s, bool ignore_na,
     }
     if (status) *status = found ? SMG_OK : SMG_NULL_VALUE;
     return found ? result : 0;
+}
+
+/* ===================================================================
+   rank (item 7.3): posição no ranking (false < true), 1-based. Só dois
+   grupos, então não precisa de qsort — os `nf` false válidos ocupam as
+   posições 1..nf, os `nt` true ocupam nf+1..nf+nt. method:
+   0=average 1=min 2=max 3=first. NAN para NA. Caller libera.
+   =================================================================== */
+double *smaug_bool_rank(const smaug_series_bool_t *s, int method) {
+    if (!s) return NULL;
+    size_t n = s->size;
+    double *result = malloc(n * sizeof(double));
+    if (!result) return NULL;
+    for (size_t i = 0; i < n; i++) result[i] = NAN;
+
+    /* conta false e true válidos */
+    size_t nf = 0, nt = 0;
+    for (size_t i = 0; i < n; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            if (s->data[i]) nt++; else nf++;
+        }
+    }
+    if (nf + nt == 0) return result;
+
+    /* ranks de cada grupo conforme o método */
+    double r_false = 0.0, r_true = 0.0;  /* usados em avg/min/max */
+    /* false: posições 1..nf ; true: nf+1..nf+nt */
+    double f_min = 1.0,            f_max = (double)nf;
+    double t_min = (double)(nf+1), t_max = (double)(nf+nt);
+    switch (method) {
+        case 1:  r_false = f_min; r_true = t_min; break;  /* min */
+        case 2:  r_false = f_max; r_true = t_max; break;  /* max */
+        default: r_false = (f_min + f_max) / 2.0;         /* average */
+                 r_true  = (t_min + t_max) / 2.0; break;
+    }
+
+    /* atribui na ordem original; para 'first' (method 3) o rank é
+       sequencial dentro de cada grupo, na ordem de aparição. */
+    size_t seen_f = 0, seen_t = 0;
+    for (size_t i = 0; i < n; i++) {
+        if (!SMAUG_VALID(s->null_mask, i)) continue;
+        if (s->data[i]) {
+            result[i] = (method == 3) ? (double)(nf + (++seen_t)) : r_true;
+        } else {
+            result[i] = (method == 3) ? (double)(++seen_f) : r_false;
+        }
+    }
+    return result;
 }

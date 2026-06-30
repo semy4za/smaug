@@ -141,10 +141,12 @@ return function(I)
     -- =====================================================================
 
     -- rank([method]): posição de cada valor no ranking (1-based, ignora nulos → NA).
-    -- method: "average" (default), "min", "max", "first". Delega para C.
+    -- method: "average" (default), "min", "max", "first". Delega ao C.
+    -- Item 7.3: todos os dtypes ordenáveis (f64/i64/dt/str/bool) têm rank no C;
+    -- a Lua delega via self._d.rank, sem branch por dtype. Erro por capacidade.
     function methods.rank(self, method)
-        if self._dtype ~= "float64" and self._dtype ~= "int64" then
-            error("smaug: rank() requer dtype numérico, não '"..self._dtype.."'", 2)
+        if not self._d.rank then
+            error("smaug: rank() não se aplica a dtype '"..self._dtype.."'", 2)
         end
         method = method or "average"
         local method_int
@@ -154,12 +156,7 @@ return function(I)
         elseif method == "first"   then method_int = 3
         else error("smaug: rank() method ∈ {average, min, max, first}", 2) end
 
-        local raw
-        if self._dtype == "float64" then
-            raw = C.smaug_f64_rank(self._c, method_int)
-        else
-            raw = C.smaug_i64_rank(self._c, method_int)
-        end
+        local raw = self._d.rank(self._c, method_int)
         if raw == nil then error("smaug: rank falhou (OOM)", 2) end
 
         local n   = self:len()

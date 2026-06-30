@@ -164,4 +164,7 @@ size_t smaug_dt_argmax (const smaug_series_dt_t *s);
 int64_t smaug_dt_min (const smaug_series_dt_t *s, bool ignore_na);
 int64_t smaug_dt_max (const smaug_series_dt_t *s, bool ignore_na);
 
+/* rank (item 7.3): ranking cronológico, double* (NAN=NA). method 0=avg 1=min 2=max 3=first. */
+double* smaug_dt_rank (const smaug_series_dt_t *s, int method);
+
 #endif /* SMAUG_DATETIME_H */

@@ -318,57 +318,31 @@ return function(I)
     end
 
     -- =====================================================================
-    -- Rolling DataSet
-    -- =====================================================================
+    -- Rolling DataSet (item 8c): delega à Series, que delega ao C. Remove a
+    -- reimplementação _agg própria — fonte única. min_periods opcional;
+    -- ganha std/var/count de graça (a Series já os tem via C).
     local Rolling = {}
     Rolling.__index = Rolling
 
-    function Rolling:_agg(col_name, fn)
-        local col  = self._ds:column(col_name)
-        local n    = col:len()
-        local w    = self._window
-        local NA   = Series.NA
-        local vals = {}
-        for i = 1, n do
-            if i < w then
-                vals[i] = NA
-            else
-                local window_vals = {}
-                for j = i - w + 1, i do
-                    local v = col:get(j)
-                    if v ~= nil then window_vals[#window_vals+1] = v end
-                end
-                vals[i] = fn(window_vals)
-            end
-        end
-        return Series.from_table(vals, col._dtype, col_name)
+    local function ds_roll(self, col_name)
+        local r = self._ds:column(col_name):rolling(self._window)
+        if self._min_periods then r = r:min_periods(self._min_periods) end
+        return r
     end
 
-    function Rolling:sum(col_name)
-        return self:_agg(col_name, function(vs)
-            local s = 0; for _, v in ipairs(vs) do s = s + v end; return s
-        end)
-    end
-    function Rolling:mean(col_name)
-        return self:_agg(col_name, function(vs)
-            if #vs == 0 then return nil end
-            local s = 0; for _, v in ipairs(vs) do s = s + v end
-            return s / #vs
-        end)
-    end
-    function Rolling:min(col_name)
-        return self:_agg(col_name, function(vs)
-            if #vs == 0 then return nil end
-            local m = vs[1]; for _, v in ipairs(vs) do if v < m then m = v end end
-            return m
-        end)
-    end
-    function Rolling:max(col_name)
-        return self:_agg(col_name, function(vs)
-            if #vs == 0 then return nil end
-            local m = vs[1]; for _, v in ipairs(vs) do if v > m then m = v end end
-            return m
-        end)
+    function Rolling:sum(col_name)   return ds_roll(self, col_name):sum()   end
+    function Rolling:mean(col_name)  return ds_roll(self, col_name):mean()  end
+    function Rolling:min(col_name)   return ds_roll(self, col_name):min()   end
+    function Rolling:max(col_name)   return ds_roll(self, col_name):max()   end
+    function Rolling:std(col_name)   return ds_roll(self, col_name):std()   end
+    function Rolling:var(col_name)   return ds_roll(self, col_name):var()   end
+    function Rolling:count(col_name) return ds_roll(self, col_name):count() end
+
+    function Rolling:min_periods(p)
+        if type(p) ~= "number" or p < 1 then
+            error("smaug: rolling:min_periods() espera p >= 1", 2)
+        end
+        return setmetatable({ _ds=self._ds, _window=self._window, _min_periods=p }, Rolling)
     end
 
     function methods.rolling(self, window)

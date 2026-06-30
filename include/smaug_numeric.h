@@ -174,4 +174,7 @@ size_t smaug_bool_argmax (const smaug_series_bool_t *s);
 uint8_t smaug_bool_min (const smaug_series_bool_t *s, bool ignore_na, smaug_status_t *status);
 uint8_t smaug_bool_max (const smaug_series_bool_t *s, bool ignore_na, smaug_status_t *status);
 
+/* rank (item 7.3): ranking false<true, double* (NAN=NA). method 0=avg 1=min 2=max 3=first. */
+double* smaug_bool_rank (const smaug_series_bool_t *s, int method);
+
 #endif /* SMAUG_NUMERIC_H */

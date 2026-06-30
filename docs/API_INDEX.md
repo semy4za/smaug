@@ -187,8 +187,8 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `:quantile(q, [ignore_na])` | percentil q ∈ [0, 1] (interpolação linear); suporta f64, i64 e datetime |
 | `:mode()` | valor mais frequente; primeira aparição em empates |
 | `:prod([ignore_na])` | produto |
-| `:rank([method])` | rank (`average`/`min`/`max`/`dense`); default `average` |
-| `:pct_rank()` | rank percentual (0..1) |
+| `:rank([method])` | rank (`average`/`min`/`max`/`first`); default `average`. Ordenáveis: f64, i64, datetime (cronológico), string (lexicográfico), bool |
+| `:pct_rank()` | rank percentual (0..1); mesmos dtypes de `rank` |
 | `:skew()` / `:kurtosis()` | assimetria / curtose (Fisher; bias-corrected) |
 | `:mad()` | desvio absoluto mediano |
 | `:sem()` | erro padrão da média = std / √n |
@@ -255,7 +255,7 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `:cummin()` / `:cummax()` | mínimo/máximo cumulativo; suporta f64, i64 e datetime |
 | `:diff([periods])` | diferença entre elemento i e i-periods; em datetime retorna `Series<int64>` (ms) |
 | `:shift([periods])` | desloca valores |
-| `:rolling(w):sum/mean/min/max/std/var/count/median/quantile/min_periods()` | agregação em janela |
+| `:rolling(w):sum/mean/min/max/std/var/count/median/quantile()` ; `:min_periods(p)` | agregação em janela (Ring 0 C; median/quantile em Lua). `min_periods(p)`: emite com >= p não-nulos (janelas parciais); sem ele, exige janela cheia |
 | `:expanding([min_periods]):sum/mean/min/max/std/var/count/median()` | janela crescente |
 
 **Matemática vetorizada (resultado sempre float64):**
@@ -529,7 +529,7 @@ mantém seu dtype de resultado). Erro se nenhuma coluna numérica.
 | `:melt(id_vars, [value_vars], [var_name], [value_name])` | wide → long |
 | `:stack(col_names)` / `:unstack(index, col, values)` | reshape eixo→linha / linha→eixo |
 | `:explode(col)` | uma linha por elemento da coluna-lista |
-| `:rolling(w):sum/mean/min/max(col)` | janela deslizante por coluna |
+| `:rolling(w):sum/mean/min/max/std/var/count(col)` | janela deslizante por coluna; `:min_periods(p)` antes do agregado p/ janelas parciais (delega à Series → Ring 0) |
 
 **I/O (Anel 3):**
 

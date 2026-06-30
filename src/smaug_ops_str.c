@@ -17,6 +17,7 @@
 #include "smaug_string.h"
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 /* Compara a string no índice idx com (target,target_len), lexicográfico por
    bytes. Retorna <0, 0 ou >0 (como memcmp/strcmp). */
@@ -443,4 +444,59 @@ const char *smaug_str_max(const smaug_series_str_t *s, bool ignore_na,
     size_t idx = smaug_str_argmax(s);
     if (idx == SIZE_MAX) return NULL;
     return smaug_str_get(s, idx, out_len);
+}
+
+/* ===================================================================
+   rank (item 7.3): posição no ranking lexicográfico (por bytes), 1-based.
+   Ordena os índices VÁLIDOS via sort_cmp (mesma ordem do argsort) e detecta
+   empates com str_cmp_idx. method: 0=average 1=min 2=max 3=first. NAN para
+   posições NA. Caller libera. Não recusa NA (rankeia só os válidos, como os
+   numéricos) — diferente de argsort/sort, que recusam NULL.
+   =================================================================== */
+double *smaug_str_rank(const smaug_series_str_t *s, int method) {
+    if (!s) return NULL;
+    size_t n = s->size;
+    double *result = malloc(n * sizeof(double));
+    if (!result) return NULL;
+    for (size_t i = 0; i < n; i++) result[i] = NAN;
+
+    size_t m = 0;
+    for (size_t i = 0; i < n; i++)
+        if (SMAUG_VALID(s->null_mask, i)) m++;
+    if (m == 0) return result;
+
+    /* índices dos elementos válidos */
+    size_t *idx = malloc(m * sizeof(size_t));
+    if (!idx) { free(result); return NULL; }
+    size_t j = 0;
+    for (size_t i = 0; i < n; i++)
+        if (SMAUG_VALID(s->null_mask, i)) idx[j++] = i;
+
+    /* ordena lexicograficamente (ascendente, estável por índice) */
+    g_sort_series    = s;
+    g_sort_ascending = true;
+    qsort(idx, m, sizeof(size_t), sort_cmp);
+    g_sort_series    = NULL;
+
+    /* atribui ranks, agrupando empates via str_cmp_idx */
+    size_t p = 0;
+    while (p < m) {
+        size_t q = p;
+        while (q + 1 < m && str_cmp_idx(s, idx[q+1], idx[p]) == 0) q++;
+        double r_min = (double)(p + 1);
+        double r_max = (double)(q + 1);
+        for (size_t k = p; k <= q; k++) {
+            double rank_val;
+            switch (method) {
+                case 1:  rank_val = r_min;                  break;
+                case 2:  rank_val = r_max;                  break;
+                case 3:  rank_val = (double)(k + 1);        break;
+                default: rank_val = (r_min + r_max) / 2.0;  break;
+            }
+            result[idx[k]] = rank_val;
+        }
+        p = q + 1;
+    }
+    free(idx);
+    return result;
 }

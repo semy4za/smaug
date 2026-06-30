@@ -18,6 +18,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <limits.h>
+#include <math.h>
 
 /* ===================================================================
    Constantes
@@ -891,4 +892,61 @@ int64_t smaug_dt_max(const smaug_series_dt_t *s, bool ignore_na) {
         }
     }
     return found ? result : DT_SENTINEL;
+}
+
+/* ===================================================================
+   rank (item 7.3): posição no ranking cronológico (1-based). Espelha
+   smaug_i64_rank — epoch_ms é int64, comparação exata. method:
+   0=average 1=min 2=max 3=first. NAN para posições NA. Caller libera.
+   =================================================================== */
+static int cmp_dt_rank_pair(const void *a, const void *b) {
+    const dt_entry_t *pa = (const dt_entry_t *)a, *pb = (const dt_entry_t *)b;
+    if (pa->val != pb->val) return (pa->val > pb->val) - (pa->val < pb->val);
+    return (pa->idx > pb->idx) - (pa->idx < pb->idx);  /* desempate estável */
+}
+
+double *smaug_dt_rank(const smaug_series_dt_t *s, int method) {
+    if (!s) return NULL;
+    size_t n = s->size;
+    double *result = malloc(n * sizeof(double));
+    if (!result) return NULL;
+    for (size_t i = 0; i < n; i++) result[i] = NAN;
+
+    size_t m = 0;
+    for (size_t i = 0; i < n; i++)
+        if (SMAUG_VALID(s->null_mask, i)) m++;
+    if (m == 0) return result;
+
+    dt_entry_t *pairs = malloc(m * sizeof(*pairs));
+    if (!pairs) { free(result); return NULL; }
+    size_t j = 0;
+    for (size_t i = 0; i < n; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            pairs[j].val = s->data[i];
+            pairs[j].idx = i;
+            j++;
+        }
+    }
+    qsort(pairs, m, sizeof(*pairs), cmp_dt_rank_pair);
+
+    size_t p = 0;
+    while (p < m) {
+        size_t q = p;
+        while (q + 1 < m && pairs[q+1].val == pairs[p].val) q++;
+        double r_min = (double)(p + 1);
+        double r_max = (double)(q + 1);
+        for (size_t k = p; k <= q; k++) {
+            double rank_val;
+            switch (method) {
+                case 1:  rank_val = r_min;                  break;
+                case 2:  rank_val = r_max;                  break;
+                case 3:  rank_val = (double)(k + 1);        break;
+                default: rank_val = (r_min + r_max) / 2.0;  break;
+            }
+            result[pairs[k].idx] = rank_val;
+        }
+        p = q + 1;
+    }
+    free(pairs);
+    return result;
 }

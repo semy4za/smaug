@@ -123,6 +123,9 @@ size_t smaug_str_argmax (const smaug_series_str_t *s);
 const char* smaug_str_min (const smaug_series_str_t *s, bool ignore_na, size_t *out_len);
 const char* smaug_str_max (const smaug_series_str_t *s, bool ignore_na, size_t *out_len);
 
+/* rank (item 7.3): ranking lexicográfico, double* (NAN=NA). method 0=avg 1=min 2=max 3=first. */
+double* smaug_str_rank (const smaug_series_str_t *s, int method);
+
 /* NOTA: comparações (eq/lt/gt) — ESTA peça. sort/argsort, take/filter e a
    evolução para dictionary encoding (via tipo `categorical`, Tier 2) são fases
    posteriores — ver Roadmap. */

@@ -1,7 +1,8 @@
 # Smaug — Relatório de Paridade
 
-> Arquivo gerado por `bash scripts/parity/parity.sh`. **Não editar à mão.**
-> Decisões conscientes de não-paridade ficam em `scripts/parity/exceptions.txt`.
+> Arquivo gerado por `bash scripts/parity/parity.sh` ou `powershell scripts/parity/parity.ps1`.
+> **Não editar à mão.** Decisões conscientes de não-paridade ficam em
+> `scripts/parity/exceptions.txt`.
 
 Convenção de status:
 
@@ -10,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-06-30 00:13:26 UTC
+Gerado em: 2026-06-30 17:27:59 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -90,10 +91,10 @@ Cada linha = um método rastreado em `Series.methods` ou `CategoricalSeries`. Co
 | `nsmallest` | 🟩 | 🟩 | ⬜ | ⬜ | ⬜ | ⬜ |
 | `nunique` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
 | `pct_change` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟨 |
-| `pct_rank` | 🟩 | 🟩 | ⬜ | ⬜ | ⬜ | ⬜ |
+| `pct_rank` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | ⬜ |
 | `prod` | 🟩 | 🟩 | ⬜ | ⬜ | ⬜ | ⬜ |
 | `quantile` | 🟩 | 🟩 | ⬜ | ⬜ | 🟩 | ⬜ |
-| `rank` | 🟩 | 🟩 | ⬜ | ⬜ | ⬜ | ⬜ |
+| `rank` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | ⬜ |
 | `rep_each` | 🟨 | 🟨 | 🟩 | 🟨 | 🟨 | 🟨 |
 | `rolling` | 🟩 | 🟩 | ⬜ | ⬜ | ⬜ | ⬜ |
 | `round` | 🟩 | 🟩 | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -119,7 +120,7 @@ Cada linha = um método rastreado em `Series.methods` ou `CategoricalSeries`. Co
 | `view` | 🟩 | 🟩 | 🟨 | ⬜ | 🟨 | 🟩 |
 | `where` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
 
-**Sumário Eixo 1:** 100 métodos × 6 dtypes = 600 células · 🟩 276 (46.0%) · ⬜ 141 (23.5%) · 🟨 183 (30.5%)
+**Sumário Eixo 1:** 100 métodos × 6 dtypes = 600 células · 🟩 276 (46.0%) · ⬜ 135 (22.5%) · 🟨 189 (31.5%)
 
 ## Eixo 2 — Paridade Series ↔ DataSet (classificada)
 
@@ -398,7 +399,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `xor` | 🟨 |  |
 
 
-### str — 29 funções C
+### str — 30 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -426,6 +427,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `max` | 🟩 |  |
 | `min` | 🟩 |  |
 | `ne` | 🟩 |  |
+| `rank` | 🟩 |  |
 | `set` | 🟩 |  |
 | `set_null` | 🟩 |  |
 | `shift` | 🟩 |  |
@@ -433,7 +435,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `take` | 🟩 |  |
 
 
-### dt — 47 funções C
+### dt — 48 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -472,6 +474,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `ne` | 🟩 |  |
 | `parse` | 🟩 |  |
 | `quarter` | 🟩 |  |
+| `rank` | 🟩 |  |
 | `second` | 🟩 |  |
 | `set` | 🟩 |  |
 | `set_null` | 🟩 |  |
@@ -665,8 +668,8 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 232/232 erros com prefixo `smaug:` (100.0%)
-- `dataset.lua`: 92/92 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 235/235 erros com prefixo `smaug:` (100.0%)
+- `dataset.lua`: 93/93 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
 
@@ -707,33 +710,33 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `series/test_access` | 101 | 15 | 8 | — | 4 | — | — |
 | `series/test_reduce` | 58 | 7 | 2 | 3 | 4 | 2 | — |
 | `series/test_stat` | 70 | 6 | 12 | — | 9 | — | — |
-| `series/test_window` | 95 | 7 | 7 | 2 | 5 | 2 | — |
+| `series/test_window` | 118 | 10 | 11 | 2 | 5 | 2 | — |
 | `series/test_predicates` | 155 | 6 | 42 | 3 | 11 | — | — |
 | `series/test_selection` | 29 | 3 | 1 | 2 | 1 | — | — |
 | `series/test_str` | 274 | 4 | 9 | 1 | 51 | — | — |
 | `series/test_dt` | 272 | 3 | 6 | 2 | 12 | 62 | — |
 | `series/test_categorical` | 295 | 7 | 7 | 8 | 5 | 13 | 57 |
-| `dataset/test_core` | 213 | 26 | 28 | 8 | 12 | — | — |
+| `dataset/test_core` | 221 | 27 | 30 | 8 | 12 | — | — |
 | `dataset/test_relational` | 172 | 10 | 50 | 4 | 34 | — | — |
 | `dataset/test_stat` | 91 | 10 | 16 | 1 | 13 | — | — |
 | `dataset/test_io_support` | 44 | 2 | 13 | 1 | 6 | — | — |
 | `io/test_csv` | 101 | 2 | 3 | 2 | 9 | — | — |
 | `io/test_json` | 28 | 1 | 1 | 1 | 2 | — | — |
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
-| `props/test_integration` | 67 | 18 | 2 | — | — | — | — |
+| `props/test_integration` | 79 | 19 | 2 | 2 | 4 | 1 | 1 |
 
-**Total de checks:** 2435
+**Total de checks:** 2478
 
 ### Menções totais por dtype (toda a suite)
 
 | dtype | menções |
 | :--- | :-: |
-| float64 | 173 |
-| int64 | 294 |
-| bool | 57 |
-| string | 196 |
-| datetime | 79 |
-| categorical | 58 |
+| float64 | 178 |
+| int64 | 300 |
+| bool | 59 |
+| string | 200 |
+| datetime | 80 |
+| categorical | 59 |
 
 ## Eixo 12 — Sincronização docs ↔ código
 
@@ -757,9 +760,9 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 966
-- ⬜ exceção registrada: 221
-- 🟨 suspeita (revisar): 258
+- 🟩 paridade: 968
+- ⬜ exceção registrada: 215
+- 🟨 suspeita (revisar): 264
 - 🟥 inconsistência clara: 12
 
 

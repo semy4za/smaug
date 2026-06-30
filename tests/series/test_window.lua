@@ -170,6 +170,35 @@ check(rmp:is_null(1),             "rolling mp std[1]=NA (1 val < mp=2)")
 check(approx(rmp:get(2), 0.7071067811865476, 1e-9), "rolling mp std[2]=sqrt(0.5)")
 check(approx(rmp:get(3), 1.0),   "rolling mp std[3]=1.0")
 
+-- item 8a: min_periods aplicado a sum/min/max (REGRESSÃO do bug histórico —
+-- o caminho C ignorava min_periods; agora respeita). rs = {1,2,3,4,5}
+local bsum = rs:rolling(3):min_periods(1):sum()
+check(approx(bsum:get(1), 1.0),  "8a sum mp1[1]=1 (parcial; ANTES era NA)")
+check(approx(bsum:get(2), 3.0),  "8a sum mp1[2]=3 (parcial)")
+check(approx(bsum:get(3), 6.0),  "8a sum mp1[3]=6 (janela cheia)")
+local bsum2 = rs:rolling(3):min_periods(2):sum()
+check(bsum2:is_null(1),          "8a sum mp2[1]=NA (1 val < mp=2)")
+check(approx(bsum2:get(2), 3.0), "8a sum mp2[2]=3")
+-- min/max com min_periods → rescan type-preserving
+local bmin = rs:rolling(3):min_periods(1):min()
+check(approx(bmin:get(1), 1.0),  "8a min mp1[1]=1 (rescan parcial)")
+check(approx(bmin:get(5), 3.0),  "8a min mp1[5]=3 ({3,4,5})")
+local bmax = rs:rolling(3):min_periods(1):max()
+check(approx(bmax:get(1), 1.0),  "8a max mp1[1]=1")
+check(approx(bmax:get(2), 2.0),  "8a max mp1[2]=2 (parcial {1,2})")
+-- mean com min_periods (caminho motor)
+local bmean = rs:rolling(3):min_periods(1):mean()
+check(approx(bmean:get(1), 1.0), "8a mean mp1[1]=1")
+check(approx(bmean:get(2), 1.5), "8a mean mp1[2]=1.5")
+-- i64 min_periods preserva tipo no rescan
+local bi = S.from_table({10,20,30,40}, "int64"):rolling(2):min_periods(1):max()
+check(bi:get(1) == 10,           "8a i64 max mp1[1]=10")
+check(bi:get(4) == 40,           "8a i64 max mp1[4]=40")
+-- default (min_periods=0) inalterado: janela-cheia
+local bdef = rs:rolling(3):sum()
+check(bdef:is_null(1) and bdef:is_null(2), "8a sum default[1,2]=NA (janela-cheia preservada)")
+check(approx(bdef:get(3), 6.0),  "8a sum default[3]=6")
+
 -- expanding
 local exp_s = S.from_table({1.0,2.0,3.0,4.0}, "float64")
 local es = exp_s:expanding():sum()
@@ -187,6 +216,23 @@ check(approx(estd:get(2), 0.7071067811865476, 1e-9), "expanding std[2]")
 
 local emd = exp_s:expanding():median()
 check(approx(emd:get(2), 1.5), "expanding median[2]=1.5")
+
+-- item 8b: expanding delega a rolling(n, min_periods>=1). Tipos coerentes
+-- com rolling: sum→dtype, mean/std/var→float64, count→int64 (correção: o
+-- expanding antigo retornava col._dtype p/ tudo, truncando mean de i64).
+local exp_i = S.from_table({10,20,30}, "int64")
+check(exp_i:expanding():sum():dtype()   == "int64",   "8b expanding sum i64→int64")
+check(exp_i:expanding():mean():dtype()  == "float64", "8b expanding mean i64→float64 (corrigido)")
+check(exp_i:expanding():count():dtype() == "int64",   "8b expanding count→int64")
+check(exp_i:expanding():std():dtype()   == "float64", "8b expanding std→float64")
+check(approx(exp_i:expanding():mean():get(2), 15.0),  "8b expanding mean i64 não trunca (10,20→15)")
+-- expanding com min_periods explícito
+local emp = exp_s:expanding(2):sum()
+check(emp:is_null(1),          "8b expanding(mp=2) sum[1]=NA")
+check(approx(emp:get(2), 3.0), "8b expanding(mp=2) sum[2]=3")
+-- expanding count acumula não-nulos
+local ecn = S.from_table({1.0, NA, 3.0}, "float64"):expanding():count()
+check(ecn:get(1) == 1 and ecn:get(2) == 1 and ecn:get(3) == 2, "8b expanding count acumula não-nulos")
 
 -- ===================================================================
 -- ffill/bfill agnósticos a tipo (item 7.1): bool, string, datetime

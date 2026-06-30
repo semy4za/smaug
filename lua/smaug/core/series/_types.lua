@@ -57,11 +57,15 @@ return function(I)
             bfill   = C.smaug_f64_bfill,
             argmin  = C.smaug_f64_argmin,
             argmax  = C.smaug_f64_argmax,
+            rank    = C.smaug_f64_rank,
             -- Grupo C (Fase 3 Ring 0): rolling ops
             rolling_sum  = C.smaug_f64_rolling_sum,
             rolling_mean = C.smaug_f64_rolling_mean,
             rolling_min  = C.smaug_f64_rolling_min,
             rolling_max  = C.smaug_f64_rolling_max,
+            rolling_std   = C.smaug_f64_rolling_std,
+            rolling_var   = C.smaug_f64_rolling_var,
+            rolling_count = C.smaug_f64_rolling_count,
         },
         int64 = {
             name        = "int64",
@@ -107,11 +111,15 @@ return function(I)
             bfill   = C.smaug_i64_bfill,
             argmin  = C.smaug_i64_argmin,
             argmax  = C.smaug_i64_argmax,
+            rank    = C.smaug_i64_rank,
             -- Grupo C (Fase 3 Ring 0): rolling ops
             rolling_sum  = C.smaug_i64_rolling_sum,
             rolling_mean = C.smaug_i64_rolling_mean,
             rolling_min  = C.smaug_i64_rolling_min,
             rolling_max  = C.smaug_i64_rolling_max,
+            rolling_std   = C.smaug_i64_rolling_std,
+            rolling_var   = C.smaug_i64_rolling_var,
+            rolling_count = C.smaug_i64_rolling_count,
         },
         string = {
             name        = "string",
@@ -145,6 +153,7 @@ return function(I)
             shift   = C.smaug_str_shift,
             argmin  = C.smaug_str_argmin,
             argmax  = C.smaug_str_argmax,
+            rank    = C.smaug_str_rank,
             -- 7.2b: min/max retornam o valor (string) ou nil (vazia/toda-NA).
             -- Wrapper materializa o ponteiro+len do C via ffi.string.
             min = function(c, ignore_na)
@@ -206,6 +215,7 @@ return function(I)
             shift   = C.smaug_dt_shift,
             argmin  = C.smaug_dt_argmin,
             argmax  = C.smaug_dt_argmax,
+            rank    = C.smaug_dt_rank,
             min     = C.smaug_dt_min,
             max     = C.smaug_dt_max,
             cmp_gt = function(c, t, om) if type(t)~="number" then error("smaug: comparação de datetime espera epoch_ms (número)",4) end return C.smaug_dt_gt(c, t, om) end,
@@ -249,6 +259,7 @@ return function(I)
             shift   = C.smaug_bool_shift,
             argmin  = C.smaug_bool_argmin,
             argmax  = C.smaug_bool_argmax,
+            rank    = C.smaug_bool_rank,
             -- 7.2b: min/max retornam o valor (bool) ou nil (vazia/toda-NA).
             -- Wrapper lê o status (Shape 1) para distinguir false de ausência.
             min = function(c, ignore_na)

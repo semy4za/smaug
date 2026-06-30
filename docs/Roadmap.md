@@ -271,12 +271,25 @@ fallback element-wise. Depende do item 1 (nulidade coerente) já pronto.
     (valor+status SMG_NULL_VALUE). `ignore_na` uniforme. Fecha a incoerência
     `dt:min`✗ → agora `dt:min == get(argmin)`. Não alocam → allocfail inalterado.
     Teste C +22 (test_ops_window 338→360), Lua +14 (test_reduce 43→57).
-    Aguarda Fedora p/ Valgrind+cobertura. **[7.2 completo]**
+    Fedora: Valgrind-clean, cobertura 98.75%, 97 exclusões. **[Done — 7.2 completo]**
     - Achado (não acionado): `df:min()`/`df:max()` no DataSet ainda filtram só
       colunas numéricas (contrato D3 do item 5). Agora que a Series faz min/max em
       str/dt/bool, estender o DataSet a essas colunas (como pandas) é decisão de
       escopo do frame — registrado para avaliação futura, fora do 7.2.
-- 7.3 rank em dt/str (lexicográfico/cronológico)
+- 7.3 ✅ **rank em dt/str/bool** (lexicográfico/cronológico/false<true) — **[Fedora]**.
+  Os 4 métodos uniformes (average/min/max/first); NA → NaN→nil como os numéricos.
+  Retorno `double*` serve todos os dtypes (o rank é sempre double). dt espelha
+  i64 (int64, precisão exata); str ordena índices via `str_cmp_idx` (reusa o
+  contexto de sort); bool sem qsort (dois grupos false/true). D7.3-d: gate Lua
+  `if float64...else i64` virou delegação `self._d.rank` (descritor liga os 5).
+  `pct_rank` passou a funcionar em str/dt/bool de graça (chama rank average).
+  Removidas 6 exceptions órfãs do parity (rank/pct_rank × str/dt/bool — eram
+  "gap real não implementado"; agora suportado). Teste C +31 (test_ops_window
+  360→391), Lua +12 (integração 66→78), allocfail +31 → 1736. Caminho numérico
+  inalterado (f64/i64 agora via descritor, mesmo C). **Windows ✓ · Fedora pendente**
+  (Valgrind + cobertura — fecha junto com o item 8).
+  - bool incluído (D7.3-a) — desvio do escopo literal "dt/str", registrado.
+  - Achado (não acionado): rank/pct_rank por-coluna no DataSet = escopo futuro.
 - 7.4 ✅ bool eq/ne no C (único dtype sem igualdade). C+header+cdef+wrapper Lua,
   teste C (+11), Lua (+6), allocfail (+20). Fedora-validado (Valgrind-clean + cobertura).
 
@@ -287,11 +300,35 @@ A versão Lua do rolling (Series e DataSet) reimplementa o que o C faz — e faz
 estender o C primeiro, depois Series/DataSet delegam. Decisão: eliminar a
 duplicação, fonte única no C.
 
-- 8.1 estender C: rolling std/var/count
-- 8.2 estender C: min_periods (usa o invariante de nulidade do item 1)
-- 8.3 estender C: expanding (janela crescente)
-- 8.4 Series delega ao C (remove reimplementação em `_rolling.lua`)
-- 8.5 DataSet delega (remove Rolling Lua em `_stat.lua`)
+- 8.1 ✅ estender C: rolling std/var/count (motor genérico double-safe)
+- 8.2 ✅ estender C: min_periods (convenção 0=janela-cheia, >=1=parcial, espelha
+  min_count do 5.5) — assinatura dos 8 rolling mudou p/ (s, window, min_periods)
+- 8.3 ✅ estender C: expanding (D8-i: É rolling(n, min_periods>=1) — sem C novo)
+- 8.4 ✅ Series delega ao C (sum/mean/min/max/std/var/count; median/quantile Lua)
+- 8.5 ✅ DataSet delega à Series (remove _agg próprio; ganha std/var/count+min_periods)
+
+> **Status: implementado no container · Fedora pendente** (fecha junto com 7.3).
+> Decisões: D8-g(i) motor cobre mean/std/var/count (double-safe); sum/min/max
+> preservam tipo + ganham min_periods local. D8-h(ii) min/max com min_periods≥1
+> usam rescan O(n·window) type-preserving (deque intocada no modo default).
+> **Bug morto**: caminho C ignorava min_periods — `rolling(3):min_periods(1):sum()`
+> agora dá 1,3,6,9 (era nil,nil,6,9). **Correção de tipo**: expanding/DataSet
+> mean de i64 agora → float64 (antes truncava via col._dtype). Testes: C +20
+> (test_ops_window 391→411), allocfail +71 (→1804), test_window +23 (93→116),
+> ds test_core +8 (212→220). median/quantile rolling/expanding ficam Lua (D8-c).
+
+> **Achado (levantamento, 2026-06-29):** `rolling:min_periods(p):sum()` **ignora
+> min_periods quando o C é usado** — `rolling(3):min_periods(1):sum()` dá
+> `nil,nil,6,9` em vez de `1,3,6,9`. O resultado depende do caminho (C/Lua). É a
+> própria incoerência que o item 8 cura: a raiz é o C não conhecer min_periods.
+> Decisão D8-a (ii): não corrigir isolado — o C passa a conhecer min_periods
+> (D8-b: na assinatura, `rolling_*(s, window, min_periods)`), e o bug some.
+> **Achado 2:** o DataSet Rolling (`_stat.lua`) NÃO delega à Series — tem `_agg`
+> próprio. Duplicação é tripla (C / Series Lua / DataSet Lua); 8.5 faz o DataSet
+> passar pela Series. **D8-c:** sum/mean/min/max/std/var/count vão pro C;
+> median/quantile ficam Lua (janela ordenada, padrão diferente) — registrado.
+> Recorte D8-e: 8a (C estendido + min_periods + Series delega), 8b (expanding C),
+> 8c (DataSet delega).
 
 ## 9. Ergonomia REPL  [Windows]
 
@@ -322,6 +359,22 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
   cobertura é real, só o número impresso engana). Achado durante o item 3.
   Corrigir o relato (um contador único ou um print por seção) — cosmético, não
   afeta validação.
+- 10.8 **Fixtures de I/O órfãos + teatro de "dados reais"** (achado 2026-06-30).
+  `tests/fixtures/` tem 5 arquivos; os testes em `tests/io/` abrem só 1
+  (`pedidos_digitados.csv`, 917 linhas). Os outros 4 (`cotacoes.csv`,
+  `cotacoes.json`, `cotacoes_SHIB_BRL.json`, `cotacoes_USD_BRL.json`) NÃO são
+  lidos por nenhum teste — estão no repo decorativos. O parser em si é exercitado
+  de verdade (por strings CSV/JSON embutidas nos .lua + o fixture de 917 linhas),
+  então não há bug; o "falso" é o rótulo "dados reais" sugerir variedade que não
+  é testada. Mesma família do 10.7 (número/aparência engana, validação é real).
+  Ação: ou remover os 4 órfãos, ou — preferível — convertê-los em cobertura de
+  **variedade real** com asserções específicas. Plano (Gui): separar tabelas
+  abertas ≤1.000 linhas de fontes BR (IBGE/dados.gov.br: `;` separador + vírgula
+  decimal) e ONU (UTF-8 acentuado, multi-idioma), cada fixture exercitando uma
+  armadilha concreta: vírgula decimal → inferência float; data BR `dd/mm/aaaa` →
+  o `dayfirst` (item F.3); aspas com vírgula interna; separador de milhar; linha
+  malformada. **Invariante:** fixture sem asserção que o exercite é decoração —
+  cada arquivo novo entra junto com os `check()` que justificam sua presença.
 
 ## 11. Reescrita de exemplos + docstrings  [Windows]
 

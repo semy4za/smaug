@@ -531,6 +531,23 @@ check(not ok3,                            "rolling: window=0 recusado")
 local ok4, _ = pcall(function() ds:rolling(1.5) end)
 check(not ok4,                            "rolling: window fracionário recusado")
 
+-- item 8c: DataSet rolling delega à Series (que delega ao C). Ganha
+-- std/var/count e min_periods de graça; sem _agg próprio.
+local rstd = ds:rolling(3):std("vendas")
+check(rstd:is_null(2),                    "8c ds rolling std[2]=NA")
+check(approx(rstd:get(3), 10.0),          "8c ds rolling std[3]=10 ({10,20,30})")
+local rcnt = ds:rolling(3):count("vendas")
+check(rcnt:get(3) == 3,                   "8c ds rolling count[3]=3")
+check(rcnt:dtype() == "int64",            "8c ds rolling count→int64")
+-- min_periods no DataSet (bug-free, delega ao C corrigido)
+local rmp = ds:rolling(3):min_periods(1):sum("vendas")
+check(rmp:get(1) == 10,                   "8c ds rolling mp1 sum[1]=10 (parcial)")
+check(rmp:get(2) == 30,                   "8c ds rolling mp1 sum[2]=30")
+check(rmp:get(3) == 60,                   "8c ds rolling mp1 sum[3]=60")
+-- correção de tipo: mean de i64 → float64 (antes truncava)
+local dsi = smaug.DataSet({{"v",{10,20,30},"int64"}})
+check(dsi:rolling(2):mean("v"):dtype() == "float64", "8c ds rolling mean i64→float64")
+
 -- ================================================================
 -- pivot
 -- ================================================================

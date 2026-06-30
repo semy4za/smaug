@@ -59,16 +59,23 @@ size_t *smaug_multi_argsort_ffi(const smaug_sort_col_ffi_t *cols,
    Se a janela inteira for nula, posição é NA.
    ===================================================================== */
 
-/* f64 */
-smaug_series_f64_t *smaug_f64_rolling_sum (const smaug_series_f64_t *s, size_t window);
-smaug_series_f64_t *smaug_f64_rolling_mean(const smaug_series_f64_t *s, size_t window);
-smaug_series_f64_t *smaug_f64_rolling_min (const smaug_series_f64_t *s, size_t window);
-smaug_series_f64_t *smaug_f64_rolling_max (const smaug_series_f64_t *s, size_t window);
+/* f64. window>=1; min_periods: 0=modo janela-cheia (default), >=1=parcial
+   (>= min_periods não-nulos). std/var amostrais (ddof=1, NaN p/ n<2). */
+smaug_series_f64_t *smaug_f64_rolling_sum  (const smaug_series_f64_t *s, size_t window, size_t min_periods);
+smaug_series_f64_t *smaug_f64_rolling_mean (const smaug_series_f64_t *s, size_t window, size_t min_periods);
+smaug_series_f64_t *smaug_f64_rolling_min  (const smaug_series_f64_t *s, size_t window, size_t min_periods);
+smaug_series_f64_t *smaug_f64_rolling_max  (const smaug_series_f64_t *s, size_t window, size_t min_periods);
+smaug_series_f64_t *smaug_f64_rolling_std  (const smaug_series_f64_t *s, size_t window, size_t min_periods);
+smaug_series_f64_t *smaug_f64_rolling_var  (const smaug_series_f64_t *s, size_t window, size_t min_periods);
+smaug_series_i64_t *smaug_f64_rolling_count(const smaug_series_f64_t *s, size_t window, size_t min_periods);
 
-/* i64: sum/min/max retornam i64; mean retorna f64 */
-smaug_series_i64_t *smaug_i64_rolling_sum (const smaug_series_i64_t *s, size_t window);
-smaug_series_f64_t *smaug_i64_rolling_mean(const smaug_series_i64_t *s, size_t window);
-smaug_series_i64_t *smaug_i64_rolling_min (const smaug_series_i64_t *s, size_t window);
-smaug_series_i64_t *smaug_i64_rolling_max (const smaug_series_i64_t *s, size_t window);
+/* i64: sum/min/max retornam i64; mean/std/var retornam f64; count retorna i64. */
+smaug_series_i64_t *smaug_i64_rolling_sum  (const smaug_series_i64_t *s, size_t window, size_t min_periods);
+smaug_series_f64_t *smaug_i64_rolling_mean (const smaug_series_i64_t *s, size_t window, size_t min_periods);
+smaug_series_i64_t *smaug_i64_rolling_min  (const smaug_series_i64_t *s, size_t window, size_t min_periods);
+smaug_series_i64_t *smaug_i64_rolling_max  (const smaug_series_i64_t *s, size_t window, size_t min_periods);
+smaug_series_f64_t *smaug_i64_rolling_std  (const smaug_series_i64_t *s, size_t window, size_t min_periods);
+smaug_series_f64_t *smaug_i64_rolling_var  (const smaug_series_i64_t *s, size_t window, size_t min_periods);
+smaug_series_i64_t *smaug_i64_rolling_count(const smaug_series_i64_t *s, size_t window, size_t min_periods);
 
 #endif /* SMAUG_OPS_WINDOW_H */

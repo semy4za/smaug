@@ -1000,6 +1000,92 @@ static void test_i64_rank(void) {
     free(rb); smaug_i64_free(sb);
 }
 
+/* rank em dt/str/bool (item 7.3: ordenáveis, ranking double*) */
+static void test_typed_rank(void) {
+    /* dt cronológico: [300,100,600,100] → avg: jan(100)=1.5,1.5; 300=3; 600=4 */
+    int64_t da[] = {300, 100, 600, 100};
+    smaug_series_dt_t *d = dt_from(da, 4);
+    double *rd = smaug_dt_rank(d, 0);
+    CHECK(rd && APPROX(rd[0], 3.0), "dt rank avg [0]=3 (300)");
+    CHECK(rd && APPROX(rd[1], 1.5), "dt rank avg [1]=1.5 (100 empate)");
+    CHECK(rd && APPROX(rd[2], 4.0), "dt rank avg [2]=4 (600)");
+    CHECK(rd && APPROX(rd[3], 1.5), "dt rank avg [3]=1.5 (100 empate)");
+    free(rd);
+    double *rdm = smaug_dt_rank(d, 1);  /* min */
+    CHECK(rdm && APPROX(rdm[1], 1.0) && APPROX(rdm[3], 1.0), "dt rank min empate=1");
+    free(rdm);
+    /* dt com NA */
+    int64_t da2[] = {300, INT64_MIN, 100};
+    smaug_series_dt_t *d2 = dt_from(da2, 3);
+    double *rd2 = smaug_dt_rank(d2, 0);
+    CHECK(rd2 && APPROX(rd2[0], 2.0),    "dt rank NA [0]=2");
+    CHECK(rd2 && rd2[1] != rd2[1],       "dt rank NA [1]=NAN");
+    CHECK(rd2 && APPROX(rd2[2], 1.0),    "dt rank NA [2]=1");
+    free(rd2); smaug_dt_free(d2);
+    CHECK(smaug_dt_rank(NULL, 0) == NULL, "dt rank NULL");
+    smaug_dt_free(d);
+
+    /* str lexicográfico: ["banana","abacaxi","caju","abacaxi"]
+       → abacaxi(1,2 empate)=1.5; banana=3; caju=4 */
+    smaug_series_str_t *s = smaug_str_create(4);
+    smaug_str_set(s, 0, "banana", 6);
+    smaug_str_set(s, 1, "abacaxi", 7);
+    smaug_str_set(s, 2, "caju", 4);
+    smaug_str_set(s, 3, "abacaxi", 7);
+    double *rs = smaug_str_rank(s, 0);
+    CHECK(rs && APPROX(rs[0], 3.0), "str rank avg [0]=3 (banana)");
+    CHECK(rs && APPROX(rs[1], 1.5), "str rank avg [1]=1.5 (abacaxi empate)");
+    CHECK(rs && APPROX(rs[2], 4.0), "str rank avg [2]=4 (caju)");
+    CHECK(rs && APPROX(rs[3], 1.5), "str rank avg [3]=1.5 (abacaxi empate)");
+    free(rs);
+    double *rsf = smaug_str_rank(s, 3);  /* first: ordem de aparição */
+    CHECK(rsf && APPROX(rsf[1], 1.0), "str rank first [1]=1 (abacaxi 1º)");
+    CHECK(rsf && APPROX(rsf[3], 2.0), "str rank first [3]=2 (abacaxi 2º)");
+    free(rsf);
+    /* str com "" e NA: ["", NA, "a"] → ""=1, NA=NAN, a=2 */
+    smaug_series_str_t *s2 = smaug_str_create(3);
+    smaug_str_set(s2, 0, "", 0);
+    smaug_str_set(s2, 2, "a", 1);
+    double *rs2 = smaug_str_rank(s2, 0);
+    CHECK(rs2 && APPROX(rs2[0], 1.0), "str rank [0]=1 (vazia é menor)");
+    CHECK(rs2 && rs2[1] != rs2[1],    "str rank [1]=NAN");
+    CHECK(rs2 && APPROX(rs2[2], 2.0), "str rank [2]=2");
+    free(rs2); smaug_str_free(s2);
+    /* str toda-NA / NULL */
+    smaug_series_str_t *se = smaug_str_create(2);
+    double *rse = smaug_str_rank(se, 0);
+    CHECK(rse && rse[0] != rse[0] && rse[1] != rse[1], "str rank toda-NA: tudo NAN");
+    free(rse); smaug_str_free(se);
+    CHECK(smaug_str_rank(NULL, 0) == NULL, "str rank NULL");
+    smaug_str_free(s);
+
+    /* bool: [true,false,true,false] → false=1,2; true=3,4
+       avg: false=1.5, true=3.5 */
+    smaug_series_bool_t *b = bool_from("1010");
+    double *rba = smaug_bool_rank(b, 0);
+    CHECK(rba && APPROX(rba[0], 3.5), "bool rank avg [0]=3.5 (true)");
+    CHECK(rba && APPROX(rba[1], 1.5), "bool rank avg [1]=1.5 (false)");
+    CHECK(rba && APPROX(rba[2], 3.5), "bool rank avg [2]=3.5 (true)");
+    CHECK(rba && APPROX(rba[3], 1.5), "bool rank avg [3]=1.5 (false)");
+    free(rba);
+    double *rbm = smaug_bool_rank(b, 1);  /* min: false=1, true=3 */
+    CHECK(rbm && APPROX(rbm[1], 1.0) && APPROX(rbm[0], 3.0), "bool rank min");
+    free(rbm);
+    double *rbf = smaug_bool_rank(b, 3);  /* first: false 1,2; true 3,4 */
+    CHECK(rbf && APPROX(rbf[1], 1.0) && APPROX(rbf[3], 2.0), "bool rank first false");
+    CHECK(rbf && APPROX(rbf[0], 3.0) && APPROX(rbf[2], 4.0), "bool rank first true");
+    free(rbf);
+    smaug_bool_free(b);
+    /* bool com NA: "1N0" → true=2, NA=NAN, false=1 */
+    smaug_series_bool_t *bn = bool_from("1N0");
+    double *rbn = smaug_bool_rank(bn, 0);
+    CHECK(rbn && APPROX(rbn[0], 2.0), "bool rank NA [0]=2 (true)");
+    CHECK(rbn && rbn[1] != rbn[1],    "bool rank NA [1]=NAN");
+    CHECK(rbn && APPROX(rbn[2], 1.0), "bool rank NA [2]=1 (false)");
+    free(rbn); smaug_bool_free(bn);
+    CHECK(smaug_bool_rank(NULL, 0) == NULL, "bool rank NULL");
+}
+
 /* =====================================================================
    multi_argsort
    ===================================================================== */
@@ -1114,7 +1200,7 @@ static void test_f64_rolling_sum(void) {
     /* [1,2,3,4,5] window=3 → [NA,NA,6,9,12] */
     double arr[] = {1.0, 2.0, 3.0, 4.0, 5.0};
     smaug_series_f64_t *s = f64_from(arr, 5);
-    smaug_series_f64_t *r = smaug_f64_rolling_sum(s, 3);
+    smaug_series_f64_t *r = smaug_f64_rolling_sum(s, 3, 0);
     CHECK(r && f64_null(r, 0), "f64 rolling_sum [0]=NA");
     CHECK(r && f64_null(r, 1), "f64 rolling_sum [1]=NA");
     CHECK(r && APPROX(f64_get(r, 2), 6.0),  "f64 rolling_sum [2]=6");
@@ -1125,50 +1211,50 @@ static void test_f64_rolling_sum(void) {
     /* com null: [1, null, 3, 4] window=2 → [NA, 1, 3, 7] */
     double arr2[] = {1.0, -9999.0, 3.0, 4.0};
     smaug_series_f64_t *s2 = f64_from(arr2, 4);
-    smaug_series_f64_t *r2 = smaug_f64_rolling_sum(s2, 2);
+    smaug_series_f64_t *r2 = smaug_f64_rolling_sum(s2, 2, 0);
     CHECK(r2 && f64_null(r2, 0),              "f64 rolling_sum null [0]=NA");
     CHECK(r2 && APPROX(f64_get(r2, 1), 1.0), "f64 rolling_sum null [1]=1 (null ignorado, soma de [1,null]=1)");
     CHECK(r2 && APPROX(f64_get(r2, 2), 3.0), "f64 rolling_sum null [2]=3 (null+3=3)");
     CHECK(r2 && APPROX(f64_get(r2, 3), 7.0), "f64 rolling_sum null [3]=7");
     smaug_f64_free(r2); smaug_f64_free(s2);
 
-    CHECK(smaug_f64_rolling_sum(NULL, 3) == NULL, "f64 rolling_sum NULL");
+    CHECK(smaug_f64_rolling_sum(NULL, 3, 0) == NULL, "f64 rolling_sum NULL");
 }
 
 static void test_f64_rolling_mean(void) {
     double arr[] = {1.0, 2.0, 3.0, 4.0, 5.0};
     smaug_series_f64_t *s = f64_from(arr, 5);
-    smaug_series_f64_t *r = smaug_f64_rolling_mean(s, 3);
+    smaug_series_f64_t *r = smaug_f64_rolling_mean(s, 3, 0);
     CHECK(r && f64_null(r, 0), "f64 rolling_mean [0]=NA");
     CHECK(r && APPROX(f64_get(r, 2), 2.0), "f64 rolling_mean [2]=2");
     CHECK(r && APPROX(f64_get(r, 4), 4.0), "f64 rolling_mean [4]=4");
     smaug_f64_free(r); smaug_f64_free(s);
-    CHECK(smaug_f64_rolling_mean(NULL, 3) == NULL, "f64 rolling_mean NULL");
+    CHECK(smaug_f64_rolling_mean(NULL, 3, 0) == NULL, "f64 rolling_mean NULL");
 }
 
 static void test_f64_rolling_min(void) {
     /* [3,1,4,1,5] window=3 → [NA,NA,1,1,1] */
     double arr[] = {3.0, 1.0, 4.0, 1.0, 5.0};
     smaug_series_f64_t *s = f64_from(arr, 5);
-    smaug_series_f64_t *r = smaug_f64_rolling_min(s, 3);
+    smaug_series_f64_t *r = smaug_f64_rolling_min(s, 3, 0);
     CHECK(r && f64_null(r, 0), "f64 rolling_min [0]=NA");
     CHECK(r && APPROX(f64_get(r, 2), 1.0), "f64 rolling_min [2]=1");
     CHECK(r && APPROX(f64_get(r, 3), 1.0), "f64 rolling_min [3]=1");
     CHECK(r && APPROX(f64_get(r, 4), 1.0), "f64 rolling_min [4]=1");
     smaug_f64_free(r); smaug_f64_free(s);
-    CHECK(smaug_f64_rolling_min(NULL, 3) == NULL, "f64 rolling_min NULL");
+    CHECK(smaug_f64_rolling_min(NULL, 3, 0) == NULL, "f64 rolling_min NULL");
 }
 
 static void test_f64_rolling_max(void) {
     double arr[] = {3.0, 1.0, 4.0, 1.0, 5.0};
     smaug_series_f64_t *s = f64_from(arr, 5);
-    smaug_series_f64_t *r = smaug_f64_rolling_max(s, 3);
+    smaug_series_f64_t *r = smaug_f64_rolling_max(s, 3, 0);
     CHECK(r && f64_null(r, 0), "f64 rolling_max [0]=NA");
     CHECK(r && APPROX(f64_get(r, 2), 4.0), "f64 rolling_max [2]=4");
     CHECK(r && APPROX(f64_get(r, 3), 4.0), "f64 rolling_max [3]=4");
     CHECK(r && APPROX(f64_get(r, 4), 5.0), "f64 rolling_max [4]=5");
     smaug_f64_free(r); smaug_f64_free(s);
-    CHECK(smaug_f64_rolling_max(NULL, 3) == NULL, "f64 rolling_max NULL");
+    CHECK(smaug_f64_rolling_max(NULL, 3, 0) == NULL, "f64 rolling_max NULL");
 }
 
 /* =====================================================================
@@ -1178,41 +1264,113 @@ static void test_f64_rolling_max(void) {
 static void test_i64_rolling_sum(void) {
     int64_t arr[] = {1, 2, 3, 4, 5};
     smaug_series_i64_t *s = i64_from(arr, 5);
-    smaug_series_i64_t *r = smaug_i64_rolling_sum(s, 3);
+    smaug_series_i64_t *r = smaug_i64_rolling_sum(s, 3, 0);
     CHECK(r && i64_null(r, 0), "i64 rolling_sum [0]=NA");
     CHECK(r && i64_get(r, 2) == 6,  "i64 rolling_sum [2]=6");
     CHECK(r && i64_get(r, 4) == 12, "i64 rolling_sum [4]=12");
     smaug_i64_free(r); smaug_i64_free(s);
-    CHECK(smaug_i64_rolling_sum(NULL, 3) == NULL, "i64 rolling_sum NULL");
+    CHECK(smaug_i64_rolling_sum(NULL, 3, 0) == NULL, "i64 rolling_sum NULL");
 }
 
 static void test_i64_rolling_mean(void) {
     int64_t arr[] = {1, 2, 3, 4, 5};
     smaug_series_i64_t *s = i64_from(arr, 5);
-    smaug_series_f64_t *r = smaug_i64_rolling_mean(s, 3);
+    smaug_series_f64_t *r = smaug_i64_rolling_mean(s, 3, 0);
     CHECK(r && f64_null(r, 0), "i64 rolling_mean [0]=NA");
     CHECK(r && APPROX(f64_get(r, 2), 2.0), "i64 rolling_mean [2]=2.0");
     CHECK(r && APPROX(f64_get(r, 4), 4.0), "i64 rolling_mean [4]=4.0");
     smaug_f64_free(r); smaug_i64_free(s);
-    CHECK(smaug_i64_rolling_mean(NULL, 3) == NULL, "i64 rolling_mean NULL");
+    CHECK(smaug_i64_rolling_mean(NULL, 3, 0) == NULL, "i64 rolling_mean NULL");
 }
 
 static void test_i64_rolling_min_max(void) {
     int64_t arr[] = {3, 1, 4, 1, 5};
     smaug_series_i64_t *s = i64_from(arr, 5);
-    smaug_series_i64_t *rmin = smaug_i64_rolling_min(s, 3);
+    smaug_series_i64_t *rmin = smaug_i64_rolling_min(s, 3, 0);
     CHECK(rmin && i64_null(rmin, 0),       "i64 rolling_min [0]=NA");
     CHECK(rmin && i64_get(rmin, 2) == 1,   "i64 rolling_min [2]=1");
     CHECK(rmin && i64_get(rmin, 4) == 1,   "i64 rolling_min [4]=1");
     smaug_i64_free(rmin);
 
-    smaug_series_i64_t *rmax = smaug_i64_rolling_max(s, 3);
+    smaug_series_i64_t *rmax = smaug_i64_rolling_max(s, 3, 0);
     CHECK(rmax && i64_null(rmax, 0),       "i64 rolling_max [0]=NA");
     CHECK(rmax && i64_get(rmax, 2) == 4,   "i64 rolling_max [2]=4");
     CHECK(rmax && i64_get(rmax, 4) == 5,   "i64 rolling_max [4]=5");
     smaug_i64_free(rmax);
 
     smaug_i64_free(s);
+}
+
+/* item 8a: rolling std/var/count + min_periods + rescan min/max */
+static void test_rolling_8a(void) {
+    /* std/var amostral (ddof=1). [1,2,3,4] w=3:
+       janela {1,2,3}: mean=2, var=((1+0+1)/2)=1, std=1; {2,3,4}: idem */
+    double arr[] = {1.0, 2.0, 3.0, 4.0};
+    smaug_series_f64_t *s = f64_from(arr, 4);
+
+    smaug_series_f64_t *rs = smaug_f64_rolling_std(s, 3, 0);
+    CHECK(rs && f64_null(rs, 0) && f64_null(rs, 1), "rolling_std [0,1]=NA");
+    CHECK(rs && APPROX(f64_get(rs, 2), 1.0), "rolling_std [2]=1");
+    CHECK(rs && APPROX(f64_get(rs, 3), 1.0), "rolling_std [3]=1");
+    smaug_f64_free(rs);
+
+    smaug_series_f64_t *rv = smaug_f64_rolling_var(s, 3, 0);
+    CHECK(rv && APPROX(f64_get(rv, 2), 1.0), "rolling_var [2]=1");
+    smaug_f64_free(rv);
+
+    /* count → i64 */
+    smaug_series_i64_t *rc = smaug_f64_rolling_count(s, 3, 0);
+    CHECK(rc && i64_null(rc, 1), "rolling_count [1]=NA (janela-cheia)");
+    CHECK(rc && i64_get(rc, 2) == 3, "rolling_count [2]=3");
+    smaug_i64_free(rc);
+
+    /* min_periods=1: janelas parciais. std precisa de n>=2 → [1] sozinho = NA */
+    smaug_series_f64_t *rs1 = smaug_f64_rolling_std(s, 3, 1);
+    CHECK(rs1 && f64_null(rs1, 0),            "rolling_std mp1 [0]=NA (n<2)");
+    CHECK(rs1 && APPROX(f64_get(rs1, 1), sqrt(0.5)), "rolling_std mp1 [1]={1,2}");
+    smaug_f64_free(rs1);
+
+    /* sum com min_periods=1: janelas parciais emitem (o BUG corrigido) */
+    smaug_series_f64_t *rsum = smaug_f64_rolling_sum(s, 3, 1);
+    CHECK(rsum && APPROX(f64_get(rsum, 0), 1.0), "rolling_sum mp1 [0]=1 (parcial)");
+    CHECK(rsum && APPROX(f64_get(rsum, 1), 3.0), "rolling_sum mp1 [1]=3");
+    CHECK(rsum && APPROX(f64_get(rsum, 2), 6.0), "rolling_sum mp1 [2]=6");
+    smaug_f64_free(rsum);
+
+    /* count com min_periods=2 e NA: [1,NA,3,4] janelas parciais */
+    double arrn[] = {1.0, -9999.0, 3.0, 4.0};
+    smaug_series_f64_t *sn = f64_from(arrn, 4);
+    smaug_series_i64_t *rcn = smaug_f64_rolling_count(sn, 3, 2);
+    CHECK(rcn && i64_null(rcn, 0), "rolling_count mp2 [0]=NA (1 nonnull)");
+    CHECK(rcn && i64_null(rcn, 1), "rolling_count mp2 [1]=NA (1 nonnull)");
+    CHECK(rcn && i64_get(rcn, 2) == 2, "rolling_count mp2 [2]=2");
+    smaug_i64_free(rcn);
+
+    /* min/max com min_periods → rescan type-preserving */
+    smaug_series_f64_t *rmin = smaug_f64_rolling_min(s, 3, 1);
+    CHECK(rmin && APPROX(f64_get(rmin, 0), 1.0), "rolling_min mp1 [0]=1 (rescan)");
+    CHECK(rmin && APPROX(f64_get(rmin, 3), 2.0), "rolling_min mp1 [3]=2");
+    smaug_f64_free(rmin);
+    smaug_series_f64_t *rmax = smaug_f64_rolling_max(s, 3, 1);
+    CHECK(rmax && APPROX(f64_get(rmax, 0), 1.0), "rolling_max mp1 [0]=1");
+    CHECK(rmax && APPROX(f64_get(rmax, 3), 4.0), "rolling_max mp1 [3]=4");
+    smaug_f64_free(rmax);
+    smaug_f64_free(sn);
+    smaug_f64_free(s);
+
+    /* i64 min com min_periods: rescan preserva tipo (sem perda >2^53) */
+    int64_t bigv[] = {9007199254740993LL, 9007199254740992LL, 9007199254740994LL};
+    smaug_series_i64_t *bs = i64_from(bigv, 3);
+    smaug_series_i64_t *rbmin = smaug_i64_rolling_min(bs, 2, 1);
+    CHECK(rbmin && i64_get(rbmin, 1) == 9007199254740992LL, "i64 rolling_min mp >2^53 exato");
+    smaug_i64_free(rbmin);
+    /* std de i64 (via motor, double-safe) */
+    int64_t iv[] = {10, 20, 30};
+    smaug_series_i64_t *is = i64_from(iv, 3);
+    smaug_series_f64_t *ristd = smaug_i64_rolling_std(is, 2, 0);
+    CHECK(ristd && APPROX(f64_get(ristd, 1), sqrt(50.0)), "i64 rolling_std [1]={10,20}");
+    smaug_f64_free(ristd); smaug_i64_free(is);
+    smaug_i64_free(bs);
 }
 
 /* =====================================================================
@@ -1245,18 +1403,18 @@ static void test_rolling_window_zero(void) {
     /* window=0 para todas as 8 funções rolling (guards, ramos 2 de cada) */
     double fd[] = {1.0, 2.0, 3.0};
     smaug_series_f64_t *sf = f64_from(fd, 3);
-    CHECK(smaug_f64_rolling_sum(sf,  0) == NULL, "f64 rolling_sum window=0");
-    CHECK(smaug_f64_rolling_mean(sf, 0) == NULL, "f64 rolling_mean window=0");
-    CHECK(smaug_f64_rolling_min(sf,  0) == NULL, "f64 rolling_min window=0");
-    CHECK(smaug_f64_rolling_max(sf,  0) == NULL, "f64 rolling_max window=0");
+    CHECK(smaug_f64_rolling_sum(sf,  0, 0) == NULL, "f64 rolling_sum window=0");
+    CHECK(smaug_f64_rolling_mean(sf, 0, 0) == NULL, "f64 rolling_mean window=0");
+    CHECK(smaug_f64_rolling_min(sf,  0, 0) == NULL, "f64 rolling_min window=0");
+    CHECK(smaug_f64_rolling_max(sf,  0, 0) == NULL, "f64 rolling_max window=0");
     smaug_f64_free(sf);
 
     int64_t id[] = {1, 2, 3};
     smaug_series_i64_t *si = i64_from(id, 3);
-    CHECK(smaug_i64_rolling_sum(si,  0) == NULL, "i64 rolling_sum window=0");
-    CHECK(smaug_i64_rolling_mean(si, 0) == NULL, "i64 rolling_mean window=0");
-    CHECK(smaug_i64_rolling_min(si,  0) == NULL, "i64 rolling_min window=0");
-    CHECK(smaug_i64_rolling_max(si,  0) == NULL, "i64 rolling_max window=0");
+    CHECK(smaug_i64_rolling_sum(si,  0, 0) == NULL, "i64 rolling_sum window=0");
+    CHECK(smaug_i64_rolling_mean(si, 0, 0) == NULL, "i64 rolling_mean window=0");
+    CHECK(smaug_i64_rolling_min(si,  0, 0) == NULL, "i64 rolling_min window=0");
+    CHECK(smaug_i64_rolling_max(si,  0, 0) == NULL, "i64 rolling_max window=0");
     smaug_i64_free(si);
 }
 
@@ -1269,11 +1427,11 @@ static void test_rolling_all_null_window(void) {
     smaug_f64_set_null(sf, 1);
 
     /* rolling_sum */
-    smaug_series_f64_t *rs = smaug_f64_rolling_sum(sf, 2);
+    smaug_series_f64_t *rs = smaug_f64_rolling_sum(sf, 2, 0);
     CHECK(rs && f64_null(rs, 1), "f64 rolling_sum all-null window: pos 1 = NA (cnt=0)");
     smaug_f64_free(rs);
     /* rolling_mean */
-    smaug_series_f64_t *rm = smaug_f64_rolling_mean(sf, 2);
+    smaug_series_f64_t *rm = smaug_f64_rolling_mean(sf, 2, 0);
     CHECK(rm && f64_null(rm, 1), "f64 rolling_mean all-null window: pos 1 = NA");
     smaug_f64_free(rm);
     smaug_f64_free(sf);
@@ -1283,7 +1441,7 @@ static void test_rolling_all_null_window(void) {
     smaug_series_i64_t *si = i64_from(arri, 3);
     smaug_i64_set_null(si, 0);
     smaug_i64_set_null(si, 1);
-    smaug_series_i64_t *ris = smaug_i64_rolling_sum(si, 2);
+    smaug_series_i64_t *ris = smaug_i64_rolling_sum(si, 2, 0);
     CHECK(ris && i64_null(ris, 1), "i64 rolling_sum all-null: pos 1 = NA (cnt=0)");
     smaug_i64_free(ris);
     smaug_i64_free(si);
@@ -1306,7 +1464,7 @@ static void test_rolling_null_in_deque_window(void) {
     smaug_f64_set_null(sf, 2);
 
     /* rolling_min */
-    smaug_series_f64_t *rmin = smaug_f64_rolling_min(sf, 2);
+    smaug_series_f64_t *rmin = smaug_f64_rolling_min(sf, 2, 0);
     CHECK(rmin && f64_null(rmin, 0),              "f64 rolling_min null-deque: [0]=NA");
     CHECK(rmin && APPROX(f64_get(rmin, 1), 1.0),  "f64 rolling_min null-deque: [1]=1.0");
     CHECK(rmin && f64_null(rmin, 2),              "f64 rolling_min null-deque: [2]=NA (258+278)");
@@ -1314,7 +1472,7 @@ static void test_rolling_null_in_deque_window(void) {
     smaug_f64_free(rmin);
 
     /* rolling_max */
-    smaug_series_f64_t *rmax = smaug_f64_rolling_max(sf, 2);
+    smaug_series_f64_t *rmax = smaug_f64_rolling_max(sf, 2, 0);
     CHECK(rmax && f64_null(rmax, 0),              "f64 rolling_max null-deque: [0]=NA");
     CHECK(rmax && APPROX(f64_get(rmax, 1), 1.0),  "f64 rolling_max null-deque: [1]=1.0");
     CHECK(rmax && f64_null(rmax, 2),              "f64 rolling_max null-deque: [2]=NA (301+318)");
@@ -1328,14 +1486,14 @@ static void test_rolling_null_in_deque_window(void) {
     smaug_i64_set_null(si, 1);
     smaug_i64_set_null(si, 2);
 
-    smaug_series_i64_t *rimin = smaug_i64_rolling_min(si, 2);
+    smaug_series_i64_t *rimin = smaug_i64_rolling_min(si, 2, 0);
     CHECK(rimin && i64_null(rimin, 0),         "i64 rolling_min null-deque: [0]=NA");
     CHECK(rimin && i64_get(rimin, 1) == 1,     "i64 rolling_min null-deque: [1]=1");
     CHECK(rimin && i64_null(rimin, 2),         "i64 rolling_min null-deque: [2]=NA (394+396)");
     CHECK(rimin && i64_get(rimin, 3) == 2,     "i64 rolling_min null-deque: [3]=2");
     smaug_i64_free(rimin);
 
-    smaug_series_i64_t *rimax = smaug_i64_rolling_max(si, 2);
+    smaug_series_i64_t *rimax = smaug_i64_rolling_max(si, 2, 0);
     CHECK(rimax && i64_null(rimax, 0),         "i64 rolling_max null-deque: [0]=NA");
     CHECK(rimax && i64_get(rimax, 1) == 1,     "i64 rolling_max null-deque: [1]=1");
     CHECK(rimax && i64_null(rimax, 2),         "i64 rolling_max null-deque: [2]=NA (416+426)");
@@ -1377,6 +1535,7 @@ int main(void) {
     test_i64_sorted_nonnull();
     test_f64_rank();
     test_i64_rank();
+    test_typed_rank();
     /* Grupo C */
     test_multi_argsort_single_f64();
     test_multi_argsort_single_i64();
@@ -1394,6 +1553,7 @@ int main(void) {
     test_i64_rolling_sum();
     test_i64_rolling_mean();
     test_i64_rolling_min_max();
+    test_rolling_8a();
     test_rolling_window_zero();
     test_rolling_all_null_window();
     test_rolling_null_in_deque_window();

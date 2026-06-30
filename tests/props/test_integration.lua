@@ -105,6 +105,35 @@ local pr = S.from_table({1.0,2.0,3.0,4.0}, "float64"):pct_rank()
 check(approx(pr:get(1), 0.25), "pct_rank[1]=0.25")
 check(approx(pr:get(4), 1.0),  "pct_rank[4]=1.0")
 
+-- rank em dtypes ordenáveis não-numéricos (item 7.3): str/dt/bool delegam ao C
+-- string lexicográfico, com empate
+local rs = S.from_table({"banana","abacaxi","caju","abacaxi"}, "string"):rank()
+check(approx(rs:get(1), 3.0), "7.3 str rank banana=3")
+check(approx(rs:get(2), 1.5), "7.3 str rank abacaxi=1.5 (empate)")
+check(approx(rs:get(3), 4.0), "7.3 str rank caju=4")
+check(approx(rs:get(4), 1.5), "7.3 str rank abacaxi=1.5")
+-- string method first
+local rsf = S.from_table({"b","a","a"}, "string"):rank("first")
+check(approx(rsf:get(2), 1.0) and approx(rsf:get(3), 2.0), "7.3 str rank first empate")
+-- string com NA
+local rsn = S.from_table({"b", NA, "a"}, "string"):rank()
+check(rsn:is_null(2) and approx(rsn:get(3), 1.0), "7.3 str rank NA preservado")
+
+-- datetime cronológico
+local rd = S.from_table({"2020-03-01","2020-01-01","2020-06-15","2020-01-01"}, "datetime"):rank()
+check(approx(rd:get(2), 1.5) and approx(rd:get(4), 1.5), "7.3 dt rank empate cronológico")
+check(approx(rd:get(1), 3.0) and approx(rd:get(3), 4.0), "7.3 dt rank ordem")
+
+-- bool: false<true
+local rb = S.from_table({true,false,true,false}, "bool"):rank()
+check(approx(rb:get(2), 1.5) and approx(rb:get(1), 3.5), "7.3 bool rank avg")
+local rbm = S.from_table({true,false,true,false}, "bool"):rank("min")
+check(approx(rbm:get(2), 1.0) and approx(rbm:get(1), 3.0), "7.3 bool rank min")
+
+-- método inválido erra; dtype sem rank (categorical) erra
+check(not pcall(function() return S.from_table({1.0}, "float64"):rank("xyz") end), "7.3 rank método inválido erra")
+check(not pcall(function() return S.from_table({"x"}, "string"):astype("categorical"):rank() end), "7.3 categorical rank erra")
+
 -- skew / kurtosis / mad / sem
 local sg = S.from_table({2,4,4,4,5,5,7,9}, "float64")
 check(approx(sg:mad(), 0.5, 1e-9), "mad: 0.5")

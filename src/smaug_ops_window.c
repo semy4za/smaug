@@ -182,6 +182,85 @@ static size_t deque_back(const deque_t *d)         { return d->buf[(d->tail-1) %
    f64 rolling
    =================================================================== */
 
+/* ===================================================================
+   Parte 2 — Motor de janela genérico (item 8a)
+   -------------------------------------------------------------------
+   Fonte única para os agregados naturalmente double: mean, std, var,
+   count. sum/min/max NÃO passam aqui (preservam tipo exato e otimização
+   própria — ver D8-g); apenas ganham o parâmetro min_periods.
+
+   Regra de emissão (unificada, espelha o _agg da camada Lua):
+     - min_periods == 0  → MODO JANELA CHEIA (default): emite valor só se
+       a posição tem janela completa (i+1 >= window) E >= 1 não-nulo.
+     - min_periods >= 1  → MODO PARCIAL: emite se a janela (parcial no
+       início) tem >= min_periods não-nulos. Convenção idêntica ao
+       min_count do item 5.5.
+
+   std/var são AMOSTRAIS (ddof=1, ÷(n-1), NaN para n<2) — coerente com a
+   reconciliação do item 5.0. Não populacional.
+   =================================================================== */
+typedef enum {
+    ROLL_MEAN = 0,
+    ROLL_STD,
+    ROLL_VAR,
+    ROLL_COUNT
+} roll_kind_t;
+
+/* Aplica o agregado `kind` sobre janelas de `data`/`mask` (tamanho n).
+   Retorna double* (NAN onde não emite). Caller libera. NULL em OOM. */
+static double *rolling_apply(const double *data, const smaug_mask_t *mask,
+                             size_t n, size_t window, size_t min_periods,
+                             roll_kind_t kind) {
+    double *out = malloc((n ? n : 1) * sizeof(double));
+    if (!out) return NULL;
+    for (size_t i = 0; i < n; i++) out[i] = NAN;
+
+    for (size_t i = 0; i < n; i++) {
+        size_t wstart = (i + 1 >= window) ? (i + 1 - window) : 0;
+
+        /* modo janela-cheia (min_periods==0): exige janela completa */
+        if (min_periods == 0 && i + 1 < window) continue;
+
+        /* varre a janela [wstart, i], acumulando não-nulos */
+        size_t cnt = 0;
+        double sum = 0.0, sumsq = 0.0;
+        for (size_t j = wstart; j <= i; j++) {
+            if (SMAUG_VALID(mask, j)) {
+                double v = data[j];
+                sum   += v;
+                sumsq += v * v;
+                cnt++;
+            }
+        }
+
+        size_t need = (min_periods == 0) ? 1 : min_periods;
+        if (cnt < need) continue;   /* não emite → permanece NAN */
+
+        switch (kind) {
+            case ROLL_COUNT:
+                out[i] = (double)cnt;
+                break;
+            case ROLL_MEAN:
+                out[i] = sum / (double)cnt;
+                break;
+            case ROLL_STD:
+            case ROLL_VAR: {
+                if (cnt < 2) { /* amostral indefinido → permanece NAN */
+                    break;
+                }
+                double mean = sum / (double)cnt;
+                /* variância amostral: (Σx² - n·mean²)/(n-1) */
+                double num = sumsq - (double)cnt * mean * mean;
+                if (num < 0.0) num = 0.0;   /* guarda contra erro numérico */
+                double var = num / (double)(cnt - 1);
+                out[i] = (kind == ROLL_VAR) ? var : sqrt(var);
+                break;
+            }
+        }
+    }
+    return out;
+}
+
 /*
  * rolling_sum f64: soma deslizante O(N).
  * Nulos ignorados dentro da janela (somados como 0, contados separado).
@@ -189,7 +268,7 @@ static size_t deque_back(const deque_t *d)         { return d->buf[(d->tail-1) %
  * Primeiras (window-1) posições são NA.
  */
 smaug_series_f64_t *smaug_f64_rolling_sum(const smaug_series_f64_t *s,
-                                           size_t window) {
+                                           size_t window, size_t min_periods) {
     if (!s || window == 0) return NULL;
     smaug_series_f64_t *r = smaug_f64_create(s->size);
     if (!r) return NULL;
@@ -205,9 +284,11 @@ smaug_series_f64_t *smaug_f64_rolling_sum(const smaug_series_f64_t *s,
             size_t out = i - window;
             if (SMAUG_VALID(s->null_mask, out)) { sum -= s->data[out]; cnt--; }
         }
-        /* janela incompleta → NA */
-        if (i + 1 < window) continue;
-        if (cnt == 0) continue;  /* janela toda nula → NA */
+        /* emissão (item 8a): modo janela-cheia (min_periods==0) exige
+           janela completa; modo parcial exige >= min_periods não-nulos. */
+        if (min_periods == 0 && i + 1 < window) continue;
+        size_t need = (min_periods == 0) ? 1 : min_periods;
+        if (cnt < need) continue;
         r->data[i]      = sum;
         r->null_mask[i] = SMAUG_MASK_VALID;
     }
@@ -217,26 +298,59 @@ smaug_series_f64_t *smaug_f64_rolling_sum(const smaug_series_f64_t *s,
 /*
  * rolling_mean f64: média deslizante O(N).
  */
-smaug_series_f64_t *smaug_f64_rolling_mean(const smaug_series_f64_t *s,
-                                            size_t window) {
-    if (!s || window == 0) return NULL;
-    smaug_series_f64_t *r = smaug_f64_create(s->size);
-    if (!r) return NULL;
-
-    double sum = 0.0;
-    size_t cnt = 0;
-
-    for (size_t i = 0; i < s->size; i++) {
-        if (SMAUG_VALID(s->null_mask, i)) { sum += s->data[i]; cnt++; }
-        if (i >= window) {
-            size_t out = i - window;
-            if (SMAUG_VALID(s->null_mask, out)) { sum -= s->data[out]; cnt--; }
+/* Empacota um double* (do motor) numa série f64, transferindo NAN→NA.
+   Consome `vals` (libera ao fim). NULL em OOM. */
+static smaug_series_f64_t *pack_f64(double *vals, size_t n) {
+    if (!vals) return NULL;
+    smaug_series_f64_t *r = smaug_f64_create(n);
+    if (!r) { free(vals); return NULL; }
+    for (size_t i = 0; i < n; i++) {
+        if (vals[i] == vals[i]) {   /* não-NAN */
+            r->data[i]      = vals[i];
+            r->null_mask[i] = SMAUG_MASK_VALID;
         }
-        if (i + 1 < window) continue;
-        if (cnt == 0) continue;
-        r->data[i]      = sum / (double)cnt;
-        r->null_mask[i] = SMAUG_MASK_VALID;
     }
+    free(vals);
+    return r;
+}
+
+smaug_series_f64_t *smaug_f64_rolling_mean(const smaug_series_f64_t *s,
+                                            size_t window, size_t min_periods) {
+    if (!s || window == 0) return NULL;
+    return pack_f64(rolling_apply(s->data, s->null_mask, s->size,
+                                  window, min_periods, ROLL_MEAN), s->size);
+}
+
+smaug_series_f64_t *smaug_f64_rolling_std(const smaug_series_f64_t *s,
+                                           size_t window, size_t min_periods) {
+    if (!s || window == 0) return NULL;
+    return pack_f64(rolling_apply(s->data, s->null_mask, s->size,
+                                  window, min_periods, ROLL_STD), s->size);
+}
+
+smaug_series_f64_t *smaug_f64_rolling_var(const smaug_series_f64_t *s,
+                                           size_t window, size_t min_periods) {
+    if (!s || window == 0) return NULL;
+    return pack_f64(rolling_apply(s->data, s->null_mask, s->size,
+                                  window, min_periods, ROLL_VAR), s->size);
+}
+
+/* count retorna int64 (contagem é naturalmente inteira). */
+smaug_series_i64_t *smaug_f64_rolling_count(const smaug_series_f64_t *s,
+                                             size_t window, size_t min_periods) {
+    if (!s || window == 0) return NULL;
+    double *vals = rolling_apply(s->data, s->null_mask, s->size,
+                                 window, min_periods, ROLL_COUNT);
+    if (!vals) return NULL;
+    smaug_series_i64_t *r = smaug_i64_create(s->size);
+    if (!r) { free(vals); return NULL; }
+    for (size_t i = 0; i < s->size; i++) {
+        if (vals[i] == vals[i]) {
+            r->data[i]      = (int64_t)vals[i];
+            r->null_mask[i] = SMAUG_MASK_VALID;
+        }
+    }
+    free(vals);
     return r;
 }
 
@@ -244,10 +358,30 @@ smaug_series_f64_t *smaug_f64_rolling_mean(const smaug_series_f64_t *s,
  * rolling_min f64: mínimo deslizante O(N) via monotone deque.
  */
 smaug_series_f64_t *smaug_f64_rolling_min(const smaug_series_f64_t *s,
-                                           size_t window) {
+                                           size_t window, size_t min_periods) {
     if (!s || window == 0) return NULL;
     smaug_series_f64_t *r = smaug_f64_create(s->size);
     if (!r) return NULL;
+
+    /* Modo min_periods>=1 (item 8a, D8-h opção ii): rescan O(n·window)
+       type-preserving (compara em double nativo, sem perda) sobre janelas
+       parciais. A deque otimizada fica reservada ao modo janela-cheia. */
+    if (min_periods >= 1) {
+        for (size_t i = 0; i < s->size; i++) {
+            size_t wstart = (i + 1 >= window) ? (i + 1 - window) : 0;
+            size_t cnt = 0; double best = 0.0;
+            for (size_t j = wstart; j <= i; j++) {
+                if (SMAUG_VALID(s->null_mask, j)) {
+                    if (cnt == 0 || s->data[j] < best) best = s->data[j];
+                    cnt++;
+                }
+            }
+            if (cnt >= min_periods) {
+                r->data[i] = best; r->null_mask[i] = SMAUG_MASK_VALID;
+            }
+        }
+        return r;
+    }
 
     deque_t dq;
     if (!deque_init(&dq, window + 1)) { smaug_f64_free(r); return NULL; }
@@ -288,10 +422,27 @@ smaug_series_f64_t *smaug_f64_rolling_min(const smaug_series_f64_t *s,
  * rolling_max f64: máximo deslizante O(N) via monotone deque.
  */
 smaug_series_f64_t *smaug_f64_rolling_max(const smaug_series_f64_t *s,
-                                           size_t window) {
+                                           size_t window, size_t min_periods) {
     if (!s || window == 0) return NULL;
     smaug_series_f64_t *r = smaug_f64_create(s->size);
     if (!r) return NULL;
+
+    if (min_periods >= 1) {  /* rescan type-preserving (D8-h ii) */
+        for (size_t i = 0; i < s->size; i++) {
+            size_t wstart = (i + 1 >= window) ? (i + 1 - window) : 0;
+            size_t cnt = 0; double best = 0.0;
+            for (size_t j = wstart; j <= i; j++) {
+                if (SMAUG_VALID(s->null_mask, j)) {
+                    if (cnt == 0 || s->data[j] > best) best = s->data[j];
+                    cnt++;
+                }
+            }
+            if (cnt >= min_periods) {
+                r->data[i] = best; r->null_mask[i] = SMAUG_MASK_VALID;
+            }
+        }
+        return r;
+    }
 
     deque_t dq;
     if (!deque_init(&dq, window + 1)) { smaug_f64_free(r); return NULL; }
@@ -329,7 +480,7 @@ smaug_series_f64_t *smaug_f64_rolling_max(const smaug_series_f64_t *s,
    =================================================================== */
 
 smaug_series_i64_t *smaug_i64_rolling_sum(const smaug_series_i64_t *s,
-                                           size_t window) {
+                                           size_t window, size_t min_periods) {
     if (!s || window == 0) return NULL;
     smaug_series_i64_t *r = smaug_i64_create(s->size);
     if (!r) return NULL;
@@ -343,40 +494,86 @@ smaug_series_i64_t *smaug_i64_rolling_sum(const smaug_series_i64_t *s,
             size_t out = i - window;
             if (SMAUG_VALID(s->null_mask, out)) { sum -= s->data[out]; cnt--; }
         }
-        if (i + 1 < window || cnt == 0) continue;
+        if (min_periods == 0 && i + 1 < window) continue;
+        size_t need = (min_periods == 0) ? 1 : min_periods;
+        if (cnt < need) continue;
         r->data[i]      = sum;
         r->null_mask[i] = SMAUG_MASK_VALID;
     }
     return r;
 }
 
+/* Converte os dados int64 para double e aplica o motor genérico.
+   mean/std/var de i64 são double-safe (resultado é estatística contínua);
+   count idem (contagem pequena). Caller libera o retorno. */
+static double *i64_rolling_via_motor(const smaug_series_i64_t *s, size_t window,
+                                     size_t min_periods, roll_kind_t kind) {
+    double *tmp = malloc((s->size ? s->size : 1) * sizeof(double));
+    if (!tmp) return NULL;
+    for (size_t i = 0; i < s->size; i++) tmp[i] = (double)s->data[i];
+    double *out = rolling_apply(tmp, s->null_mask, s->size,
+                                window, min_periods, kind);
+    free(tmp);
+    return out;
+}
+
 smaug_series_f64_t *smaug_i64_rolling_mean(const smaug_series_i64_t *s,
-                                            size_t window) {
+                                            size_t window, size_t min_periods) {
     if (!s || window == 0) return NULL;
-    smaug_series_f64_t *r = smaug_f64_create(s->size);  /* resultado é f64 */
-    if (!r) return NULL;
+    return pack_f64(i64_rolling_via_motor(s, window, min_periods, ROLL_MEAN), s->size);
+}
 
-    int64_t sum = 0;
-    size_t  cnt = 0;
+smaug_series_f64_t *smaug_i64_rolling_std(const smaug_series_i64_t *s,
+                                           size_t window, size_t min_periods) {
+    if (!s || window == 0) return NULL;
+    return pack_f64(i64_rolling_via_motor(s, window, min_periods, ROLL_STD), s->size);
+}
 
+smaug_series_f64_t *smaug_i64_rolling_var(const smaug_series_i64_t *s,
+                                           size_t window, size_t min_periods) {
+    if (!s || window == 0) return NULL;
+    return pack_f64(i64_rolling_via_motor(s, window, min_periods, ROLL_VAR), s->size);
+}
+
+smaug_series_i64_t *smaug_i64_rolling_count(const smaug_series_i64_t *s,
+                                             size_t window, size_t min_periods) {
+    if (!s || window == 0) return NULL;
+    double *vals = i64_rolling_via_motor(s, window, min_periods, ROLL_COUNT);
+    if (!vals) return NULL;
+    smaug_series_i64_t *r = smaug_i64_create(s->size);
+    if (!r) { free(vals); return NULL; }
     for (size_t i = 0; i < s->size; i++) {
-        if (SMAUG_VALID(s->null_mask, i)) { sum += s->data[i]; cnt++; }
-        if (i >= window) {
-            size_t out = i - window;
-            if (SMAUG_VALID(s->null_mask, out)) { sum -= s->data[out]; cnt--; }
+        if (vals[i] == vals[i]) {
+            r->data[i]      = (int64_t)vals[i];
+            r->null_mask[i] = SMAUG_MASK_VALID;
         }
-        if (i + 1 < window || cnt == 0) continue;
-        r->data[i]      = (double)sum / (double)cnt;
-        r->null_mask[i] = SMAUG_MASK_VALID;
     }
+    free(vals);
     return r;
 }
 
 smaug_series_i64_t *smaug_i64_rolling_min(const smaug_series_i64_t *s,
-                                           size_t window) {
+                                           size_t window, size_t min_periods) {
     if (!s || window == 0) return NULL;
     smaug_series_i64_t *r = smaug_i64_create(s->size);
     if (!r) return NULL;
+
+    if (min_periods >= 1) {  /* rescan type-preserving int64 (D8-h ii) */
+        for (size_t i = 0; i < s->size; i++) {
+            size_t wstart = (i + 1 >= window) ? (i + 1 - window) : 0;
+            size_t cnt = 0; int64_t best = 0;
+            for (size_t j = wstart; j <= i; j++) {
+                if (SMAUG_VALID(s->null_mask, j)) {
+                    if (cnt == 0 || s->data[j] < best) best = s->data[j];
+                    cnt++;
+                }
+            }
+            if (cnt >= min_periods) {
+                r->data[i] = best; r->null_mask[i] = SMAUG_MASK_VALID;
+            }
+        }
+        return r;
+    }
 
     deque_t dq;
     if (!deque_init(&dq, window + 1)) { smaug_i64_free(r); return NULL; }
@@ -403,10 +600,27 @@ smaug_series_i64_t *smaug_i64_rolling_min(const smaug_series_i64_t *s,
 }
 
 smaug_series_i64_t *smaug_i64_rolling_max(const smaug_series_i64_t *s,
-                                           size_t window) {
+                                           size_t window, size_t min_periods) {
     if (!s || window == 0) return NULL;
     smaug_series_i64_t *r = smaug_i64_create(s->size);
     if (!r) return NULL;
+
+    if (min_periods >= 1) {  /* rescan type-preserving int64 (D8-h ii) */
+        for (size_t i = 0; i < s->size; i++) {
+            size_t wstart = (i + 1 >= window) ? (i + 1 - window) : 0;
+            size_t cnt = 0; int64_t best = 0;
+            for (size_t j = wstart; j <= i; j++) {
+                if (SMAUG_VALID(s->null_mask, j)) {
+                    if (cnt == 0 || s->data[j] > best) best = s->data[j];
+                    cnt++;
+                }
+            }
+            if (cnt >= min_periods) {
+                r->data[i] = best; r->null_mask[i] = SMAUG_MASK_VALID;
+            }
+        }
+        return r;
+    }
 
     deque_t dq;
     if (!deque_init(&dq, window + 1)) { smaug_i64_free(r); return NULL; }

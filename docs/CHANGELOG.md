@@ -5,6 +5,101 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-06-30 — Item 8: Rolling → Ring 0 (motor genérico + min_periods + expanding + DataSet)
+
+Levou a tese de "fonte única" ao rolling. Antes a duplicação era TRIPLA (C /
+Series Lua / DataSet Lua), e o C fazia menos que o Lua. Agora o C é a fonte;
+Series e DataSet delegam.
+
+**Bug histórico corrigido (a motivação real do item):** o caminho C ignorava
+min_periods. `rolling(3):min_periods(1):sum()` dava `nil,nil,6,9` (o C era
+chamado sem saber de min_periods) em vez de `1,3,6,9`. O resultado dependia de
+qual caminho (C/Lua) era tomado. A cura: o C passou a conhecer min_periods, e o
+fallback Lua foi removido — não há mais dois caminhos.
+
+**Arquitetura (8a):**
+- Motor genérico `rolling_apply(data, mask, n, window, min_periods, kind)` —
+  fonte única dentro do C para mean/std/var/count (D8-g opção i: os agregados
+  naturalmente double-safe). std/var amostrais (ddof=1, NaN p/ n<2) — coerente
+  com a reconciliação do item 5.0.
+- sum/min/max NÃO passam pelo motor (preservam tipo exato — sum i64 >2^53 não
+  perde precisão, min/max mantêm a deque O(n)). Só ganharam min_periods.
+- **min_periods (D8-b)**: convenção `0 = modo janela-cheia (default), >=1 =
+  parcial (>= min_periods não-nulos)`. Auditoria do motor confirmou que isso
+  espelha o min_count do item 5.5 — não é invenção local, é o idioma já usado.
+- **min/max com min_periods (D8-h opção ii)**: a deque não rastreia contagem de
+  não-nulos (o resumo inicial subestimou isso). Em vez de mexer na deque (que
+  tem invariantes COV-EXCL delicados, arriscado sem Fedora), o modo min_periods>=1
+  usa um rescan O(n·window) type-preserving (compara no tipo nativo, sem double);
+  a deque fica intocada no modo default (caso comum). "Não pague pelo que não usa".
+
+**Expanding (8b, D8-i opção i):** expanding É rolling com janela = comprimento
+total e min_periods>=1. Zero C novo — delega a `rolling(n, min_periods)`.
+Eliminou todo o SeriesExpanding reimplementado. Não regride performance (o
+expanding Lua já era O(n²)). median/quantile expanding ficam Lua (via _agg).
+
+**DataSet (8c):** Rolling DataSet tinha _agg próprio (3ª cópia). Agora delega à
+Series via `column():rolling()`. Ganhou std/var/count e min_periods de graça.
+
+**Correção de tipo (efeito colateral saudável):** o expanding e o DataSet rolling
+antigos usavam `col._dtype` para todos os agregados — então `mean` de i64
+**truncava** para int64. Agora mean/std/var → float64 (coerente com a Series).
+Nenhum teste dependia do comportamento truncado.
+
+**Decisão D8-c:** sum/mean/min/max/std/var/count no C; median/quantile ficam Lua
+(janela ordenada é padrão diferente; registrado, candidato a C pós-1.0).
+
+- Testes: C +20 (test_ops_window 391→411: std/var/count, min_periods, rescan,
+  i64 >2^53 exato); allocfail +71 (1733→1804: motor, pack_f64, i64_via_motor,
+  count, modos min_periods/rescan); Lua test_window +23 (93→116: bug corrigido,
+  novos agregados, expanding delega, tipos); ds test_core +8 (212→220).
+- Migração de ABI: 100 chamadas rolling em test_ops_window + 18 em allocfail
+  atualizadas p/ a assinatura de 3 args (min_periods=0 = comportamento anterior).
+- `[Fedora]`: implementado e verde no container + Windows-equivalente; aguarda
+  Valgrind + cobertura no Fedora. Fecha JUNTO com o item 7.3. Atenção no Valgrind
+  ao motor genérico (malloc/free de tmp em i64_via_motor) e ao rescan de min/max.
+
+---
+## 2026-06-29 — Item 7.3: rank em dt/str/bool no Ring 0
+
+Último gap de completude do motor (o 7.4 já estava feito). `rank`/`pct_rank`
+existiam só em f64/i64; agora todos os ordenáveis (f64/i64/dt/str/bool) têm.
+
+- **Insight de assinatura**: o resultado do rank é sempre `double` (average pode
+  dar .5), em qualquer dtype. Só a comparação dos valores é type-specific. Então
+  `double* smaug_<t>_rank(s, method)` serve todos — sem a bifurcação de retorno que
+  o 7.2b (min/max) teve. Por isso pacote único (D7.3-e).
+- **dt** (`smaug_dt_rank`): espelha `smaug_i64_rank` (epoch é int64, comparação
+  exata via `dt_entry_t {idx,val}` — sem converter a double, preserva precisão).
+- **str** (`smaug_str_rank`): ordena um array de **índices válidos** via `sort_cmp`
+  (mesmo contexto global do argsort) e detecta empates com `str_cmp_idx`. Não cabe
+  em par numérico, então é gather de índices. "" é valor válido (a menor string).
+- **bool** (`smaug_bool_rank`): sem qsort — só dois grupos. Os `nf` false ocupam
+  posições 1..nf, os `nt` true ocupam nf+1..nf+nt; o método decide o valor.
+- **Métodos uniformes** (D7.3-b): average/min/max/first em todos. NA → NAN → nil
+  (D7.3-c), rankeando só os válidos, igual aos numéricos.
+- **D7.3-d (refatoração do gate)**: `methods.rank` tinha `if float64...else i64`
+  hardcoded. Agora o descritor liga `rank` nos 5 dtypes e a Lua delega via
+  `self._d.rank`, sem branch por dtype — alinha com shift/ffill/min/max. f64/i64
+  passaram a ir pelo descritor (mesmo C, comportamento idêntico).
+- **Ganho de graça**: `pct_rank` chama `rank("average")` internamente, então passou
+  a funcionar em str/dt/bool sem código novo (count_nonnull já existia em todos).
+- **Coerência (exceptions órfãs)**: o eixo 1 do parity tinha 6 exceptions marcadas
+  "gap real não implementado" / "sem semântica" para rank e pct_rank × str/dt/bool.
+  Com a implementação, viraram órfãs — removidas. rank/pct_rank × categorical
+  ficam (sem ordem útil). bool saiu de "sem semântica" porque D7.3-a o incluiu.
+- D7.3-a: bool incluído (escopo literal era "dt/str") — registrado.
+- Testes: C +31 (test_ops_window 360→391: dt/str/bool nos 4 métodos, empates, NA,
+  "" válida, toda-NA, NULL); Lua +12 (integração 66→78); allocfail +31 (1705→1736,
+  varrendo malloc(result)+malloc(pairs/idx)+qsort de cada).
+- Achado (não acionado): rank/pct_rank por-coluna no DataSet = escopo futuro
+  (exceptions eixo 2 mantidas).
+- Corrigido de passagem: API_INDEX dizia método `dense` (inexistente); o correto
+  é `first`.
+- `[Fedora]`: aguarda Valgrind + cobertura. Atenção ao `str_rank` (qsort de índices
+  com contexto global) e às ramificações de método.
+
+---
 ## 2026-06-29 — Item 7.2b: min/max em dt/str/bool no Ring 0 (7.2 completo)
 
 Segunda metade do 7.2. Fecha a outra metade da incoerência: `dt:min`/`dt:max`

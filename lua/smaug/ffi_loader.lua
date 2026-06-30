@@ -269,6 +269,7 @@ ffi.cdef([[
     size_t smaug_bool_argmax (const smaug_series_bool_t *s);
     uint8_t smaug_bool_min (const smaug_series_bool_t *s, bool ignore_na, smaug_status_t *status);
     uint8_t smaug_bool_max (const smaug_series_bool_t *s, bool ignore_na, smaug_status_t *status);
+    double* smaug_bool_rank (const smaug_series_bool_t *s, int method);
 
     /* ===================================================================
        Operações Boolean (BoolSeries) — lógica de três valores (Kleene)
@@ -345,6 +346,7 @@ ffi.cdef([[
     size_t smaug_str_argmax (const smaug_series_str_t *s);
     const char* smaug_str_min (const smaug_series_str_t *s, bool ignore_na, size_t *out_len);
     const char* smaug_str_max (const smaug_series_str_t *s, bool ignore_na, size_t *out_len);
+    double* smaug_str_rank (const smaug_series_str_t *s, int method);
 
     /* ===================================================================
        Anel 3 — I/O (CSV + JSON)
@@ -478,6 +480,7 @@ ffi.cdef([[
     size_t smaug_dt_argmax (const smaug_series_dt_t *s);
     int64_t smaug_dt_min (const smaug_series_dt_t *s, bool ignore_na);
     int64_t smaug_dt_max (const smaug_series_dt_t *s, bool ignore_na);
+    double* smaug_dt_rank (const smaug_series_dt_t *s, int method);
 
     /* ===================================================================
        Grupo C (Fase 3 Ring 0): multi_argsort e rolling ops
@@ -506,17 +509,23 @@ ffi.cdef([[
     size_t* smaug_multi_argsort_ffi(const smaug_sort_col_ffi_t *cols,
                                     size_t ncols, size_t nrows);
 
-    /* --- Rolling ops f64 --- */
-    smaug_series_f64_t* smaug_f64_rolling_sum (const smaug_series_f64_t *s, size_t window);
-    smaug_series_f64_t* smaug_f64_rolling_mean(const smaug_series_f64_t *s, size_t window);
-    smaug_series_f64_t* smaug_f64_rolling_min (const smaug_series_f64_t *s, size_t window);
-    smaug_series_f64_t* smaug_f64_rolling_max (const smaug_series_f64_t *s, size_t window);
+    /* --- Rolling ops f64 (window, min_periods) --- */
+    smaug_series_f64_t* smaug_f64_rolling_sum  (const smaug_series_f64_t *s, size_t window, size_t min_periods);
+    smaug_series_f64_t* smaug_f64_rolling_mean (const smaug_series_f64_t *s, size_t window, size_t min_periods);
+    smaug_series_f64_t* smaug_f64_rolling_min  (const smaug_series_f64_t *s, size_t window, size_t min_periods);
+    smaug_series_f64_t* smaug_f64_rolling_max  (const smaug_series_f64_t *s, size_t window, size_t min_periods);
+    smaug_series_f64_t* smaug_f64_rolling_std  (const smaug_series_f64_t *s, size_t window, size_t min_periods);
+    smaug_series_f64_t* smaug_f64_rolling_var  (const smaug_series_f64_t *s, size_t window, size_t min_periods);
+    smaug_series_i64_t* smaug_f64_rolling_count(const smaug_series_f64_t *s, size_t window, size_t min_periods);
 
-    /* --- Rolling ops i64 (mean retorna f64) --- */
-    smaug_series_i64_t* smaug_i64_rolling_sum (const smaug_series_i64_t *s, size_t window);
-    smaug_series_f64_t* smaug_i64_rolling_mean(const smaug_series_i64_t *s, size_t window);
-    smaug_series_i64_t* smaug_i64_rolling_min (const smaug_series_i64_t *s, size_t window);
-    smaug_series_i64_t* smaug_i64_rolling_max (const smaug_series_i64_t *s, size_t window);
+    /* --- Rolling ops i64 (mean/std/var retornam f64; count retorna i64) --- */
+    smaug_series_i64_t* smaug_i64_rolling_sum  (const smaug_series_i64_t *s, size_t window, size_t min_periods);
+    smaug_series_f64_t* smaug_i64_rolling_mean (const smaug_series_i64_t *s, size_t window, size_t min_periods);
+    smaug_series_i64_t* smaug_i64_rolling_min  (const smaug_series_i64_t *s, size_t window, size_t min_periods);
+    smaug_series_i64_t* smaug_i64_rolling_max  (const smaug_series_i64_t *s, size_t window, size_t min_periods);
+    smaug_series_f64_t* smaug_i64_rolling_std  (const smaug_series_i64_t *s, size_t window, size_t min_periods);
+    smaug_series_f64_t* smaug_i64_rolling_var  (const smaug_series_i64_t *s, size_t window, size_t min_periods);
+    smaug_series_i64_t* smaug_i64_rolling_count(const smaug_series_i64_t *s, size_t window, size_t min_periods);
 ]])
 
 -- Nome do arquivo da lib conforme o SO.
