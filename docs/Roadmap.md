@@ -3,7 +3,7 @@
 Este roadmap é uma **timeline sequencial**. Cada número é um tema; os decimais são
 subtarefas. A ordem reflete dependência e risco — temas anteriores são fundação
 dos seguintes. A **v1.0 ganha o direito de existir quando a timeline zerar**
-(item 12 não achar inconsistência nova).
+(item 14 não achar inconsistência nova).
 
 O histórico do que já foi entregue está no apêndice e no `CHANGELOG`. A descrição
 arquitetural permanente (Filosofia, Anéis) está abaixo, antes da timeline.
@@ -286,8 +286,7 @@ fallback element-wise. Depende do item 1 (nulidade coerente) já pronto.
   Removidas 6 exceptions órfãs do parity (rank/pct_rank × str/dt/bool — eram
   "gap real não implementado"; agora suportado). Teste C +31 (test_ops_window
   360→391), Lua +12 (integração 66→78), allocfail +31 → 1736. Caminho numérico
-  inalterado (f64/i64 agora via descritor, mesmo C). **Windows ✓ · Fedora pendente**
-  (Valgrind + cobertura — fecha junto com o item 8).
+  inalterado (f64/i64 agora via descritor, mesmo C). **[Done]** — Fedora: Valgrind-clean, cobertura 98.71%. Item 7 completo (7.1✓ 7.2✓ 7.3✓ 7.4✓).
   - bool incluído (D7.3-a) — desvio do escopo literal "dt/str", registrado.
   - Achado (não acionado): rank/pct_rank por-coluna no DataSet = escopo futuro.
 - 7.4 ✅ bool eq/ne no C (único dtype sem igualdade). C+header+cdef+wrapper Lua,
@@ -307,7 +306,7 @@ duplicação, fonte única no C.
 - 8.4 ✅ Series delega ao C (sum/mean/min/max/std/var/count; median/quantile Lua)
 - 8.5 ✅ DataSet delega à Series (remove _agg próprio; ganha std/var/count+min_periods)
 
-> **Status: implementado no container · Fedora pendente** (fecha junto com 7.3).
+> **Status: [Done]** — Fedora: Valgrind-clean (motor genérico + rescan de min/max sem leak/leitura inválida).
 > Decisões: D8-g(i) motor cobre mean/std/var/count (double-safe); sum/min/max
 > preservam tipo + ganham min_periods local. D8-h(ii) min/max com min_periods≥1
 > usam rescan O(n·window) type-preserving (deque intocada no modo default).
@@ -330,43 +329,123 @@ duplicação, fonte única no C.
 > Recorte D8-e: 8a (C estendido + min_periods + Series delega), 8b (expanding C),
 > 8c (DataSet delega).
 
-## 9. Ergonomia REPL  [Windows]
+## 9. Contratos de fronteira  [Fedora: 9.1 / Windows: 9.2]
+
+Dois achados da exploração de 2026-06-30 sobre o que a lib **promete ao usuário na
+borda** — precisão de dados e posse de dados. Não são bugs de corrupção
+espontânea; são decisões de contrato com aresta, que precisam estar resolvidas
+**antes** do congelamento da API (item 11). "Falha visível > acerto adivinhado"
+é o princípio em jogo nas duas.
+
+- 9.1 **int64 acima de 2^53 sem caminho de entrada correto** (E1). Tensão entre o
+  guard anti-coerção (CODE_REVIEW A7, correto — recusa `1.5`/`NaN` em int64) e o
+  suporte a int64 real. Dois sub-problemas de naturezas distintas:
+  - **Sub-problema A** (limitação do Lua, não da lib): literal grande comum
+    (`9007199254740993`) já chega truncado — em Lua esse literal *é*
+    `9007199254740992` (double) antes de entrar na lib. A lib não pode recuperar,
+    só tornar visível.
+  - **Sub-problema B** (a lib controla — o bug real): `check_value` (`_core.lua`)
+    exige `type(v) == "number"`, o que recusa **cdata int64** (`9007199254740993LL`,
+    `ffi.new("int64_t", ...)`) — a única forma que preserva 64 bits. Provado: o C
+    guarda até 2^63-1 sem perda; o gargalo é só o guard Lua. Conserto é
+    Lua-puro (Anel 0 intocado): `check_value` aceitar cdata `int64_t`/`uint64_t`
+    via `ffi.istype`, distinguindo de `double`/`float` cdata (que seguem recusados).
+  - **Decisões pendentes** (aguardam Gui):
+    - D-E1-a: consertar B e A juntos? (recomendação: sim — meia-porta senão)
+    - D-E1-b: number > 2^53 em int64 → **recusar** com erro claro (mais fiel ao
+      lema) ou **avisar-mas-aceitar**?
+    - D-E1-c: `uint64_t` acima de 2^63 (vira negativo em int64) → recusar
+      (recomendação) ou aceitar wraparound?
+  - Vínculo: CODE_REVIEW A7; inferência de tipos (item 12.3).
+- 9.2 **`df:column(name)` compartilha buffer com o frame** (E2) — **[Windows]**,
+  Lua-puro. `column()` (`dataset/_core.lua`) retorna a referência Series interna
+  direto (aliasing de **objeto**, não view COW — `rawequal` confirma). Mutar a
+  coluna extraída com `set()` altera o DataFrame silenciosamente. Contornos
+  (confirmados, reduzem o risco): só `set()` propaga; `sort`/`shift`/transformações
+  retornam Series nova e não mutam o frame. O perigo é o padrão
+  `col = df:column("x"); col:set(...)`.
+  - **Decisão tomada:** alinhar ao CoW do pandas 2.0 (não à view+warning antiga).
+    `column()` retorna uma **view COW** (`smaug_*_view`, já existe no Anel 0):
+    zero-copy na leitura, detach automático no primeiro `set` → frame protegido.
+    Alternativa registrada (clone cheio) preterida por custar cópia sempre.
+  - Vínculo: COW.md (tema vivo).
+
+## 10. Completude de vetorização (Anel 0)  [Fedora]
+
+Mesma tese do item 7 (completude do motor), agora para **transformações
+element-wise**. A exploração de 2026-06-30 mapeou operações que fazem o loop em
+Lua cruzando FFI por elemento, quando o padrão correto (delegar ao descritor → C)
+já existe e é seguido em toda a aritmética (o `binop` é exemplar). Não são bugs —
+são assimetrias de vetorização (performance): 1 travessia FFI por linha vs 1 total.
+
+> **Meta-decisão:** levar ao Anel 0 o que o projeto já sabe fazer (o `binop`
+> prova o padrão). Onde a primitiva escalar já existe mas falta a vetorizada,
+> criar a versão de série; onde nem escalar existe, criar. A Lua passa a delegar.
+
+- 10.1 **`prod()` → Ring 0** (E3). Única redução escalar fora do C — sum/mean/min/
+  max/std/var todas têm primitiva; existe `cumprod`, falta `prod`. Assimetria por
+  omissão (passou batido no item 5). Criar `smaug_f64_prod`/`smaug_i64_prod`.
+- 10.2 **`between()` compõe no C** (E4). Element-wise (máscara `ge & le`); os
+  comparadores `gt/lt/ge/le` já existem no Anel 0 — compor em C e usar o motor,
+  eliminando o loop Lua.
+- 10.3 **`abs`/`round`/`clip` → Ring 0** (E5). Element-wise matemáticos fixos, hoje
+  via `self:map(closure)` (FFI por elemento). Provável que **falte a primitiva C**
+  — então "delegar" aqui é criar a primitiva vetorizada, não só religar. Confirmar
+  no fonte antes de executar.
+- 10.4 **família `.dt` e `.str` vetorizadas** (E6). `dt_component` chama
+  `C.smaug_dt_year(v)` **por elemento** num loop Lua — a lógica escalar está no C,
+  falta a versão de série (`smaug_dt_year_series(s) → série`). Mesmo padrão em
+  `.str` (upper/lower/len/...). Criar as primitivas de série; a Lua delega.
+- 10.5 **primitiva `hash_series` no Anel 0** (E7) — **precisa de levantamento
+  próprio antes de executar**. Padrão `tostring`-como-hash repetido em 6
+  call-sites: `unique`/`nunique`/`value_counts`/`mode`/`isin` (Series) +
+  `key_to_str` (relacional). Padrão repetido = primitiva ausente. É a de **maior
+  alavancagem** (resolve 6 lugares), mas também a mais pesada (hash de valores
+  arbitrários incl. string/datetime em C é trabalho real). Levantar escopo e
+  decisões antes de cravar. Vínculo: item 12.4 (categorical hash — a ponta já
+  registrada).
+
+## 11. Ergonomia REPL  [Windows]
 
 Objetos que o usuário segura devem se auto-mostrar legíveis — para exploração e
 para debug quando dá erro. Requisito de v1.0: a API congela com a ergonomia que
 tiver.
 
-- 9.1 CategoricalSeries `__tostring` (objeto de 1ª classe; hoje cospe `table: 0x…`)
-- 9.2 proxies `__tostring` (StrProxy, .dt, .at, .cat, Rolling, Expanding, GroupBy)
-- 9.3 estabelecer invariante "objeto exposto → `__tostring`" + eixo de auditoria no
+- 11.1 CategoricalSeries `__tostring` (objeto de 1ª classe; hoje cospe `table: 0x…`)
+- 11.2 proxies `__tostring` (StrProxy, .dt, .at, .cat, Rolling, Expanding, GroupBy)
+- 11.3 estabelecer invariante "objeto exposto → `__tostring`" + eixo de auditoria no
   parity que o guarda
 
-## 10. Achados menores + débitos antigos  [Windows+Fedora]
+## 12. Achados menores + débitos antigos  [Windows+Fedora]
 
 Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
 
-- 10.1 mensagens I/O: remover "smaug" duplicado (`smaug: smaug_read_csv:` →
+- 12.1 mensagens I/O: remover "smaug" duplicado (`smaug: smaug_read_csv:` →
   padrão `smaug: <op> —`)
-- 10.2 `read_parquet` fantasma (init.lua:50 comentado) — remover ou marcar pós-1.0
-- 10.3 `column_t` sem datetime / CSV não infere dt — decidir: fechar ou registrar
+- 12.2 `read_parquet` fantasma (init.lua:50 comentado) — remover ou marcar pós-1.0
+- 12.3 `column_t` sem datetime / CSV não infere dt — decidir: fechar ou registrar
   como pós-1.0 (conecta Anel 0 ↔ Anel 3)
-- 10.4 D4 — categorical hash via `tostring` (cosmético)
-- 10.5 I3 — `g_sort_series` global em `ops_str` (single-thread: sem bug)
-- 10.6 I4 — `get_value` passa `nil` como status (assimetria; sem bug)
-- 10.7 `tests/series/test_constructors.lua` re-declara `local n_ok` por seção
+  - Nota (E10, 2026-06-30): vírgula decimal BR não é bug — o CSV **suporta**
+    `decimal=','` (o C troca por `.` em `try_f64`); ler `34,12` como string foi
+    default `.`. Mesma natureza do E9 (12.10): default não-BR, não defeito.
+    Documentar; conecta com 12.8 (fixtures BR).
+- 12.4 D4 — categorical hash via `tostring` (cosmético)
+- 12.5 I3 — `g_sort_series` global em `ops_str` (single-thread: sem bug)
+- 12.6 I4 — `get_value` passa `nil` como status (assimetria; sem bug)
+- 12.7 `tests/series/test_constructors.lua` re-declara `local n_ok` por seção
   (linhas 14/25/394/616) mas só imprime uma vez no fim → o headline "98 checks"
   subconta o real (~328 `check()` rodam de fato; cada um aborta em falha, então a
   cobertura é real, só o número impresso engana). Achado durante o item 3.
   Corrigir o relato (um contador único ou um print por seção) — cosmético, não
   afeta validação.
-- 10.8 **Fixtures de I/O órfãos + teatro de "dados reais"** (achado 2026-06-30).
+- 12.8 **Fixtures de I/O órfãos + teatro de "dados reais"** (achado 2026-06-30).
   `tests/fixtures/` tem 5 arquivos; os testes em `tests/io/` abrem só 1
   (`pedidos_digitados.csv`, 917 linhas). Os outros 4 (`cotacoes.csv`,
   `cotacoes.json`, `cotacoes_SHIB_BRL.json`, `cotacoes_USD_BRL.json`) NÃO são
   lidos por nenhum teste — estão no repo decorativos. O parser em si é exercitado
   de verdade (por strings CSV/JSON embutidas nos .lua + o fixture de 917 linhas),
   então não há bug; o "falso" é o rótulo "dados reais" sugerir variedade que não
-  é testada. Mesma família do 10.7 (número/aparência engana, validação é real).
+  é testada. Mesma família do 12.7 (número/aparência engana, validação é real).
   Ação: ou remover os 4 órfãos, ou — preferível — convertê-los em cobertura de
   **variedade real** com asserções específicas. Plano (Gui): separar tabelas
   abertas ≤1.000 linhas de fontes BR (IBGE/dados.gov.br: `;` separador + vírgula
@@ -375,30 +454,50 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
   o `dayfirst` (item F.3); aspas com vírgula interna; separador de milhar; linha
   malformada. **Invariante:** fixture sem asserção que o exercite é decoração —
   cada arquivo novo entra junto com os `check()` que justificam sua presença.
+- 12.9 **`s:iat(i)` produz erro que despeja a Series inteira** (E8) — [Windows].
+  `at`/`iat` são acessores por colchete (`s.iat[i]`, estilo pandas). A forma
+  method `s:iat(i)` faz `self` cair como índice no `check_index` e, como a
+  mensagem usa `tostring(i)`, imprime a Series toda (numa série grande, milhares
+  de linhas). Detectar a chamada-método e orientar "use s.iat[i]".
+- 12.10 **`read_csv` — aviso passivo quando lê 1 coluna com separador suspeito**
+  (E9) — [Windows]. Default `sep=','` num CSV com `;` lê N colunas como 1, sem
+  erro. **Decisão tomada:** NÃO detectar/escolher separador sozinho (esperto
+  demais, falso-positivo pior que o problema); apenas, quando `ncols==1` e a
+  coluna contém `;`/`\t` repetido, emitir `warn` "lido como 1 coluna; se
+  esperava mais, verifique o separador (sep=';'?)". Ilumina cedo sem adivinhar;
+  o usuário ignora se foi intencional. Vínculo: 12.8 (dados BR), 12.3.
+- 12.11 **`Series:nrows()` — alias faltando** (E11) — [Windows]. Series tem `len`
+  e `size`; DataSet tem `nrows` e `len`. Falta só `methods.nrows = methods.len`
+  na Series (confirmado: não falta lógica, só o alias). Considerar alinhar os três
+  nomes (len/size/nrows) nos dois lados para simetria total.
+- 12.12 **sugestão em método errado** (E12) — [Windows]. `df:group_by()` cai no
+  erro cru do Lua (`attempt to call method ... (nil)`). Polish: sugerir "você quis
+  dizer groupby?" no `__index` quando o método não existe. Não é defeito; melhora
+  a descoberta.
 
-## 11. Reescrita de exemplos + docstrings  [Windows]
+## 13. Reescrita de exemplos + docstrings  [Windows]
 
-Doc reflete a API depois que ela para de mudar (itens 1–10).
+Doc reflete a API depois que ela para de mudar (itens 1–12).
 
-- 11.1 exemplos README/API_INDEX → forma oficial `smaug.Series({...})`
-- 11.2 docstrings nos métodos públicos de Series e DataSet
+- 13.1 exemplos README/API_INDEX → forma oficial `smaug.Series({...})`
+- 13.2 docstrings nos métodos públicos de Series e DataSet
 
-## 12. REVISÃO FINAL (penúltimo)  [Fedora]
+## 14. REVISÃO FINAL (penúltimo)  [Fedora]
 
 O teste de que a campanha de coerência fechou. Se achar 🟥 novo, volta pra timeline.
 
-- 12.1 reauditar os 4 anéis com as mesmas lentes (completude, invariantes,
+- 14.1 reauditar os 4 anéis com as mesmas lentes (completude, invariantes,
   coerência interna, ergonomia, paridade)
-- 12.2 limpar e reconciliar `exceptions.txt` do parity
-- 12.3 Fedora: parity 12/12 + Valgrind + cobertura + allocfail
-- 12.4 a timeline zera somente se 12.1 não achar inconsistência nova
+- 14.2 limpar e reconciliar `exceptions.txt` do parity
+- 14.3 Fedora: parity 12/12 + Valgrind + cobertura + allocfail
+- 14.4 a timeline zera somente se 14.1 não achar inconsistência nova
 
-## 13. RELEASE v1.0 (último)  [Windows+Fedora]
+## 15. RELEASE v1.0 (último)  [Windows+Fedora]
 
-- 13.1 FFI loader instalável (descobre `.so`/`.dll`/`.dylib` em layout instalado)
-- 13.2 distribuição / LuaRocks
-- 13.3 LDoc + GitHub Pages
-- 13.4 tag v1.0.0
+- 15.1 FFI loader instalável (descobre `.so`/`.dll`/`.dylib` em layout instalado)
+- 15.2 distribuição / LuaRocks
+- 15.3 LDoc + GitHub Pages
+- 15.4 tag v1.0.0
 
 ---
 
