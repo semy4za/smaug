@@ -49,10 +49,6 @@ return function(I)
     -- view: fatia zero-copy [start, start+len-1] (1-based).
     function methods.view(self, start, len)
         if self._d.view == nil then
-            if self._dtype == "string" then
-                error("smaug: view() ainda não é suportado para dtype 'string' "..
-                      "(planejado); use :take(idx) ou :head(n)/:tail(n) para uma cópia", 2)
-            end
             error("smaug: view() não é suportado para dtype '"..self._dtype..
                   "'; use :take(idx) ou :head(n)/:tail(n) para uma cópia", 2)
         end

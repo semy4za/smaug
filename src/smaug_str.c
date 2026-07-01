@@ -57,6 +57,7 @@ smaug_series_str_t *smaug_str_create_with_capacity(size_t size, size_t buffer_ca
     s->capacity        = size;
     s->buffer_len      = 0;
     s->buffer_capacity = bufcap;
+    s->offsets_owned   = true;   /* série normal é dona do seu offsets */
     s->meta.name           = "unnamed";
     s->meta.dtype          = "string";
     s->meta.is_view        = false;
@@ -92,12 +93,51 @@ smaug_series_str_t *smaug_str_clone(const smaug_series_str_t *s) {
 
 void smaug_str_free(smaug_series_str_t *s) {
     if (!s) return;
-    if (!s->meta.external_alloc) {  /* COV-EXCL-BR: external_alloc=true inalcancavel via API publica; usado apenas internamente */
+    /* Posse dividida (A1): buffer e null_mask seguem external_alloc; offsets
+       segue offsets_owned. Numa série normal ambos batem (dona de tudo). Numa
+       view, external_alloc=true (não toca buffer/null_mask do pai) mas
+       offsets_owned=true (libera o offsets rebaseado próprio). */
+    if (!s->meta.external_alloc) {
         free(s->buffer);
-        free(s->offsets);
         free(s->null_mask);
     }
+    if (s->offsets_owned) {
+        free(s->offsets);
+    }
     free(s);   /* o struct em si sempre é heap-allocated */
+}
+
+/* View: janela zero-copy sobre `s`. Ver contrato completo em smaug_string.h.
+   Checagem de limites overflow-safe (mesma forma do f64: `len > size - start`).
+   Aloca só o array `offsets` (len+1 marcadores absolutos); buffer e null_mask
+   são compartilhados com o pai. */
+smaug_series_str_t *smaug_str_view(smaug_series_str_t *s, size_t start, size_t len) {
+    if (!s || start > s->size || len > s->size - start) return NULL;
+
+    smaug_series_str_t *v = malloc(sizeof(smaug_series_str_t));
+    if (!v) return NULL;
+
+    /* offsets próprio: (len+1) marcadores absolutos, copiados da janela do pai.
+       Não rebaseados — apontam para dentro do buffer compartilhado, que é o
+       mesmo ponteiro-base de s->buffer. */
+    v->offsets = malloc((len + 1) * sizeof(size_t));
+    if (!v->offsets) { free(v); return NULL; }
+    for (size_t i = 0; i <= len; i++) v->offsets[i] = s->offsets[start + i];
+
+    v->buffer          = s->buffer;                 /* compartilhado (mesmo base) */
+    v->null_mask       = s->null_mask + start;       /* compartilhado, deslocado  */
+    v->size            = len;
+    v->capacity        = len;
+    /* buffer_len/capacity da view descrevem a EXTENSÃO válida no buffer do pai
+       que a view enxerga: do primeiro ao último offset da janela. Usados só
+       como limites; a view não faz append sem antes destacar (COW). */
+    v->buffer_len      = s->offsets[start + len];
+    v->buffer_capacity = s->buffer_capacity;
+    v->offsets_owned   = true;                        /* dona do offsets próprio */
+    v->meta                = s->meta;
+    v->meta.is_view        = true;
+    v->meta.external_alloc = true;                    /* não libera buffer/null_mask */
+    return v;
 }
 
 /* ===================================================================
@@ -224,10 +264,73 @@ static int str_slots_reserve_one(smaug_series_str_t *s) {
     return 0;
 }
 
+/* --- Copy-on-Write detach (string) ---
+   Chamado antes de qualquer mutação numa view (set, set_null, append,
+   append_null). Diferente do detach numérico (dois buffers de tamanho fixo),
+   a string tem três estruturas e os offsets são ABSOLUTOS na view (apontam pro
+   buffer do pai). O detach:
+     1. calcula a extensão de bytes da janela: [offsets[0], offsets[size]);
+     2. aloca buffer privado com esses bytes (copiando a fatia do pai);
+     3. aloca offsets privado REBASEADO (subtrai offsets[0] → começa em 0);
+     4. aloca null_mask privado (cópia da janela).
+   Após o detach a série é normal (offsets começam em 0, buffer só da janela),
+   e os setters seguem sua lógica usual. O pai fica intacto.
+   Guarda size==0: view vazia não copia bytes; desvincula as flags.
+   Retorna 0 se ok, -1 se OOM (série intacta — falha segura: nada é substituído
+   até que TODAS as alocações tenham sucesso). */
+static int str_cow_detach(smaug_series_str_t *s) {
+    if (!s->meta.is_view) return 0;            /* já é privada, nada a fazer */
+
+    size_t base       = s->offsets[0];          /* offset absoluto do 1º elemento */
+    size_t end        = s->offsets[s->size];    /* offset absoluto do fim da janela */
+    size_t byte_count = end - base;             /* bytes da janela                 */
+
+    if (s->size == 0) {                         /* view vazia: sem dados a copiar */
+        /* offsets ainda tem 1 marcador (size+1=1). Rebaseia-o para 0 e privatiza
+           buffer/null_mask como vazios, mantendo o struct coerente. */
+        char *nb = malloc(SMAUG_STR_BUFFER_INIT);
+        if (!nb) return -1;
+        s->offsets[0]          = 0;
+        s->buffer              = nb;
+        s->null_mask           = NULL;
+        s->size                = 0;
+        s->capacity            = 0;
+        s->buffer_len          = 0;
+        s->buffer_capacity     = SMAUG_STR_BUFFER_INIT;
+        s->meta.is_view        = false;
+        s->meta.external_alloc = false;
+        return 0;
+    }
+
+    /* aloca os três privados; só substitui após todos terem sucesso */
+    size_t bufcap = byte_count > 0 ? byte_count : SMAUG_STR_BUFFER_INIT;
+    char         *nb = malloc(bufcap);
+    size_t       *no = malloc((s->size + 1) * sizeof(size_t));
+    smaug_mask_t *nm = malloc(s->size * sizeof(smaug_mask_t));
+    if (!nb || !no || !nm) { free(nb); free(no); free(nm); return -1; }
+
+    if (byte_count > 0) memcpy(nb, s->buffer + base, byte_count);
+    for (size_t i = 0; i <= s->size; i++) no[i] = s->offsets[i] - base;  /* rebaseia */
+    memcpy(nm, s->null_mask, s->size * sizeof(smaug_mask_t));
+
+    free(s->offsets);          /* offsets_owned=true: a view é dona; libera o antigo */
+    s->buffer              = nb;
+    s->offsets             = no;
+    s->null_mask           = nm;
+    s->capacity            = s->size;
+    s->buffer_len          = byte_count;
+    s->buffer_capacity     = bufcap;
+    s->offsets_owned       = true;
+    s->meta.is_view        = false;
+    s->meta.external_alloc = false;
+    return 0;
+}
+
 smaug_status_t smaug_str_set(smaug_series_str_t *s, size_t idx, const char *str, size_t len) {
     if (!s)             return SMG_ERR_ARGUMENT;
     if (idx >= s->size) return SMG_ERR_OOB;
     if (!str && len > 0) return SMG_ERR_ARGUMENT;   /* ponteiro nulo com len>0 */
+    if (str_cow_detach(s) != 0) return SMG_ERR_NOMEM;
 
     size_t start   = s->offsets[idx];
     size_t old_len = s->offsets[idx + 1] - start;
@@ -286,6 +389,8 @@ smaug_status_t smaug_str_set_null(smaug_series_str_t *s, size_t idx) {
        set("",0) sobre idx já validado não cresce o buffer (encolhe ou no-op),
        logo não aloca; mas propagamos o status em vez de descartá-lo (o str_set
        legado devolve -1 só em !s/idx inválido/OOM, todos impossíveis aqui). */
+    /* COW: o detach dispara dentro do smaug_str_set abaixo (primeira mutação
+       numa view). A linha null_mask[idx] seguinte já opera no buffer privado. */
     smaug_status_t rc = smaug_str_set(s, idx, "", 0);
     if (rc != SMG_OK) return rc;   /* propaga (na prática impossível após validação acima); COV-EXCL-BR: rc sempre SMG_OK neste ponto (validacao acima ja garante) */
     s->null_mask[idx] = SMAUG_MASK_NULL;       /* e marca NULL (set deixou SMAUG_MASK_VALID) */
@@ -295,6 +400,7 @@ smaug_status_t smaug_str_set_null(smaug_series_str_t *s, size_t idx) {
 int smaug_str_append(smaug_series_str_t *s, const char *str, size_t len) {
     if (!s) return -1;
     if (!str && len > 0) return -1;
+    if (str_cow_detach(s) != 0) return -1;   /* COW: destaca se for view; -1 se OOM */
 
     /* reserva 1 slot (offsets/mask) e os bytes da string */
     if (str_slots_reserve_one(s) != 0) return -1;
@@ -313,6 +419,7 @@ int smaug_str_append(smaug_series_str_t *s, const char *str, size_t len) {
 
 int smaug_str_append_null(smaug_series_str_t *s) {
     if (!s) return -1;
+    if (str_cow_detach(s) != 0) return -1;   /* COW: destaca se for view; -1 se OOM */
     if (str_slots_reserve_one(s) != 0) return -1;
 
     /* NULL: comprimento zero — o offset final repete o anterior. */

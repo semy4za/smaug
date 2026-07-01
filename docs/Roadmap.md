@@ -189,8 +189,9 @@ ou dropna antes`. NA em qualquer coluna da chave composta dispara.
 > **Concluído (2026-06-29).** 5.0 valida no Fedora (Anel 0: Valgrind-clean,
 > cobertura 101→99 exclusões fechando no ramo n<2). 5.1–5.5 (Lua-puro) verdes no
 > Fedora **e no Windows** (`windows_build.ps1`, MSYS2-UCRT64). **Decisões:**
-> D1 = DataSet 1-linha; Opção A = std/var amostrais (ddof=1); D4 = (i) element-wise
-> numérico erra em coluna não-numérica, (A) astype por mapa.
+> reduções mantêm DataSet 1-linha (cada coluna preserva seu dtype); std/var
+> amostrais (ddof=1); element-wise numérico erra em coluna não-numérica; astype
+> por mapa.
 
 O DataSet não tinha reduções diretas (`df.sum()`) nem element-wise. O GroupBy
 reimplementava reduções por não ter a quem delegar. Maior bloco de paridade.
@@ -200,13 +201,13 @@ reimplementava reduções por não ter a quem delegar. Maior bloco de paridade.
   (÷n-1) e o pandas **amostrais** (÷N-1). Sem isso, 5.4 impossível. **Opção A:**
   tudo amostral (ddof=1), NaN para n<2. Anel 0 (`smaug_f64_var`/`smaug_i64_var`)
   → `[Fedora]`. C ajustado, 3 testes recalculados, docs atualizados.
-- 5.1 ✅ reduções → **DataSet 1-linha** (D1: cada coluna mantém seu dtype): sum,
+- 5.1 ✅ reduções → **DataSet 1-linha** (cada coluna mantém seu dtype): sum,
   mean, min, max, std, var, median, prod, quantile, skew, kurtosis, mad, sem,
   count_nonnull. Helper `reduce_frame` delega às reduções da Series.
 - 5.2 ✅ element-wise → DataSet mesma forma: abs, round, clip, cumsum, cummin,
-  cummax, cumprod. D4-i: erra em coluna não-numérica.
+  cummax, cumprod. Erra em coluna não-numérica.
 - 5.3 ✅ transforms: ffill/bfill/shift (qualquer dtype), diff (numérico),
-  isna/notna (mask bool, qualquer dtype), astype (mapa `{col=dtype}`, D4-A).
+  isna/notna (mask bool, qualquer dtype), astype (mapa `{col=dtype}`).
 - 5.4 ✅ GroupBy delega às reduções da Series (`col:take(idx):<redução>()`);
   duplicação inline eliminada; behavior-preserving (possível após a 5.0).
 - 5.5 ✅ `min_count` opt-in em sum/prod (Series e DataSet). Default preserva o
@@ -220,12 +221,12 @@ presença** em **paridade classificada**: cada assimetria é (1) intencional
 gap real. Decisões da sessão de levantamento (2026-06-29), a partir do output real
 do parity (83 assimetrias: 51 só-Series, 32 só-DataSet, 44 em ambos):
 
-- 6.1 ✅ `Series:dtype()` — singular que faltava. **D6.1.**
-- 6.2 ✅ `sort`/`sort_by`: mantidos os dois; pareados no auditor (sem rename). **D6.2.**
-- 6.3 ✅ `Series:sample/to_markdown/to_string` adicionados. **D6.3.**
+- 6.1 ✅ `Series:dtype()` — singular que faltava.
+- 6.2 ✅ `sort`/`sort_by`: mantidos os dois; pareados no auditor (sem rename).
+- 6.3 ✅ `Series:sample/to_markdown/to_string` adicionados.
 - 6.4 ✅ eixo 02 reescrito: pares de nome + 74 intencionais em `exceptions.txt` +
-  **falha em gap real** (os.exit). 48 ambos · 6 pares · 74 intencionais · 0 gaps. **D6.4.**
-- 6.5 ✅ `DataSet:clone()` (cópia profunda). **D6.5.**
+  **falha em gap real** (os.exit). 48 ambos · 6 pares · 74 intencionais · 0 gaps.
+- 6.5 ✅ `DataSet:clone()` (cópia profunda).
 
 > **Concluído (2026-06-29), Lua-puro.** Windows verde (`windows_build.ps1`,
 > Series acesso 34, DataSet core 212); equivalência Fedora de praxe para Lua-puro.
@@ -237,14 +238,14 @@ O motor foi construído numérico-primeiro. Operações agnósticas a tipo e de 
 ordenável só existem em f64/i64 no C; para os demais dtypes a Lua reimplementa via
 fallback element-wise. Depende do item 1 (nulidade coerente) já pronto.
 
-> **Meta-decisão (D7, 2026-06-29):** tudo do item 7 vai pro **C (Anel 0)**, a Lua
-> apenas delega — **sem fallback**. É responsabilidade do Anel 0 (dono do buffer e
-> da máscara). Elimina a duplicação Lua↔C (mesma tese do item 8). Levantamento
-> confirmou no fonte: shift/ffill/bfill já funcionam via fallback Lua (mover);
-> min/max/rank erram em str/dt (preencher); argmin/argmax erram em str mas dt já
-> tem fallback Lua (mover+preencher); eq/ne existem em f64/i64/dt/str, só bool não
-> (preencher). String NÃO é bloqueio: a limitação do COW.md é sobre `view`
-> (zero-copy), não sobre cópia — `str_take`/`clone`/`filter` já reconstroem buffer.
+- 7.0 **[fundação, 2026-06-29]** tudo do item 7 vai pro **C (Anel 0)**, a Lua
+  apenas delega — **sem fallback**. É responsabilidade do Anel 0 (dono do buffer
+  e da máscara). Elimina a duplicação Lua↔C (mesma tese do item 8). Levantamento
+  confirmou no fonte: shift/ffill/bfill já funcionam via fallback Lua (mover);
+  min/max/rank erram em str/dt (preencher); argmin/argmax erram em str mas dt já
+  tem fallback Lua (mover+preencher); eq/ne existem em f64/i64/dt/str, só bool
+  não (preencher). String NÃO é bloqueio: a limitação do COW.md é sobre `view`
+  (zero-copy), não sobre cópia — `str_take`/`clone`/`filter` já reconstroem buffer.
 
 - 7.1 ✅ shift/ffill/bfill em bool/str/dt (agnósticas a tipo) — **[Fedora]**, era 🟥 do inventário
   - 7.1a ✅ **ffill/bfill** no C (bool/str/dt) + descritor liga, fallback Lua removido.
@@ -258,14 +259,14 @@ fallback element-wise. Depende do item 1 (nulidade coerente) já pronto.
     tinha teste em lugar nenhum. Teste C +29 (285→314), Lua +13 (80→93),
     allocfail +28 → 1705. Fedora: Valgrind-clean, cobertura 98.98%, 97 exclusões.
     **[Done]** — 7.1 fechado (toda movimentação agnóstica a tipo no Anel 0).
-- 7.2 min/max/argmin/argmax em ordenáveis (str/dt; bool incluído por D7.2-b)
+- 7.2 min/max/argmin/argmax em ordenáveis (str/dt; bool também incluído)
   - 7.2a ✅ **argmin/argmax** no C para str (lexicográfico), bool (false<true) e
     dt (movido de fallback Lua → C). Fecha a incoerência `dt:argmin`✓/`dt:min`✗ pela
     metade do argmin; gate na Lua passou a ser por capacidade (`self._d.argmin`),
     sem fallback. Removidas 4 exceptions órfãs do parity (argmin/argmax × str/bool).
     Teste C +24 (test_ops_window 314→338), Lua +9 (test_window 93→102). argmin/argmax
     não alocam → allocfail inalterado. Aguarda Fedora p/ Valgrind+cobertura.
-  - 7.2b ✅ **min/max** em dt/str/bool (D7.2-a ii: retornam valor). dt → int64
+  - 7.2b ✅ **min/max** em dt/str/bool (decisão: retornam valor). dt → int64
     (sentinela INT64_MIN, via reduce_num); str → ponteiro+len materializado por
     wrapper no descritor (ffi.string), "" distinta de NULL; bool → Shape 1
     (valor+status SMG_NULL_VALUE). `ignore_na` uniforme. Fecha a incoerência
@@ -273,21 +274,21 @@ fallback element-wise. Depende do item 1 (nulidade coerente) já pronto.
     Teste C +22 (test_ops_window 338→360), Lua +14 (test_reduce 43→57).
     Fedora: Valgrind-clean, cobertura 98.75%, 97 exclusões. **[Done — 7.2 completo]**
     - Achado (não acionado): `df:min()`/`df:max()` no DataSet ainda filtram só
-      colunas numéricas (contrato D3 do item 5). Agora que a Series faz min/max em
+      colunas numéricas (contrato do item 5). Agora que a Series faz min/max em
       str/dt/bool, estender o DataSet a essas colunas (como pandas) é decisão de
       escopo do frame — registrado para avaliação futura, fora do 7.2.
 - 7.3 ✅ **rank em dt/str/bool** (lexicográfico/cronológico/false<true) — **[Fedora]**.
   Os 4 métodos uniformes (average/min/max/first); NA → NaN→nil como os numéricos.
   Retorno `double*` serve todos os dtypes (o rank é sempre double). dt espelha
   i64 (int64, precisão exata); str ordena índices via `str_cmp_idx` (reusa o
-  contexto de sort); bool sem qsort (dois grupos false/true). D7.3-d: gate Lua
+  contexto de sort); bool sem qsort (dois grupos false/true). O gate Lua
   `if float64...else i64` virou delegação `self._d.rank` (descritor liga os 5).
   `pct_rank` passou a funcionar em str/dt/bool de graça (chama rank average).
   Removidas 6 exceptions órfãs do parity (rank/pct_rank × str/dt/bool — eram
   "gap real não implementado"; agora suportado). Teste C +31 (test_ops_window
   360→391), Lua +12 (integração 66→78), allocfail +31 → 1736. Caminho numérico
   inalterado (f64/i64 agora via descritor, mesmo C). **[Done]** — Fedora: Valgrind-clean, cobertura 98.71%. Item 7 completo (7.1✓ 7.2✓ 7.3✓ 7.4✓).
-  - bool incluído (D7.3-a) — desvio do escopo literal "dt/str", registrado.
+  - bool incluído — desvio do escopo literal "dt/str", registrado.
   - Achado (não acionado): rank/pct_rank por-coluna no DataSet = escopo futuro.
 - 7.4 ✅ bool eq/ne no C (único dtype sem igualdade). C+header+cdef+wrapper Lua,
   teste C (+11), Lua (+6), allocfail (+20). Fedora-validado (Valgrind-clean + cobertura).
@@ -302,34 +303,34 @@ duplicação, fonte única no C.
 - 8.1 ✅ estender C: rolling std/var/count (motor genérico double-safe)
 - 8.2 ✅ estender C: min_periods (convenção 0=janela-cheia, >=1=parcial, espelha
   min_count do 5.5) — assinatura dos 8 rolling mudou p/ (s, window, min_periods)
-- 8.3 ✅ estender C: expanding (D8-i: É rolling(n, min_periods>=1) — sem C novo)
+- 8.3 ✅ estender C: expanding (é rolling(n, min_periods>=1) — sem C novo)
 - 8.4 ✅ Series delega ao C (sum/mean/min/max/std/var/count; median/quantile Lua)
 - 8.5 ✅ DataSet delega à Series (remove _agg próprio; ganha std/var/count+min_periods)
 
 > **Status: [Done]** — Fedora: Valgrind-clean (motor genérico + rescan de min/max sem leak/leitura inválida).
-> Decisões: D8-g(i) motor cobre mean/std/var/count (double-safe); sum/min/max
-> preservam tipo + ganham min_periods local. D8-h(ii) min/max com min_periods≥1
+> Decisões: o motor cobre mean/std/var/count (double-safe); sum/min/max
+> preservam tipo + ganham min_periods local. min/max com min_periods≥1
 > usam rescan O(n·window) type-preserving (deque intocada no modo default).
 > **Bug morto**: caminho C ignorava min_periods — `rolling(3):min_periods(1):sum()`
 > agora dá 1,3,6,9 (era nil,nil,6,9). **Correção de tipo**: expanding/DataSet
 > mean de i64 agora → float64 (antes truncava via col._dtype). Testes: C +20
 > (test_ops_window 391→411), allocfail +71 (→1804), test_window +23 (93→116),
-> ds test_core +8 (212→220). median/quantile rolling/expanding ficam Lua (D8-c).
+> ds test_core +8 (212→220). median/quantile rolling/expanding ficam Lua.
 
 > **Achado (levantamento, 2026-06-29):** `rolling:min_periods(p):sum()` **ignora
 > min_periods quando o C é usado** — `rolling(3):min_periods(1):sum()` dá
 > `nil,nil,6,9` em vez de `1,3,6,9`. O resultado depende do caminho (C/Lua). É a
 > própria incoerência que o item 8 cura: a raiz é o C não conhecer min_periods.
-> Decisão D8-a (ii): não corrigir isolado — o C passa a conhecer min_periods
-> (D8-b: na assinatura, `rolling_*(s, window, min_periods)`), e o bug some.
+> Decisão: não corrigir isolado — o C passa a conhecer min_periods
+> (na assinatura, `rolling_*(s, window, min_periods)`), e o bug some.
 > **Achado 2:** o DataSet Rolling (`_stat.lua`) NÃO delega à Series — tem `_agg`
 > próprio. Duplicação é tripla (C / Series Lua / DataSet Lua); 8.5 faz o DataSet
-> passar pela Series. **D8-c:** sum/mean/min/max/std/var/count vão pro C;
+> passar pela Series. Recorte: sum/mean/min/max/std/var/count vão pro C;
 > median/quantile ficam Lua (janela ordenada, padrão diferente) — registrado.
-> Recorte D8-e: 8a (C estendido + min_periods + Series delega), 8b (expanding C),
-> 8c (DataSet delega).
+> C estendido + min_periods + Series delega (8.1, 8.2, 8.4); expanding no C
+> (8.3); DataSet delega (8.5).
 
-## 9. Contratos de fronteira  [Fedora: 9.1 / Windows: 9.2]
+## 9. Contratos de fronteira  [Fedora]
 
 Dois achados da exploração de 2026-06-30 sobre o que a lib **promete ao usuário na
 borda** — precisão de dados e posse de dados. Não são bugs de corrupção
@@ -350,25 +351,60 @@ espontânea; são decisões de contrato com aresta, que precisam estar resolvida
     guarda até 2^63-1 sem perda; o gargalo é só o guard Lua. Conserto é
     Lua-puro (Anel 0 intocado): `check_value` aceitar cdata `int64_t`/`uint64_t`
     via `ffi.istype`, distinguindo de `double`/`float` cdata (que seguem recusados).
-  - **Decisões pendentes** (aguardam Gui):
-    - D-E1-a: consertar B e A juntos? (recomendação: sim — meia-porta senão)
-    - D-E1-b: number > 2^53 em int64 → **recusar** com erro claro (mais fiel ao
-      lema) ou **avisar-mas-aceitar**?
-    - D-E1-c: `uint64_t` acima de 2^63 (vira negativo em int64) → recusar
-      (recomendação) ou aceitar wraparound?
+  - **Decisões (fechadas, 2026-07-01):**
+    - 9.1.1 consertar Sub-A e Sub-B juntos (não meia-porta).
+    - 9.1.2 número > 2^53 em int64 → **avisar-mas-aceitar** (aviso educativo,
+      sem bloquear — mesmo padrão do 12.10).
+    - 9.1.3 `uint64_t` acima de `INT64_MAX` → **recusar** com erro claro (sem
+      wraparound silencioso — coerente com CODE_REVIEW A7 e "falha visível >
+      acerto adivinhado").
+  - **Achado durante a implementação (2026-07-01):** o `check_value` corrigido
+    resolve a **entrada** (`set`/`append`), mas `Series:get(i)` usa
+    `get_value`, que aplica `tonumber()` no `int64_t` devolvido pelo C — a
+    MESMA limitação da Sub-A, só que na **saída**. O valor fica correto no
+    buffer C, mas `get()` reintroduz a perda de precisão acima de 2^53 na
+    leitura. **Decisão: escopo estendido no mesmo item.** Novo método
+    `Series:get_raw(i)` (só para int64) devolve o `int64_t` cru (cdata),
+    sem passar por `get_value`/`tonumber` — espelha o que `check_value` já
+    aceita na entrada. `get()` normal mantém o comportamento antigo
+    (documentado como limitação conhecida), sem quebrar nada existente.
+  - **[Done — 9.1 completo]** `check_value` (`_core.lua`) e `get_raw`
+    (`access/_access.lua`) implementados; helper `warn` central adicionado em
+    `init.lua` (reutilizável pelo 12.10). Guardado por teste em
+    `test_constructors.lua` (9.1.1-9.1.3 + round-trip via `get_raw`).
+    **Confirmado no Windows** (`windows_build.ps1`, MSYS2-UCRT64): C 10/10
+    binários PASS, stress 81851 checks, Lua 18/18 suítes verdes (incl.
+    property-based 360862 checks), **parity 12/12**. `get_raw` registrado
+    como exceção intencional do Eixo 2 (`scripts/parity/exceptions.txt`) —
+    é acesso 1-D como `get`; DataSet não precisa de espelho porque acessa
+    via `column()` (que devolve a própria Series).
   - Vínculo: CODE_REVIEW A7; inferência de tipos (item 12.3).
-- 9.2 **`df:column(name)` compartilha buffer com o frame** (E2) — **[Windows]**,
-  Lua-puro. `column()` (`dataset/_core.lua`) retorna a referência Series interna
-  direto (aliasing de **objeto**, não view COW — `rawequal` confirma). Mutar a
-  coluna extraída com `set()` altera o DataFrame silenciosamente. Contornos
-  (confirmados, reduzem o risco): só `set()` propaga; `sort`/`shift`/transformações
-  retornam Series nova e não mutam o frame. O perigo é o padrão
-  `col = df:column("x"); col:set(...)`.
-  - **Decisão tomada:** alinhar ao CoW do pandas 2.0 (não à view+warning antiga).
-    `column()` retorna uma **view COW** (`smaug_*_view`, já existe no Anel 0):
-    zero-copy na leitura, detach automático no primeiro `set` → frame protegido.
-    Alternativa registrada (clone cheio) preterida por custar cópia sempre.
-  - Vínculo: COW.md (tema vivo).
+- 9.2 **`df:column(name)` compartilha buffer com o frame** (E2) — **[Fedora]**
+  (passou a tocar Anel 0: view+COW de string em C). `column()` retornava a
+  referência Series interna direto (aliasing de **objeto**); mutar a coluna
+  extraída com `set()` alterava o DataFrame silenciosamente.
+  - **Decisão tomada e implementada:** `column()`/`col()` retorna **view COW**
+    (não a referência). Leitura zero-copy; primeira mutação destaca buffer
+    privado, frame intacto. Categorical (sem view, é Lua puro) retorna `clone()`.
+  - **Estendido para tocar Anel 0 (decisão 2026-07-01):** string não tinha view.
+    Foi implementada `smaug_str_view` + `str_cow_detach` em C, com **modelo de
+    posse mista A1** (campo novo `offsets_owned` na struct `smaug_series_str_t`):
+    view compartilha `buffer`/`null_mask`, possui `offsets` próprio absoluto.
+    Detach materializa a janela com offsets rebaseados. Ver COW.md.
+  - **Op1 (mata o E2 na raiz):** acesso público `column()` protege; código
+    interno (relacional, csv, stat — ~40 call-sites) migrado para `_raw_column`
+    (referência crua explícita). Mutação intencional de coluna é via
+    `update_column`, não mais pelo aliasing.
+  - **[Done — 9.2 completo]** C: struct + view + detach; FFI cdef sincronizado
+    (layout binário); `_types.lua` liga view; `column()`/`_raw_column` em
+    `dataset/_core.lua`; testes de proteção E2 (test_core, +8) e de string view
+    (test_cow +70, allocfail +70). Testes que dependiam do aliasing E2 migrados
+    para dados que nascem com NA (Op A) / `update_column`. `_raw_column`
+    registrado como exceção intencional do Eixo 2. **Valgrind-clean**
+    (test_cow, test_string, allocfail: 0 leaks, 0 errors); parity 12/12; 18/18
+    suítes Lua. Aguarda `--all` do Gui no Fedora (Valgrind + cobertura) para
+    selo final.
+  - Vínculo: COW.md (string ❌→✅); CODE_REVIEW A7 (posse de dados).
 
 ## 10. Completude de vetorização (Anel 0)  [Fedora]
 
@@ -429,7 +465,7 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
     `decimal=','` (o C troca por `.` em `try_f64`); ler `34,12` como string foi
     default `.`. Mesma natureza do E9 (12.10): default não-BR, não defeito.
     Documentar; conecta com 12.8 (fixtures BR).
-- 12.4 D4 — categorical hash via `tostring` (cosmético)
+- 12.4 categorical hash via `tostring` (cosmético)
 - 12.5 I3 — `g_sort_series` global em `ops_str` (single-thread: sem bug)
 - 12.6 I4 — `get_value` passa `nil` como status (assimetria; sem bug)
 - 12.7 `tests/series/test_constructors.lua` re-declara `local n_ok` por seção

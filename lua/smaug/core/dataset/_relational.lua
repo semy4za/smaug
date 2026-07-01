@@ -48,8 +48,8 @@ return function(I)
                 if not ds:has_column(cname) then
                     error("smaug: concat — elemento "..k.." não tem coluna '"..cname.."'", 2)
                 end
-                local dt1 = ref:column(cname)._dtype
-                local dt2 = ds:column(cname)._dtype
+                local dt1 = ref:_raw_column(cname)._dtype
+                local dt2 = ds:_raw_column(cname)._dtype
                 if dt1 ~= dt2 then
                     error("smaug: concat — coluna '"..cname.."': dtype incompatível"
                           .." ('"..dt1.."' vs '"..dt2.."')", 2)
@@ -58,10 +58,10 @@ return function(I)
         end
         local result = DataSet.new(name or ref._name)
         for _, cname in ipairs(col_names) do
-            local dtype = ref:column(cname)._dtype
+            local dtype = ref:_raw_column(cname)._dtype
             local vals  = {}
             for _, ds in ipairs(list) do
-                local col = ds:column(cname)
+                local col = ds:_raw_column(cname)
                 for i = 1, col:len() do
                     local v = col:get(i)
                     vals[#vals + 1] = (v == nil) and NA or v
@@ -195,8 +195,8 @@ return function(I)
             end
         end
         local left_key_cols, right_key_cols = {}, {}
-        for _, k in ipairs(left_key_names)  do left_key_cols[#left_key_cols+1]   = self:column(k)  end
-        for _, k in ipairs(right_key_names) do right_key_cols[#right_key_cols+1] = other:column(k) end
+        for _, k in ipairs(left_key_names)  do left_key_cols[#left_key_cols+1]   = self:_raw_column(k)  end
+        for _, k in ipairs(right_key_names) do right_key_cols[#right_key_cols+1] = other:_raw_column(k) end
 
         -- Contrato 8: NA em chave de join não casa — erro orientado.
         do
@@ -245,7 +245,7 @@ return function(I)
         local result = DataSet.new(self._name .. "_join_" .. other._name)
         for _, pair in ipairs(res_left) do
             local orig, final = pair[1], pair[2]
-            local src = self:column(orig)
+            local src = self:_raw_column(orig)
             if join_keys_set[orig] then
                 local right_key_idx = 1
                 for ri, rk in ipairs(right_key_names) do
@@ -253,7 +253,7 @@ return function(I)
                         right_key_idx = ri; break
                     end
                 end
-                local right_key_src = other:column(right_key_names[right_key_idx] or right_key_names[1])
+                local right_key_src = other:_raw_column(right_key_names[right_key_idx] or right_key_names[1])
                 local vals = {}
                 for _, p in ipairs(pairs_idx) do
                     if p[1] ~= 0 then
@@ -271,7 +271,7 @@ return function(I)
         end
         for _, pair in ipairs(res_right) do
             local orig, final = pair[1], pair[2]
-            result:add_column(final, build_col(other:column(orig), pairs_idx, "right", NA))
+            result:add_column(final, build_col(other:_raw_column(orig), pairs_idx, "right", NA))
         end
         return result
     end
@@ -316,7 +316,7 @@ return function(I)
         if n == 0 then return {} end
         local cols_lua = {}
         for _, name in ipairs(key_names) do
-            local col = ds:column(name)
+            local col = ds:_raw_column(name)
             -- NA na chave já foi rejeitado por validate_keys_no_na em methods.groupby
             -- (Contrato 8). multi_argsort só é alcançado por build_groups/groupby.
             cols_lua[#cols_lua+1] = col
@@ -356,7 +356,7 @@ return function(I)
     local function build_groups(ds, key_names)
         local perm = multi_argsort(ds, key_names)
         local key_cols = {}
-        for _, name in ipairs(key_names) do key_cols[#key_cols+1] = ds:column(name) end
+        for _, name in ipairs(key_names) do key_cols[#key_cols+1] = ds:_raw_column(name) end
         local groups = {}
         local n = ds:nrows()
         if n == 0 then return groups end
@@ -388,7 +388,7 @@ return function(I)
         local result = {}
         for _, c in ipairs(ds._col_names) do
             if not key_set[c] then
-                local dt = ds:column(c)._dtype
+                local dt = ds:_raw_column(c)._dtype
                 if dt == "float64" or dt == "int64" then result[#result+1] = c end
             end
         end
@@ -426,13 +426,13 @@ return function(I)
         local key_set   = gb._key_set
         local result    = DataSet.new(ds._name .. "_groupby")
         if #key_names == 1 then
-            local key_dtype = ds:column(key_names[1])._dtype
+            local key_dtype = ds:_raw_column(key_names[1])._dtype
             local vals = {}
             for _, g in ipairs(groups) do vals[#vals+1] = g.key end
             result:add_column(key_names[1], Series.from_table(vals, key_dtype, key_names[1]))
         else
             for ki, kname in ipairs(key_names) do
-                local key_dtype = ds:column(kname)._dtype
+                local key_dtype = ds:_raw_column(kname)._dtype
                 local vals = {}
                 for _, g in ipairs(groups) do vals[#vals+1] = g.key[ki] end
                 result:add_column(kname, Series.from_table(vals, key_dtype, kname))
@@ -440,7 +440,7 @@ return function(I)
         end
         local agg_cols = resolve_agg_cols(ds, key_set, col_names)
         for _, cname in ipairs(agg_cols) do
-            local src  = ds:column(cname)
+            local src  = ds:_raw_column(cname)
             local vals = {}
             for gi, g in ipairs(groups) do
                 local v = agg_fn(src, g.idx)
@@ -509,13 +509,13 @@ return function(I)
         local ds, key_names, key_set, groups = self._ds, self._key_names, self._key_set, self._groups
         local result = DataSet.new(ds._name .. "_groupby")
         if #key_names == 1 then
-            local key_dtype = ds:column(key_names[1])._dtype
+            local key_dtype = ds:_raw_column(key_names[1])._dtype
             local vals = {}
             for _, g in ipairs(groups) do vals[#vals+1] = g.key end
             result:add_column(key_names[1], Series.from_table(vals, key_dtype, key_names[1]))
         else
             for ki, kname in ipairs(key_names) do
-                local key_dtype = ds:column(kname)._dtype
+                local key_dtype = ds:_raw_column(kname)._dtype
                 local vals = {}
                 for _, g in ipairs(groups) do vals[#vals+1] = g.key[ki] end
                 result:add_column(kname, Series.from_table(vals, key_dtype, kname))
@@ -523,7 +523,7 @@ return function(I)
         end
         local agg_cols = resolve_agg_cols(ds, key_set, cols)
         for _, cname in ipairs(agg_cols) do
-            local src  = ds:column(cname)
+            local src  = ds:_raw_column(cname)
             local vals = {}
             for _, g in ipairs(groups) do vals[#vals+1] = agg_nunique(src, g.idx) end
             result:add_column(cname, Series.from_table(vals, "int64", cname))
@@ -566,13 +566,13 @@ return function(I)
         }
         local result = DataSet.new(ds._name .. "_groupby")
         if #key_names == 1 then
-            local key_dtype = ds:column(key_names[1])._dtype
+            local key_dtype = ds:_raw_column(key_names[1])._dtype
             local vals = {}
             for _, g in ipairs(groups) do vals[#vals+1] = g.key end
             result:add_column(key_names[1], Series.from_table(vals, key_dtype, key_names[1]))
         else
             for ki, kname in ipairs(key_names) do
-                local key_dtype = ds:column(kname)._dtype
+                local key_dtype = ds:_raw_column(kname)._dtype
                 local vals = {}
                 for _, g in ipairs(groups) do vals[#vals+1] = g.key[ki] end
                 result:add_column(kname, Series.from_table(vals, key_dtype, kname))
@@ -583,7 +583,7 @@ return function(I)
                 error("smaug: groupby:agg() — coluna '"..cname.."' não existe", 2)
             end
             if type(fns) ~= "table" then fns = {fns} end
-            local src = ds:column(cname)
+            local src = ds:_raw_column(cname)
             for _, fn in ipairs(fns) do
                 local fn_real = type(fn) == "string" and builtin[fn] or fn
                 if not fn_real then
@@ -615,7 +615,7 @@ return function(I)
         if not fn then
             error("smaug: groupby:transform() — função desconhecida '"..tostring(fn_name).."'", 2)
         end
-        local src  = ds:column(col_name)
+        local src  = ds:_raw_column(col_name)
         local n    = ds:nrows()
         local vals = {}
         for i = 1, n do vals[i] = NA end
@@ -632,14 +632,14 @@ return function(I)
         local groups    = self._groups
         local result    = DataSet.new(ds._name .. "_groupby")
         if #key_names == 1 then
-            local key_dtype = ds:column(key_names[1])._dtype
+            local key_dtype = ds:_raw_column(key_names[1])._dtype
             local kv, cv = {}, {}
             for _, g in ipairs(groups) do kv[#kv+1] = g.key; cv[#cv+1] = #g.idx end
             result:add_column(key_names[1], Series.from_table(kv, key_dtype, key_names[1]))
             result:add_column("count",      Series.from_table(cv, "int64",   "count"))
         else
             for ki, kname in ipairs(key_names) do
-                local key_dtype = ds:column(kname)._dtype
+                local key_dtype = ds:_raw_column(kname)._dtype
                 local vals = {}
                 for _, g in ipairs(groups) do vals[#vals+1] = g.key[ki] end
                 result:add_column(kname, Series.from_table(vals, key_dtype, kname))
@@ -669,7 +669,7 @@ return function(I)
         -- Contrato 8: NA em chave de groupby não agrupa — erro orientado.
         do
             local named = {}
-            for _, k in ipairs(key_names) do named[#named+1] = { name = k, col = self:column(k) } end
+            for _, k in ipairs(key_names) do named[#named+1] = { name = k, col = self:_raw_column(k) } end
             validate_keys_no_na(named, "groupby")
         end
         local key_set = {}
@@ -698,9 +698,9 @@ return function(I)
             end
         end
         local n       = self:nrows()
-        local idx_col = self:column(index)
-        local col_col = self:column(columns)
-        local val_col = self:column(values)
+        local idx_col = self:_raw_column(index)
+        local col_col = self:_raw_column(columns)
+        local val_col = self:_raw_column(values)
         -- Contrato 8: NA em index/columns do pivot não é descartado em silêncio — erro.
         validate_keys_no_na({ { name = index, col = idx_col }, { name = columns, col = col_col } }, "pivot")
         local idx_vals, idx_seen = {}, {}
@@ -768,7 +768,7 @@ return function(I)
         local nrows    = self:nrows()
         local val_dtype = nil
         for _, vv in ipairs(value_vars) do
-            local dt = self:column(vv)._dtype
+            local dt = self:_raw_column(vv)._dtype
             if val_dtype == nil then val_dtype = dt
             elseif val_dtype ~= dt then val_dtype = "string"; break end
         end
@@ -777,10 +777,10 @@ return function(I)
         for _, n in ipairs(id_vars) do id_data[n] = {} end
         local var_data, value_data = {}, {}
         for _, vv in ipairs(value_vars) do
-            local src = self:column(vv)
+            local src = self:_raw_column(vv)
             for i = 1, nrows do
                 for _, n in ipairs(id_vars) do
-                    local v = self:column(n):get(i)
+                    local v = self:_raw_column(n):get(i)
                     id_data[n][#id_data[n]+1] = (v == nil) and NA or v
                 end
                 var_data[#var_data+1] = vv
@@ -796,7 +796,7 @@ return function(I)
         end
         local result = DataSet.new(self._name.."_melt")
         for _, n in ipairs(id_vars) do
-            result:add_column(n, Series.from_table(id_data[n], self:column(n)._dtype, n))
+            result:add_column(n, Series.from_table(id_data[n], self:_raw_column(n)._dtype, n))
         end
         result:add_column(var_name,   Series.from_table(var_data,   "string",   var_name))
         result:add_column(value_name, Series.from_table(value_data, val_dtype, value_name))
@@ -815,9 +815,9 @@ return function(I)
         }
         local fn = fns[aggfunc]
         if not fn then error("smaug: pivot_table — aggfunc desconhecida '"..aggfunc.."'", 2) end
-        local idx_col = self:column(index)
-        local col_col = self:column(columns)
-        local val_col = self:column(values)
+        local idx_col = self:_raw_column(index)
+        local col_col = self:_raw_column(columns)
+        local val_col = self:_raw_column(values)
         local n       = self:nrows()
         -- Contrato 8: NA em index/columns do pivot_table não é descartado em silêncio — erro.
         validate_keys_no_na({ { name = index, col = idx_col }, { name = columns, col = col_col } }, "pivot_table")
@@ -883,7 +883,7 @@ return function(I)
         if not self:has_column(col_name) then
             error("smaug: explode() — coluna '"..col_name.."' não existe", 2)
         end
-        local src = self:column(col_name)
+        local src = self:_raw_column(col_name)
         local n   = self:nrows()
         local total = 0
         for i = 1, n do
@@ -895,7 +895,7 @@ return function(I)
         local other_cols = {}
         for _, cname in ipairs(self._col_names) do
             if cname ~= col_name then
-                other_cols[cname] = { col=self:column(cname), vals={} }
+                other_cols[cname] = { col=self:_raw_column(cname), vals={} }
             end
         end
         local exploded_vals = {}

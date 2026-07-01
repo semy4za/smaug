@@ -3,7 +3,7 @@
 -- Acesso elementar e ciclo de vida básico da Series.
 -- Recebe I com: I.methods, I.check_index, I.check_value, I.checkrc,
 --               I.wrap, I.is_na, I.C
--- Contribui: methods.get, set, is_null, set_null, append,
+-- Contribui: methods.get, get_raw, set, is_null, set_null, append,
 --            count_nonnull, len, size, clone
 
 return function(I)
@@ -22,6 +22,23 @@ return function(I)
         check_index(self, i)
         if self._d.is_null(self._c, i - 1) then return nil end
         return self._d.get_value(self._c, i - 1)
+    end
+
+    -- get_raw: só para int64. get() normal passa por tonumber() em get_value,
+    -- que converte o int64_t pra double — a MESMA limitação da Sub-A do item
+    -- 9.1 (2^53), só que na saída em vez da entrada. get_raw devolve o cdata
+    -- int64_t direto do C (self._d.get, sem o wrapper get_value), preservando
+    -- os 64 bits para quem precisa do valor exato acima de 2^53 (espelha o
+    -- que check_value já aceita na entrada via cdata — vínculo 9.1.1-9.1.3).
+    function methods.get_raw(self, i)
+        if self._dtype ~= "int64" then
+            error("smaug: get_raw() só se aplica a séries int64 (preserva "
+                  .. "int64_t cru, sem conversão pra double); dtype é '"
+                  .. self._dtype .. "'", 2)
+        end
+        check_index(self, i)
+        if self._d.is_null(self._c, i - 1) then return nil end
+        return self._d.get(self._c, i - 1, nil)
     end
 
     function methods.set(self, i, v)

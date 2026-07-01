@@ -301,6 +301,7 @@ ffi.cdef([[
         size_t            capacity;
         size_t            buffer_len;
         size_t            buffer_capacity;
+        bool              offsets_owned;
         smaug_metadata_t  meta;
     } smaug_series_str_t;
 
@@ -310,6 +311,7 @@ ffi.cdef([[
     smaug_series_str_t* smaug_str_create_from_array(const char *const *array, size_t len);
     void                smaug_str_free(smaug_series_str_t *s);
     smaug_series_str_t* smaug_str_clone(const smaug_series_str_t *s);
+    smaug_series_str_t* smaug_str_view(smaug_series_str_t *s, size_t start, size_t len);
 
     /* --- Acesso --- */
     const char* smaug_str_get(const smaug_series_str_t *s, size_t idx, size_t *out_len);

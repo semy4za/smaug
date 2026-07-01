@@ -192,10 +192,14 @@ check(bbase:get(1) == true,          "pai bool preservada após set_null COW")
 local bvw_oob = pcall(function() return bbase:view(4, 5) end)
 check(not bvw_oob, "bool view fora dos limites dá erro")
 
--- view() em dtypes sem suporte: mensagem com a razão correta por dtype (3.3)
-local ok_sv, e_sv = pcall(function() return Series.from_table({"a","b"}, "string"):view(1,1) end)
-check(not ok_sv and e_sv:match("'string'") and e_sv:match("planejado"),
-      "view string: erro com razão correta (planejado)")
+-- view() de string agora é suportado (9.2): funciona + COW. Categorical não.
+local sv_str = Series.from_table({"SP","RJ","MG","BA"}, "string"):view(2, 2)  -- [RJ,MG]
+check(sv_str:get(1) == "RJ" and sv_str:get(2) == "MG", "view string: janela correta")
+local sv_base = Series.from_table({"SP","RJ","MG","BA"}, "string")
+local sv_win  = sv_base:view(2, 2)
+sv_win:set(1, "MINAS")                        -- detach COW
+check(sv_win:get(1) == "MINAS",               "view string: set na view reflete")
+check(sv_base:get(2) == "RJ",                 "view string: pai intacto após COW")
 local ok_cv, e_cv = pcall(function() return Series.from_table({"x","y"}, "categorical"):view(1,1) end)
 check(not ok_cv and e_cv:match("'categorical'") and e_cv:match("sem buffer"),
       "view categorical: erro com razão correta (Lua puro)")
@@ -613,9 +617,50 @@ do
 end
 
 
--- =====================================================================
--- bool dtype (de test_bool_dtype.lua)
--- =====================================================================
+-- ===================================================================
+-- 9.1: int64 acima de 2^53 — cdata na entrada (check_value) e get_raw
+-- na saída, preservando precisão de 64 bits ponta a ponta.
+-- ===================================================================
+do
+    local ffi = require("ffi")
+    local s = S.int64(1)
+
+    -- 9.1.1 — cdata int64_t: aceito, preserva valor exato acima de 2^53
+    local big = 9007199254740993LL  -- 2^53 + 1, não representável em double
+    s:set(1, big)
+    check(s:get_raw(1) == big, "9.1.1 int64 cdata preserva 2^53+1 via get_raw")
+
+    -- get() comum ainda passa por tonumber (double) — perda esperada e
+    -- documentada (get_raw existe exatamente para contornar isso).
+    check(s:get(1) == 9007199254740992,
+          "9.1.1 get() comum trunca em double (limitação conhecida, documentada)")
+
+    -- cdata uint64_t dentro do range de int64: aceito
+    local u_ok = ffi.new("uint64_t", 123)
+    s:set(1, u_ok)
+    check(s:get_raw(1) == 123LL, "9.1.1 uint64_t dentro do range aceito")
+
+    -- 9.1.2 — number > 2^53: aceito (avisar-mas-aceitar), sem erro
+    local ok_warn = pcall(function() s:set(1, 9007199254740994) end)
+    check(ok_warn == true, "9.1.2 number > 2^53 é aceito (avisa, não bloqueia)")
+
+    -- 9.1.3 — uint64_t > INT64_MAX: recusado (sem wraparound silencioso)
+    local u_big = 18446744073709551615ULL  -- maior uint64_t possível
+    local ok_wrap = pcall(function() s:set(1, u_big) end)
+    check(ok_wrap == false, "9.1.3 uint64_t acima de INT64_MAX é recusado")
+
+    -- cdata float/double continuam recusados (mesma exigência do A7)
+    local ok_fcdata = pcall(function() s:set(1, ffi.new("double", 3.5)) end)
+    check(ok_fcdata == false, "9.1.1 cdata double continua recusado")
+
+    -- get_raw só se aplica a int64
+    local sf = S.float64(1)
+    sf:set(1, 3.5)
+    local ok_rawf = pcall(function() sf:get_raw(1) end)
+    check(ok_rawf == false, "get_raw recusa dtype != int64")
+end
+
+
 
 local smaug  = require("smaug")
 local Series = smaug.Series

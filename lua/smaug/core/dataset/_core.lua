@@ -107,10 +107,30 @@ return function(I)
     -- =====================================================================
     -- Acesso / metadados
     -- =====================================================================
-    function methods.column(self, name)
+    -- _raw_column: acesso INTERNO à referência real da coluna (mesma Series
+    -- guardada no frame). Usado pelo código interno (relacional, csv, stat) que
+    -- só lê metadados/valores ou precisa de identidade de objeto — sem o custo
+    -- de criar view a cada chamada. NÃO exposto ao usuário: mutar o retorno aqui
+    -- altera o frame (é a referência viva). Público usa column() (protegido).
+    function methods._raw_column(self, name)
         local c = self._columns[name]
         if c == nil then error("smaug: coluna '"..name.."' não existe", 2) end
         return c
+    end
+
+    -- column: acesso PÚBLICO protegido (9.2, mata o E2). Retorna uma view COW da
+    -- coluna inteira, não a referência interna: leitura é zero-copy; a primeira
+    -- mutação (set/set_null/append) destaca um buffer privado, deixando o frame
+    -- intacto. `col = df:column("x"); col:set(...)` já não corrompe o frame.
+    -- Categorical não tem view (é Lua puro: codes + dicionário), então recebe um
+    -- clone (cópia profunda protegida) — mesmo contrato de "o frame não muda".
+    function methods.column(self, name)
+        local c = self._columns[name]
+        if c == nil then error("smaug: coluna '"..name.."' não existe", 2) end
+        if is_categorical(c) then
+            return c:clone()
+        end
+        return c:view(1, c:len())
     end
     methods.col = methods.column
 
@@ -248,7 +268,7 @@ return function(I)
     end
 
     function methods.sort_by(self, col, ascending)
-        local key = self:column(col)
+        local key = self:_raw_column(col)
         local idx = key:argsort(ascending)
         if idx == nil then
             error("smaug: sort_by não suporta nulos na coluna '"..col..
@@ -322,7 +342,7 @@ return function(I)
     function methods.nunique(self)
         local t = {}
         for _, name in ipairs(self._col_names) do
-            t[name] = self:column(name):nunique()
+            t[name] = self:_raw_column(name):nunique()
         end
         return t
     end

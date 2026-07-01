@@ -310,4 +310,8 @@ o objeto pai nunca é tocado.
 - `append` / `append_null`: retornam `-1` se o detach ou o grow falharem.
 - Em qualquer falha, view e pai permanecem intactos.
 
+Cobertura: `float64`, `int64`, `datetime`, `bool` (buffers fixos, view O(1)) e
+`string` (offset-based, view com posse mista — ver COW.md). Apenas `categorical`
+não tem view (é Lua puro, sem buffer compartilhável).
+
 Ver `docs/COW.md` para a especificação completa.

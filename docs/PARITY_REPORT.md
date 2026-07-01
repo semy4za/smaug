@@ -1,7 +1,8 @@
 # Smaug — Relatório de Paridade
 
-> Arquivo gerado por `bash scripts/parity/parity.sh`. **Não editar à mão.**
-> Decisões conscientes de não-paridade ficam em `scripts/parity/exceptions.txt`.
+> Arquivo gerado por `bash scripts/parity/parity.sh` ou `powershell scripts/parity/parity.ps1`.
+> **Não editar à mão.** Decisões conscientes de não-paridade ficam em
+> `scripts/parity/exceptions.txt`.
 
 Convenção de status:
 
@@ -10,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-07-01 01:18:45 UTC
+Gerado em: 2026-07-01 18:16:12 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -56,7 +57,8 @@ Cada linha = um método rastreado em `Series.methods` ou `CategoricalSeries`. Co
 | `filter` | 🟨 | 🟨 | 🟩 | 🟨 | 🟨 | 🟩 |
 | `first_valid_index` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 | `ge` | 🟨 | 🟨 | 🟩 | 🟨 | 🟨 | 🟩 |
-| `get` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
+| `get` | 🟨 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
+| `get_raw` | 🟨 | 🟩 | 🟨 | 🟨 | 🟨 | 🟨 |
 | `gt` | 🟨 | 🟨 | 🟩 | 🟨 | 🟨 | 🟩 |
 | `head` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
 | `idxmax` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
@@ -119,7 +121,7 @@ Cada linha = um método rastreado em `Series.methods` ou `CategoricalSeries`. Co
 | `view` | 🟩 | 🟩 | 🟨 | ⬜ | 🟨 | 🟩 |
 | `where` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
 
-**Sumário Eixo 1:** 100 métodos × 6 dtypes = 600 células · 🟩 276 (46.0%) · ⬜ 135 (22.5%) · 🟨 189 (31.5%)
+**Sumário Eixo 1:** 101 métodos × 6 dtypes = 606 células · 🟩 276 (45.5%) · ⬜ 135 (22.3%) · 🟨 195 (32.2%)
 
 ## Eixo 2 — Paridade Series ↔ DataSet (classificada)
 
@@ -127,6 +129,7 @@ Cada assimetria é classificada: 🟩 ambos · 🟦 par de nome · ⬜ intencion
 
 | método | Series | DataSet | classificação |
 | :--- | :-: | :-: | :-: |
+| `_raw_column` | — | 🟩 | ⬜ acesso interno cru à coluna, sem view COW (2-D); só código interno |
 | `abs` | 🟩 | 🟩 | 🟩  |
 | `add_column` | — | 🟩 | ⬜ gerência de coluna (2-D) |
 | `all` | 🟩 | — | ⬜ redução booleana de uma coluna (1-D) |
@@ -175,6 +178,7 @@ Cada assimetria é classificada: 🟩 ambos · 🟦 par de nome · ⬜ intencion
 | `first_valid_index` | 🟩 | — | ⬜ primeiro índice não-NA (1-D) |
 | `ge` | 🟩 | — | ⬜ comparação element-wise → máscara (1-D) |
 | `get` | 🟩 | — | ⬜ acesso a elemento individual (1-D) |
+| `get_raw` | 🟩 | — | ⬜ acesso a elemento int64 cru sem perda de precisão (1-D); DataSet acessa via column() |
 | `groupby` | — | 🟩 | ⬜ agregação por chave (2-D) |
 | `gt` | 🟩 | — | ⬜ comparação element-wise → máscara (1-D) |
 | `has_column` | — | 🟩 | ⬜ existência de coluna (2-D) |
@@ -256,7 +260,7 @@ Cada assimetria é classificada: 🟩 ambos · 🟦 par de nome · ⬜ intencion
 | `view` | 🟩 | — | ⬜ buffer compartilhado de uma coluna (1-D); DataSet não tem buffer único |
 | `where` | 🟩 | — | ⬜ seleção condicional element-wise (1-D) |
 
-**Sumário Eixo 2:** 48 em ambos · 6 pares de nome · 74 intencionais · 0 gaps reais
+**Sumário Eixo 2:** 48 em ambos · 6 pares de nome · 76 intencionais · 0 gaps reais
 
 ## Eixo 3 — Espelhamento C ↔ Lua
 
@@ -398,7 +402,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `xor` | 🟨 |  |
 
 
-### str — 30 funções C
+### str — 31 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -432,6 +436,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `shift` | 🟩 |  |
 | `sort` | 🟩 |  |
 | `take` | 🟩 |  |
+| `view` | 🟩 |  |
 
 
 ### dt — 48 funções C
@@ -667,8 +672,8 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 235/235 erros com prefixo `smaug:` (100.0%)
-- `dataset.lua`: 93/93 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 237/237 erros com prefixo `smaug:` (100.0%)
+- `dataset.lua`: 94/94 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
 
@@ -682,7 +687,7 @@ Cada dtype com backend C deve oferecer o mesmo conjunto de operações de lifecy
 | `create_from_array` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 | `free` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 | `clone` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-| `view` | 🟩 | 🟩 | 🟩 | ⬜ | 🟩 |
+| `view` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 | `append` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 | `append_null` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 | `set` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
@@ -694,7 +699,7 @@ Cada dtype com backend C deve oferecer o mesmo conjunto de operações de lifecy
 
 | função | f64 | i64 | bool | str | dt |
 | :--- | :-: | :-: | :-: | :-: | :-: |
-| `view` | 🟩 | 🟩 | 🟩 | ⬜ | 🟩 |
+| `view` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 
 ## Eixo 11 — Cobertura de testes proporcional
 
@@ -705,17 +710,17 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 
 | arquivo | checks | float64 | int64 | bool | string | datetime | categorical |
 | :--- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| `series/test_constructors` | 330 | 36 | 55 | 19 | 11 | — | 1 |
+| `series/test_constructors` | 339 | 36 | 55 | 19 | 12 | — | 1 |
 | `series/test_access` | 101 | 15 | 8 | — | 4 | — | — |
 | `series/test_reduce` | 58 | 7 | 2 | 3 | 4 | 2 | — |
 | `series/test_stat` | 70 | 6 | 12 | — | 9 | — | — |
 | `series/test_window` | 118 | 10 | 11 | 2 | 5 | 2 | — |
 | `series/test_predicates` | 155 | 6 | 42 | 3 | 11 | — | — |
 | `series/test_selection` | 29 | 3 | 1 | 2 | 1 | — | — |
-| `series/test_str` | 274 | 4 | 9 | 1 | 51 | — | — |
+| `series/test_str` | 276 | 4 | 9 | 1 | 50 | — | — |
 | `series/test_dt` | 272 | 3 | 6 | 2 | 12 | 62 | — |
 | `series/test_categorical` | 295 | 7 | 7 | 8 | 5 | 13 | 57 |
-| `dataset/test_core` | 221 | 27 | 30 | 8 | 12 | — | — |
+| `dataset/test_core` | 229 | 30 | 32 | 8 | 13 | — | 1 |
 | `dataset/test_relational` | 172 | 10 | 50 | 4 | 34 | — | — |
 | `dataset/test_stat` | 91 | 10 | 16 | 1 | 13 | — | — |
 | `dataset/test_io_support` | 44 | 2 | 13 | 1 | 6 | — | — |
@@ -724,18 +729,18 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 79 | 19 | 2 | 2 | 4 | 1 | 1 |
 
-**Total de checks:** 2478
+**Total de checks:** 2497
 
 ### Menções totais por dtype (toda a suite)
 
 | dtype | menções |
 | :--- | :-: |
-| float64 | 178 |
-| int64 | 300 |
+| float64 | 181 |
+| int64 | 302 |
 | bool | 59 |
-| string | 200 |
+| string | 201 |
 | datetime | 80 |
-| categorical | 59 |
+| categorical | 60 |
 
 ## Eixo 12 — Sincronização docs ↔ código
 
@@ -744,8 +749,8 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 | categoria | total | documentados | faltam | % | detalhe |
 | :--- | :-: | :-: | :-: | :-: | :-: |
-| `Series.methods` | 99 | 99 | 0 | 100% | 🟩 completo |
-| `DataSet.methods` | 77 | 77 | 0 | 100% | 🟩 completo |
+| `Series.methods` | 100 | 99 | 1 | 99% | 🟨 faltam: get_raw |
+| `DataSet.methods` | 78 | 77 | 1 | 99% | 🟩 completo |
 | `GroupBy:*` | 15 | 15 | 0 | 100% | 🟩 completo |
 | `CategoricalSeries:*` | 42 | 42 | 0 | 100% | 🟩 completo |
 | `CatProxy:*` (.cat) | 6 | 6 | 0 | 100% | 🟩 completo |
@@ -759,9 +764,9 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 968
+- 🟩 paridade: 972
 - ⬜ exceção registrada: 215
-- 🟨 suspeita (revisar): 264
+- 🟨 suspeita (revisar): 271
 - 🟥 inconsistência clara: 12
 
 

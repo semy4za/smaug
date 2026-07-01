@@ -221,6 +221,7 @@
 
 # --- Só-Series: acesso a elemento (1-D); DataSet usa at/iat/row/column ---
 2:get          acesso a elemento individual (1-D)
+2:get_raw      acesso a elemento int64 cru sem perda de precisão (1-D); DataSet acessa via column()
 2:set          escrita de elemento individual (1-D)
 2:set_null     marca elemento individual como NA (1-D)
 2:is_null      nulidade de elemento individual (1-D); DataSet usa isna (vetorizado)
@@ -282,6 +283,7 @@
 2:update_column  gerência de coluna (2-D)
 2:rename         renomeio de colunas em lote (2-D)
 2:column         acesso a coluna por nome (2-D)
+2:_raw_column    acesso interno cru à coluna, sem view COW (2-D); só código interno
 2:columns        lista de nomes de coluna (2-D)
 2:has_column     existência de coluna (2-D)
 2:select         projeção de colunas (2-D)

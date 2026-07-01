@@ -7,27 +7,34 @@ Dtypes: `float64`, `int64`, `bool`, `string`, `datetime`, `categorical`. Null po
 
 ## Começando
 
+Os valores nascem tipados por inferência — você só declara o dtype quando a
+inferência não alcança (`bool`, `datetime`, `categorical`).
+
 ```lua
 local smaug = require("smaug")
 local NA    = smaug.NA
 
 local ds = smaug.DataSet({
-    {"cidade",  {"SP", "RJ", "SP", "MG"},         "string"},
-    {"vendas",  {120,   85,  200,  NA}                    },
-    {"ativo",   {true, false, true, true},          "bool"},
+    {"cidade", {"SP", "RJ", "SP", "MG"}},
+    {"vendas", {120,   85,  200,  NA}},
+    {"ativo",  {true, false, true, true}, "bool"},
 })
 
 print(ds)
 ```
 
 ```
-DataSet '' [4 linhas x 3 colunas]
+DataSet 'DataSet' [4 linhas x 3 colunas]
    cidade  vendas  ativo
 1  SP      120     true
 2  RJ      85      false
 3  SP      200     true
 4  MG      NA      true
 ```
+
+Aqui `cidade` virou `string` e `vendas` virou `int64` (todos inteiros) por
+inferência; `ativo` recebeu `bool` explícito. Um `120.0` no lugar de `120` já
+bastaria para inferir `float64`.
 
 ---
 
@@ -36,218 +43,214 @@ DataSet '' [4 linhas x 3 colunas]
 Uma coluna tipada. Toda operação retorna uma nova Series — imutabilidade por padrão.
 
 ```lua
-local s = smaug.Series.from_table({4, 7, 2, 9, 1, 5, 8, 3, 6}, "float64")
-
--- reduções
-s:sum()       -- 45
-s:mean()      -- 5.0
-s:median()    -- 5
-s:min()       -- 1       s:max()    -- 9
-s:std()       -- 2.739   s:var()    -- 7.5
-s:prod()      -- 362880
-s:quantile(0.75)  -- 7.0
-s:mad()           -- 2       (desvio absoluto mediano)
-s:sem()           -- 0.913   (erro padrão da média)
-s:skew()          -- 0.0
-s:kurtosis()      -- -1.23
-
--- posição
-s:argmin()  -- 5   (índice do menor)
-s:argmax()  -- 4   (índice do maior)
-
--- ranking
-s:rank()            -- {4, 7, 2, 9, 1, 5, 8, 3, 6} → posições 1-based
-s:pct_rank()        -- normalizado em [0, 1]
-
--- seleção
-s:nlargest(3)       -- {9, 8, 7}
-s:nsmallest(3)      -- {1, 2, 3}
+print(ds["vendas"])
 ```
+
+```
+Series 'vendas' (int64, len=4)
+  [1] 120
+  [2] 85
+  [3] 200
+  [4] NA
+```
+
+### Reduções
+
+Uma redução colapsa cada coluna num único valor. No DataSet, o resultado é um
+frame de uma linha:
+
+```lua
+local ds = smaug.DataSet({
+    {"vendas", {100.0, 200.0, 150.0, 300.0}},
+    {"custo",  {30.0,  70.0,  50.0,  120.0}},
+})
+
+print(ds:sum())
+print(ds:mean())
+```
+
+```
+DataSet 'DataSet_sum' [1 linhas x 2 colunas]
+   vendas  custo
+1  750     270
+
+DataSet 'DataSet_mean' [1 linhas x 2 colunas]
+   vendas  custo
+1  187.5   67.5
+```
+
+A mesma redução existe na Series, devolvendo o escalar direto (`s:sum()`,
+`s:mean()`, `s:median()`, `s:min()`, `s:max()`, `s:std()`, `s:var()`,
+`s:prod()`, `s:quantile(p)`, `s:argmin()`, `s:argmax()`). Estatística estendida:
+`skew`, `kurtosis`, `mad`, `sem`, `rank`, `pct_rank`, `nlargest`, `nsmallest`.
 
 ### Nulos
 
-```lua
-local NA = smaug.NA
-local s = smaug.Series.from_table({1.0, NA, NA, 4.0, NA}, "float64")
-
-s:is_null(2)    -- true
-s:isna(2)       -- alias
-s:notna(1)      -- true
-
-s:ffill():to_table()  -- {1.0, 1.0, 1.0, 4.0, 4.0}
-s:bfill():to_table()  -- {1.0, 4.0, 4.0, 4.0, NA}
-s:fillna(0.0)         -- substitui NA por 0.0
-s:dropna()            -- remove NAs
-```
-
-### Transformações de janela
+`null` é ausência explícita, guardada em bitmask — não é `NaN`, não é zero.
 
 ```lua
-local s = smaug.Series.from_table({1, 2, 3, 4, 5, 6}, "float64")
+local s = smaug.DataSet({{"v", {1.0, NA, NA, 4.0, NA}}})["v"]
 
--- cumulativas
-s:cumsum()    -- {1, 3, 6, 10, 15, 21}
-s:cumprod()   -- {1, 2, 6, 24, 120, 720}
-s:cummin()    -- {1, 1, 1,  1,  1,  1}
-s:cummax()    -- {1, 2, 3,  4,  5,  6}
-s:diff()      -- {NA, 1, 1, 1, 1, 1}
-s:shift(2)    -- {NA, NA, 1, 2, 3, 4}
-
--- rolling (janela deslizante)
-s:rolling(3):sum()      -- {NA, NA, 6, 9, 12, 15}
-s:rolling(3):mean()     -- {NA, NA, 2, 3,  4,  5}
-s:rolling(3):std()      -- {NA, NA, 1, 1,  1,  1}
-s:rolling(3):var()
-s:rolling(3):min()
-s:rolling(3):max()
-s:rolling(3):count()    -- não-nulos na janela
-s:rolling(3):median()
-s:rolling(3):quantile(0.5)
-
--- min_periods: produz resultado com janela parcial
-s:rolling(3):min_periods(2):std()  -- resultado a partir da posição 2
-
--- expanding (janela crescente)
-s:expanding():sum()     -- {1, 3, 6, 10, 15, 21}
-s:expanding():mean()    -- {1, 1.5, 2, 2.5, 3, 3.5}
-s:expanding():std()
-s:expanding():min_periods(2):std()
+print(s:ffill())
 ```
+
+```
+Series 'v' (float64, len=5)
+  [1] 1
+  [2] 1
+  [3] 1
+  [4] 4
+  [5] 4
+```
+
+`bfill`, `fillna(valor)`, `dropna`, `is_null`/`isna`, `notna` completam o
+conjunto.
+
+### Janela deslizante e cumulativas
+
+```lua
+local s = smaug.DataSet({{"v", {1, 2, 3, 4, 5, 6}}})["v"]
+
+print(s:rolling(3):sum())
+```
+
+```
+Series 'v' (float64, len=6)
+  [1] NA
+  [2] NA
+  [3] 6
+  [4] 9
+  [5] 12
+  [6] 15
+```
+
+O motor de janela cobre `sum`/`mean`/`min`/`max`/`std`/`var`/`count`, com
+`min_periods(k)` para janela parcial e `expanding()` para janela crescente
+(`median`/`quantile` também disponíveis). Cumulativas: `cumsum`, `cumprod`,
+`cummin`, `cummax`, `diff`, `shift`.
 
 ### Substituição condicional
 
 ```lua
-local s    = smaug.Series.from_table({1.0, 2.0, 3.0, 4.0, 5.0}, "float64")
-local cond = s:gt(3)
+local s = smaug.DataSet({{"v", {1, 2, 3, 4, 5}}})["v"]
 
-s:where(cond, 0.0)   -- {0, 0, 0, 4, 5}  mantém onde true, 0 onde false
-s:mask(cond, 0.0)    -- {1, 2, 3, 0, 0}  inverso do where
-smaug.Series.ifelse(cond, s, smaug.Series.full(5, 0.0, "float64"))
+print(s:where(s:gt(3), 0.0))   -- mantém onde a condição é true, 0 no resto
 ```
+
+```
+Series 'v' (int64, len=5)
+  [1] 0
+  [2] 0
+  [3] 0
+  [4] 4
+  [5] 5
+```
+
+`mask` é o inverso (zera onde é true). `Series.ifelse(cond, a, b)` escolhe
+elemento a elemento entre duas Series.
+
+### Comparações e lógica Kleene
+
+```lua
+local s = smaug.DataSet({{"v", {10, 20, 30}}})["v"]
+
+print(s:gt(15))
+```
+
+```
+Series 'v' (bool, len=3)
+  [1] false
+  [2] true
+  [3] true
+```
+
+`eq`, `ne`, `ge`, `le`, `lt` retornam `Series<bool>`. A lógica de três valores
+(`land`, `lor`, `lnot`) propaga `NA` corretamente.
 
 ### Matemática vetorizada
 
 ```lua
-local s = smaug.Series.from_table({0.0, 1.0, 4.0, 9.0}, "float64")
+local s = smaug.DataSet({{"v", {0.0, 1.0, 4.0, 9.0}}})["v"]
 
-s:sqrt()   -- {0, 1, 2, 3}
-s:exp()    -- {1, e, e⁴, e⁹}
-s:log()    -- {-inf, 0, 1.386, 2.197}
-s:sin()
-s:cos()
-s:tan()
+print(s:sqrt())
 ```
 
-### Comparações e Bool
+```
+Series 'v' (float64, len=4)
+  [1] 0
+  [2] 1
+  [3] 2
+  [4] 3
+```
+
+`exp`, `log`, `sin`, `cos`, `tan`, `abs`, `round(n)`, `clip(lo, hi)` seguem o
+mesmo padrão element-wise.
+
+### `.str` — texto
 
 ```lua
-local s = smaug.Series.from_table({10, 20, 30}, "int64")
+local nomes = smaug.DataSet({{"c", {"  São Paulo  ", "rio", "MINAS"}}})["c"]
 
-s:gt(15)   -- Series<bool>: {false, true, true}
-s:eq(20)   -- {false, true, false}
-s:ne(20)   -- {true, false, true}
-s:ge(20)   -- {false, true, true}
-
--- lógica Kleene
-local a = s:gt(15)
-local b = s:lt(25)
-a:land(b)  -- AND: {false, true, false}
-a:lor(b)   -- OR:  {true,  true, true}
-a:lnot()   -- NOT: {true, false, false}
+print(nomes.str:strip())
 ```
 
-### Outras operações
+```
+Series 'c' (string, len=3)
+  [1] São Paulo
+  [2] rio
+  [3] MINAS
+```
+
+Também: `lower`, `upper`, `len`, `contains`, `startswith`, `endswith`,
+`replace`, `find`, `slice`, `pad`, `zfill`, `rep_each`, `cat`, `split`. Opera
+sobre bytes (não normaliza UTF-8); comparação é lexicográfica por byte.
+
+### `.dt` — calendário
+
+Datetime pede dtype explícito (não há como inferir de strings ISO):
 
 ```lua
-local s = smaug.Series.from_table({"SP","RJ","SP","MG","RJ"}, "string")
+local ds = smaug.DataSet({
+    {"data", {"2026-01-15T12:30:00Z", "2026-06-30T00:00:00Z"}, "datetime"},
+})
 
-s:unique()          -- {"SP","RJ","MG"}  (ordem de 1ª aparição)
-s:nunique()         -- 3
-s:value_counts()    -- DataSet {value, count} ordenado por freq
-
-local n = smaug.Series.from_table({-3.0, 1.5, 2.7}, "float64")
-n:abs()             -- {3.0, 1.5, 2.7}
-n:round(1)          -- {-3.0, 1.5, 2.7}
-n:clip(0.0, 2.0)    -- {0.0, 1.5, 2.0}
-n:sort()            -- nova Series ordenada
-n:argsort()         -- permutação de ordenação
-n:rank("min")       -- rank com método "min"/"max"/"first"/"average"
-n:pct_rank()        -- rank normalizado em [0,1]
-
--- astype
-smaug.Series.from_table({"1.5","2.0","abc"}, "string"):astype("float64")
--- {1.5, 2.0, null}  — inconversíveis viram null, nunca erro
+print(ds["data"].dt:year())
 ```
 
-### `.str` — operações sobre Series string
-
-```lua
-local cidades = smaug.Series.from_table({"  São Paulo  ", "rio", "MINAS"}, "string")
-
-cidades.str:strip()            -- {"São Paulo", "rio", "MINAS"}
-cidades.str:lower()            -- {"  são paulo  ", "rio", "minas"}
-cidades.str:upper()            -- {"  SÃO PAULO  ", "RIO", "MINAS"}
-cidades.str:len()              -- Series<int64>: comprimentos em bytes
-cidades.str:contains("Paulo") -- Series<bool>
-cidades.str:startswith("rio")
-cidades.str:endswith("S")
-cidades.str:replace("Paulo", "P.")
-cidades.str:find("Paulo")      -- índice 1-based (0 se ausente)
-cidades.str:slice(1, 3)        -- primeiros 3 bytes
-cidades.str:pad(10, "right")   -- preenche até 10 chars
-cidades.str:zfill(6)           -- pad com '0'
-cidades.str:rep(2, "-")        -- repete com separador
-cidades.str:cat(", ")          -- concatena tudo → string Lua
-cidades.str:split(" ")         -- divide → tabela de Series
+```
+Series 'data' (int64, len=2)
+  [1] 2026
+  [2] 2026
 ```
 
-### `.dt` — operações de calendário sobre Series datetime
-
-```lua
-local datas = smaug.Series.from_table({
-    "2026-01-15T12:30:00.500Z",
-    "2026-06-30T00:00:00Z",
-    "2026-12-31T23:59:59Z",
-}, "datetime")
-
-datas.dt:year()              -- {2026, 2026, 2026}
-datas.dt:month()             -- {1, 6, 12}
-datas.dt:quarter()           -- {1, 2, 4}
-datas.dt:weekday()           -- 0=seg … 6=dom
-datas.dt:format()            -- → Series<string> ISO 8601
-
--- truncamento e aritmética
-datas.dt:truncate("M")       -- início do mês
-datas.dt:add_days(30)        -- +30 dias
-datas.dt:diff()              -- diferença em ms entre elementos consecutivos
-
--- helpers estáticos
-smaug.Series.dt_parse("2026-06-14T15:30:00Z")     -- → epoch_ms
-smaug.Series.dt_from_parts(2026, 6, 14, 15, 30)   -- → epoch_ms
-```
+`month`, `quarter`, `weekday`, `format`, `truncate("M")`, `add_days(n)`, `diff`
+e os helpers estáticos `dt_parse` / `dt_from_parts` completam o módulo.
 
 ### Series categorical
 
-Dictionary encoding em Lua puro. Útil para colunas com poucos valores distintos
-(cidades, categorias, status). Comparação por igualdade é rápida e o armazenamento
-é compacto.
+Dictionary encoding em Lua puro — compacto e com igualdade rápida, ideal para
+colunas de baixa cardinalidade (cidades, status, categorias). Também pede dtype
+explícito:
 
 ```lua
-local cidade = smaug.Series.from_table(
-    {"SP", "RJ", "SP", "MG", "RJ", "SP"}, "categorical"
-)
+local ds = smaug.DataSet({
+    {"uf", {"SP", "RJ", "SP", "MG"}, "categorical"},
+})
 
-cidade.cat:codes()           -- → Series<int64> {1, 2, 1, 3, 2, 1}
-cidade.cat:levels()          -- → {"SP", "RJ", "MG"}  (ordem de 1ª aparição)
-cidade:value_counts()        -- {value, count} ordenado por frequência
-
--- renomear sem alterar dados
-cidade.cat:rename_categories({SP="São Paulo", RJ="Rio de Janeiro"})
-
--- restringir ou reordenar levels
-cidade.cat:set_categories({"SP", "RJ"})     -- MG → null
-cidade.cat:add_categories({"BA", "PR"})     -- adiciona sem alterar dados
+print(ds["uf"].cat:codes())
 ```
+
+```
+Series 'uf' (int64, len=4)
+  [1] 1
+  [2] 2
+  [3] 1
+  [4] 3
+```
+
+`levels()` devolve `{"SP", "RJ", "MG"}` (ordem de 1ª aparição).
+`rename_categories`, `set_categories`, `add_categories` reorganizam os níveis
+sem tocar os dados.
 
 ---
 
@@ -257,142 +260,118 @@ Coleção de Series alinhadas. Toda operação retorna um novo DataSet.
 
 ```lua
 local ds = smaug.DataSet({
-    {"uf",    {"SP","RJ","SP","MG","RJ","SP"}, "string"},
-    {"venda", {100.0,200.0,150.0,300.0,250.0,120.0},   },
-    {"marca", {"A","B","A","A","B","B"},        "string"},
+    {"uf",    {"SP", "RJ", "SP", "MG"}},
+    {"venda", {100.0, 200.0, 150.0, 300.0}},
 })
 ```
 
 ### Inspecionar
 
 ```lua
-ds:nrows()     -- 6
-ds:ncols()     -- 3
-ds:columns()   -- {"uf","venda","marca"}
-ds:dtypes()    -- {uf="string", venda="float64", marca="string"}
+ds:nrows()
+ds:ncols()
+ds:columns()
+ds:dtypes()
 ds:describe()
-print(ds)      -- tabela formatada
+print(ds)
 ```
+
+`nrows`/`ncols` dão as dimensões; `columns` lista os nomes; `dtypes` mapeia cada
+coluna ao seu tipo; `describe` resume estatísticas por coluna; `print(ds)`
+formata a tabela.
 
 ### Acesso e seleção
 
-```lua
-ds["venda"]              -- Series<float64>
-ds:col("uf")             -- idem
-ds:has_column("marca")   -- true
+Acessar uma coluna devolve uma **view protegida** do frame: ler é zero-copy,
+mas mutá-la não altera o DataSet original.
 
-ds:head(3)               -- primeiras 3 linhas
-ds:tail(2)               -- últimas 2 linhas
-ds:iloc(2, 4)            -- linhas 2–3 (índice Lua, exclusivo no topo)
-ds:sample(3)             -- 3 linhas aleatórias
-ds:select({"uf","venda"})-- subconjunto de colunas
-ds:row(1)                -- linha 1 como tabela Lua
+```lua
+ds["venda"]                 -- Series<float64> (view COW do frame)
+ds:col("uf")                -- idem
+ds:head(3)                  -- primeiras 3 linhas
+ds:iloc(2, 4)               -- linhas 2–3 (topo exclusivo)
+ds:select({"uf", "venda"})  -- subconjunto de colunas
 ```
 
 ### Filtrar
 
 ```lua
--- filtro simples
-ds:filter(ds["venda"]:gt(150.0))
-
--- açúcar sintático: ds[mask]
-ds[ds["uf"]:eq("SP")]
-
--- múltiplas condições (Kleene)
-ds[ds["venda"]:gt(100.0):land(ds["marca"]:eq("A"))]
+print(ds:filter(ds["venda"]:gt(150.0)))
 ```
+
+```
+DataSet 'DataSet' [2 linhas x 2 colunas]
+   uf  venda
+1  RJ  200
+2  MG  300
+```
+
+Açúcar sintático `ds[mask]` e condições compostas via Kleene:
+`ds[ds["venda"]:gt(100.0):land(ds["uf"]:eq("SP"))]`.
 
 ### Ordenar e mutar
 
 ```lua
-ds:sort_by("venda", false)     -- decrescente
-ds:sort_by({"uf", "venda"})    -- chave composta
+ds:sort_by("venda", false)                              -- decrescente
+ds:sort_by({"uf", "venda"})                             -- chave composta
 
 ds:assign("desconto", function(d) return d["venda"] * 0.1 end)
-ds:assign("flag", smaug.Series.full(6, true, "bool"))
-ds["nova_col"] = smaug.Series.from_table({1,2,3,4,5,6}, "int64")
-
-ds:rename({uf="estado", venda="valor"})   -- em lote
-ds:rename_column("marca", "produto")       -- uma coluna
-ds:drop_column("marca")
-```
-
-### Nulos
-
-```lua
-ds:dropna()                   -- remove linhas com qualquer NA
-ds:dropna({"venda","marca"})  -- só nessas colunas
-ds:fillna(0.0)                -- todas as colunas numéricas
-ds:fillna({venda=0.0})        -- coluna específica
+ds:update_column("venda", nova_series)                  -- mutação intencional
+ds:rename({uf = "estado"})                              -- em lote
+ds:drop_column("uf")
 ```
 
 ### GroupBy
 
 ```lua
-local gb = ds:groupby("uf")    -- chave simples
-local gb = ds:groupby({"uf","marca"})  -- chave composta
+local ds = smaug.DataSet({
+    {"uf",    {"SP", "RJ", "SP", "MG"}},
+    {"venda", {100.0, 200.0, 150.0, 300.0}},
+})
 
--- agregações
-gb:sum("venda")
-gb:mean("venda")
-gb:min("venda")   gb:max("venda")
-gb:count()
-gb:std("venda")   gb:var("venda")
-gb:median("venda")
-gb:prod("venda")
-gb:first("venda") gb:last("venda")
-gb:nunique("venda")
-gb:quantile(0.75, "venda")
-
--- múltiplas agregações de uma vez
-ds:groupby("uf"):agg({venda = {"sum","mean","std"}})
--- → DataSet com colunas: uf, venda_sum, venda_mean, venda_std
-
--- transform: broadcast do resultado de volta ao tamanho original
-ds:groupby("uf"):transform("mean","venda")
--- → Series com a média do grupo para cada linha
+print(ds:groupby("uf"):agg({venda = {"sum", "mean"}}))
 ```
+
+```
+DataSet 'DataSet_groupby' [3 linhas x 3 colunas]
+   uf  venda_sum  venda_mean
+1  MG  300        300
+2  RJ  200        200
+3  SP  250        125
+```
+
+Agregações individuais (`sum`, `mean`, `min`, `max`, `count`, `std`, `var`,
+`median`, `prod`, `first`, `last`, `nunique`, `quantile`), chave composta e
+`transform` (broadcast do resultado de volta ao tamanho original).
 
 ### Join
 
 ```lua
-local meta = smaug.DataSet({
-    {"uf",     {"SP","RJ","MG"},        "string"},
-    {"regiao", {"Sudeste","Sudeste","Sudeste"}, "string"},
-})
+local ds   = smaug.DataSet({{"uf", {"SP", "RJ", "MG"}}, {"venda", {100.0, 200.0, 300.0}}})
+local meta = smaug.DataSet({{"uf", {"SP", "RJ", "MG"}}, {"regiao", {"Sudeste", "Sudeste", "Sudeste"}}})
 
-ds:join(meta, "uf")              -- inner (default)
-ds:join(meta, "uf", "left")      -- left
-ds:join(meta, "uf", "outer")     -- outer
-ds:join(meta, {"uf","marca"})    -- chave composta
+print(ds:join(meta, "uf"))
 ```
 
-### Concat
-
-```lua
-smaug.concat({ds, ds2, ds3})   -- empilha verticalmente
-ds:concat(ds2)                  -- atalho para dois DataSets
+```
+DataSet 'DataSet_join_DataSet' [3 linhas x 3 colunas]
+   uf  venda  regiao
+1  SP  100    Sudeste
+2  RJ  200    Sudeste
+3  MG  300    Sudeste
 ```
 
-### Reshape
+Modos `inner` (default), `left`, `outer` e chave composta.
+
+### Concat e Reshape
 
 ```lua
--- pivot: long → wide
-ds:pivot("uf", "marca", "venda")
-
--- pivot_table: pivot com agregação
+smaug.concat({ds, ds2, ds3})                 -- empilha verticalmente
+ds:pivot("uf", "marca", "venda")             -- long → wide
 ds:pivot_table("uf", "marca", "venda", "sum")
-ds:pivot_table("uf", "marca", "venda", "mean")
-
--- melt: wide → long
-wide:melt({"id"}, {"a","b"}, "variavel", "valor")
-
--- stack / unstack
-wide:stack({"a","b"})             -- empilha colunas em linhas
-long:unstack("index","col","val") -- inverso (pivot com first)
-
--- explode: lista → linhas
-ds:explode("tags")   -- cada elemento da coluna vira uma linha
+wide:melt({"id"}, {"a", "b"}, "var", "val")  -- wide → long
+wide:stack({"a", "b"})                       -- colunas → linhas
+ds:explode("tags")                           -- lista → linhas
 ```
 
 ### Rolling no DataSet
@@ -400,75 +379,47 @@ ds:explode("tags")   -- cada elemento da coluna vira uma linha
 ```lua
 ds:rolling(3):sum("venda")
 ds:rolling(3):mean("venda")
-ds:rolling(3):min("venda")
-ds:rolling(3):max("venda")
 ```
 
 ### View Copy-on-Write
 
+Views são zero-copy até a primeira escrita, que materializa um buffer privado —
+o objeto pai nunca é tocado. Vale para todos os dtypes com buffer, incluindo
+`string` (via posse mista — ver [COW](COW.md)).
+
 ```lua
-local s   = ds["venda"]
-local sub = s:view(2, 3)   -- zero-copy: compartilha buffer
-sub:set(1, 999.0)          -- materializa buffer privado
--- s inalterada
+local s   = smaug.DataSet({{"v", {10, 20, 30, 40, 50}}})["v"]
+local sub = s:view(2, 3)   -- janela [20, 30, 40], compartilha buffer
+sub:set(1, 999.0)          -- detach: materializa buffer privado
+-- s permanece intacta
 ```
 
 ---
 
 ## I/O
 
-Parsers próprios em C puro. Zero dependências externas.
+Parsers próprios em C puro, zero dependências.
 
 ```lua
--- CSV
 local ds = smaug.read_csv("pedidos.csv")
-local ds = smaug.read_csv("pedidos.csv", {sep=";", header=true})
-local ds = smaug.read_csv_mem(buffer_string)
+local ds = smaug.read_csv("pedidos.csv", {sep = ";", header = true})
 ds:to_csv("saida.csv")
-ds:to_csv("saida.csv", {sep=","})
-local s = ds:to_csv_mem()   -- retorna string Lua
 
--- JSON (array de records: [{...}, {...}])
-local ds = smaug.read_json("dados.json")
-local ds = smaug.read_json_mem(json_string)
-ds:to_json("saida.json")
-ds:to_json("saida.json", {pretty=true})
-local s = ds:to_json_mem()
-
--- Inferência automática de tipo no CSV
--- int64 → float64 → bool → string (ordem de teste)
--- Células vazias, "NA", "null", "N/A", "nan", "NaN", "NULL" → null
+local ds = smaug.read_json("dados.json")   -- array de records
+ds:to_json("saida.json", {pretty = true})
 ```
 
----
-
-## Construção
-
-```lua
--- DataSet inline
-local ds = smaug.DataSet({
-    {"nome",   {"Ana", "Bruno"}, "string"},
-    {"idade",  {28, 35},         "int64"},
-    {"ativo",  {true, false},    "bool"},
-    {"score",  {9.5, 7.2}              },   -- dtype inferido: float64
-})
-
--- Series fábrica
-smaug.Series.from_table({1, 2, 3}, "int64")
-smaug.Series.from_table({"a","b","c"}, "string")
-smaug.Series.full(5, 0.0, "float64")   -- {0,0,0,0,0}
-
--- Sentinela de nulo
-local NA = smaug.NA
-smaug.Series.from_table({1, NA, 3}, "int64")  -- elemento 2 = null
-```
+Variantes em memória (`read_csv_mem`, `to_csv_mem`, `read_json_mem`,
+`to_json_mem`) trabalham direto com strings Lua. O CSV infere tipo por coluna
+(`int64` → `float64` → `bool` → `string`); células vazias, `NA`, `null`, `N/A`,
+`nan`, `NaN`, `NULL` viram `null`.
 
 ---
 
 ## Tipos e nulos
 
-`null` não é `NaN`, não é zero, não é string vazia.
-É ausência explícita, armazenada em bitmask dedicada.
+`null` não é `NaN`, não é zero, não é string vazia. É ausência explícita,
+armazenada em bitmask dedicada.
 
 | dtype | descrição | nulo |
 |---|---|---|
@@ -480,16 +431,24 @@ smaug.Series.from_table({1, NA, 3}, "int64")  -- elemento 2 = null
 | `categorical` | dictionary encoding (Lua puro) | `_codes[i] == nil` |
 
 ```lua
--- NaN ≠ null
-local s = smaug.Series.from_table({0/0, NA, 1.0}, "float64")
-s:is_null(1)   -- false  (NaN é valor presente)
-s:is_null(2)   -- true   (NA é ausência)
-s:is_null(3)   -- false
+local s = smaug.DataSet({{"v", {0/0, NA, 1.0}}})["v"]
 
--- null propaga em aritmética
--- NaN contamina reduções (ignore_na pula null, não NaN)
--- div/0 → null (não NaN, não Inf)
+s:is_null(1)
+s:is_null(2)
 ```
+
+O primeiro elemento é `NaN` — um valor presente — então `is_null(1)` é falso. O
+segundo é `NA`, ausência explícita, então `is_null(2)` é verdadeiro. É a
+distinção central: `NaN` não é `null`.
+
+`null` propaga em aritmética; `NaN` contamina reduções (`ignore_na` pula `null`,
+não `NaN`); divisão por zero → `null` (não `NaN`, não `Inf`).
+
+> **int64 acima de 2^53:** um literal Lua grande (ex. `9007199254740993`) já
+> chega truncado, porque o Lua o representa como `double` antes de entrar na
+> lib. Para preservar os 64 bits, use `ffi.new("int64_t", ...)` ou o sufixo
+> `LL`, e leia de volta com `s:get_raw(i)` (o `get` normal converte para
+> `double`). Valores acima de 2^53 disparam aviso.
 
 ---
 

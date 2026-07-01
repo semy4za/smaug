@@ -5,6 +5,68 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-01 — Item 9: Contratos de fronteira (9.1 int64 > 2^53 + 9.2 column COW / view de string)
+
+Fechou os dois contratos de fronteira do item 9. O fio condutor: quem é dono do
+dado, e onde a precisão/posse pode se perder silenciosamente.
+
+**9.1 — int64 acima de 2^53 (`check_value`, Lua-puro, Anel 0 intocado).**
+Dois sub-problemas distintos:
+- Sub-A (limitação da linguagem, não da lib): um literal Lua grande como
+  `9007199254740993` já chega **truncado** para `9007199254740992` — o parser do
+  Lua o representa como `double` antes de qualquer código do Smaug rodar. A lib
+  não pode recuperar o valor, só tornar visível. Decisão (9.1.2):
+  **avisar-mas-aceitar** — número > 2^53 dispara um `warn` educativo (helper novo
+  `I.warn` central em `init.lua`, reutilizável pelo 12.10), sem bloquear.
+- Sub-B (o bug real, a lib controla): `check_value` recusava `cdata int64_t`
+  (`9007199254740993LL`, `ffi.new("int64_t")`) — a única forma que preserva 64
+  bits — porque exigia `type(v) == "number"`. O C guarda até 2^63-1 sem perda; o
+  gargalo era só o guard Lua. Corrigido via `ffi.istype`: aceita cdata
+  int64/uint64, recusa `uint64_t > INT64_MAX` (9.1.3, sem wraparound silencioso)
+  e segue recusando float/double cdata (mantém A7).
+
+**Achado durante a implementação:** consertar a entrada (`set`) não bastava — a
+saída (`get`) reintroduzia a perda, porque `get_value` faz `tonumber()` no
+int64_t (mesma limitação da Sub-A, do outro lado). Escopo estendido no mesmo
+item: novo `Series:get_raw(i)` devolve o cdata int64_t cru, sem conversão. `get`
+normal mantém o comportamento antigo (limitação documentada).
+
+**9.2 — `column()` compartilhava buffer com o frame (E2). Op1: o E2 morre.**
+`column()` retornava a referência Series interna; `col = df:column("x");
+col:set(...)` mutava o frame silenciosamente. Decisão: `column()`/`col()` passa a
+retornar **view COW** protegida (leitura zero-copy, detach na 1ª mutação). O
+código interno (relacional, csv, stat — ~40 call-sites) migrou para `_raw_column`
+(acesso cru explícito). Mutação intencional agora é via `update_column`.
+
+**Estendido para o Anel 0 (a parte pesada):** string não tinha view. Implementada
+`smaug_str_view` + `str_cow_detach` em C. Diferente dos numéricos (buffer fixo,
+view O(1)), a string é offset-based → **modelo de posse mista A1**: campo novo
+`offsets_owned` na struct `smaug_series_str_t`, a view compartilha
+`buffer`/`null_mask` mas possui um `offsets` próprio absoluto. O `free` passou a
+separar as duas posses; o detach materializa a janela com offsets rebaseados.
+Escolhido A1 sobre A3 (rebase on-the-fly em cada acesso) porque A1 concentra a
+complexidade no ciclo de vida da view — A3 a espalharia por toda operação de
+string (fonte de regressão distribuída).
+
+**Achado de teste (E2 tinha alcance oculto):** ~14 setups de `test_core` usavam
+`df:col("x"):set_null(i)` como atalho para injetar nulos — só funcionava pelo
+aliasing que estávamos matando. Migrados (Op A) para dados que **nascem** com
+`NA` via `from_table({..., NA, ...})` e mutação via `update_column`. Review do C
+confirmou: `from_table(NA)` chama o mesmo `set_null` do C (só escreve a máscara),
+então o estado de memória é idêntico — zero reimplementação.
+
+**Sincronização crítica:** o cdef do FFI declara a struct str campo a campo, então
+`offsets_owned` teve de entrar no cdef na mesma posição do C (senão o LuaJIT lê o
+layout errado — bug de memória silencioso).
+
+**Validação:** Valgrind-clean (test_cow, test_string, allocfail — 0 leaks/errors,
+incl. caminhos de OOM do detach); test_cow +70, allocfail +70, test_core +8
+(prova E2 morto); 18/18 Lua; parity 12/12 (`get_raw` e `_raw_column` registrados
+como exceções intencionais). Docs sincronizados: COW.md (string ❌→✅),
+API_Reference, API_INDEX, CONTRACT. 9.1 fechou por Windows (Lua-puro); 9.2 é
+[Fedora] (Anel 0 novo) — aguarda `--all` para o selo de cobertura.
+
+---
 ## 2026-06-30 — Item 8: Rolling → Ring 0 (motor genérico + min_periods + expanding + DataSet)
 
 Levou a tese de "fonte única" ao rolling. Antes a duplicação era TRIPLA (C /

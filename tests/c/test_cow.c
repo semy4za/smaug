@@ -26,6 +26,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* Verificação que NÃO some sob -DNDEBUG. Os testes deste arquivo foram
    escritos com assert() como verificação principal; redefinir assert como
@@ -418,6 +419,185 @@ static void test_i64_append_null_detaches_view(void) {
 /* ===================================================================
    main
    ================================================================= */
+/* ===================================================================
+   STRING — view + COW (offset-based, modelo A1: buffer/null_mask
+   compartilhados, offsets próprio absoluto)
+   ================================================================= */
+
+/* Utilitário: cria string ["SP","RJ","MG","BA","CE"] */
+static smaug_series_str_t *make_str5(void) {
+    const char *const arr[] = {"SP", "RJ", "MG", "BA", "CE"};
+    smaug_series_str_t *s = smaug_str_create_from_array(arr, 5);
+    assert(s);
+    return s;
+}
+
+static const char *sget(const smaug_series_str_t *s, size_t i, size_t *len) {
+    return smaug_str_get(s, i, len);
+}
+static int seq(const smaug_series_str_t *s, size_t i, const char *exp) {
+    size_t len; const char *p = sget(s, i, &len);
+    if (!p) return exp == NULL;
+    if (exp == NULL) return 0;
+    return len == strlen(exp) && memcmp(p, exp, len) == 0;
+}
+
+/* view lê o pai antes de qualquer escrita */
+static void test_str_view_reads_parent(void) {
+    smaug_series_str_t *pai = make_str5();
+    smaug_series_str_t *v = smaug_str_view(pai, 1, 3);   /* [RJ,MG,BA] */
+    assert(v);
+    assert(v->meta.is_view == true);
+    assert(v->meta.external_alloc == true);
+    assert(v->offsets_owned == true);
+    assert(v->size == 3);
+    assert(seq(v, 0, "RJ"));
+    assert(seq(v, 1, "MG"));
+    assert(seq(v, 2, "BA"));
+    smaug_str_free(v);
+    smaug_str_free(pai);
+}
+
+/* set numa view destaca; pai intacto. Caso mais sensível: nova string de
+   tamanho DIFERENTE, forçando remontagem do buffer privado. */
+static void test_str_set_detaches_view(void) {
+    smaug_series_str_t *pai = make_str5();
+    smaug_series_str_t *v = smaug_str_view(pai, 1, 3);   /* [RJ,MG,BA] */
+
+    /* troca "MG" (pos 1 da view = pos 2 do pai) por "MINAS" (maior) */
+    assert(smaug_str_set(v, 1, "MINAS", 5) == SMG_OK);
+    assert(v->meta.is_view == false);           /* destacou */
+    assert(v->meta.external_alloc == false);
+    assert(v->offsets_owned == true);
+
+    /* view reflete a mudança */
+    assert(seq(v, 0, "RJ"));
+    assert(seq(v, 1, "MINAS"));
+    assert(seq(v, 2, "BA"));
+
+    /* pai INTACTO — não viu a mudança */
+    assert(seq(pai, 0, "SP"));
+    assert(seq(pai, 1, "RJ"));
+    assert(seq(pai, 2, "MG"));    /* continua MG, não MINAS */
+    assert(seq(pai, 3, "BA"));
+    assert(seq(pai, 4, "CE"));
+
+    smaug_str_free(v);
+    smaug_str_free(pai);
+}
+
+/* set_null numa view destaca (via set interno) e não toca o pai */
+static void test_str_set_null_detaches_view(void) {
+    smaug_series_str_t *pai = make_str5();
+    smaug_series_str_t *v = smaug_str_view(pai, 0, 3);   /* [SP,RJ,MG] */
+
+    assert(smaug_str_set_null(v, 0) == SMG_OK);
+    assert(v->meta.is_view == false);
+    assert(smaug_str_is_null(v, 0) == true);
+    assert(seq(v, 1, "RJ"));
+
+    /* pai intacto */
+    assert(smaug_str_is_null(pai, 0) == false);
+    assert(seq(pai, 0, "SP"));
+    smaug_str_free(v);
+    smaug_str_free(pai);
+}
+
+/* append numa view destaca e cresce a cópia privada; pai intacto no tamanho */
+static void test_str_append_detaches_view(void) {
+    smaug_series_str_t *pai = make_str5();
+    size_t pai_size_antes = pai->size;
+    smaug_series_str_t *v = smaug_str_view(pai, 1, 2);   /* [RJ,MG] */
+
+    assert(smaug_str_append(v, "NOVO", 4) == 0);
+    assert(v->meta.is_view == false);
+    assert(v->size == 3);
+    assert(seq(v, 0, "RJ"));
+    assert(seq(v, 1, "MG"));
+    assert(seq(v, 2, "NOVO"));
+
+    /* pai não cresceu */
+    assert(pai->size == pai_size_antes);
+    smaug_str_free(v);
+    smaug_str_free(pai);
+}
+
+/* append_null numa view destaca */
+static void test_str_append_null_detaches_view(void) {
+    smaug_series_str_t *pai = make_str5();
+    smaug_series_str_t *v = smaug_str_view(pai, 2, 2);   /* [MG,BA] */
+
+    assert(smaug_str_append_null(v) == 0);
+    assert(v->meta.is_view == false);
+    assert(v->size == 3);
+    assert(seq(v, 0, "MG"));
+    assert(seq(v, 1, "BA"));
+    assert(smaug_str_is_null(v, 2) == true);
+    smaug_str_free(v);
+    smaug_str_free(pai);
+}
+
+/* view de view: detach da neta não afeta a filha nem o avô */
+static void test_str_nested_view(void) {
+    smaug_series_str_t *avo = make_str5();           /* [SP,RJ,MG,BA,CE] */
+    smaug_series_str_t *filha = smaug_str_view(avo, 1, 3);   /* [RJ,MG,BA] */
+    smaug_series_str_t *neta  = smaug_str_view(filha, 1, 2); /* [MG,BA] */
+
+    assert(seq(neta, 0, "MG"));
+    assert(seq(neta, 1, "BA"));
+
+    assert(smaug_str_set(neta, 0, "X", 1) == SMG_OK);   /* detach só da neta */
+    assert(seq(neta, 0, "X"));
+    assert(seq(filha, 1, "MG"));    /* filha intacta */
+    assert(seq(avo, 2, "MG"));      /* avô intacto */
+
+    smaug_str_free(neta);
+    smaug_str_free(filha);
+    smaug_str_free(avo);
+}
+
+/* view destacada sobrevive ao pai liberado */
+static void test_str_view_outlives_parent(void) {
+    smaug_series_str_t *pai = make_str5();
+    smaug_series_str_t *v = smaug_str_view(pai, 1, 3);   /* [RJ,MG,BA] */
+    assert(smaug_str_set(v, 0, "ZZ", 2) == SMG_OK);      /* destaca */
+    smaug_str_free(pai);                                 /* pai vai embora */
+    /* view ainda íntegra (buffer/offsets/null_mask são privados agora) */
+    assert(seq(v, 0, "ZZ"));
+    assert(seq(v, 1, "MG"));
+    assert(seq(v, 2, "BA"));
+    smaug_str_free(v);
+}
+
+/* view vazia (len=0): detach materializa struct coerente sem UB */
+static void test_str_empty_view(void) {
+    smaug_series_str_t *pai = make_str5();
+    smaug_series_str_t *v = smaug_str_view(pai, 2, 0);   /* janela vazia */
+    assert(v);
+    assert(v->size == 0);
+    /* append destaca a view vazia e adiciona */
+    assert(smaug_str_append(v, "UNICO", 5) == 0);
+    assert(v->meta.is_view == false);
+    assert(v->size == 1);
+    assert(seq(v, 0, "UNICO"));
+    smaug_str_free(v);
+    smaug_str_free(pai);
+}
+
+/* segunda escrita não re-detacha (já é privada) */
+static void test_str_second_write_no_redetach(void) {
+    smaug_series_str_t *pai = make_str5();
+    smaug_series_str_t *v = smaug_str_view(pai, 0, 3);
+    assert(smaug_str_set(v, 0, "AA", 2) == SMG_OK);
+    assert(v->meta.is_view == false);
+    assert(smaug_str_set(v, 1, "BB", 2) == SMG_OK);   /* já privada */
+    assert(seq(v, 0, "AA"));
+    assert(seq(v, 1, "BB"));
+    assert(seq(v, 2, "MG"));
+    smaug_str_free(v);
+    smaug_str_free(pai);
+}
+
 int main(void) {
     test_f64_set_detaches_view();
     test_f64_set_null_detaches_view();
@@ -434,6 +614,16 @@ int main(void) {
     test_f64_append_then_grow();
     test_i64_append_detaches_view();
     test_i64_append_null_detaches_view();
+
+    test_str_view_reads_parent();
+    test_str_set_detaches_view();
+    test_str_set_null_detaches_view();
+    test_str_append_detaches_view();
+    test_str_append_null_detaches_view();
+    test_str_nested_view();
+    test_str_view_outlives_parent();
+    test_str_empty_view();
+    test_str_second_write_no_redetach();
 
     printf("PASS: COW (%d checks)\n", n_checks);
     return 0;

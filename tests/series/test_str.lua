@@ -772,13 +772,15 @@ check(j.str:join("-") == j.str:cat("-"), "join idêntico a cat")
 local je = S.from_table({}, "string")
 check(je.str:join(",") == "",       "join série vazia → vazia")
 
--- view não suportado em string → erro orientado (I.3; antes era nil-call cru)
+-- view de string agora suportada (9.2): zero-copy na leitura, COW na escrita
 local sv = S.from_table({"SP", "RJ", "MG"}, "string")
-local ok_v, err_v = pcall(function() return sv:view(1, 2) end)
-check(not ok_v,                            "string view: erro (não nil-call)")
-check(type(err_v) == "string" and err_v:find("não é suportado", 1, true) ~= nil,
-                                           "string view: mensagem orienta (não suportado)")
-check(sv:take({1, 2}):len() == 2,          "string take: alternativa a view funciona")
+local sv_w = sv:view(1, 2)                  -- [SP, RJ]
+check(sv_w:len() == 2,                      "string view: janela com len correto")
+check(sv_w:get(1) == "SP" and sv_w:get(2) == "RJ", "string view: lê o pai (zero-copy)")
+sv_w:set(1, "SAOPAULO")                     -- dispara COW detach
+check(sv_w:get(1) == "SAOPAULO",            "string view: set reflete na view")
+check(sv:get(1) == "SP",                    "string view: pai intacto após COW")
+check(sv:take({1, 2}):len() == 2,           "string take: cópia independente também funciona")
 
 -- ================================================================
 -- Resultado

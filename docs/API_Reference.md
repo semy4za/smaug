@@ -317,8 +317,12 @@ normalização nem validação UTF-8 (dívida futura). Comparações e ordenaç�
 **lexicográficas por byte**, não Unicode-aware. A string vazia `""` é um valor
 **válido e distinto de NULL**.
 
-> **String não tem views nem Copy-on-Write** (diferente de f64/i64). Toda série
-> string é dona do próprio buffer; não há detach.
+> **String tem view + Copy-on-Write** (item 9.2). Diferente de f64/i64 (buffer
+> fixo, view = soma de ponteiro O(1)), a string é offset-based, então a view usa
+> **posse mista** (campo `offsets_owned` na struct): compartilha `buffer` e
+> `null_mask` com o pai, mas possui um `offsets` próprio absoluto de (len+1)
+> marcadores. A primeira mutação dispara detach, que materializa buffer/offsets
+> (rebaseados)/null_mask privados da janela; o pai fica intacto. Ver COW.md.
 
 ### Lifecycle
 
@@ -329,6 +333,7 @@ normalização nem validação UTF-8 (dívida futura). Comparações e ordenaç�
 | `create_from_array(array, len)` | série / NULL | `array` é `const char *const *`; entrada `NULL` no array → posição NULL |
 | `free(s)` | void | idempotente (`NULL` seguro); respeita `external_alloc` |
 | `clone(s)` | série / NULL | deep copy independente |
+| `view(s, start, len)` | série / NULL | janela **zero-copy** `[start, start+len)`; posse mista (offsets próprio); COW na 1ª mutação; NULL se `start+len > size` ou OOM |
 
 ### Acesso e mutação
 
@@ -348,8 +353,8 @@ normalização nem validação UTF-8 (dívida futura). Comparações e ordenaç�
 > que possa realocar o buffer (`set`/`append`).
 >
 > **`set` retorna `smaug_status_t`** (migrado do antigo `int`), consistente com
-> `f64_set`/`i64_set`. Como string não tem views, o `SMG_ERR_NOMEM` vem da
-> realocação do buffer de bytes, não de detach COW.
+> `f64_set`/`i64_set`. O `SMG_ERR_NOMEM` pode vir da realocação do buffer de
+> bytes ou do detach COW (quando a série é uma view — ver `view`, abaixo).
 
 ### Comparações
 

@@ -1,7 +1,7 @@
 -- lua/smaug/core/series/_core.lua
 --
 -- Núcleo da Series: metatype, helpers de fronteira, reduce_num.
--- Recebe I com: I.C, I.ffi, I.DTYPES, I.NA, I.is_nan, I.is_na, I.I64_MIN
+-- Recebe I com: I.C, I.ffi, I.DTYPES, I.NA, I.is_nan, I.is_na, I.I64_MIN, I.warn
 -- Produz em I: I.Series, I.methods, I.wrap, I.check_index, I.check_value,
 --              I.checkrc, I.require_op, I.reduce_num, I.SMG_ERR_NOMEM
 
@@ -12,6 +12,7 @@ return function(I)
     local NA     = I.NA
     local is_nan = I.is_nan
     local is_na  = I.is_na
+    local warn   = I.warn
 
     local SMG_ERR_NOMEM = 4   -- espelha smaug_types.h (enum fixo, 0-indexed)
     I.SMG_ERR_NOMEM = SMG_ERR_NOMEM
@@ -49,10 +50,33 @@ return function(I)
     end
     I.check_index = check_index
 
+    local INT64_MAX_MAG = 9007199254740992  -- 2^53: teto de precisão exata do double
+    local INT64_MAX_U   = 9223372036854775807ULL  -- teto de int64_t, visto como uint64_t
+
     local function check_value(self, v, level)
         local dt = self._dtype
         if dt == "int64" then
-            if type(v) ~= "number" or v % 1 ~= 0 then
+            local tv = type(v)
+            if tv == "number" then
+                if v % 1 ~= 0 then
+                    error("smaug: valor para int64 deve ser inteiro (sem coerção); "
+                          .. "recebido " .. tostring(v), level or 3)
+                end
+                if v > INT64_MAX_MAG or v < -INT64_MAX_MAG then
+                    warn("valor " .. tostring(v) .. " para int64 excede 2^53; "
+                         .. "literais Lua acima desse limite podem já ter perdido "
+                         .. "precisão antes de chegar aqui — use ffi.new(\"int64_t\", ...) "
+                         .. "ou o sufixo LL para preservar o valor exato")
+                end
+            elseif tv == "cdata" and ffi.istype("uint64_t", v) then
+                if v > INT64_MAX_U then
+                    error("smaug: valor uint64_t (" .. tostring(v) .. ") excede o "
+                          .. "range de int64 (máx " .. tostring(INT64_MAX_U) .. "); "
+                          .. "wraparound não é permitido", level or 3)
+                end
+            elseif tv == "cdata" and ffi.istype("int64_t", v) then
+                -- cdata int64_t: já preserva os 64 bits, nada a checar aqui.
+            else
                 error("smaug: valor para int64 deve ser inteiro (sem coerção); "
                       .. "recebido " .. tostring(v), level or 3)
             end

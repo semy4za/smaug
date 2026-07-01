@@ -134,6 +134,7 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | Método | O que faz |
 |--------|-----------|
 | `:get(i)` / `:set(i, v)` | acesso 1-based; nil↔NA |
+| `:get_raw(i)` | só int64: devolve o `int64_t` cru (cdata), sem `tonumber` — preserva precisão acima de 2^53 |
 | `s[i]` / `s.at[i]` / `s.at(i)` / `s.iat[i]` | acesso escalar (alias de `:get`); at e iat equivalem em Series 1-D |
 | `:is_null(i)` / `:set_null(i)` | nulos |
 | `:append(v)` | adiciona ao fim (chainable) |
@@ -448,7 +449,7 @@ com `nil` no meio (limitação do `#` do Lua).
 |--------|-----------|
 | `:add_column(nome, series)` | adiciona (valida comprimento e nome único) |
 | `:drop_column(nome)` / `:rename_column(old, new)` | CRUD de colunas |
-| `:column(nome)` / `:col(nome)` / `df[nome]` | acessa coluna |
+| `:column(nome)` / `:col(nome)` / `df[nome]` | acessa coluna → **view COW protegida** (mutar a extraída não altera o frame; use `:update_column` para mutação intencional) |
 | `:has_column(nome)` / `:columns()` | metadados |
 | `:ncols()` / `:nrows()` / `:len()` | dimensões |
 | `:dtypes()` / `:row(i, [na])` | tipos por coluna / linha como tabela |

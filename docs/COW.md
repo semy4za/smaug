@@ -140,7 +140,7 @@ Operações que produzem novo objeto nunca tocam o armazenamento compartilhado:
 | `float64` | ✅ | ✅ |
 | `int64` | ✅ | ✅ |
 | `datetime` | ✅ | ✅ |
-| `string` | ❌ (futuro) | — |
+| `string` | ✅ | ✅ |
 | `bool` | ✅ | ✅ |
 
 `datetime` tem view + COW completos: é um buffer de `int64_t` (epoch_ms) de
@@ -149,9 +149,16 @@ mesma mecânica de `float64`/`int64`.
 `bool` também tem view + COW completos: é um buffer de `uint8_t` de valores mais
 a máscara de nulos paralela, ambos de tamanho fixo — mesma mecânica zero-copy +
 detach contíguo de `float64`. (BoolSeries é mutável: tem `set`/`set_null`.)
-`string` não tem view ainda; quando ganhar, o detach será mais complexo
-(buffer de bytes + offsets rebaseados). Chamar `:view()` em `string` ou `bool`
-lança erro orientado (não falha silenciosa).
+`string` tem view + COW (item 9.2). Diferente dos numéricos (buffer fixo, view =
+soma de ponteiro O(1)), a string é offset-based, então usa um **modelo de posse
+mista** (campo `offsets_owned` na struct): a view compartilha `buffer` e
+`null_mask` com o pai (zero-copy) mas possui um `offsets` próprio de (len+1)
+marcadores absolutos, copiados da janela — O(len), não O(1), mas sem copiar os
+bytes. Criar a view custa só o array de offsets. A primeira mutação dispara o
+detach, que materializa buffer + offsets (rebaseados para 0) + null_mask
+privados da janela; o pai fica intacto. O único dtype sem view é `categorical`
+(Lua puro: codes + dicionário, sem buffer compartilhável) — `:view()` nele lança
+erro orientado.
 
 ---
 

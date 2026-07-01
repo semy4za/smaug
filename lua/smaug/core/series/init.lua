@@ -68,6 +68,14 @@ local function is_nan(v) return v ~= v end
 local NA = setmetatable({}, { __tostring = function() return "NA" end })
 local function is_na(v) return v == nil or v == NA end
 
+-- Aviso não-fatal (stderr) — canal único para "falha visível > acerto
+-- adivinhado" quando o dado é aceito mas merece atenção do usuário (ex.:
+-- precisão de int64 > 2^53). Não interrompe o fluxo; quem quiser silenciar
+-- redireciona stderr por fora.
+local function warn(msg)
+    io.stderr:write("smaug: aviso — " .. msg .. "\n")
+end
+
 -- =====================================================================
 -- Módulo interno _internal (I): ponto de encontro entre submódulos
 -- =====================================================================
@@ -79,6 +87,7 @@ local I = {
     is_nan  = is_nan,
     NA      = NA,
     is_na   = is_na,
+    warn    = warn,
 }
 
 -- 1. DTYPES

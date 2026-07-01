@@ -99,7 +99,7 @@ local function dataset_to_table(ds)
     ffi.fill(t.columns, ncols * col_size, 0)
 
     for ci, cname in ipairs(ds._col_names) do
-        local col   = ds:column(cname)
+        local col   = ds:_raw_column(cname)
         local dtype = col._dtype
         local idx   = ci - 1
 

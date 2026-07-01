@@ -676,6 +676,92 @@ static void af_str_append_null_grow(void) {
     }
 }
 
+/* --- str view + COW detach sob OOM (item 9.2) ---
+   smaug_str_view aloca struct + offsets próprio (2 mallocs). Escrever numa view
+   dispara str_cow_detach, que aloca buffer + offsets + null_mask privados (3
+   mallocs) — todos revertidos de forma segura se algum falhar (série intacta,
+   pai intacto). Espelha af_dt_setters, mas com as alocações extras da string. */
+static void af_str_view_cow(void) {
+    const char *arr[] = {"SP", "RJ", "MG", "BA", "CE"};
+
+    /* smaug_str_view em si sob OOM (malloc do struct + offsets) */
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_str_t *base = smaug_str_create_from_array(arr, 5);
+        assert(base);
+        reset(k);
+        smaug_series_str_t *v = smaug_str_view(base, 1, 3);
+        if (v) { OK(v->size == 3, "str view size"); smaug_str_free(v); }
+        reset(-1);
+        smaug_str_free(base);
+    }
+    /* set numa view → str_cow_detach (buffer+offsets+null_mask) */
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_str_t *base = smaug_str_create_from_array(arr, 5);
+        assert(base);
+        smaug_series_str_t *v = smaug_str_view(base, 1, 3);
+        if (!v) { smaug_str_free(base); reset(-1); continue; }
+        reset(k);
+        smaug_status_t st = smaug_str_set(v, 1, "MINAS", 5); /* detach + set_grow */
+        OK(st == SMG_OK || st == SMG_ERR_NOMEM, "str_set view: status válido");
+        reset(-1);
+        smaug_str_free(v); smaug_str_free(base);
+    }
+    /* set_null numa view → detach via set interno */
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_str_t *base = smaug_str_create_from_array(arr, 5);
+        assert(base);
+        smaug_series_str_t *v = smaug_str_view(base, 0, 3);
+        if (!v) { smaug_str_free(base); reset(-1); continue; }
+        reset(k);
+        smaug_status_t st = smaug_str_set_null(v, 0); /* detach */
+        OK(st == SMG_OK || st == SMG_ERR_NOMEM, "str_set_null view: status válido");
+        reset(-1);
+        smaug_str_free(v); smaug_str_free(base);
+    }
+    /* append numa view → detach + slots/buffer reserve */
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_str_t *base = smaug_str_create_from_array(arr, 5);
+        assert(base);
+        smaug_series_str_t *v = smaug_str_view(base, 1, 2);
+        if (!v) { smaug_str_free(base); reset(-1); continue; }
+        reset(k);
+        int rc = smaug_str_append(v, "NOVO", 4); /* detach + grow */
+        OK(rc == 0 || rc == -1, "str_append view: rc válido");
+        reset(-1);
+        smaug_str_free(v); smaug_str_free(base);
+    }
+    /* append_null numa view → detach + slots reserve */
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_str_t *base = smaug_str_create_from_array(arr, 5);
+        assert(base);
+        smaug_series_str_t *v = smaug_str_view(base, 2, 2);
+        if (!v) { smaug_str_free(base); reset(-1); continue; }
+        reset(k);
+        int rc = smaug_str_append_null(v); /* detach + slots */
+        OK(rc == 0 || rc == -1, "str_append_null view: rc válido");
+        reset(-1);
+        smaug_str_free(v); smaug_str_free(base);
+    }
+    /* view vazia: detach materializa buffer inicial (1 malloc no ramo size==0) */
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(-1);
+        smaug_series_str_t *base = smaug_str_create_from_array(arr, 5);
+        assert(base);
+        smaug_series_str_t *v = smaug_str_view(base, 2, 0);
+        if (!v) { smaug_str_free(base); reset(-1); continue; }
+        reset(k);
+        int rc = smaug_str_append(v, "X", 1); /* detach ramo vazio + grow */
+        OK(rc == 0 || rc == -1, "str_append empty view: rc válido");
+        reset(-1);
+        smaug_str_free(v); smaug_str_free(base);
+    }
+}
+
 static void af_str_compare(void) {
     const char *arr[] = {"SP", "RJ", "MG"};
     reset(-1);
@@ -2332,6 +2418,7 @@ int main(void) {
     af_str_set_grow();
     af_str_append_grow();
     af_str_append_null_grow();
+    af_str_view_cow();
     af_str_compare();
     af_str_ge();
     af_str_le();

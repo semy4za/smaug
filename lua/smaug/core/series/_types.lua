@@ -146,6 +146,7 @@ return function(I)
             cmp_ne = function(c, t, om) if type(t)~="string" then error("smaug: comparação de string espera string",4) end return C.smaug_str_ne(c,t,#t,om) end,
             filter = C.smaug_str_filter,
             take   = C.smaug_str_take,
+            view    = C.smaug_str_view,   -- 9.2: view + COW (offset-based, modelo A1)
             sort    = C.smaug_str_sort,
             argsort = C.smaug_str_argsort,
             ffill   = C.smaug_str_ffill,

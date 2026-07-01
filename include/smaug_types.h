@@ -132,6 +132,15 @@ typedef struct {
     size_t        capacity;        /* strings que cabem em offsets/null_mask    */
     size_t        buffer_len;      /* bytes usados no buffer                     */
     size_t        buffer_capacity; /* bytes alocados no buffer                   */
+    /* Posse do array `offsets`, independente de meta.external_alloc.
+       Necessário porque a view de string (offset-based) é um estado MISTO de
+       posse: ela compartilha `buffer` e `null_mask` com o pai (external_alloc
+       = true → free não os toca), mas possui um `offsets` PRÓPRIO rebaseado
+       (offsets_owned = true → free o libera). Um único external_alloc não
+       consegue representar isso. Séries normais têm offsets_owned = true e
+       external_alloc = false (donas de tudo); a view tem offsets_owned = true
+       e external_alloc = true (dona só do offsets). Ver smaug_str_view/free. */
+    bool          offsets_owned;
     smaug_metadata_t meta;
 } smaug_series_str_t;
 

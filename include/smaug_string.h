@@ -42,6 +42,22 @@ smaug_series_str_t* smaug_str_create_from_array(const char *const *array, size_t
 void                smaug_str_free(smaug_series_str_t *s);
 smaug_series_str_t* smaug_str_clone(const smaug_series_str_t *s);
 
+/* View: janela zero-copy [start, start+len) sobre a série-pai (1-based no
+   frontend; 0-based aqui). Diferente dos numéricos (buffer de tamanho fixo,
+   view = soma de ponteiro O(1)), a string é offset-based, então a view usa um
+   modelo de POSSE MISTA (ver smaug_types.h, campo offsets_owned):
+     - `buffer` e `null_mask` são COMPARTILHADOS com o pai (mesmo ponteiro-base
+       do buffer; null_mask deslocado por `start`). external_alloc=true → o free
+       da view não os toca; o pai continua dono.
+     - `offsets` é PRÓPRIO da view: um array de (len+1) marcadores copiados de
+       s->offsets[start..start+len]. São offsets ABSOLUTOS (não rebaseados) —
+       apontam corretamente para dentro do buffer compartilhado do pai, já que
+       o buffer é o mesmo ponteiro. offsets_owned=true → o free da view o libera.
+   Mutações na view (set/set_null/append) disparam COW detach: materializam
+   buffer/offsets/null_mask privados da janela, e o pai fica intacto.
+   O caller garante que o pai sobrevive à view. NULL em OOB/OOM. */
+smaug_series_str_t* smaug_str_view(smaug_series_str_t *s, size_t start, size_t len);
+
 /* ===================== Acesso ===================== */
 
 /* Lê a string no índice idx. NÃO copia: devolve ponteiro para dentro do buffer

@@ -109,20 +109,22 @@ check(tostring(smaug.DataSet.new("vazio")):find("vazio") ~= nil, "tostring vazio
 local df_sel = df:select({"id", "preco"})
 check(df_sel:ncols() == 2,                       "select: ncols")
 check(df_sel:col("id"):get(1) == 1,              "select: valor ok")
--- mutation no derivado NÃO afeta o original
+-- 9.2: col() retorna view COW protegida — set numa coluna extraída NÃO
+-- propaga para o frame (nem no derivado, nem no original). E2 morto.
 df_sel:col("preco"):set(1, 999.0)
-check(df:col("preco"):get(1) == 10.0,            "select: independente — original intacto")
-check(df_sel:col("preco"):get(1) == 999.0,       "select: derivado tem o valor novo")
+check(df:col("preco"):get(1) == 10.0,            "select: original intacto (col protege)")
+check(df_sel:col("preco"):get(1) == 10.0,        "select: frame derivado também protegido (E2 morto)")
+-- mutação intencional de coluna é via update_column (caminho explícito)
+df_sel:update_column("preco", Series.from_table({999.0, 20, 30, 40, 50}, "float64"))
+check(df_sel:col("preco"):get(1) == 999.0,       "update_column: mutação intencional funciona")
+check(df:col("preco"):get(1) == 10.0,            "update_column: original permanece intacto")
 
 -- ---- dropna(): remove linhas com NULL ----
+-- (dados nascem com os nulos no lugar — não dependem de mutação pós-criação)
 local df_nulls = smaug.dataset({
-    {"x", Series.from_table({1, 2, 3, 4, 5}, "float64")},
-    {"y", Series.from_table({10, 20, 30, 40, 50}, "float64")},
+    {"x", Series.from_table({1, NA, 3, 4, NA}, "float64")},   -- null nas linhas 2 e 5
+    {"y", Series.from_table({10, 20, 30, NA, NA}, "float64")}, -- null nas linhas 4 e 5
 }, "nulltest")
-df_nulls:col("x"):set_null(2)           -- linha 2 tem null em x
-df_nulls:col("y"):set_null(4)           -- linha 4 tem null em y
-df_nulls:col("x"):set_null(5)           -- linha 5 tem null em x e y
-df_nulls:col("y"):set_null(5)
 
 local clean = df_nulls:dropna()
 check(clean:nrows() == 2,                "dropna: remove linhas com null (sobram 2)")
@@ -139,19 +141,16 @@ check(all:nrows() == df:nrows(),        "dropna sem nulls: nrows igual")
 
 -- dropna em dataset todo-null: retorna vazio
 local df_all_null = smaug.dataset({
-    {"z", Series.from_table({1, 2}, "float64")},
+    {"z", Series.from_table({NA, NA}, "float64")},
 }, "allnull")
-df_all_null:col("z"):set_null(1)
-df_all_null:col("z"):set_null(2)
 local empty = df_all_null:dropna()
 check(empty:nrows() == 0,               "dropna todo-null: dataset vazio")
 
 -- dropna no sort_by (resolve a promessa do erro 'use dropna primeiro')
 local df_sort = smaug.dataset({
-    {"val",   Series.from_table({3, 1, 2}, "float64")},
+    {"val",   Series.from_table({3, NA, 2}, "float64")},   -- null na linha 2
     {"label", Series.from_table({1, 2, 3}, "int64")},
 }, "sorttest")
-df_sort:col("val"):set_null(2)         -- null na linha 2
 local df_clean = df_sort:dropna()
 local df_sorted = df_clean:sort_by("val")
 check(df_sorted:col("val"):get(1) == 2.0, "dropna + sort_by: primeiro = 2.0")
@@ -185,14 +184,14 @@ local base_sel = smaug.dataset({
     {"b", Series.from_table({4, 5, 6}, "float64")},
 }, "sel_indep")
 local proj = base_sel:select({"a"})
-base_sel:col("a"):set(1, 111.0)                 -- muta o ORIGINAL
+-- muta o ORIGINAL de forma intencional (update_column); derivado não acompanha
+base_sel:update_column("a", Series.from_table({111.0, 2, 3}, "float64"))
 check(proj:col("a"):get(1) == 1.0, "select: mutar original não afeta o derivado")
 
 -- ---- dropna(): subset vazio -> mantém todas as linhas ----
 local dn_base = smaug.dataset({
-    {"x", Series.from_table({1, 2, 3}, "float64")},
+    {"x", Series.from_table({1, NA, 3}, "float64")},   -- null na linha 2 desde a criação
 }, "dn_empty_subset")
-dn_base:col("x"):set_null(2)
 local kept = dn_base:dropna({})
 check(kept:nrows() == 3, "dropna({}) mantém todas as linhas (subset vazio)")
 
@@ -206,22 +205,12 @@ check(not pcall(function() return dn_base:dropna({"zzz"}) end),
 
 -- ---- dropna(): resultado independente do original ----
 local dn_indep = smaug.dataset({
-    {"v", Series.from_table({10, 20, 30}, "float64")},
+    {"v", Series.from_table({10, NA, 30}, "float64")},   -- null na linha 2 desde a criação
 }, "dn_indep")
-dn_indep:col("v"):set_null(2)                   -- linha 2 vira null
 local dn_clean = dn_indep:dropna()              -- sobram linhas 1 e 3
 check(dn_clean:nrows() == 2, "dropna independência: sobram 2 linhas")
-dn_clean:col("v"):set(1, 999.0)                 -- muta o derivado
-check(dn_indep:col("v"):get(1) == 10.0, "dropna: derivado independente do original")
-
--- ---- dropna(): resultado independente do original ----
-local dn_indep = smaug.dataset({
-    {"v", Series.from_table({10, 20, 30}, "float64")},
-}, "dn_indep")
-dn_indep:col("v"):set_null(2)                   -- linha 2 vira null
-local dn_clean = dn_indep:dropna()              -- sobram linhas 1 e 3
-check(dn_clean:nrows() == 2, "dropna independência: sobram 2 linhas")
-dn_clean:col("v"):set(1, 999.0)                 -- muta o derivado
+-- mutar o derivado (via update_column) não toca o original
+dn_clean:update_column("v", Series.from_table({999.0, 30}, "float64"))
 check(dn_indep:col("v"):get(1) == 10.0, "dropna: derivado independente do original")
 
 -- =====================================================================
@@ -718,13 +707,49 @@ do
     local cp = df:clone()
     check(#cp:to_dict().a == 2 and cp:column("a"):get(1) == 1, "6.5 clone: valores copiados")
     check(table.concat(cp._col_names, ",") == "a,b", "6.5 clone: nomes e ordem preservados")
-    -- cópia PROFUNDA: mutar o clone não afeta o original
-    cp:column("a"):set(1, 99)
+    -- cópia PROFUNDA: mutar o clone (via update_column) não afeta o original
+    cp:update_column("a", Series.from_table({99, 2}, "int64"))
     check(df:column("a"):get(1) == 1, "6.5 clone: profundo (original intacto)")
     check(cp:column("a"):get(1) == 99, "6.5 clone: mutação isolada no clone")
     -- DataSet vazio
     check(smaug.DataSet.new("vazio"):clone():ncols() == 0, "6.5 clone: DataSet vazio")
 end
 
+
+-- ================================================================
+-- 9.2 — Contrato de fronteira: column()/col() protege o frame (E2 morto)
+-- ================================================================
+do
+    local df = smaug.DataSet({
+        {"num", {10, 20, 30}, "float64"},
+        {"cnt", {1, 2, 3}, "int64"},
+        {"txt", {"a", "b", "c"}, "string"},
+    })
+    -- set numa coluna extraída NÃO propaga para o frame (view COW)
+    df:col("num"):set(1, 999.0)
+    check(df:col("num"):get(1) == 10.0, "9.2 float64: col() protege o frame")
+    df:col("cnt"):set(1, 999)
+    check(df:col("cnt"):get(1) == 1,    "9.2 int64: col() protege o frame")
+    df:col("txt"):set(1, "ZZZ")
+    check(df:col("txt"):get(1) == "a",  "9.2 string: col() protege o frame")
+
+    -- set_null e append também não propagam
+    df:col("num"):set_null(2)
+    check(df:col("num"):get(2) == 20.0, "9.2 float64: set_null em col() não propaga")
+    local before = df:nrows()
+    df:col("num"):append(77.0)
+    check(df:nrows() == before,         "9.2: append em col() não altera nrows do frame")
+
+    -- a view reflete a própria mutação (só o frame é que fica intacto)
+    local c = df:col("num")
+    c:set(1, 555.0)
+    check(c:get(1) == 555.0,            "9.2: a view extraída vê a própria escrita")
+    check(df:col("num"):get(1) == 10.0, "9.2: mas o frame permanece intacto")
+
+    -- categorical: protegido via clone (não tem view)
+    local dfc = smaug.DataSet({{"cat", {"x", "y", "x"}, "categorical"}})
+    local extracted = dfc:col("cat")
+    check(extracted ~= nil,             "9.2 categorical: col() retorna cópia protegida")
+end
 
 print(string.format("OK — %d checks passaram (DataSet: core, ops, rename, pivot_table, stack, unstack, explode)", n_ok))

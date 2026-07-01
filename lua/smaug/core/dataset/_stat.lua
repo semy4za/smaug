@@ -325,7 +325,7 @@ return function(I)
     Rolling.__index = Rolling
 
     local function ds_roll(self, col_name)
-        local r = self._ds:column(col_name):rolling(self._window)
+        local r = self._ds:_raw_column(col_name):rolling(self._window)
         if self._min_periods then r = r:min_periods(self._min_periods) end
         return r
     end
