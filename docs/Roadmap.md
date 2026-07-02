@@ -411,8 +411,11 @@ espontânea; são decisões de contrato com aresta, que precisam estar resolvida
 Mesma tese do item 7 (completude do motor), agora para **transformações
 element-wise**. A exploração de 2026-06-30 mapeou operações que fazem o loop em
 Lua cruzando FFI por elemento, quando o padrão correto (delegar ao descritor → C)
-já existe e é seguido em toda a aritmética (o `binop` é exemplar). Não são bugs —
-são assimetrias de vetorização (performance): 1 travessia FFI por linha vs 1 total.
+já existe e é seguido em toda a aritmética (o `binop` é exemplar). Em 10.1–10.5
+não são bugs — são assimetrias de vetorização (performance): 1 travessia FFI por
+linha vs 1 total. Em 10.6–10.7 a assimetria vem com defeito de correção: o loop
+Lua round-tripa por `get()`/`tonumber()`, corrompendo int64 acima de 2^53 no que
+escreve (mesma natureza da Sub-A do 9.1, reintroduzida na reconstrução).
 
 > **Meta-decisão:** levar ao Anel 0 o que o projeto já sabe fazer (o `binop`
 > prova o padrão). Onde a primitiva escalar já existe mas falta a vetorizada,
@@ -440,6 +443,26 @@ são assimetrias de vetorização (performance): 1 travessia FFI por linha vs 1 
   arbitrários incl. string/datetime em C é trabalho real). Levantar escopo e
   decisões antes de cravar. Vínculo: item 12.4 (categorical hash — a ponta já
   registrada).
+- 10.6 **`fillna` → primitiva C** (achado 2026-07-02). Reconstrói via loop
+  `get→set` por elemento (`access/_transform.lua`) — além da travessia FFI por
+  linha, o round-trip por `tonumber()` **corrompe int64 > 2^53** no que grava na
+  série nova (o `check_value` do 9.1 avisa por elemento — ruidoso, mas o dado sai
+  errado). Datetime fora do raio (epoch_ms ≪ 2^53). Criar primitiva de série por
+  dtype; a Lua delega.
+- 10.7 **`astype` — faixas int64** (achado 2026-07-02, mesma natureza do 10.6).
+  O loop geral do `astype` também round-tripa por `get()`: conversão de/para
+  int64 com valores > 2^53 grava corrompido. Decidir na abertura do item, com o
+  fonte na mesa: (a) vetorizar a matriz src×dst completa em C, ou (b) somente as
+  faixas que tocam int64. Fora do raio (delegam ao C): `take`/`filter`/`view`.
+- 10.8 **`BoolSeries` — coerência de caminho com o Anel 0** (achado 2026-07-02) —
+  **precisa de bloco de design próprio antes de executar**. No mesmo arquivo,
+  `count_true`/`any`/`all` delegam ao C, mas `describe` reconta nulos/trues em
+  loop Lua (podia usar `count_true`) e `filter`/`dropna`/`fillna`/`argsort` fazem
+  loop por elemento — sendo que `C.smaug_bool_argsort` existe e está registrado
+  no descritor de `Series<bool>`. Mesma categoria de operação, dois caminhos,
+  dependendo de qual representação bool devolveu o objeto. Questão arquitetural
+  a resolver primeiro: o BoolSeries (par de arrays crus) delega às mesmas
+  primitivas C, ou passa a encapsular o struct como `Series<bool>`?
 
 ## 11. Ergonomia REPL  [Windows]
 
@@ -451,6 +474,11 @@ tiver.
 - 11.2 proxies `__tostring` (StrProxy, .dt, .at, .cat, Rolling, Expanding, GroupBy)
 - 11.3 estabelecer invariante "objeto exposto → `__tostring`" + eixo de auditoria no
   parity que o guarda
+- 11.4 exibição de int64 > 2^53: `to_string`/`to_markdown` formatam via
+  `cell_str(get(i))` — o número impresso não é o armazenado, sem sinal ("acerto
+  adivinhado" impresso). O dado no buffer C está íntegro; defeito só de
+  apresentação. Decidir formato: dígitos exatos (via `get_raw`), sufixo `LL`
+  como marcador honesto de int64, ou aviso ao exibir acima do limite.
 
 ## 12. Achados menores + débitos antigos  [Windows+Fedora]
 
@@ -510,6 +538,11 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
   erro cru do Lua (`attempt to call method ... (nil)`). Polish: sugerir "você quis
   dizer groupby?" no `__index` quando o método não existe. Não é defeito; melhora
   a descoberta.
+- 12.13 **documentação prometida pelo 9.1 incompleta** — [Windows]. A limitação
+  do `get()` (`tonumber`, perda > 2^53) e a faixa correta `get_raw` estão
+  registradas só no API_INDEX; API_Reference e CONTRACT silenciosos. Completar,
+  incluindo a herança nos consumidores do `get()` — em especial `map` (a função
+  do usuário recebe double, série armazenada intacta).
 
 ## 13. Reescrita de exemplos + docstrings  [Windows]
 

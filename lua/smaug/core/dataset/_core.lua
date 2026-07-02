@@ -193,7 +193,7 @@ return function(I)
         if type(names) ~= "table" then error("smaug: select espera uma tabela de nomes", 2) end
         local df = DataSet.new(self._name)
         for _, n in ipairs(names) do
-            df:add_column(n, self:column(n):clone())
+            df:add_column(n, self:_raw_column(n):clone())
         end
         return df
     end
@@ -326,14 +326,14 @@ return function(I)
                 if cname == name then
                     result:add_column(name, col)
                 else
-                    result:add_column(cname, self:column(cname):clone())
+                    result:add_column(cname, self:_raw_column(cname):clone())
                 end
             end
             return result
         end
         local result = DataSet.new(self._name)
         for _, cname in ipairs(self._col_names) do
-            result:add_column(cname, self:column(cname):clone())
+            result:add_column(cname, self:_raw_column(cname):clone())
         end
         result:add_column(name, col)
         return result
@@ -362,7 +362,7 @@ return function(I)
         local result = DataSet.new(self._name)
         for _, cname in ipairs(self._col_names) do
             local new_name = mapping[cname] or cname
-            result:add_column(new_name, self:column(cname):clone())
+            result:add_column(new_name, self:_raw_column(cname):clone())
         end
         return result
     end

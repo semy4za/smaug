@@ -101,7 +101,7 @@ void smaug_str_free(smaug_series_str_t *s) {
         free(s->buffer);
         free(s->null_mask);
     }
-    if (s->offsets_owned) {
+    if (s->offsets_owned) {   /* COV-EXCL-BR: offsets_owned=false nao existe na API atual; o campo separa a posse do offsets da do buffer (modelo A1, smaug_types.h) — sem ele o free inferiria posse por acoplamento external_alloc+is_view */
         free(s->offsets);
     }
     free(s);   /* o struct em si sempre é heap-allocated */

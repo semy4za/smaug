@@ -5,6 +5,49 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-02 — 9.2: fechamento de cobertura do C novo (pré-selo)
+
+Checkup pós-9.2 rodou o `--all` em Linux (container, pré-checagem — Fedora
+segue autoritativo) e encontrou o que o selo existe para encontrar:
+`smaug_str.c` com 100% de linha mas **4 ramos descobertos, todos no código
+novo do 9.2**. gcov com `-b` identificou as direções exatas:
+
+- **Guard da view (l.115):** nenhuma das 3 sub-condições jamais disparou —
+  não existia teste de entrada inválida para `smaug_str_view` (o
+  `test_cow_oob_does_not_detach` é só f64). Novo
+  `test_str_view_invalid_inputs`: NULL, `start > size`, `len > size-start`,
+  borda inválida `start==size, len>0` e a borda VÁLIDA `start==size, len==0`
+  (janela vazia no fim — prova que o guard overflow-safe aceita o mesmo
+  contrato do f64). Pai intacto após as recusas.
+- **Detach de janela toda-vazia (l.306/312):** `byte_count==0` com `size>0`
+  (todas as strings `""`) nunca ocorria — caso distinto do
+  `test_str_empty_view` (`size==0`). Novo `test_str_detach_all_empty_window`:
+  bufcap cai no fallback `SMAUG_STR_BUFFER_INIT`, memcpy pulado, série
+  destacada coerente e mutável, `""` ≠ NULL preservado, pai intacto.
+- **`offsets_owned` false (l.104):** estruturalmente inalcançável — o campo é
+  atribuído `true` nos 3 pontos (create/view/detach) e nunca `false`.
+  Decisão: `COV-EXCL-BR`, com justificativa de posse, não de "porta futura":
+  o campo paga seu custo hoje porque torna o `free` correto por semântica
+  (A1) — sem ele, a posse do offsets seria inferida por acoplamento
+  `external_alloc`+`is_view`.
+
+Allocfail NÃO estendido (decisão registrada): o trio de OOM do detach já é
+varrido pelo harness; o ramo distinto era só o `byte_count==0`.
+
+**Resultado:** `smaug_str.c` 100% linha / 100% branch-alvo; test_cow 263→279.
+Validado: Linux container (Valgrind 0-errors nos 12 binários, 18/18 Lua,
+parity 12/12) + Windows (suítes idênticas). **Selo [Fedora] pendente** —
+`--all` no Fedora fecha o 9.2 oficialmente.
+
+**Auditoria Lua (mesma sessão):** disciplina de erro, warn e helpers de NA
+limpos. Fix aplicado: 4 call-sites internos migrados para `_raw_column()`
+(`dataset/_core.lua` — select/insert/rename; fecha os retardatários do 9.2).
+Achados registrados na estrada: 10.6 (`fillna` corrompe i64 > 2^53 via
+round-trip `get`), 10.7 (`astype`, mesma natureza), 10.8 (`BoolSeries` —
+coerência de caminho, design prévio), 11.4 (exibição de i64 > 2^53) e 12.13
+(doc do 9.1 incompleta). Datetime fora do raio (epoch_ms).
+
+---
 ## 2026-07-01 — Item 9: Contratos de fronteira (9.1 int64 > 2^53 + 9.2 column COW / view de string)
 
 Fechou os dois contratos de fronteira do item 9. O fio condutor: quem é dono do

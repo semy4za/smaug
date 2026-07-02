@@ -598,6 +598,47 @@ static void test_str_second_write_no_redetach(void) {
     smaug_str_free(pai);
 }
 
+/* guard da view: entradas inválidas retornam NULL; pai intacto.
+   Cobre as 3 sub-condições (linha a linha do guard) + a borda VÁLIDA
+   start==size com len==0 (janela vazia no fim — offsets[size] existe). */
+static void test_str_view_invalid_inputs(void) {
+    smaug_series_str_t *pai = make_str5();
+    assert(smaug_str_view(NULL, 0, 0) == NULL);   /* !s                    */
+    assert(smaug_str_view(pai, 6, 0) == NULL);    /* start > size          */
+    assert(smaug_str_view(pai, 2, 4) == NULL);    /* len > size - start    */
+    assert(smaug_str_view(pai, 5, 1) == NULL);    /* borda: start==size, len>0 */
+    smaug_series_str_t *v = smaug_str_view(pai, 5, 0);  /* borda válida */
+    assert(v && v->size == 0);
+    smaug_str_free(v);
+    /* pai intacto após as recusas */
+    assert(pai->size == 5 && seq(pai, 0, "SP") && seq(pai, 4, "CE"));
+    smaug_str_free(pai);
+}
+
+/* detach com byte_count==0 e size>0: janela onde TODAS as strings são "".
+   bufcap cai no fallback SMAUG_STR_BUFFER_INIT e o memcpy do buffer é
+   pulado. A série destacada deve ser coerente, mutável, e preservar
+   "" ≠ NULL. Pai intacto. */
+static void test_str_detach_all_empty_window(void) {
+    const char *const arr[] = {"", "", "", "X"};
+    smaug_series_str_t *pai = smaug_str_create_from_array(arr, 4);
+    assert(pai);
+    smaug_series_str_t *v = smaug_str_view(pai, 0, 3);  /* ["","",""], 0 bytes */
+    assert(v && v->size == 3);
+    assert(seq(v, 0, "") && seq(v, 1, "") && seq(v, 2, ""));  /* "" ≠ NULL na view */
+
+    assert(smaug_str_set(v, 1, "NOVO", 4) == SMG_OK);   /* dispara o detach */
+    assert(v->meta.is_view == false);
+    assert(v->meta.external_alloc == false);
+    assert(v->offsets_owned == true);
+    assert(seq(v, 0, "") && seq(v, 1, "NOVO") && seq(v, 2, ""));
+
+    /* pai integralmente intacto */
+    assert(seq(pai, 0, "") && seq(pai, 1, "") && seq(pai, 2, "") && seq(pai, 3, "X"));
+    smaug_str_free(v);
+    smaug_str_free(pai);
+}
+
 int main(void) {
     test_f64_set_detaches_view();
     test_f64_set_null_detaches_view();
@@ -624,6 +665,8 @@ int main(void) {
     test_str_view_outlives_parent();
     test_str_empty_view();
     test_str_second_write_no_redetach();
+    test_str_view_invalid_inputs();
+    test_str_detach_all_empty_window();
 
     printf("PASS: COW (%d checks)\n", n_checks);
     return 0;

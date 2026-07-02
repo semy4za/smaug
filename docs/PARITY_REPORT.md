@@ -11,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-07-01 18:16:12 UTC
+Gerado em: 2026-07-02 14:23:40 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -749,7 +749,7 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 | categoria | total | documentados | faltam | % | detalhe |
 | :--- | :-: | :-: | :-: | :-: | :-: |
-| `Series.methods` | 100 | 99 | 1 | 99% | 🟨 faltam: get_raw |
+| `Series.methods` | 100 | 100 | 0 | 100% | 🟩 completo |
 | `DataSet.methods` | 78 | 77 | 1 | 99% | 🟩 completo |
 | `GroupBy:*` | 15 | 15 | 0 | 100% | 🟩 completo |
 | `CategoricalSeries:*` | 42 | 42 | 0 | 100% | 🟩 completo |
@@ -764,9 +764,9 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 972
+- 🟩 paridade: 973
 - ⬜ exceção registrada: 215
-- 🟨 suspeita (revisar): 271
+- 🟨 suspeita (revisar): 270
 - 🟥 inconsistência clara: 12
 
 
