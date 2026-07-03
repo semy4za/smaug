@@ -3,9 +3,9 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `978255c`  |  Data: 2026-06-30 14:46:01 -0300
+- Commit medido: `b8a44ed`  |  Data: 2026-07-02 15:19:59 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `3621/3941 = 91.88%` -- 97 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- **Branch-bruto** (todos os ramos): `3660/3979 = 91.98%` -- 96 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 | Arquivo | Linhas | Branch-alvo (taken) |
@@ -14,13 +14,13 @@
 | `smaug_ops_f64.c` | `463/463 = 100.00%` `[██████████]` | `463/464 = 99.78%` `[██████████]` |
 | `smaug_ops_i64.c` | `451/454 = 99.34%` `[█████████░]` | `456/466 = 97.85%` `[█████████░]` |
 | `smaug_ops_bool.c` | `305/311 = 98.07%` `[█████████░]` | `373/400 = 93.25%` `[█████████░]` |
-| `smaug_str.c` | `164/164 = 100.00%` `[██████████]` | `134/134 = 100.00%` `[██████████]` |
+| `smaug_str.c` | `225/225 = 100.00%` `[██████████]` | `173/173 = 100.00%` `[██████████]` |
 | `smaug_ops_str.c` | `250/255 = 98.04%` `[█████████░]` | `266/283 = 93.99%` `[█████████░]` |
 | `smaug_csv.c` | `304/312 = 97.44%` `[█████████░]` | `349/387 = 90.18%` `[█████████░]` |
 | `smaug_json.c` | `347/360 = 96.39%` `[█████████░]` | `414/461 = 89.80%` `[█████████░]` |
 | `smaug_datetime.c` | `511/517 = 98.84%` `[█████████░]` | `532/580 = 91.72%` `[█████████░]` |
 | `smaug_ops_window.c` | `329/334 = 98.50%` `[█████████░]` | `344/379 = 90.77%` `[█████████░]` |
-| **TOTAL** | `3526/3572 = 98.71%` `[█████████░]` | `3621/3844 = 94.20%` `[█████████░]` |
+| **TOTAL** | `3587/3633 = 98.73%` `[█████████░]` | `3660/3883 = 94.26%` `[█████████░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
@@ -231,14 +231,13 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_ops_bool.c:48` — at&&bt sempre true aqui (linhas 45/47 ja garantiram ambos validos-nao-false)
 - `smaug_ops_bool.c:48` — at&&bt sempre true aqui (linhas 45/47 ja garantiram ambos validos-nao-false)
 - `smaug_ops_bool.c:158` — m sempre fornecido pelas Kleene raw (out_mask != NULL); ramo :SMAUG_MASK_VALID defensivo, uso interno controlado
-- `smaug_str.c:95` — external_alloc=true inalcancavel via API publica; usado apenas internamente
-- `smaug_str.c:124` — total ~ SIZE_MAX; inalcancavel
-- `smaug_str.c:185` — overflow na soma buffer_len+extra; so com buffer_len ~ SIZE_MAX
-- `smaug_str.c:187` — buffer_capacity==0 inalcancavel via API publica (create garante bufcap>=INIT)
-- `smaug_str.c:205` — overflow ao dobrar capacity; so com capacity ~ SIZE_MAX
-- `smaug_str.c:218` — realloc de shrink falhando; defensivo
-- `smaug_str.c:250` — len==0 inalcancavel aqui (bloco len>old_len implica len>0)
-- `smaug_str.c:290` — rc sempre SMG_OK neste ponto (validacao acima ja garante)
+- `smaug_str.c:104` — offsets_owned=false nao existe na API atual; o campo separa a posse do offsets da do buffer (modelo A1, smaug_types.h) — sem ele o free inferiria posse por acoplamento external_alloc+is_view
+- `smaug_str.c:164` — total ~ SIZE_MAX; inalcancavel
+- `smaug_str.c:225` — overflow na soma buffer_len+extra; so com buffer_len ~ SIZE_MAX
+- `smaug_str.c:227` — buffer_capacity==0 inalcancavel via API publica (create garante bufcap>=INIT)
+- `smaug_str.c:245` — overflow ao dobrar capacity; so com capacity ~ SIZE_MAX
+- `smaug_str.c:258` — realloc de shrink falhando; defensivo
+- `smaug_str.c:353` — len==0 inalcancavel aqui (bloco len>old_len implica len>0)
 - `smaug_ops_str.c:81` — mode e enum interno (LT/GT/LE/GE aqui); case default inalcancavel
 - `smaug_ops_str.c:222` — ia==ib inalcancavel (indices sempre unicos no argsort)
 - `smaug_csv.c:37` — falha de syscall não simulável sem mock

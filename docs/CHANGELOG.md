@@ -36,8 +36,9 @@ varrido pelo harness; o ramo distinto era só o `byte_count==0`.
 
 **Resultado:** `smaug_str.c` 100% linha / 100% branch-alvo; test_cow 263→279.
 Validado: Linux container (Valgrind 0-errors nos 12 binários, 18/18 Lua,
-parity 12/12) + Windows (suítes idênticas). **Selo [Fedora] pendente** —
-`--all` no Fedora fecha o 9.2 oficialmente.
+parity 12/12) + Windows (suítes idênticas). **Selo [Fedora] obtido
+(2026-07-02):** `--all` verde — Valgrind 0-errors, `smaug_str.c` 100/100,
+test_cow 279. 9.2 fechado.
 
 **Auditoria Lua (mesma sessão):** disciplina de erro, warn e helpers de NA
 limpos. Fix aplicado: 4 call-sites internos migrados para `_raw_column()`

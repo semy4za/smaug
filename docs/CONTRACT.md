@@ -136,12 +136,13 @@ local ds = smaug.DataSet(payload)
 
 print(ds:filter(ds["ativo"]):nrows())
 ds["ativo"] = ds["ativo"]:lnot()
-print(ds["ativo"]:describe())
+local d = ds["ativo"]:describe()
+print(d.count, d.nulls, d.count_true, d.count_false)
 ```
 
 ```
 2
-{count=3, nulls=0, true=1, false=2}
+3	0	1	2
 ```
 
 Toda coluna aceita pelo DataSet funciona em toda a API do DataSet. O dtype

@@ -330,7 +330,7 @@ duplicação, fonte única no C.
 > C estendido + min_periods + Series delega (8.1, 8.2, 8.4); expanding no C
 > (8.3); DataSet delega (8.5).
 
-## 9. Contratos de fronteira  [Fedora]
+## 9. Contratos de fronteira  [Fedora]  [Done]
 
 Dois achados da exploração de 2026-06-30 sobre o que a lib **promete ao usuário na
 borda** — precisão de dados e posse de dados. Não são bugs de corrupção
@@ -395,7 +395,7 @@ espontânea; são decisões de contrato com aresta, que precisam estar resolvida
     interno (relacional, csv, stat — ~40 call-sites) migrado para `_raw_column`
     (referência crua explícita). Mutação intencional de coluna é via
     `update_column`, não mais pelo aliasing.
-  - **[Done — 9.2 completo]** C: struct + view + detach; FFI cdef sincronizado
+  - **[Done — 9.2 completo, selado Fedora 2026-07-02]** C: struct + view + detach; FFI cdef sincronizado
     (layout binário); `_types.lua` liga view; `column()`/`_raw_column` em
     `dataset/_core.lua`; testes de proteção E2 (test_core, +8) e de string view
     (test_cow +70, allocfail +70). Testes que dependiam do aliasing E2 migrados
