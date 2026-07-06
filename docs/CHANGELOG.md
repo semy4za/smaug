@@ -5,6 +5,43 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-05 — 10.6/10.7 Passo A (degrau): corrupção silenciosa → falha visível
+
+Antes de vetorizar `fillna`/`astype` ao Anel 0, um degrau paliativo que troca
+acerto-adivinhado por falha visível.
+
+Achado que refina o Roadmap (10.6, l.449): a corrupção de int64 > 2^53 no
+round-trip `get()`→`double` tem **dois regimes**, não um. Muito acima de 2^53
+dispara o warn do 9.1 por elemento (ruidoso, grava errado) — esse já era
+conhecido. Mas na fronteira (logo acima de 2^53, que o `double` arredonda de
+volta a exatamente 2^53) grava em **silêncio total**: o `number` arredondado
+passa no guard do 9.1 (`> 2^53` é falso para `== 2^53`) e entra sem aviso. Pior
+caso de falha-invisível, não registrado antes. Provado com `2^53+1` (silencioso)
+vs `2^60+7` (avisa).
+
+Guarda única `check_int64_lossless` (`_core.lua`, ao lado do `check_value`):
+reusa o `INT64_MAX_MAG` (2^53) do 9.1 — **fronteira única**, sem segundo
+critério. Lê o valor cru (`cdata int64_t`, sem `tonumber`) só para comparar
+magnitude — detecção, não conversão. `fillna` e `astype` delegam; nenhuma regra
+de fronteira nova nasce nos call-sites (anti-redundância).
+
+Seletividade por par no `astype`: recusa só onde `double` perde **e** importa —
+`int64→int64` e `int64→string`. `int64→float64` **não** recusa (o `double` é o
+destino correto; a matriz empírica provou que atravessar `double` nem sempre é
+erro); `int64→bool` tampouco (0/1).
+
+Paliativo por construção: não vetoriza, não move nada ao Anel 0, não reescreve
+loop nem matriz. Sai quando o Passo B (Anel 0) entrar — junto com os testes que
+hoje esperam recusa, que passarão a esperar sucesso com valor exato. Desparidade
+registrada e **não** consertada aqui: `fillna` rejeita `value` cdata (validação
+divergente do `check_value`) — morre no Passo B ao delegar.
+
+Testes: +2 em `fillna` (`test_access`, visíveis 34→36) e +5 em `astype`
+(`test_constructors`, contagem mascarada pelo 12.7 — os checks rodam e passam,
+o headline subconta). Suíte verde, parity 12/12, selo [Fedora] 2026-07-05
+(Valgrind 0-errors nos 12 binários; coverage inalterado — nenhuma linha C nova).
+
+---
 ## 2026-07-02 — 9.2: fechamento de cobertura do C novo (pré-selo)
 
 Checkup pós-9.2 rodou o `--all` em Linux (container, pré-checagem — Fedora

@@ -446,14 +446,29 @@ escreve (mesma natureza da Sub-A do 9.1, reintroduzida na reconstrução).
 - 10.6 **`fillna` → primitiva C** (achado 2026-07-02). Reconstrói via loop
   `get→set` por elemento (`access/_transform.lua`) — além da travessia FFI por
   linha, o round-trip por `tonumber()` **corrompe int64 > 2^53** no que grava na
-  série nova (o `check_value` do 9.1 avisa por elemento — ruidoso, mas o dado sai
-  errado). Datetime fora do raio (epoch_ms ≪ 2^53). Criar primitiva de série por
+  série nova. Dois regimes (provados 2026-07-05): muito acima de 2^53 dispara o
+  warn do 9.1 por elemento (ruidoso, mas grava errado); na fronteira (logo acima
+  de 2^53, que o double arredonda de volta a ≤ 2^53) grava em **silêncio total**
+  — pior caso de falha-invisível, não capturado antes. Datetime fora do raio
+  (epoch_ms ≪ 2^53). Criar primitiva de série por
   dtype; a Lua delega.
-- 10.7 **`astype` — faixas int64** (achado 2026-07-02, mesma natureza do 10.6).
-  O loop geral do `astype` também round-tripa por `get()`: conversão de/para
-  int64 com valores > 2^53 grava corrompido. Decidir na abertura do item, com o
-  fonte na mesa: (a) vetorizar a matriz src×dst completa em C, ou (b) somente as
-  faixas que tocam int64. Fora do raio (delegam ao C): `take`/`filter`/`view`.
+- 10.7 **`astype` — matriz `src×dst` no Anel 0** (achado 2026-07-02, mesma
+  natureza do 10.6). O loop geral do `astype` também round-tripa por `get()`:
+  conversão de/para int64 com valores > 2^53 grava corrompido. **Decisão
+  (2026-07-05): matriz `src×dst` completa em C**, não só as faixas int64 — a
+  opção parcial deixaria o `astype` com dois caminhos para a mesma operação
+  (metade C, metade Lua), a desparidade que o item existe para eliminar.
+  Condição de fechamento: paridade provada contra o comportamento Lua atual
+  (rigidez bool 0/1, tolerância string→num/datetime, `dayfirst`), que hoje é o
+  oráculo. Fora do raio (delegam ao C): `take`/`filter`/`view`.
+  - **Passo A — degrau (selo [Fedora] 2026-07-05):** guarda única
+    `check_int64_lossless` (`_core.lua`, ao lado do `check_value`, fronteira
+    única do 9.1) troca corrupção silenciosa por falha visível. `fillna` e
+    `astype` (`int64→{int64,string}`) recusam > 2^53; `int64→float64` e
+    `int64→bool` seguem OK (double é o destino correto / 0-1). Paliativo — sai
+    quando o Anel 0 (Passo B) entrar. Testes: +2 `fillna`, +5 `astype`.
+    Desparidade registrada e não consertada aqui: `fillna` rejeita `value`
+    cdata (validação divergente do `check_value`) — morre no Passo B ao delegar.
 - 10.8 **`BoolSeries` — coerência de caminho com o Anel 0** (achado 2026-07-02) —
   **precisa de bloco de design próprio antes de executar**. No mesmo arquivo,
   `count_true`/`any`/`all` delegam ao C, mas `describe` reconta nulos/trues em
@@ -479,6 +494,16 @@ tiver.
   adivinhado" impresso). O dado no buffer C está íntegro; defeito só de
   apresentação. Decidir formato: dígitos exatos (via `get_raw`), sufixo `LL`
   como marcador honesto de int64, ou aviso ao exibir acima do limite.
+- 11.5 **`pad`/`cell_str` duplicados com formatação divergente** (achado
+  2026-07-05). `pad` definido 5× (2 em `access/_transform.lua`, 1 em
+  `dataset/_core.lua`, 2 em `dataset/_io_support.lua`) com lógica idêntica —
+  redundância pura. `cell_str` definido 2× **divergentes**: Series
+  (`_transform.lua:146`) usa `tostring` (14 díg. significativos); DataSet
+  (`_core.lua:392`) usa `%.4g`. Mesmo float impresso diferente conforme o
+  contêiner — provado: `3.14159265358979` sai `3.1415926535898` na Series e
+  `3.142` no DataSet. Consolidar numa fonte única de formatação de célula
+  (`I.cell_str` do DataSet já é exportado — candidato a canônico). Vínculo:
+  11.4, que consome `cell_str(get(i))`.
 
 ## 12. Achados menores + débitos antigos  [Windows+Fedora]
 
@@ -543,6 +568,19 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
   registradas só no API_INDEX; API_Reference e CONTRACT silenciosos. Completar,
   incluindo a herança nos consumidores do `get()` — em especial `map` (a função
   do usuário recebe double, série armazenada intacta).
+- 12.14 **`GroupBy:quantile` duplica a interpolação canônica** — [Windows]
+  (achado 2026-07-05). `_relational.lua:551` reimplementa linha a linha a
+  fórmula de `I.quantile_sorted` (`stats/_stat.lua:93-102`, já exposta em `I`)
+  em vez de delegar. Se a regra de interpolação mudar num lugar, diverge. De
+  quebra: `col:get(i)` em loop + `table.sort` em Lua (element-wise no Anel 1).
+  Delegar a `I.quantile_sorted`.
+- 12.15 **`CategoricalSeries:get` aceita índice não-inteiro em silêncio** —
+  [Windows] (achado 2026-07-05). O guard (`categorical/_categorical.lua`) checa
+  tipo e faixa mas **não** inteiro (falta `i % 1 ~= 0`), divergindo do
+  `check_index` canônico da Series. Provado: `get(1.5)` → `nil` silencioso, onde
+  `Series:get(1.5)` erra (viola falha-visível). O mesmo guard está repetido 3×
+  (get/is_null/set) — delegar ao `check_index` canônico corrige os três de uma
+  vez.
 
 ## 13. Reescrita de exemplos + docstrings  [Windows]
 
