@@ -2,7 +2,8 @@
 --
 -- Transformações elementares: sort, view, take, astype, fillna, map, abs, round, clip.
 -- Recebe I com: I.methods, I.Series, I.wrap, I.DTYPES, I.ffi, I.C,
---               I.NA, I.is_na, I.is_nan, I.infer_dtype_from_value
+--               I.NA, I.is_na, I.is_nan, I.infer_dtype_from_value,
+--               I.check_int64_lossless
 -- Contribui: methods.sort, argsort, view, take, dropna, head, tail,
 --            to_table, astype, fillna, map, abs, round, clip
 
@@ -16,6 +17,7 @@ return function(I)
     local NA      = I.NA
     local is_na   = I.is_na
     local is_nan  = I.is_nan
+    local check_int64_lossless = I.check_int64_lossless   -- degrau 10.6/10.7
 
     -- =====================================================================
     -- Ordenação
@@ -225,8 +227,14 @@ return function(I)
         local n   = self:len()
         local out = Series.new(dtype, n, name or self._name)
 
+        -- degrau 10.7: so os pares onde double perde e importa. int64->float64
+        -- NAO entra (double e o destino correto); int64->bool tambem nao (0/1).
+        local guard_int64 = (src == "int64") and (dtype == "int64" or dtype == "string")
         for i = 1, n do
             local v = self:get(i)
+            if v ~= nil and guard_int64 then
+                check_int64_lossless(self, i, "astype('" .. dtype .. "')")
+            end
             if v == nil then
                 out:set_null(i)
             elseif src == "datetime" and dtype ~= "datetime" then
@@ -340,6 +348,7 @@ return function(I)
             if self:is_null(i) then
                 out:set(i, value)
             else
+                check_int64_lossless(self, i, "fillna")   -- degrau 10.6
                 out:set(i, self:get(i))
             end
         end

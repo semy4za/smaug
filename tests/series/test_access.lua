@@ -341,5 +341,22 @@ do
     check(select(2, md:gsub("\n", "\n")) == 3, "6.3 to_markdown: 4 linhas (header+sep+2 dados)")
 end
 
+-- =====================================================================
+-- Degrau 10.6: fillna em int64 > 2^53 falha VISIVEL (a copia dos nao-nulos
+-- via get()->double corromperia). <= 2^53 e outros dtypes: intactos.
+-- =====================================================================
+do
+    local ffi = require("ffi")
+    local s = S.new("int64", 2, "big")
+    s:set_null(1)
+    s:set(2, ffi.new("int64_t", 9007199254740993LL))   -- 2^53 + 1
+    check_err(function() return s:fillna(0) end,
+              "10.6: fillna i64 > 2^53 recusa (falha visivel)")
+    local sp = S.new("int64", 2, "p")
+    sp:set_null(1); sp:set(2, 42)
+    local fp = sp:fillna(7)
+    check(fp:get(1) == 7 and fp:get(2) == 42, "10.6: fillna i64 <=2^53 intacto (nao-regressao)")
+end
+
 
 print(string.format("OK — %d checks passaram (Series: acesso, edge cases, fillna)", n_ok))

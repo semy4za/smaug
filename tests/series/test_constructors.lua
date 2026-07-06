@@ -589,6 +589,34 @@ do
 end
 
 -- ===================================================================
+-- Degrau 10.7: astype de int64 > 2^53 falha VISIVEL nos pares que
+-- perdem digitos (i64->i64, i64->string). i64->f64 e i64->bool seguem
+-- OK (double e o destino correto; 0/1 cabem sob 2^53).
+-- ===================================================================
+do
+    local ffi = require("ffi")
+    local function mk()
+        local s = S.new("int64", 1, "big")
+        s:set(1, ffi.new("int64_t", 9007199254740993LL))   -- 2^53 + 1
+        return s
+    end
+    check(not pcall(function() return mk():astype("int64")  end),
+          "10.7: astype i64->i64 > 2^53 recusa (falha visivel)")
+    check(not pcall(function() return mk():astype("string") end),
+          "10.7: astype i64->string > 2^53 recusa (falha visivel)")
+    -- pares seguros permanecem funcionando
+    check(mk():astype("float64")._dtype == "float64",
+          "10.7: astype i64->f64 permitido (double e o destino correto)")
+    local sb = S.new("int64", 2, "b")
+    sb:set(1, ffi.new("int64_t", 0LL)); sb:set(2, ffi.new("int64_t", 1LL))
+    local b = sb:astype("bool")
+    check(b:get(1) == false and b:get(2) == true,
+          "10.7: astype i64->bool 0/1 permitido")
+    check(S.from_table({10, 20}, "int64"):astype("int64"):get(1) == 10,
+          "10.7: astype i64->i64 <=2^53 intacto (nao-regressao)")
+end
+
+-- ===================================================================
 -- Sem coerção: set/append em int64 recusam não-inteiro (CODE_REVIEW A7).
 -- astype f64->i64 é a conversão EXPLÍCITA (trunca em direção a zero).
 -- ===================================================================
