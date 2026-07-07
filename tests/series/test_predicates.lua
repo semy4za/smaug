@@ -489,5 +489,19 @@ check(ddl:at(1, "b") == "x",        "DataSet drop a last: última a=1 tem b=x")
 -- Resultado
 -- ================================================================
 
+-- ===================================================================
+-- Degrau família (10.6): combine_first recusa int64 > 2^53.
+-- ===================================================================
+do
+    local ffi = require("ffi")
+    local BIG = ffi.new("int64_t", 9007199254740993LL)
+    local a = S.new("int64", 1, "a"); a:set_null(1)
+    local b = S.new("int64", 1, "b"); b:set(1, BIG)
+    check(not pcall(function() return a:combine_first(b) end), "degrau: combine_first i64>2^53 recusa")
+    local a2 = S.new("int64", 1, "a"); a2:set_null(1)
+    local b2 = S.from_table({42}, "int64")
+    check(a2:combine_first(b2):get(1) == 42, "degrau: combine_first i64<=2^53 intacto")
+end
+
 
 print(string.format("OK — %d checks passaram (Series: predicados, duplicatas, searchsorted, rep_each)", n_ok))

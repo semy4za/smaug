@@ -15,6 +15,7 @@ return function(I)
     local ffi              = I.ffi
     local wrap             = I.wrap
     local NA               = I.NA
+    local check_int64_lossless = I.check_int64_lossless   -- degrau família (10.6)
     local bool_mask_parts  = I.bool_mask_parts
     local bool_series_from_raw = I.bool_series_from_raw
     local kleene_binop     = I.kleene_binop
@@ -116,8 +117,10 @@ return function(I)
         for i = 1, n do
             local c = cond:get(i)
             if c == true then
+                check_int64_lossless(self, i, "where")
                 vals[i] = self:get(i)
             else
+                if is_series_other then check_int64_lossless(other, i, "where") end
                 vals[i] = is_series_other and other:get(i) or (other == nil and NA or other)
             end
         end
@@ -138,8 +141,10 @@ return function(I)
         for i = 1, n do
             local c = cond:get(i)
             if c == true then
+                if is_series_other then check_int64_lossless(other, i, "mask") end
                 vals[i] = is_series_other and other:get(i) or (other == nil and NA or other)
             else
+                check_int64_lossless(self, i, "mask")
                 vals[i] = self:get(i)
             end
         end
@@ -166,8 +171,10 @@ return function(I)
         for i = 1, n do
             local c = cond:get(i)
             if c == true then
+                if is_a then check_int64_lossless(a, i, "ifelse") end
                 vals[i] = is_a and a:get(i) or (a == nil and NA or a)
             else
+                if is_b then check_int64_lossless(b, i, "ifelse") end
                 vals[i] = is_b and b:get(i) or (b == nil and NA or b)
             end
         end

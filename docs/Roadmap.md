@@ -443,15 +443,31 @@ escreve (mesma natureza da Sub-A do 9.1, reintroduzida na reconstrução).
   arbitrários incl. string/datetime em C é trabalho real). Levantar escopo e
   decisões antes de cravar. Vínculo: item 12.4 (categorical hash — a ponta já
   registrada).
-- 10.6 **`fillna` → primitiva C** (achado 2026-07-02). Reconstrói via loop
-  `get→set` por elemento (`access/_transform.lua`) — além da travessia FFI por
-  linha, o round-trip por `tonumber()` **corrompe int64 > 2^53** no que grava na
-  série nova. Dois regimes (provados 2026-07-05): muito acima de 2^53 dispara o
-  warn do 9.1 por elemento (ruidoso, mas grava errado); na fronteira (logo acima
-  de 2^53, que o double arredonda de volta a ≤ 2^53) grava em **silêncio total**
-  — pior caso de falha-invisível, não capturado antes. Datetime fora do raio
-  (epoch_ms ≪ 2^53). Criar primitiva de série por
-  dtype; a Lua delega.
+- 10.6 **Família seleção/preenchimento por máscara → Anel 0** (achado 2026-07-02,
+  ampliado 2026-07-06). Toda a família que escolhe/preenche valor por posição
+  segundo uma máscara vive no Anel 1 via loop `get→set`+`from_table`: `fillna`
+  (null→escalar), `combine_first` (null→`other[i]`), `where`/`mask`/`ifelse`
+  (cond bool→a/b), e os parentes de propagação `ffill`/`bfill`. Todos round-tripam
+  por `tonumber()` e **corrompem int64 > 2^53** (provado 2026-07-06 em
+  where/mask/ifelse/combine_first, além de fillna/astype). Dois regimes: muito
+  acima de 2^53 avisa (ruidoso, grava errado); na fronteira (double arredonda a ≤
+  2^53) grava em **silêncio total**. Datetime fora do raio (epoch_ms ≪ 2^53).
+  - **Passo A — degrau estendido à família (selo [Fedora] 2026-07-06):** a guarda
+    única `check_int64_lossless` (fronteira única do 9.1) passou a proteger
+    `where`/`mask`/`ifelse`/`combine_first` — recusam visível int64 > 2^53 em vez
+    de corromper calado. Reuso da mesma guarda, sem critério novo. Testes: +5
+    selection, +2 predicates. (fillna/astype já cobertos em 2026-07-05.)
+  - **Passo B (plano revisado, 2026-07-06):** **não** criar `fillna` isolado — a
+    pergunta "isso deveria estar no C?" expôs que fillna é membro de uma família;
+    primitiva isolada bifurcaria a categoria (metade C, metade Lua), a desparidade
+    que o item combate. Desenhar as primitivas **fundamentais**: (a) seleção por
+    null-mask + fonte escalar/série (serve `fillna`, `combine_first`); (b) seleção
+    por cond-bool com Kleene (serve `where`/`mask`/`ifelse`); (c) o caso à parte
+    da propagação (`ffill`/`bfill`). Todos os membros delegam. As 3 primitivas C
+    `*_fillna` isoladas (i64/f64/dt) tentadas antes foram **descartadas**
+    (2026-07-06) — reintroduzidas integradas no desenho da família. Paridade:
+    property-based + Lua-ref lado a lado + casos dirigidos int64 > 2^53. `str` e
+    `bool` são casos especiais (offset-based; bool alinha ao 10.8).
 - 10.7 **`astype` — matriz `src×dst` no Anel 0** (achado 2026-07-02, mesma
   natureza do 10.6). O loop geral do `astype` também round-tripa por `get()`:
   conversão de/para int64 com valores > 2^53 grava corrompido. **Decisão
@@ -469,6 +485,14 @@ escreve (mesma natureza da Sub-A do 9.1, reintroduzida na reconstrução).
     quando o Anel 0 (Passo B) entrar. Testes: +2 `fillna`, +5 `astype`.
     Desparidade registrada e não consertada aqui: `fillna` rejeita `value`
     cdata (validação divergente do `check_value`) — morre no Passo B ao delegar.
+  - **Passo B (plano, 2026-07-05):** matriz `src×dst` explícita no C. Cantos
+    `datetime↔bool` (hoje erram por acidente — `bool→datetime` vaza erro Lua cru)
+    → **erro limpo** ("conversão não suportada; use `:map`"), sem semântica
+    inventada. Paridade (opção 2): manter o `astype` Lua como referência
+    temporária lado a lado; property-based compara C vs Lua-ref nos 23 pares bons;
+    cantos e int64 > 2^53 como casos dirigidos com gabarito definido. Gabarito =
+    comportamento **intencional**, não o literal (não se copia o bug dos cantos).
+    Lua-ref e degrau saem quando a paridade fechar.
 - 10.8 **`BoolSeries` — coerência de caminho com o Anel 0** (achado 2026-07-02) —
   **precisa de bloco de design próprio antes de executar**. No mesmo arquivo,
   `count_true`/`any`/`all` delegam ao C, mas `describe` reconta nulos/trues em

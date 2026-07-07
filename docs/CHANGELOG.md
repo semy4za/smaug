@@ -5,6 +5,32 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-06 — 10.6 vira família; degrau estendido a where/mask/ifelse/combine_first
+
+A pergunta "isso deveria estar no C?" reenquadrou o 10.6. `fillna` não é uma
+operação isolada: é membro de uma família que escolhe/preenche valor por posição
+segundo uma máscara — `fillna`, `combine_first`, `where`, `mask`, `ifelse`, e os
+parentes de propagação `ffill`/`bfill`. Todos vivem no Anel 1 (loop
+`get→set`+`from_table`) e, portanto, herdam a corrupção de int64 > 2^53.
+
+Achado (provado): `where`, `mask`, `ifelse` e `combine_first` corrompiam int64 >
+2^53 **em silêncio, agora** — o degrau de 2026-07-05 só cobria `fillna`/`astype`.
+Era um bug ativo em meia família.
+
+Degrau estendido: a guarda única `check_int64_lossless` (mesma fronteira 2^53 do
+9.1, fonte única) passou a proteger os quatro. Recusam visível em vez de
+corromper calado. Reuso da guarda existente — nenhum critério novo, nenhuma
+guarda duplicada. Testes: +5 selection, +2 predicates. Suíte verde, parity 12/12,
+Valgrind 0-errors, coverage inalterado (Lua-puro).
+
+Decisão de arquitetura: **não** criar `fillna` isolado no Anel 0 — bifurcaria a
+família (metade C, metade Lua), a desparidade que o item combate. O Passo B passa
+a ser desenhar as primitivas fundamentais da família (seleção por null-mask;
+seleção por cond-bool com Kleene; propagação à parte), com todos delegando. As
+3 primitivas C `*_fillna` isoladas (i64/f64/dt) tentadas antes foram descartadas
+— voltam integradas no desenho da família.
+
+---
 ## 2026-07-05 — 10.6/10.7 Passo A (degrau): corrupção silenciosa → falha visível
 
 Antes de vetorizar `fillna`/`astype` ao Anel 0, um degrau paliativo que troca

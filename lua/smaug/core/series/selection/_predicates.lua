@@ -11,6 +11,7 @@ return function(I)
     local methods = I.methods
     local Series  = I.Series
     local NA      = I.NA
+    local check_int64_lossless = I.check_int64_lossless   -- degrau família (10.6)
 
     -- =====================================================================
     -- F.2 — Predicados
@@ -260,8 +261,10 @@ return function(I)
         end
         local vals = {}
         for i = 1, self:len() do
+            check_int64_lossless(self, i, "combine_first")
             local v = self:get(i)
             if v == nil then
+                check_int64_lossless(other, i, "combine_first")
                 local o = other:get(i)
                 vals[i] = (o == nil) and NA or o
             else

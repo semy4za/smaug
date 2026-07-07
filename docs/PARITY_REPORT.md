@@ -1,8 +1,7 @@
 # Smaug — Relatório de Paridade
 
-> Arquivo gerado por `bash scripts/parity/parity.sh` ou `powershell scripts/parity/parity.ps1`.
-> **Não editar à mão.** Decisões conscientes de não-paridade ficam em
-> `scripts/parity/exceptions.txt`.
+> Arquivo gerado por `bash scripts/parity/parity.sh`. **Não editar à mão.**
+> Decisões conscientes de não-paridade ficam em `scripts/parity/exceptions.txt`.
 
 Convenção de status:
 
@@ -11,7 +10,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-07-06 18:11:10 UTC
+Gerado em: 2026-07-07 01:28:12 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -715,8 +714,8 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `series/test_reduce` | 58 | 7 | 2 | 3 | 4 | 2 | — |
 | `series/test_stat` | 70 | 6 | 12 | — | 9 | — | — |
 | `series/test_window` | 118 | 10 | 11 | 2 | 5 | 2 | — |
-| `series/test_predicates` | 155 | 6 | 42 | 3 | 11 | — | — |
-| `series/test_selection` | 29 | 3 | 1 | 2 | 1 | — | — |
+| `series/test_predicates` | 157 | 6 | 46 | 3 | 11 | — | — |
+| `series/test_selection` | 34 | 3 | 3 | 3 | 1 | — | — |
 | `series/test_str` | 276 | 4 | 9 | 1 | 50 | — | — |
 | `series/test_dt` | 272 | 3 | 6 | 2 | 12 | 62 | — |
 | `series/test_categorical` | 295 | 7 | 7 | 8 | 5 | 13 | 57 |
@@ -729,15 +728,15 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 79 | 19 | 2 | 2 | 4 | 1 | 1 |
 
-**Total de checks:** 2503
+**Total de checks:** 2510
 
 ### Menções totais por dtype (toda a suite)
 
 | dtype | menções |
 | :--- | :-: |
 | float64 | 183 |
-| int64 | 309 |
-| bool | 60 |
+| int64 | 315 |
+| bool | 61 |
 | string | 202 |
 | datetime | 80 |
 | categorical | 60 |

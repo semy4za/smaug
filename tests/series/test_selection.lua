@@ -104,5 +104,22 @@ do
     check(not ok, "7.4 bool eq(número) erra (espera true/false)")
 end
 
+-- ===================================================================
+-- Degrau família (10.6): where/mask/ifelse recusam int64 > 2^53 que a
+-- leitura via get() corromperia. <= 2^53 e float: intactos.
+-- ===================================================================
+do
+    local ffi = require("ffi")
+    local BIG = ffi.new("int64_t", 9007199254740993LL)  -- 2^53+1
+    local big = S.new("int64", 2, "b"); big:set(1, BIG); big:set(2, BIG)
+    local cond = S.from_table({true, false}, "bool")
+    check(not pcall(function() return big:where(cond, big) end),   "degrau: where i64>2^53 recusa")
+    check(not pcall(function() return big:mask(cond, big) end),    "degrau: mask i64>2^53 recusa")
+    check(not pcall(function() return S.ifelse(cond, big, big) end),"degrau: ifelse i64>2^53 recusa")
+    local sm = S.from_table({10, 20}, "int64")
+    check(sm:where(cond, sm):get(1) == 10,       "degrau: where i64<=2^53 intacto")
+    check(S.ifelse(cond, sm, sm):get(1) == 10,   "degrau: ifelse i64<=2^53 intacto")
+end
+
 
 print(string.format("OK — %d checks passaram (Series: at/iat, where, mask, ifelse, isna/notna)", n_ok))
