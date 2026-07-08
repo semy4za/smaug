@@ -365,5 +365,18 @@ do
     check_err(function() return sp:fillna(1.5) end, "10.6B: fillna i64 fracionário recusa")
 end
 
+do
+    -- 10.6B: fillna string toda-nula com value="" — buffer total 0 e len 0 por
+    -- posição (cobre os ramos total==0 e len==0 do coalesce_scalar str).
+    local sv = S.new("string", 2, "sv"); sv:set_null(1); sv:set_null(2)
+    local rv = sv:fillna("")
+    check(rv:get(1) == "" and rv:get(2) == "", "10.6B: fillna string toda-nula value='' -> vazias válidas")
+    check(not rv:is_null(1) and not rv:is_null(2), "10.6B: fillna string '' resulta válido (não nulo)")
+    -- mistura: buraco + string não-vazia (cobre também os ramos total>0/len>0)
+    local sm = S.new("string", 2, "sm"); sm:set_null(1); sm:set(2, "abc")
+    local rm = sm:fillna("")
+    check(rm:get(1) == "" and rm:get(2) == "abc", "10.6B: fillna string mistura buraco/'abc'")
+end
+
 
 print(string.format("OK — %d checks passaram (Series: acesso, edge cases, fillna)", n_ok))

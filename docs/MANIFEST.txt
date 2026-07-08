@@ -14,7 +14,7 @@ eafa3ab85e3f10599db21a4d944f5c9eff0f6aebd16a843fb7d4435a3ee5dc64    2445  .\docs
 3adf8081f63ec2c28d17e8a12deed2a6a8a1b5e81e6f3979234497c5cc2801f3     318  .\docs\CONTRACT.md
 2b9e49d064608b3b75c67cd497f326fde4ac6c1c5fdc6d4f5c5189f77589415c     333  .\docs\COVERAGE.md
 9f89a9d98d9531648723af2b8aff51121dc75c71fb7bd0620ffb6b71938cbae3     173  .\docs\COW.md
-00f0161b5f4c350354658d9346e12bae40e2dcf74ae3555db11956fe6fc9de6e     782  .\docs\PARITY_REPORT.md
+d6094717b76dd69e43e08831876684c9e2377087fc9105bbf237212f28ba3e7f     782  .\docs\PARITY_REPORT.md
 1ee953728af74e3abe1c26e19a364fadf6cd129a5376a02675fa20f6db7d5037     498  .\docs\README.md
 822c6b001d1d12cf613414ddd2f91ca0a224f4d9ec990e2be2fa6c46cac76210     686  .\docs\Roadmap.md
 aa9cae92e013e03bffaf812ce257644cc6f8d84b3a8eac0309c37279fe92e3b3      36  .\include\smaug.h
@@ -80,11 +80,11 @@ e076df0e54f4f516de87fa0379c7f906d2a303640f35f1fd9d42735cb9e21d34     528  .\src\
 adb970ccb7a1603d03497236b20cd60891c4381126ff6db44ed19844499944e9     972  .\src\smaug_datetime.c
 7ef362f350b28802b8dcbe9410abdcced09d44c022700187871ab2bbf26b99c9     630  .\src\smaug_json.c
 ee0a3a429102623e1f6c733205415bdf735664c34f8518a6ad1d0afa0eb5b7e2     526  .\src\smaug_ops_bool.c
-f2113465f93d1141a2030c27bc37520c7a189d61cdf58e122e5f04f9e96340f5     854  .\src\smaug_ops_f64.c
-b4bc870ba9b595ae7a505be41a92772eb39dddae33f079c619cd1ab086bdb521     790  .\src\smaug_ops_i64.c
+ac3890fda0bd793cc430a0c9ac3fcc9b6a02f8071665a0b6e2f8e21d97cd6313     854  .\src\smaug_ops_f64.c
+0d534c3aead5d18d869ea9ba22c6677b07f9885df9fe0e9b3e8a4308c51454d9     790  .\src\smaug_ops_i64.c
 d10f1bbf5f9f2b0dfae1caec95d2c82edd7be45cd23b33257f7e76d7d81d1c61     502  .\src\smaug_ops_str.c
 750d6afa9bf01b1f91fa53561d44c43a4fe582a02b9615a635905beff689b0c7     647  .\src\smaug_ops_window.c
-ba1c5adc3e4b22beaae3dc35818beaafffafe425e4a559a62ec1cebc9d181fe8     488  .\src\smaug_str.c
+8b3764c5f9ff78481d6b78133b5b42a99e2b824848380a7d7ce6ac550bc0f1e8     488  .\src\smaug_str.c
 a36f1bc90fc803698564edbbfd0638d7120591249aca575b86b3fed0101966ca     285  .\tests\c\test_alloc.c
 2363232d26269ba7ce42e77b4233ab4ca43c016ca4ad90574858d51e6179428f    2515  .\tests\c\test_allocfail.c
 fb307f1c88f60b4ca7f545b9db54587cadded87ef7fa0dba73999b17b86bf1fd     225  .\tests\c\test_bool.c
@@ -105,7 +105,7 @@ e81b64ad005c5f58954b346fb60a9929d49ad40c84cbe05aa1d8ff2225dc96d1     324  .\test
 74e40466dbd2b622b59f85b6993e3fad42ca39e4f72999eac6a6e3011550d08e      92  .\tests\io\test_json.lua
 26ef3db8a6f25c3742aa2e0581ff468fe5f648fb289a6a607046b4c76104be71     174  .\tests\props\test_integration.lua
 508581de821c8e2c7fc49f35c7a89ac51a7aca7bf563a69ee39ad5b7fd61fa92     557  .\tests\props\test_props.lua
-07a99d21fcc7d00dba6456d8162b5aa47bb8ce545f20cfdc81fb4469cff7a681     369  .\tests\series\test_access.lua
+5375334abd1b0000175532404920f8fe95bfdfbcc2eeef406a4c956ec91e888d     382  .\tests\series\test_access.lua
 a5351dc236135b505f815cc09cc72d82cc49d7e7ef592364c410c3735184dc82     882  .\tests\series\test_categorical.lua
 e328c30274dabe731f97e2a82283ecc32ef5b80b7297662aa11ff2159250dfca     918  .\tests\series\test_constructors.lua
 bbb6b5e74977e8dba46c6a1c612920fa85f31689a0c5441920449b8f281a6122     809  .\tests\series\test_dt.lua

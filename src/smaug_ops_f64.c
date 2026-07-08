@@ -161,10 +161,10 @@ smaug_series_f64_t *smaug_f64_div_scalar(const smaug_series_f64_t *a, double sca
    smaug_f64_clone (cópia via memcpy); o loop só preenche os buracos. */
 smaug_series_f64_t *smaug_f64_coalesce_scalar(const smaug_series_f64_t *self,
                                               double value) {
-    if (!self) return NULL;
+    if (!self) return NULL;  /* COV-EXCL-BR: o engine nao confia no caller; frontend nunca passa NULL (fillna valida antes) */
 
     smaug_series_f64_t *r = smaug_f64_clone(self);
-    if (!r) return NULL;
+    if (!r) return NULL;  /* COV-EXCL-BR: falha de alloc do clone; OOM sem injecao */
 
     for (size_t i = 0; i < self->size; i++) {
         if (SMAUG_NULL(r->null_mask, i)) {

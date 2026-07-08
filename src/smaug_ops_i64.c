@@ -155,10 +155,10 @@ smaug_series_i64_t *smaug_i64_div_scalar(const smaug_series_i64_t *a, int64_t sc
    value chega int64_t nativo e a cópia é byte a byte → int64 > 2^53 exato. */
 smaug_series_i64_t *smaug_i64_coalesce_scalar(const smaug_series_i64_t *self,
                                               int64_t value) {
-    if (!self) return NULL;
+    if (!self) return NULL;  /* COV-EXCL-BR: o engine nao confia no caller; frontend nunca passa NULL (fillna valida antes) */
 
     smaug_series_i64_t *r = smaug_i64_clone(self);
-    if (!r) return NULL;
+    if (!r) return NULL;  /* COV-EXCL-BR: falha de alloc do clone; OOM sem injecao */
 
     for (size_t i = 0; i < self->size; i++) {
         if (SMAUG_NULL(r->null_mask, i)) {

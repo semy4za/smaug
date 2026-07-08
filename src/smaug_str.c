@@ -196,8 +196,8 @@ smaug_series_str_t *smaug_str_create_from_array(const char *const *array, size_t
    responsabilidade do frontend (wrap), não do meta.name aqui. */
 smaug_series_str_t *smaug_str_coalesce_scalar(const smaug_series_str_t *self,
                                               const char *value, size_t value_len) {
-    if (!self) return NULL;
-    if (!value && value_len > 0) return NULL;   /* ponteiro nulo com len>0 */
+    if (!self) return NULL;  /* COV-EXCL-BR: o engine nao confia no caller; frontend nunca passa NULL (fillna valida antes) */
+    if (!value && value_len > 0) return NULL;   /* COV-EXCL-BR: ponteiro-nulo-com-len; frontend passa value com #value coerente */
 
     /* Passo 1: mede o buffer final (não-nulo: comprimento real; nulo: value). */
     size_t total = 0;
@@ -211,7 +211,7 @@ smaug_series_str_t *smaug_str_coalesce_scalar(const smaug_series_str_t *self,
     smaug_series_str_t *r =
         smaug_str_create_with_capacity(self->size,
                                        total > 0 ? total : SMAUG_STR_BUFFER_INIT);
-    if (!r) return NULL;
+    if (!r) return NULL;  /* COV-EXCL-BR: falha de alloc; OOM sem injecao */
 
     /* Passo 2: copia sequencial. Toda posição fica VÁLIDA (resultado sem nulos). */
     size_t pos = 0;
