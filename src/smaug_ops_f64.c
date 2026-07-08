@@ -154,6 +154,27 @@ smaug_series_f64_t *smaug_f64_div_scalar(const smaug_series_f64_t *a, double sca
     return r;
 }
 
+/* coalesce_scalar (natureza null-mask): onde self[i] é nulo, entra `value`;
+   senão, mantém self[i]. Serve fillna. Opera sobre a MÁSCARA, não sobre o
+   valor: NaN existente (máscara válida) é preservado como está — coerente com
+   a política do Smaug de NaN ser valor presente, distinto de null. Reusa
+   smaug_f64_clone (cópia via memcpy); o loop só preenche os buracos. */
+smaug_series_f64_t *smaug_f64_coalesce_scalar(const smaug_series_f64_t *self,
+                                              double value) {
+    if (!self) return NULL;
+
+    smaug_series_f64_t *r = smaug_f64_clone(self);
+    if (!r) return NULL;
+
+    for (size_t i = 0; i < self->size; i++) {
+        if (SMAUG_NULL(r->null_mask, i)) {
+            r->data[i]      = value;
+            r->null_mask[i] = SMAUG_MASK_VALID;
+        }
+    }
+    return r;
+}
+
 /* ===================================================================
    REDUÇÕES
    ignore_na=false: retorna NAN ao encontrar o primeiro NULL.

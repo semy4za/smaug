@@ -210,6 +210,26 @@ smaug_series_dt_t *smaug_dt_clone(const smaug_series_dt_t *s) {
     return c;
 }
 
+/* coalesce_scalar (natureza null-mask): onde self[i] é nulo, entra `value`
+   (epoch_ms); senão, mantém self[i]. Serve fillna. Reusa smaug_dt_clone (cópia
+   data+mask via memcpy, já reseta meta view/external); o loop só preenche os
+   buracos. Sem double no caminho — epoch_ms int64 exato. */
+smaug_series_dt_t *smaug_dt_coalesce_scalar(const smaug_series_dt_t *self,
+                                            int64_t value) {
+    if (!self) return NULL;
+
+    smaug_series_dt_t *r = smaug_dt_clone(self);
+    if (!r) return NULL;
+
+    for (size_t i = 0; i < self->size; i++) {
+        if (SMAUG_NULL(r->null_mask, i)) {
+            r->data[i]      = value;
+            r->null_mask[i] = SMAUG_MASK_VALID;
+        }
+    }
+    return r;
+}
+
 smaug_series_dt_t *smaug_dt_view(smaug_series_dt_t *s, size_t start, size_t len) {
     if (!s || start > s->size || len > s->size - start) return NULL;  /* COV-EXCL-BR: args inválidos — start > size ou len > size-start */
     smaug_series_dt_t *v = malloc(sizeof(smaug_series_dt_t));

@@ -188,6 +188,51 @@ smaug_series_str_t *smaug_str_create_from_array(const char *const *array, size_t
     return s;
 }
 
+/* coalesce_scalar (natureza null-mask), string: onde self[i] é nulo, entra a
+   string `value`; senão, mantém self[i]. Serve fillna. Resultado sem nulos.
+   Two-pass O(n) espelhando create_from_array, MAS com comprimentos reais
+   (offsets), não strlen — preserva strings com \0 embutido. Não reusa clone
+   (preencher muda o tamanho do buffer). self const: só lido. O nome é
+   responsabilidade do frontend (wrap), não do meta.name aqui. */
+smaug_series_str_t *smaug_str_coalesce_scalar(const smaug_series_str_t *self,
+                                              const char *value, size_t value_len) {
+    if (!self) return NULL;
+    if (!value && value_len > 0) return NULL;   /* ponteiro nulo com len>0 */
+
+    /* Passo 1: mede o buffer final (não-nulo: comprimento real; nulo: value). */
+    size_t total = 0;
+    for (size_t i = 0; i < self->size; i++) {
+        if (SMAUG_VALID(self->null_mask, i))
+            total += self->offsets[i + 1] - self->offsets[i];
+        else
+            total += value_len;
+    }
+
+    smaug_series_str_t *r =
+        smaug_str_create_with_capacity(self->size,
+                                       total > 0 ? total : SMAUG_STR_BUFFER_INIT);
+    if (!r) return NULL;
+
+    /* Passo 2: copia sequencial. Toda posição fica VÁLIDA (resultado sem nulos). */
+    size_t pos = 0;
+    for (size_t i = 0; i < self->size; i++) {
+        const char *src; size_t len;
+        if (SMAUG_VALID(self->null_mask, i)) {
+            src = self->buffer + self->offsets[i];
+            len = self->offsets[i + 1] - self->offsets[i];
+        } else {
+            src = value;
+            len = value_len;
+        }
+        if (len > 0) memcpy(r->buffer + pos, src, len);
+        pos += len;
+        r->null_mask[i]   = SMAUG_MASK_VALID;
+        r->offsets[i + 1] = pos;
+    }
+    r->buffer_len = pos;
+    return r;
+}
+
 /* Lê a string no índice idx. NÃO copia: devolve ponteiro para dentro do buffer
    e escreve o comprimento em *out_len. Retorna NULL se idx inválido ou elemento
    NULL (com *out_len = 0). Distingue "" (retorna ponteiro válido, *out_len=0,

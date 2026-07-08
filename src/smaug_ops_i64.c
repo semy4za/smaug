@@ -148,6 +148,27 @@ smaug_series_i64_t *smaug_i64_div_scalar(const smaug_series_i64_t *a, int64_t sc
     return r;
 }
 
+/* coalesce_scalar (natureza null-mask): onde self[i] é nulo, entra `value`;
+   senão, mantém self[i]. `value` é sempre presente → resultado sem nulos.
+   Serve fillna. Reusa smaug_i64_clone (cópia data+mask via memcpy — fonte
+   única da cópia); o loop só preenche os buracos. Sem double no caminho:
+   value chega int64_t nativo e a cópia é byte a byte → int64 > 2^53 exato. */
+smaug_series_i64_t *smaug_i64_coalesce_scalar(const smaug_series_i64_t *self,
+                                              int64_t value) {
+    if (!self) return NULL;
+
+    smaug_series_i64_t *r = smaug_i64_clone(self);
+    if (!r) return NULL;
+
+    for (size_t i = 0; i < self->size; i++) {
+        if (SMAUG_NULL(r->null_mask, i)) {
+            r->data[i]      = value;
+            r->null_mask[i] = SMAUG_MASK_VALID;
+        }
+    }
+    return r;
+}
+
 /* ===================================================================
    REDUÇÕES
    Funções que retornam int64_t NÃO TÊM como representar NAN.

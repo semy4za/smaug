@@ -37,6 +37,10 @@ smaug_series_dt_t* smaug_dt_create_from_array(const int64_t *array, size_t len);
 
 void               smaug_dt_free(smaug_series_dt_t *s);
 smaug_series_dt_t* smaug_dt_clone(const smaug_series_dt_t *s);
+
+/* coalesce_scalar (null-mask): onde self[i] é nulo, entra value (epoch_ms);
+   senão self[i]. Serve fillna. */
+smaug_series_dt_t* smaug_dt_coalesce_scalar(const smaug_series_dt_t *self, int64_t value);
 smaug_series_dt_t* smaug_dt_view(smaug_series_dt_t *s, size_t start, size_t len);
 
 /* ===================== Acesso ===================== */

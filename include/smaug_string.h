@@ -42,6 +42,11 @@ smaug_series_str_t* smaug_str_create_from_array(const char *const *array, size_t
 void                smaug_str_free(smaug_series_str_t *s);
 smaug_series_str_t* smaug_str_clone(const smaug_series_str_t *s);
 
+/* coalesce_scalar (null-mask): onde self[i] é nulo, entra value (com value_len);
+   senão self[i]. Resultado sem nulos. Serve fillna. */
+smaug_series_str_t* smaug_str_coalesce_scalar(const smaug_series_str_t *self,
+                                              const char *value, size_t value_len);
+
 /* View: janela zero-copy [start, start+len) sobre a série-pai (1-based no
    frontend; 0-based aqui). Diferente dos numéricos (buffer de tamanho fixo,
    view = soma de ponteiro O(1)), a string é offset-based, então a view usa um

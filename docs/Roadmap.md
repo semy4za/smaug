@@ -468,6 +468,24 @@ escreve (mesma natureza da Sub-A do 9.1, reintroduzida na reconstrução).
     (2026-07-06) — reintroduzidas integradas no desenho da família. Paridade:
     property-based + Lua-ref lado a lado + casos dirigidos int64 > 2^53. `str` e
     `bool` são casos especiais (offset-based; bool alinha ao 10.8).
+  - **Passo B.1 — null-mask escalar CONCLUÍDO (2026-07-07):** `coalesce_scalar`
+    por dtype (`i64`/`f64`/`dt`/`str`), no molde do `binop_scalar` — `i64`/`f64`/`dt`
+    reusam `clone`; `str` faz two-pass O(n) (offset-based, preserva `\0`). O
+    `fillna` delega: valida o `value` uma vez via `check_value` canônico (aceita
+    `cdata int64` — **cura a desparidade** do porteiro caseiro) e chama a primitiva.
+    int64 > 2^53 preservado exato; o **degrau saiu do `fillna`** (segue nos demais
+    membros). `bool` no Anel 1 até 10.8; `dt` restrito a `number` (ISO → 12.16).
+    Provado por FFI + suíte (fillna 39 checks). Valgrind 0-errors; cobertura de
+    linha 98.73→98.75%.
+  - **Passo B.1.cov — fechar branch-alvo do `coalesce_scalar` [PRÉ-SELO PENDENTE]:**
+    o `--all` de 2026-07-06 deixou 8 branches novos descobertos, todos guards
+    defensivos das primitivas: `if (!self)` (i64:158, f64:164, str:199), `if (!r)`
+    (i64:161, f64:167, str:214), `if (!value && value_len>0)` (str:200) e o
+    `total>0?…`/`if (len>0) memcpy` do `str` (212/227). 7 são `COV-EXCL-BR` com o
+    mesmo precedente já no COVERAGE.md ("o engine não confia no caller" / OOM sem
+    injeção); `str:227` (`len==0`) é alcançável (`value=""`/string vazia) — confere
+    se o teste já cobre, senão adiciona teste. **Selo do null-mask escalar fica
+    incompleto até isto fechar.** Trabalho de Windows (edição de `src/` + reselo).
 - 10.7 **`astype` — matriz `src×dst` no Anel 0** (achado 2026-07-02, mesma
   natureza do 10.6). O loop geral do `astype` também round-tripa por `get()`:
   conversão de/para int64 com valores > 2^53 grava corrompido. **Decisão
@@ -605,6 +623,13 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
   `Series:get(1.5)` erra (viola falha-visível). O mesmo guard está repetido 3×
   (get/is_null/set) — delegar ao `check_index` canônico corrige os três de uma
   vez.
+- 12.16 **`fillna` de datetime aceitar string ISO** — [Windows] (registrado
+  2026-07-07, futuro próximo). O `check_value` de datetime já aceita `number`
+  (epoch_ms) **ou** string ISO 8601, como `set`/`append`. Mas o `fillna` de
+  datetime aceita só `number` — na integração ao `coalesce_scalar` (Anel 0) o
+  `dt` ficou restrito a `number` para não ampliar escopo. Alinhar: aceitar string
+  ISO no `fillna` de datetime, parseando via `dt_parse` antes de delegar —
+  uniformiza `fillna` com `set`/`append`.
 
 ## 13. Reescrita de exemplos + docstrings  [Windows]
 

@@ -342,20 +342,27 @@ do
 end
 
 -- =====================================================================
--- Degrau 10.6: fillna em int64 > 2^53 falha VISIVEL (a copia dos nao-nulos
--- via get()->double corromperia). <= 2^53 e outros dtypes: intactos.
+-- 10.6 Passo B: fillna em int64 delega a coalesce_scalar (Anel 0).
+-- int64 > 2^53 PRESERVADO exato (o degrau saiu; o C copia sem double).
 -- =====================================================================
 do
     local ffi = require("ffi")
-    local s = S.new("int64", 2, "big")
-    s:set_null(1)
-    s:set(2, ffi.new("int64_t", 9007199254740993LL))   -- 2^53 + 1
-    check_err(function() return s:fillna(0) end,
-              "10.6: fillna i64 > 2^53 recusa (falha visivel)")
-    local sp = S.new("int64", 2, "p")
-    sp:set_null(1); sp:set(2, 42)
+    local BIG = ffi.new("int64_t", 9007199254740993LL)   -- 2^53 + 1
+    -- nao-nulo > 2^53 preservado exato
+    local s = S.new("int64", 2, "big"); s:set_null(1); s:set(2, BIG)
+    local r = s:fillna(0)
+    check(tostring(r:get_raw(2)) == tostring(BIG), "10.6B: fillna i64 nao-nulo 2^53+1 preservado exato")
+    check(r:get(1) == 0, "10.6B: fillna i64 preenche buraco")
+    -- value cdata int64 grande agora aceito (desparidade curada)
+    local s2 = S.new("int64", 2, "big2"); s2:set_null(1); s2:set(2, 10)
+    local r2 = s2:fillna(BIG)
+    check(tostring(r2:get_raw(1)) == tostring(BIG), "10.6B: fillna value cdata int64 > 2^53 (desparidade curada)")
+    -- <= 2^53 intacto
+    local sp = S.new("int64", 2, "p"); sp:set_null(1); sp:set(2, 42)
     local fp = sp:fillna(7)
-    check(fp:get(1) == 7 and fp:get(2) == 42, "10.6: fillna i64 <=2^53 intacto (nao-regressao)")
+    check(fp:get(1) == 7 and fp:get(2) == 42, "10.6B: fillna i64 <=2^53 intacto (nao-regressao)")
+    -- fracionário ainda recusa (check_value)
+    check_err(function() return sp:fillna(1.5) end, "10.6B: fillna i64 fracionário recusa")
 end
 
 

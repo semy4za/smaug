@@ -18,6 +18,7 @@ return function(I)
             free        = C.smaug_f64_free,
             create      = C.smaug_f64_create,
             clone       = C.smaug_f64_clone,
+            coalesce_scalar = C.smaug_f64_coalesce_scalar,
             get         = C.smaug_f64_get,
             get_value   = function(c, i) return tonumber(C.smaug_f64_get(c, i, nil)) end,
             set         = C.smaug_f64_set,
@@ -72,6 +73,7 @@ return function(I)
             free        = C.smaug_i64_free,
             create      = C.smaug_i64_create,
             clone       = C.smaug_i64_clone,
+            coalesce_scalar = C.smaug_i64_coalesce_scalar,
             get         = C.smaug_i64_get,
             get_value   = function(c, i) return tonumber(C.smaug_i64_get(c, i, nil)) end,
             set         = C.smaug_i64_set,
@@ -126,6 +128,7 @@ return function(I)
             free        = C.smaug_str_free,
             create      = C.smaug_str_create,
             clone       = C.smaug_str_clone,
+            coalesce_scalar = C.smaug_str_coalesce_scalar,
             get_value   = function(c, i)
                 local len = ffi.new("size_t[1]")
                 local p   = C.smaug_str_get(c, i, len)
@@ -176,6 +179,7 @@ return function(I)
             free        = C.smaug_dt_free,
             create      = C.smaug_dt_create,
             clone       = C.smaug_dt_clone,
+            coalesce_scalar = C.smaug_dt_coalesce_scalar,
             get_value   = function(c, i)
                 local st = ffi.new("smaug_status_t[1]")
                 local v  = C.smaug_dt_get(c, i, st)

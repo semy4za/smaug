@@ -5,6 +5,36 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-07 — fillna → Anel 0 via coalesce_scalar (natureza null-mask, lado escalar)
+
+Primeira das três naturezas da família seleção/preenchimento por máscara vai ao
+Anel 0. Primitiva `coalesce_scalar` por dtype (`i64`/`f64`/`dt`/`str`): onde
+`self[i]` é nulo entra o `value`, senão mantém `self[i]`; resultado sem nulos.
+Molde do `binop_scalar`. `i64`/`f64`/`dt` reusam `clone` (cópia via memcpy — não
+reinventam a cópia byte a byte). `str` não pode: preencher muda o tamanho do
+buffer, então faz two-pass O(n) espelhando `create_from_array`, mas com os
+comprimentos reais dos offsets (não `strlen`) — preserva `\0` embutido. `bool`
+fica de fora (tipo paralelo, alinha ao 10.8).
+
+O `fillna` passa a delegar: valida o `value` **uma vez** via `check_value`
+canônico e chama a primitiva. Dois ganhos: (1) int64 > 2^53 nos não-nulos é
+preservado exato — o degrau **sai do `fillna`** (segue nos outros membros da
+família); (2) o `check_value` aceita `cdata int64_t`, que o porteiro caseiro do
+`fillna` rejeitava — **cura a desparidade** e passa a aceitar preenchimento int64
+exato acima de 2^53. `dt` restrito a `number` (epoch_ms) nesta leva; string ISO
+registrada como 12.16.
+
+Descoberta de método (via pergunta "usar str_set num loop é eficiente?"): não —
+seria O(n²) pelos memmoves; o two-pass O(n) é o caminho, e o próprio Smaug já o
+usa no construtor em massa. Reforça o hábito de medir antes de cravar.
+
+Provado por FFI (2^53+1 exato, NaN preservado, `\0` embutido, `value` cdata) e
+suíte (fillna 39 checks, property-based 360k). Valgrind 0-errors; cobertura de
+linha 98.73→98.75%. **Pré-selo pendente:** 8 branches de guards defensivos das
+primitivas a fechar (7 `COV-EXCL-BR`, 1 confere `str:227`) — ver 10.6 Passo
+B.1.cov. Selo do null-mask escalar fecha quando a cobertura fechar.
+
+---
 ## 2026-07-06 — 10.6 vira família; degrau estendido a where/mask/ifelse/combine_first
 
 A pergunta "isso deveria estar no C?" reenquadrou o 10.6. `fillna` não é uma

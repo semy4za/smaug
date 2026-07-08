@@ -10,7 +10,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-07-07 01:28:12 UTC
+Gerado em: 2026-07-08 02:20:12 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -266,7 +266,7 @@ Cada assimetria é classificada: 🟩 ambos · 🟦 par de nome · ⬜ intencion
 Cada função pública do backend C deveria ter caminho no frontend Lua (direto via FFI ou exposto via método Series). 🟨 = função C que não aparece em `lua/smaug/core/series.lua` (pode ser órfã ou exposta indiretamente via outro nome).
 
 
-### f64 — 49 funções C
+### f64 — 50 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -279,6 +279,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `argsort` | 🟩 |  |
 | `bfill` | 🟩 |  |
 | `clone` | 🟩 |  |
+| `coalesce_scalar` | 🟩 |  |
 | `count_nonnull` | 🟩 |  |
 | `create` | 🟩 |  |
 | `create_from_array` | 🟨 |  |
@@ -321,7 +322,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `view` | 🟩 |  |
 
 
-### i64 — 49 funções C
+### i64 — 50 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -334,6 +335,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `argsort` | 🟩 |  |
 | `bfill` | 🟩 |  |
 | `clone` | 🟩 |  |
+| `coalesce_scalar` | 🟩 |  |
 | `count_nonnull` | 🟩 |  |
 | `create` | 🟩 |  |
 | `create_from_array` | 🟨 |  |
@@ -401,7 +403,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `xor` | 🟨 |  |
 
 
-### str — 31 funções C
+### str — 32 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -412,6 +414,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `argsort` | 🟩 |  |
 | `bfill` | 🟩 |  |
 | `clone` | 🟩 |  |
+| `coalesce_scalar` | 🟩 |  |
 | `count_nonnull` | 🟩 |  |
 | `create` | 🟩 |  |
 | `create_from_array` | 🟨 |  |
@@ -438,7 +441,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `view` | 🟩 |  |
 
 
-### dt — 48 funções C
+### dt — 49 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -450,6 +453,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `argsort` | 🟩 |  |
 | `bfill` | 🟩 |  |
 | `clone` | 🟩 |  |
+| `coalesce_scalar` | 🟩 |  |
 | `count_nonnull` | 🟩 |  |
 | `create` | 🟩 |  |
 | `create_from_array` | 🟨 |  |
@@ -671,7 +675,7 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 238/238 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 236/236 erros com prefixo `smaug:` (100.0%)
 - `dataset.lua`: 94/94 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
@@ -710,7 +714,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | arquivo | checks | float64 | int64 | bool | string | datetime | categorical |
 | :--- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
 | `series/test_constructors` | 344 | 38 | 60 | 20 | 13 | — | 1 |
-| `series/test_access` | 102 | 15 | 10 | — | 4 | — | — |
+| `series/test_access` | 105 | 15 | 11 | — | 4 | — | — |
 | `series/test_reduce` | 58 | 7 | 2 | 3 | 4 | 2 | — |
 | `series/test_stat` | 70 | 6 | 12 | — | 9 | — | — |
 | `series/test_window` | 118 | 10 | 11 | 2 | 5 | 2 | — |
@@ -728,14 +732,14 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 79 | 19 | 2 | 2 | 4 | 1 | 1 |
 
-**Total de checks:** 2510
+**Total de checks:** 2513
 
 ### Menções totais por dtype (toda a suite)
 
 | dtype | menções |
 | :--- | :-: |
 | float64 | 183 |
-| int64 | 315 |
+| int64 | 316 |
 | bool | 61 |
 | string | 202 |
 | datetime | 80 |
@@ -763,7 +767,7 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 973
+- 🟩 paridade: 977
 - ⬜ exceção registrada: 215
 - 🟨 suspeita (revisar): 270
 - 🟥 inconsistência clara: 12

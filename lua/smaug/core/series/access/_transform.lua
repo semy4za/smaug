@@ -17,6 +17,7 @@ return function(I)
     local NA      = I.NA
     local is_na   = I.is_na
     local is_nan  = I.is_nan
+    local check_value = I.check_value                     -- porteiro canônico (9.1)
     local check_int64_lossless = I.check_int64_lossless   -- degrau 10.6/10.7
 
     -- =====================================================================
@@ -322,37 +323,38 @@ return function(I)
             error("smaug: fillna requer um valor de preenchimento", 2)
         end
         local dt = self._dtype
-        if dt == "string" then
-            if type(value) ~= "string" then
-                error("smaug: fillna em série string espera uma string Lua; "
-                      .. "recebido " .. type(value), 2)
-            end
-        elseif dt == "bool" then
+
+        -- bool continua no Anel 1 até o 10.8 (tipo paralelo, arrays crus).
+        if dt == "bool" then
             if type(value) ~= "boolean" then
                 error("smaug: fillna em série bool espera boolean (true/false); "
                       .. "recebido " .. type(value), 2)
             end
+            local n   = self:len()
+            local out = Series.new(dt, n, self._name)
+            for i = 1, n do
+                if self:is_null(i) then out:set(i, value) else out:set(i, self:get(i)) end
+            end
+            return out
+        end
+
+        -- datetime restrito a number (epoch_ms) nesta leva; string ISO → 12.16.
+        if dt == "datetime" and type(value) ~= "number" then
+            error("smaug: fillna em série datetime espera número (epoch_ms); "
+                  .. "recebido " .. type(value) .. " (string ISO ainda não; ver 12.16)", 2)
+        end
+
+        -- Anel 0: valida o value uma vez pelo porteiro canônico (aceita cdata
+        -- int64, curando a antiga desparidade) e delega a coalesce_scalar. Sem
+        -- round-trip por get() → int64 > 2^53 preservado exato (degrau sai).
+        check_value(self, value, 3)
+        local r
+        if dt == "string" then
+            r = self._d.coalesce_scalar(self._c, value, #value)
         else
-            if type(value) ~= "number" then
-                error("smaug: fillna em série " .. dt .. " espera um número; "
-                      .. "recebido " .. type(value), 2)
-            end
-            if dt == "int64" and value % 1 ~= 0 then
-                error("smaug: fillna em int64 requer valor inteiro (sem coerção); "
-                      .. "recebido " .. tostring(value), 2)
-            end
+            r = self._d.coalesce_scalar(self._c, value)
         end
-        local n   = self:len()
-        local out = Series.new(dt, n, self._name)
-        for i = 1, n do
-            if self:is_null(i) then
-                out:set(i, value)
-            else
-                check_int64_lossless(self, i, "fillna")   -- degrau 10.6
-                out:set(i, self:get(i))
-            end
-        end
-        return out
+        return wrap(r, dt, self._name)
     end
 
     -- =====================================================================
