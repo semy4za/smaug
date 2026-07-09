@@ -54,6 +54,7 @@ ffi.cdef([[
     void                smaug_f64_free(smaug_series_f64_t *s);
     smaug_series_f64_t* smaug_f64_clone(const smaug_series_f64_t *s);
     smaug_series_f64_t* smaug_f64_coalesce_scalar(const smaug_series_f64_t *self, double value);
+    smaug_series_f64_t* smaug_f64_coalesce(const smaug_series_f64_t *self, const smaug_series_f64_t *other);
     smaug_series_f64_t* smaug_f64_view(smaug_series_f64_t *s, size_t start, size_t len);
 
     /* --- Getters / Setters --- */
@@ -139,6 +140,7 @@ ffi.cdef([[
     void                smaug_i64_free(smaug_series_i64_t *s);
     smaug_series_i64_t* smaug_i64_clone(const smaug_series_i64_t *s);
     smaug_series_i64_t* smaug_i64_coalesce_scalar(const smaug_series_i64_t *self, int64_t value);
+    smaug_series_i64_t* smaug_i64_coalesce(const smaug_series_i64_t *self, const smaug_series_i64_t *other);
     smaug_series_i64_t* smaug_i64_view(smaug_series_i64_t *s, size_t start, size_t len);
 
     /* --- Getters / Setters --- */
@@ -314,6 +316,7 @@ ffi.cdef([[
     void                smaug_str_free(smaug_series_str_t *s);
     smaug_series_str_t* smaug_str_clone(const smaug_series_str_t *s);
     smaug_series_str_t* smaug_str_coalesce_scalar(const smaug_series_str_t *self, const char *value, size_t value_len);
+    smaug_series_str_t* smaug_str_coalesce(const smaug_series_str_t *self, const smaug_series_str_t *other);
     smaug_series_str_t* smaug_str_view(smaug_series_str_t *s, size_t start, size_t len);
 
     /* --- Acesso --- */
@@ -429,6 +432,7 @@ ffi.cdef([[
     void               smaug_dt_free(smaug_series_dt_t *s);
     smaug_series_dt_t* smaug_dt_clone(const smaug_series_dt_t *s);
     smaug_series_dt_t* smaug_dt_coalesce_scalar(const smaug_series_dt_t *self, int64_t value);
+    smaug_series_dt_t* smaug_dt_coalesce(const smaug_series_dt_t *self, const smaug_series_dt_t *other);
     smaug_series_dt_t* smaug_dt_view(smaug_series_dt_t *s, size_t start, size_t len);
 
     /* Acesso */

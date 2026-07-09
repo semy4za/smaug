@@ -47,6 +47,12 @@ smaug_series_str_t* smaug_str_clone(const smaug_series_str_t *s);
 smaug_series_str_t* smaug_str_coalesce_scalar(const smaug_series_str_t *self,
                                               const char *value, size_t value_len);
 
+/* coalesce (null-mask, série+série): onde self[i] é nulo entra other[i] (se
+   válido); senão self[i]. Ambos nulos → nulo (resultado PODE ter nulos).
+   Serve combine_first. */
+smaug_series_str_t* smaug_str_coalesce(const smaug_series_str_t *self,
+                                       const smaug_series_str_t *other);
+
 /* View: janela zero-copy [start, start+len) sobre a série-pai (1-based no
    frontend; 0-based aqui). Diferente dos numéricos (buffer de tamanho fixo,
    view = soma de ponteiro O(1)), a string é offset-based, então a view usa um

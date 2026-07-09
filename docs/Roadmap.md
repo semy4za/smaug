@@ -477,15 +477,15 @@ escreve (mesma natureza da Sub-A do 9.1, reintroduzida na reconstrução).
     membros). `bool` no Anel 1 até 10.8; `dt` restrito a `number` (ISO → 12.16).
     Provado por FFI + suíte (fillna 39 checks). Valgrind 0-errors; cobertura de
     linha 98.73→98.75%.
-  - **Passo B.1.cov — fechar branch-alvo do `coalesce_scalar` [PRÉ-SELO PENDENTE]:**
-    o `--all` de 2026-07-06 deixou 8 branches novos descobertos, todos guards
-    defensivos das primitivas: `if (!self)` (i64:158, f64:164, str:199), `if (!r)`
-    (i64:161, f64:167, str:214), `if (!value && value_len>0)` (str:200) e o
-    `total>0?…`/`if (len>0) memcpy` do `str` (212/227). 7 são `COV-EXCL-BR` com o
-    mesmo precedente já no COVERAGE.md ("o engine não confia no caller" / OOM sem
-    injeção); `str:227` (`len==0`) é alcançável (`value=""`/string vazia) — confere
-    se o teste já cobre, senão adiciona teste. **Selo do null-mask escalar fica
-    incompleto até isto fechar.** Trabalho de Windows (edição de `src/` + reselo).
+  - **Passo B.1.cov — branch-alvo do `coalesce_scalar` [CONCLUÍDO 2026-07-08]:**
+    7 guards de contrato marcados `COV-EXCL-BR`; ramos alcançáveis do `str`
+    cobertos pelo teste de string vazia. Selo Fedora: Valgrind 0, branch-alvo
+    94.26%. Detalhe no CHANGELOG.
+  - **Passo B.2 — null-mask série CONCLUÍDO (2026-07-09):** `coalesce` série+série
+    por dtype (i64/f64/dt/str), irmão do escalar. `combine_first` delega (bool no
+    Anel 1 até 10.8; degrau sai). int64 > 2^53 exato; ambos-nulos → nulo. Fecha a
+    primitiva **(a)** do Passo B (escalar + série); restam (b) cond-bool e (c)
+    propagação. Selo Fedora: Valgrind 0, branch-alvo 94.26→94.33%. Detalhe no CHANGELOG.
 - 10.7 **`astype` — matriz `src×dst` no Anel 0** (achado 2026-07-02, mesma
   natureza do 10.6). O loop geral do `astype` também round-tripa por `get()`:
   conversão de/para int64 com valores > 2^53 grava corrompido. **Decisão
@@ -630,6 +630,13 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
   `dt` ficou restrito a `number` para não ampliar escopo. Alinhar: aceitar string
   ISO no `fillna` de datetime, parseando via `dt_parse` antes de delegar —
   uniformiza `fillna` com `set`/`append`.
+- 12.17 **`dt_coalesce_scalar` guards sem `COV-EXCL-BR`** — [Fedora] (achado
+  2026-07-09). Os guards `if (!self)` (datetime:219) e `if (!r)` (datetime:222)
+  do `dt_coalesce_scalar` não têm o tag `COV-EXCL-BR`, ao contrário dos irmãos
+  i64/f64/str, que o receberam no B.1.cov. Inconsistência pré-existente (não
+  regressão — contabilidade de branches fecha exata). Alinhar: marcar os dois
+  com a justificativa canônica ("engine não confia no caller" / OOM sem
+  injeção) e reselar.
 
 ## 13. Reescrita de exemplos + docstrings  [Windows]
 

@@ -233,6 +233,51 @@ smaug_series_str_t *smaug_str_coalesce_scalar(const smaug_series_str_t *self,
     return r;
 }
 
+/* coalesce (natureza null-mask, série+série), string: onde self[i] é nulo entra
+   other[i] (se other[i] válido); senão mantém self[i]. Ambos nulos → nulo
+   (ao contrário do coalesce_scalar, o resultado PODE ter nulos). Two-pass
+   O(n) offset-based, preserva \0 embutido; a máscara é setada por caso. */
+smaug_series_str_t *smaug_str_coalesce(const smaug_series_str_t *self,
+                                       const smaug_series_str_t *other) {
+    if (!self || !other || self->size != other->size) return NULL;  /* COV-EXCL-BR: combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente */
+
+    /* Passo 1: mede o buffer final. Ambos nulos contribui 0. */
+    size_t total = 0;
+    for (size_t i = 0; i < self->size; i++) {
+        if (SMAUG_VALID(self->null_mask, i))
+            total += self->offsets[i + 1] - self->offsets[i];
+        else if (SMAUG_VALID(other->null_mask, i))
+            total += other->offsets[i + 1] - other->offsets[i];
+    }
+
+    smaug_series_str_t *r =
+        smaug_str_create_with_capacity(self->size,
+                                       total > 0 ? total : SMAUG_STR_BUFFER_INIT);
+    if (!r) return NULL;  /* COV-EXCL-BR: falha de alloc; OOM sem injecao */
+
+    /* Passo 2: copia sequencial; máscara por caso (VÁLIDA se self ou other
+       fornecem, NULA se ambos nulos). */
+    size_t pos = 0;
+    for (size_t i = 0; i < self->size; i++) {
+        const char *src = NULL; size_t len = 0; bool valid = false;
+        if (SMAUG_VALID(self->null_mask, i)) {
+            src   = self->buffer + self->offsets[i];
+            len   = self->offsets[i + 1] - self->offsets[i];
+            valid = true;
+        } else if (SMAUG_VALID(other->null_mask, i)) {
+            src   = other->buffer + other->offsets[i];
+            len   = other->offsets[i + 1] - other->offsets[i];
+            valid = true;
+        }
+        if (len > 0) memcpy(r->buffer + pos, src, len);
+        pos += len;
+        r->null_mask[i]   = valid ? SMAUG_MASK_VALID : SMAUG_MASK_NULL;
+        r->offsets[i + 1] = pos;
+    }
+    r->buffer_len = pos;
+    return r;
+}
+
 /* Lê a string no índice idx. NÃO copia: devolve ponteiro para dentro do buffer
    e escreve o comprimento em *out_len. Retorna NULL se idx inválido ou elemento
    NULL (com *out_len = 0). Distingue "" (retorna ponteiro válido, *out_len=0,

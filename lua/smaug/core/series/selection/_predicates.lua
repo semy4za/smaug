@@ -11,7 +11,7 @@ return function(I)
     local methods = I.methods
     local Series  = I.Series
     local NA      = I.NA
-    local check_int64_lossless = I.check_int64_lossless   -- degrau família (10.6)
+    local wrap    = I.wrap
 
     -- =====================================================================
     -- F.2 — Predicados
@@ -259,19 +259,27 @@ return function(I)
             error("smaug: combine_first() — tamanhos diferentes ("..self:len()
                   .." vs "..other:len()..")", 2)
         end
-        local vals = {}
-        for i = 1, self:len() do
-            check_int64_lossless(self, i, "combine_first")
-            local v = self:get(i)
-            if v == nil then
-                check_int64_lossless(other, i, "combine_first")
-                local o = other:get(i)
-                vals[i] = (o == nil) and NA or o
-            else
-                vals[i] = v
+
+        -- bool continua no Anel 1 até o 10.8 (tipo paralelo, arrays crus). Sem
+        -- risco int64 → sem degrau; loop get/set direto.
+        if self._dtype == "bool" then
+            local vals = {}
+            for i = 1, self:len() do
+                local v = self:get(i)
+                if v == nil then
+                    local o = other:get(i)
+                    vals[i] = (o == nil) and NA or o
+                else
+                    vals[i] = v
+                end
             end
+            return Series.from_table(vals, self._dtype, self._name)
         end
-        return Series.from_table(vals, self._dtype, self._name)
+
+        -- Anel 0: delega a coalesce série+série (null-mask posicional). O degrau
+        -- sai — int64 > 2^53 preservado exato, sem round-trip por get().
+        local r = self._d.coalesce(self._c, other._c)
+        return wrap(r, self._dtype, self._name)
     end
 
     -- searchsorted(value, [side]): posição de inserção (1-based).

@@ -490,17 +490,59 @@ check(ddl:at(1, "b") == "x",        "DataSet drop a last: última a=1 tem b=x")
 -- ================================================================
 
 -- ===================================================================
--- Degrau família (10.6): combine_first recusa int64 > 2^53.
+-- 10.6 Passo B (série+série): combine_first delega a coalesce (Anel 0).
+-- int64 > 2^53 preservado EXATO nos dois caminhos (self mantém / other
+-- preenche) — o degrau saiu; cura a corrupção E a antiga recusa.
 -- ===================================================================
 do
     local ffi = require("ffi")
-    local BIG = ffi.new("int64_t", 9007199254740993LL)
-    local a = S.new("int64", 1, "a"); a:set_null(1)
-    local b = S.new("int64", 1, "b"); b:set(1, BIG)
-    check(not pcall(function() return a:combine_first(b) end), "degrau: combine_first i64>2^53 recusa")
+    local BIG = ffi.new("int64_t", 9007199254740993LL)  -- 2^53+1
+
+    -- self mantém o valor grande; buraco preenchido por other também grande;
+    -- posição ambos-nulos permanece nula.
+    local a = S.new("int64", 3, "a"); a:set(1, BIG); a:set_null(2); a:set_null(3)
+    local b = S.new("int64", 3, "b"); b:set(1, 7LL); b:set(2, BIG); b:set_null(3)
+    local r = a:combine_first(b)
+    check(tostring(r:get_raw(1)) == tostring(BIG), "10.6B: combine_first self 2^53+1 exato")
+    check(tostring(r:get_raw(2)) == tostring(BIG), "10.6B: combine_first buraco por other 2^53+1 exato")
+    check(r:is_null(3),                            "10.6B: combine_first ambos-nulos → nulo")
+
+    -- não-regressão: int64 <= 2^53 intacto.
     local a2 = S.new("int64", 1, "a"); a2:set_null(1)
     local b2 = S.from_table({42}, "int64")
-    check(a2:combine_first(b2):get(1) == 42, "degrau: combine_first i64<=2^53 intacto")
+    check(a2:combine_first(b2):get(1) == 42, "10.6B: combine_first i64<=2^53 intacto")
+
+    -- f64: tabela-verdade completa (self mantém / other preenche / ambos-nulos).
+    local fa = S.new("float64", 3); fa:set(1, 1.5); fa:set_null(2); fa:set_null(3)
+    local fb = S.new("float64", 3); fb:set(1, 9.9); fb:set(2, 2.5); fb:set_null(3)
+    local rf = fa:combine_first(fb)
+    check(rf:get(1) == 1.5,  "10.6B: combine_first f64 self mantido")
+    check(rf:get(2) == 2.5,  "10.6B: combine_first f64 buraco por other")
+    check(rf:is_null(3),     "10.6B: combine_first f64 ambos-nulos → nulo")
+
+    -- str: \0 embutido preservado, '' de self mantida (válida), ambos-nulos → nulo.
+    local sa = S.new("string", 4); sa:set(1, "abc"); sa:set_null(2); sa:set_null(3); sa:set(4, "")
+    local sb = S.new("string", 4); sb:set(1, "X"); sb:set(2, "a\0b"); sb:set_null(3); sb:set(4, "Y")
+    local rs = sa:combine_first(sb)
+    check(rs:get(1) == "abc",  "10.6B: combine_first str self mantido")
+    check(rs:get(2) == "a\0b", "10.6B: combine_first str buraco por other, \\0 preservado")
+    check(rs:is_null(3),       "10.6B: combine_first str ambos-nulos → nulo")
+    check(rs:get(4) == "",     "10.6B: combine_first str '' de self mantido (válido)")
+
+    -- str total==0: ambas toda-nulas → resultado toda-nulo, buffer final vazio
+    -- (exercita o ramo `total>0 ? total : INIT`).
+    local se = S.new("string", 2); se:set_null(1); se:set_null(2)
+    local so = S.new("string", 2); so:set_null(1); so:set_null(2)
+    local re = se:combine_first(so)
+    check(re:is_null(1) and re:is_null(2), "10.6B: combine_first str ambas toda-nulas → toda-nulo")
+
+    -- datetime (epoch_ms): self mantém / other preenche / ambos-nulos → nulo.
+    local da = S.new("datetime", 3); da:set(1, 1000); da:set_null(2); da:set_null(3)
+    local db = S.new("datetime", 3); db:set(1, 9999); db:set(2, 2000); db:set_null(3)
+    local rd = da:combine_first(db)
+    check(rd:get(1) == 1000, "10.6B: combine_first dt self mantido")
+    check(rd:get(2) == 2000, "10.6B: combine_first dt buraco por other")
+    check(rd:is_null(3),     "10.6B: combine_first dt ambos-nulos → nulo")
 end
 
 

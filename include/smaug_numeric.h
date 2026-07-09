@@ -29,6 +29,10 @@ smaug_series_f64_t* smaug_f64_div_scalar(const smaug_series_f64_t *a, double sca
    NaN existente preservado (opera sobre máscara). Serve fillna. */
 smaug_series_f64_t* smaug_f64_coalesce_scalar(const smaug_series_f64_t *self, double value);
 
+/* coalesce (null-mask, série+série): onde self[i] é nulo entra other[i] (se
+   válido); senão self[i]. Ambos nulos → nulo. Serve combine_first. */
+smaug_series_f64_t* smaug_f64_coalesce(const smaug_series_f64_t *self, const smaug_series_f64_t *other);
+
 /* Reduções (var/std são populacionais) */
 double smaug_f64_sum (const smaug_series_f64_t *s, bool ignore_na);
 double smaug_f64_mean(const smaug_series_f64_t *s, bool ignore_na);
@@ -87,6 +91,10 @@ smaug_series_i64_t* smaug_i64_div_scalar(const smaug_series_i64_t *a, int64_t sc
 /* coalesce_scalar (null-mask): onde self[i] é nulo, entra value; senão self[i].
    Resultado sem nulos. Serve fillna. */
 smaug_series_i64_t* smaug_i64_coalesce_scalar(const smaug_series_i64_t *self, int64_t value);
+
+/* coalesce (null-mask, série+série): onde self[i] é nulo entra other[i] (se
+   válido); senão self[i]. Ambos nulos → nulo. Serve combine_first. */
+smaug_series_i64_t* smaug_i64_coalesce(const smaug_series_i64_t *self, const smaug_series_i64_t *other);
 
 /* Reduções (sum/min/max retornam INT64_MIN como sentinela; mean/var/std → double) */
 int64_t smaug_i64_sum(const smaug_series_i64_t *s, bool ignore_na);

@@ -230,6 +230,26 @@ smaug_series_dt_t *smaug_dt_coalesce_scalar(const smaug_series_dt_t *self,
     return r;
 }
 
+/* coalesce (natureza null-mask, série+série): onde self[i] é nulo entra
+   other[i] (epoch_ms, se other[i] válido); senão mantém self[i]. Ambos nulos
+   → nulo. Serve combine_first. Reusa smaug_dt_clone; o loop só preenche os
+   buracos de self a partir de other — epoch_ms int64 exato. */
+smaug_series_dt_t *smaug_dt_coalesce(const smaug_series_dt_t *self,
+                                     const smaug_series_dt_t *other) {
+    if (!self || !other || self->size != other->size) return NULL;  /* COV-EXCL-BR: combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente */
+
+    smaug_series_dt_t *r = smaug_dt_clone(self);
+    if (!r) return NULL;  /* COV-EXCL-BR: falha de alloc do clone; OOM sem injecao */
+
+    for (size_t i = 0; i < self->size; i++) {
+        if (SMAUG_NULL(r->null_mask, i) && SMAUG_VALID(other->null_mask, i)) {
+            r->data[i]      = other->data[i];
+            r->null_mask[i] = SMAUG_MASK_VALID;
+        }
+    }
+    return r;
+}
+
 smaug_series_dt_t *smaug_dt_view(smaug_series_dt_t *s, size_t start, size_t len) {
     if (!s || start > s->size || len > s->size - start) return NULL;  /* COV-EXCL-BR: args inválidos — start > size ou len > size-start */
     smaug_series_dt_t *v = malloc(sizeof(smaug_series_dt_t));

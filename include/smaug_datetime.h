@@ -41,6 +41,10 @@ smaug_series_dt_t* smaug_dt_clone(const smaug_series_dt_t *s);
 /* coalesce_scalar (null-mask): onde self[i] é nulo, entra value (epoch_ms);
    senão self[i]. Serve fillna. */
 smaug_series_dt_t* smaug_dt_coalesce_scalar(const smaug_series_dt_t *self, int64_t value);
+
+/* coalesce (null-mask, série+série): onde self[i] é nulo entra other[i]
+   (epoch_ms, se válido); senão self[i]. Ambos nulos → nulo. Serve combine_first. */
+smaug_series_dt_t* smaug_dt_coalesce(const smaug_series_dt_t *self, const smaug_series_dt_t *other);
 smaug_series_dt_t* smaug_dt_view(smaug_series_dt_t *s, size_t start, size_t len);
 
 /* ===================== Acesso ===================== */

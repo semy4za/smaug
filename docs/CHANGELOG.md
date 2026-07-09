@@ -5,6 +5,52 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-09 — combine_first → Anel 0 via coalesce série+série (null-mask, lado série)
+
+Segunda metade da natureza null-mask vai ao Anel 0, fechando a primitiva (a) do
+Passo B (escalar + série). `coalesce` série+série por dtype: onde `self[i]` é
+nulo entra `other[i]` (se válido), senão `self[i]`; ambos nulos → nulo.
+i64/f64/dt reusam `clone` + preenchem buracos a partir de other; str faz
+two-pass offset-based (preserva `\0` e agora **pode** gerar nulos — máscara por
+caso, ao contrário do escalar, que sempre produzia série sem nulos).
+
+`combine_first` passa a delegar: valida Series/dtype/tamanho e chama
+`self._d.coalesce(self._c, other._c)`. O degrau `check_int64_lossless` **sai do
+`combine_first`** (int64 > 2^53 exato, sem round-trip por `get()`). bool fica no
+Anel 1 até 10.8 (branch próprio, sem degrau — sem risco int64).
+
+Testes: o teste antigo do degrau ("combine_first recusa int64 > 2^53") virou
+paridade Anel 0 — 2^53+1 exato nos dois caminhos, ambos-nulos → nulo, str com
+`\0`/vazia/`total==0`, dt self/other/ambos-nulos, nas 4 dtypes. Guards de
+entrada (`!self||!other||size`) marcados `COV-EXCL-BR` — `combine_first` valida
+antes de delegar.
+
+Selo Fedora: Valgrind 0-errors nos 12 binários, branch-alvo 94.26→94.33% (acima
+do baseline), zero descoberto nas coalesce. Com a primitiva (a) fechada, resta
+(b) cond-bool com Kleene (`where`/`mask`/`ifelse`) e (c) propagação
+(`ffill`/`bfill`).
+
+Achado registrado (12.17): `dt_coalesce_scalar` (datetime:219/222) sem
+`COV-EXCL-BR`, ao contrário dos irmãos i64/f64/str — inconsistência pré-existente
+do B.1, a corrigir (não é regressão; contabilidade de branches fecha exata).
+
+---
+## 2026-07-08 — selo do null-mask escalar completo (B.1.cov)
+
+Fecha a cobertura pendente das primitivas `coalesce_scalar`. O `--all` de
+2026-07-06 deixara os guards defensivos novos sem cobrir. Resolução: os 7
+guards de contrato (`if (!self)`, `if (!r)`, `if (!value && value_len>0)` em
+i64/f64/str) marcados `COV-EXCL-BR` com o precedente já firmado. Os dois ramos
+alcançáveis do `str` (`total>0?…` e `if (len>0) memcpy`) já ficavam cobertos
+pelo teste 10.6B de string vazia — `fillna("")` sobre série toda-nula e sobre
+mistura buraco/`"abc"` exercita os dois lados sem teste novo.
+
+Selado no Fedora: Valgrind 0-errors nos 12 binários, branch-alvo 94.26%
+(3693/3918, 105 excluídos), zero branch `coalesce_scalar` descoberto. Com isto o
+lado escalar da família seleção/preenchimento por máscara está 100% fechado —
+próximo: `coalesce` série+série (serve `combine_first`).
+
+---
 ## 2026-07-07 — fillna → Anel 0 via coalesce_scalar (natureza null-mask, lado escalar)
 
 Primeira das três naturezas da família seleção/preenchimento por máscara vai ao

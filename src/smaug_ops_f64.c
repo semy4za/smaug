@@ -175,6 +175,27 @@ smaug_series_f64_t *smaug_f64_coalesce_scalar(const smaug_series_f64_t *self,
     return r;
 }
 
+/* coalesce (natureza null-mask, série+série): onde self[i] é nulo entra
+   other[i] (se other[i] válido); senão mantém self[i]. Ambos nulos → nulo.
+   Serve combine_first. Opera sobre a MÁSCARA: NaN válido (de self ou de other)
+   é valor presente, preservado como está. Reusa smaug_f64_clone; o loop só
+   preenche os buracos de self a partir de other. */
+smaug_series_f64_t *smaug_f64_coalesce(const smaug_series_f64_t *self,
+                                       const smaug_series_f64_t *other) {
+    if (!self || !other || self->size != other->size) return NULL;  /* COV-EXCL-BR: combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente */
+
+    smaug_series_f64_t *r = smaug_f64_clone(self);
+    if (!r) return NULL;  /* COV-EXCL-BR: falha de alloc do clone; OOM sem injecao */
+
+    for (size_t i = 0; i < self->size; i++) {
+        if (SMAUG_NULL(r->null_mask, i) && SMAUG_VALID(other->null_mask, i)) {
+            r->data[i]      = other->data[i];
+            r->null_mask[i] = SMAUG_MASK_VALID;
+        }
+    }
+    return r;
+}
+
 /* ===================================================================
    REDUÇÕES
    ignore_na=false: retorna NAN ao encontrar o primeiro NULL.
