@@ -490,7 +490,7 @@ bash scripts/build.sh --all  # + Valgrind + coverage + manifest
 
 ```powershell
 # Windows (MSYS2-UCRT64)
-scripts/windows_build.ps1
+scripts/build_win.ps1
 ```
 
 ---

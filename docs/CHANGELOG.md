@@ -5,6 +5,18 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-09 — 12.17: alinha COV-EXCL-BR do dt_coalesce_scalar
+
+Os guards `if (!self)` (datetime:219) e `if (!r)` (datetime:222) do
+`dt_coalesce_scalar` estavam sem `COV-EXCL-BR`, ao contrário dos irmãos
+i64/f64/str (anotados no B.1.cov). Recebem agora a justificativa idêntica
+("engine não confia no caller" / OOM sem injeção). Mudança só de comentário,
+sem alteração funcional.
+
+Prévia Ubuntu (gcov, sem Valgrind): branch-alvo 94.33→94.38% — os 2 guards saem
+de descobertos para excluídos. Selo Fedora `--all` (Valgrind + gcov) pendente.
+
+---
 ## 2026-07-09 — combine_first → Anel 0 via coalesce série+série (null-mask, lado série)
 
 Segunda metade da natureza null-mask vai ao Anel 0, fechando a primitiva (a) do
@@ -519,7 +531,7 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   inalteradas (compartilhadas; Series são COW). Erro em coluna inexistente ou se o
   argumento não for mapa.
 - Tudo Lua-puro sobre a 5.0 (Anel 0 já validado no Fedora). DataSet stat: 49→90
-  checks. **Item 5 fecha** por equivalência Fedora; follow-up `windows_build.ps1`.
+  checks. **Item 5 fecha** por equivalência Fedora; follow-up `build_win.ps1`.
 
 ---
 ## 2026-06-28 — Item 5: reduções DataSet (5.1), min_count (5.5), delegação GroupBy (5.4)
@@ -608,7 +620,7 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
 - `[Windows]` Lua-puro, mesma categoria dos itens 2/3 (nenhum C tocado). Build
   Linux verde, parity 12/12. **Mudança de comportamento** + contrato novo, então
   os testes são o guard. Fecha por equivalência Fedora com confirmação do
-  `windows_build.ps1`.
+  `build_win.ps1`.
 
 ---
 ## 2026-06-28 — Timeline item 3: bool_view (exposição na camada Lua)
@@ -647,7 +659,7 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   (já provada no Windows). É a mesma categoria Lua-pura do item 2, não expõe C novo.
 - Fechado por equivalência Fedora: suíte Lua verde (incl. bool view+COW), parity
   12/12 (eixos 1 e 10 coerentes), Valgrind-clean. Follow-up leve: confirmar no
-  `windows_build.ps1`. A regra "C novo não fecha por equivalência" segue válida;
+  `build_win.ps1`. A regra "C novo não fecha por equivalência" segue válida;
   o item só não se enquadra nela.
 
 ---
@@ -660,7 +672,7 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
 - **Item 2 (Done via Fedora):** Lua puro, sem C tocado. Critério `[Windows]`
   suprido por validação Fedora (mesmo LuaJIT; parity eixo 09 OK; ponto sensível
   do `_dt.lua` exercitado de fato). Follow-up leve: confirmar com
-  `windows_build.ps1`. **Equivalência vale só por ser Lua puro — não é regra.**
+  `build_win.ps1`. **Equivalência vale só por ser Lua puro — não é regra.**
 
 ### Incidente: `lua/smaug/init.lua` (entry point) sobrescrito
 - Na aplicação do item 2, o orquestrador da Series (`core/series/init.lua`) foi
@@ -764,7 +776,7 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   realloc` não intercepta esses dois (resolvem internamente na libc), deixando
   todos os guards de OOM sobre eles sem exercício. Adicionados `__wrap_calloc`
   e `__wrap_strdup`; flag propagada às quatro configurações de build (Makefile,
-  build.sh, make_coverage.sh, windows_build.ps1). Verificações 1492 → 1515
+  build.sh, make_coverage.sh, build_win.ps1). Verificações 1492 → 1515
   (inclui sweep de OOM em `multi_argsort`/`multi_argsort_ffi`, antes sem
   cobertura de falha de alocação).
 - **Cobertura branch-alvo dos parsers** (medição Fedora autoritativa):
@@ -900,7 +912,7 @@ a família `smaug_{f64,i64}_rolling_*` — símbolos que o `ffi_loader.lua` decl
 e consome. A `.so` gerada pelo `build.sh` ficava sem eles: qualquer uso de
 rolling ou sort multi-coluna pelo frontend Lua quebraria em runtime com símbolo
 indefinido. Confirmado por `nm -D` (0 símbolos antes, 10 depois). O Makefile e
-o `windows_build.ps1` (que descobre `src/*.c` por glob) já estavam corretos —
+o `build_win.ps1` (que descobre `src/*.c` por glob) já estavam corretos —
 o bug era exclusivo do `build.sh`.
 
 ### Bug 2 — cobertura cega em `make_coverage.sh` (corrigido)
@@ -920,7 +932,7 @@ estrutura por domínio:
 - **`build.sh`** — `SRCS` += `smaug_ops_window.c`; `C_TESTS_PLAIN` += `test_ops_window`;
   testes C compilam de `tests/c/`; `LUA_TESTS` passou a listar as 18 suítes em
   subpasta (`series/…`, `dataset/…`, `io/…`, `props/…`).
-- **`windows_build.ps1`** — testes C de `tests\c\`; lista Lua atualizada para as
+- **`build_win.ps1`** — testes C de `tests\c\`; lista Lua atualizada para as
   18 suítes; normalização de separador (`/`→`\`) no caminho do luajit; cabeçalho
   corrigido (era "8 suites Lua").
 - **`make_coverage.sh`** — `SRCS` e `C_TESTS` corrigidos (ver Bug 2); testes C e
@@ -952,7 +964,7 @@ estrutura nova, confirmando zero dependência residual.
 
 ### Validação
 
-`windows_build.ps1` verde no Windows (MSYS2-UCRT64): DLL com 10 fontes, 12
+`build_win.ps1` verde no Windows (MSYS2-UCRT64): DLL com 10 fontes, 12
 testes C (incl. `test_ops_window` 207 checks, `test_io_c` 190 checks), 18 suítes
 Lua, 12 eixos de paridade OK, property-based 360 862 checks. MANIFEST: 113
 arquivos (era 154 antes da limpeza). Valgrind + cobertura no Fedora pendentes
@@ -1215,7 +1227,7 @@ função de classe, documentada à parte como `from_columns`). Roadmap marca F.5
 
 ### Corrigido — testes de I/O com path hardcoded (Windows)
 
-`windows_build.ps1` falhou em `test_io_c`, `test_io` e `test_io_real`: os testes
+`build_win.ps1` falhou em `test_io_c`, `test_io` e `test_io_real`: os testes
 escreviam em `/tmp/...`, que não existe no Windows/UCRT64. Não era regressão da
 biblioteca — `to_csv`/`smaug_write_csv` reportaram fielmente a falha de escrita.
 Introduzido helper `tmp_path` (um em C, um em Lua) que resolve o diretório
@@ -1270,10 +1282,10 @@ helpers `str_map` (→ Series<string>) e `bool_map` (→ Series<bool>) existente
 
 ### Sincronização das três fontes de build
 
-`windows_build.ps1` estava atrás em duas dimensões: faltava `test_datetime_c`
+`build_win.ps1` estava atrás em duas dimensões: faltava `test_datetime_c`
 (C) e seis suítes Lua (`test_datetime`, `test_categorical`, `test_completeness`,
 `test_dt_extended`, `test_stats`, `test_predicates`). Alinhado ao Makefile
-canônico — as três fontes (`Makefile`, `build.sh`, `windows_build.ps1`) agora
+canônico — as três fontes (`Makefile`, `build.sh`, `build_win.ps1`) agora
 rodam o conjunto idêntico, verificado por diff: 9 binários C plain + allocfail +
 stress, e 26 suítes Lua.
 
@@ -1863,7 +1875,7 @@ função de classe, documentada à parte como `from_columns`). Roadmap marca F.5
 
 ### Corrigido — testes de I/O com path hardcoded (Windows)
 
-`windows_build.ps1` falhou em `test_io_c`, `test_io` e `test_io_real`: os testes
+`build_win.ps1` falhou em `test_io_c`, `test_io` e `test_io_real`: os testes
 escreviam em `/tmp/...`, que não existe no Windows/UCRT64. Não era regressão da
 biblioteca — `to_csv`/`smaug_write_csv` reportaram fielmente a falha de escrita.
 Introduzido helper `tmp_path` (um em C, um em Lua) que resolve o diretório
@@ -1918,10 +1930,10 @@ helpers `str_map` (→ Series<string>) e `bool_map` (→ Series<bool>) existente
 
 ### Sincronização das três fontes de build
 
-`windows_build.ps1` estava atrás em duas dimensões: faltava `test_datetime_c`
+`build_win.ps1` estava atrás em duas dimensões: faltava `test_datetime_c`
 (C) e seis suítes Lua (`test_datetime`, `test_categorical`, `test_completeness`,
 `test_dt_extended`, `test_stats`, `test_predicates`). Alinhado ao Makefile
-canônico — as três fontes (`Makefile`, `build.sh`, `windows_build.ps1`) agora
+canônico — as três fontes (`Makefile`, `build.sh`, `build_win.ps1`) agora
 rodam o conjunto idêntico, verificado por diff: 9 binários C plain + allocfail +
 stress, e 26 suítes Lua.
 

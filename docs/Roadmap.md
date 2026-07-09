@@ -67,7 +67,7 @@ Resumo enxuto — detalhe histórico no apêndice e no `CHANGELOG`.
 # Timeline — caminho até a v1.0
 
 **Critério geral de fechamento** (vale para todo item, salvo exceção explícita):
-build verde (`build.sh --all` no Fedora / `windows_build.ps1` no Windows), teste
+build verde (`build.sh --all` no Fedora / `build_win.ps1` no Windows), teste
 que guarda o comportamento novo, parity 12/12, e — para itens de Ring 0 —
 Valgrind-clean + cobertura medida no Fedora. Nenhum item fecha sem um teste que o
 proteja de regressão. Documentação afetada (`CHANGELOG`, contrato, COW.md)
@@ -109,7 +109,7 @@ pura).
 > e o ponto sensível — carregamento do `_dt.lua` com `is_int_sentinel` — foi
 > exercitado de fato (chegou a regredir e foi corrigido). O risco conhecido do
 > MSYS2 (flush de `.gcda` via FFI) não se aplica: item 2 não tem cobertura-C.
-> **Follow-up leve:** rodar `windows_build.ps1` como confirmação; reabrir se
+> **Follow-up leve:** rodar `build_win.ps1` como confirmação; reabrir se
 > acusar algo. Esta equivalência vale SÓ por ser Lua puro — não vira regra para
 > itens `[Windows]` que expõem C novo (ex.: item 3).
 
@@ -142,7 +142,7 @@ frágil). Correção cirúrgica: fazer o infrator consumir o central.
 > item 2 — **não** expõe C novo. Critério `[Windows]` suprido por validação
 > Fedora: suíte Lua verde (incl. teste bool view+COW), parity 12/12 (eixos 1 e 10
 > coerentes com bool=view), Valgrind-clean (nenhuma regressão de memória).
-> **Follow-up leve:** confirmar com `windows_build.ps1`; reabrir se acusar algo.
+> **Follow-up leve:** confirmar com `build_win.ps1`; reabrir se acusar algo.
 > A regra "itens que expõem C novo não fecham por equivalência" segue válida —
 > item 3 simplesmente não se enquadra nela.
 
@@ -165,7 +165,7 @@ Decisão tomada: **expor**. Demonstrado rodando (view + COW idênticos a f64/i64
 > novo, então o guard são os testes: 8 novos cobrindo os quatro caminhos (simples,
 > composta, dois lados do join, NA em valores não dispara). Critério `[Windows]`
 > suprido por validação Fedora: suíte Lua verde, parity 12/12, Valgrind-clean.
-> **Follow-up leve:** confirmar com `windows_build.ps1`; reabrir se acusar algo.
+> **Follow-up leve:** confirmar com `build_win.ps1`; reabrir se acusar algo.
 > Nota: documentado como **Contrato 8** (o nº 7 já existe — "índices 1-based").
 
 Hoje join (casa NA com NA), groupby (erro) e pivot_table (aceita) tratam NA na
@@ -188,7 +188,7 @@ ou dropna antes`. NA em qualquer coluna da chave composta dispara.
 
 > **Concluído (2026-06-29).** 5.0 valida no Fedora (Anel 0: Valgrind-clean,
 > cobertura 101→99 exclusões fechando no ramo n<2). 5.1–5.5 (Lua-puro) verdes no
-> Fedora **e no Windows** (`windows_build.ps1`, MSYS2-UCRT64). **Decisões:**
+> Fedora **e no Windows** (`build_win.ps1`, MSYS2-UCRT64). **Decisões:**
 > reduções mantêm DataSet 1-linha (cada coluna preserva seu dtype); std/var
 > amostrais (ddof=1); element-wise numérico erra em coluna não-numérica; astype
 > por mapa.
@@ -228,7 +228,7 @@ do parity (83 assimetrias: 51 só-Series, 32 só-DataSet, 44 em ambos):
   **falha em gap real** (os.exit). 48 ambos · 6 pares · 74 intencionais · 0 gaps.
 - 6.5 ✅ `DataSet:clone()` (cópia profunda).
 
-> **Concluído (2026-06-29), Lua-puro.** Windows verde (`windows_build.ps1`,
+> **Concluído (2026-06-29), Lua-puro.** Windows verde (`build_win.ps1`,
 > Series acesso 34, DataSet core 212); equivalência Fedora de praxe para Lua-puro.
 > Build verde, parity 12/12.
 
@@ -372,7 +372,7 @@ espontânea; são decisões de contrato com aresta, que precisam estar resolvida
     (`access/_access.lua`) implementados; helper `warn` central adicionado em
     `init.lua` (reutilizável pelo 12.10). Guardado por teste em
     `test_constructors.lua` (9.1.1-9.1.3 + round-trip via `get_raw`).
-    **Confirmado no Windows** (`windows_build.ps1`, MSYS2-UCRT64): C 10/10
+    **Confirmado no Windows** (`build_win.ps1`, MSYS2-UCRT64): C 10/10
     binários PASS, stress 81851 checks, Lua 18/18 suítes verdes (incl.
     property-based 360862 checks), **parity 12/12**. `get_raw` registrado
     como exceção intencional do Eixo 2 (`scripts/parity/exceptions.txt`) —
@@ -630,13 +630,11 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
   `dt` ficou restrito a `number` para não ampliar escopo. Alinhar: aceitar string
   ISO no `fillna` de datetime, parseando via `dt_parse` antes de delegar —
   uniformiza `fillna` com `set`/`append`.
-- 12.17 **`dt_coalesce_scalar` guards sem `COV-EXCL-BR`** — [Fedora] (achado
-  2026-07-09). Os guards `if (!self)` (datetime:219) e `if (!r)` (datetime:222)
-  do `dt_coalesce_scalar` não têm o tag `COV-EXCL-BR`, ao contrário dos irmãos
-  i64/f64/str, que o receberam no B.1.cov. Inconsistência pré-existente (não
-  regressão — contabilidade de branches fecha exata). Alinhar: marcar os dois
-  com a justificativa canônica ("engine não confia no caller" / OOM sem
-  injeção) e reselar.
+- 12.17 **`dt_coalesce_scalar` guards sem `COV-EXCL-BR`** — [CONCLUÍDO
+  2026-07-09, selo Fedora pendente]. Os guards `if (!self)` (datetime:219) e
+  `if (!r)` (datetime:222) receberam `COV-EXCL-BR` com a justificativa canônica
+  dos irmãos i64/f64/str. Prévia Ubuntu: branch-alvo 94.33→94.38%. Selo Fedora
+  `--all` pendente (mudança só de comentário, sem alteração funcional).
 
 ## 13. Reescrita de exemplos + docstrings  [Windows]
 

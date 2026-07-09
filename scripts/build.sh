@@ -2,7 +2,7 @@
 # scripts/build.sh
 #
 # Build + testes completos do Smaug no Linux/macOS.
-# Equivalente ao windows_build.ps1, com Valgrind e coverage adicionais.
+# Equivalente ao build_win.ps1, com Valgrind e coverage adicionais.
 #
 # O que faz (por padrao, tudo):
 #   1. Compila o backend C em build/libsmaug.so

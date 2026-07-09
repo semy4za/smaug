@@ -216,10 +216,10 @@ smaug_series_dt_t *smaug_dt_clone(const smaug_series_dt_t *s) {
    buracos. Sem double no caminho — epoch_ms int64 exato. */
 smaug_series_dt_t *smaug_dt_coalesce_scalar(const smaug_series_dt_t *self,
                                             int64_t value) {
-    if (!self) return NULL;
+    if (!self) return NULL;  /* COV-EXCL-BR: o engine nao confia no caller; frontend nunca passa NULL (fillna valida antes) */
 
     smaug_series_dt_t *r = smaug_dt_clone(self);
-    if (!r) return NULL;
+    if (!r) return NULL;  /* COV-EXCL-BR: falha de alloc do clone; OOM sem injecao */
 
     for (size_t i = 0; i < self->size; i++) {
         if (SMAUG_NULL(r->null_mask, i)) {

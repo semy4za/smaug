@@ -55,7 +55,7 @@ luajit tests/io/test_csv.lua
 ## Windows — MSYS2-UCRT64
 
 ```powershell
-scripts/windows_build.ps1
+scripts/build_win.ps1
 ```
 
 Detecta automaticamente todos os `.c` em `src/` (incluindo parsers I/O).
@@ -180,6 +180,6 @@ e emite um aviso — inofensivo para compilação e cobertura.
 ## CMake
 
 > **⚠️ Bloco desatualizado / decisão pendente.** O CMake não está em uso.
-> O desenvolvimento usa o Makefile no Linux e `scripts/windows_build.ps1`
+> O desenvolvimento usa o Makefile no Linux e `scripts/build_win.ps1`
 > no Windows. O futuro deste bloco depende da decisão sobre portar para
 > Lua 5.4 (ver "Visão de longo prazo" no Roadmap).

@@ -1,4 +1,4 @@
-# scripts\windows_build.ps1
+# scripts\build_win.ps1
 #
 # Setup + build + testes do Smaug no Windows (sem make, sem Valgrind).
 #
@@ -14,8 +14,8 @@
 #   5. Regenera o MANIFEST.txt (make manifest equivalente).
 #
 # Uso (a partir da raiz do projeto):
-#   powershell -ExecutionPolicy Bypass -File .\scripts\windows_build.ps1
-#   powershell -ExecutionPolicy Bypass -File .\scripts\windows_build.ps1 -Setup
+#   powershell -ExecutionPolicy Bypass -File .\scripts\build_win.ps1
+#   powershell -ExecutionPolicy Bypass -File .\scripts\build_win.ps1 -Setup
 #
 # Observacoes:
 #   * Valgrind nao existe no Windows; a checagem de leaks fica so no Linux.
