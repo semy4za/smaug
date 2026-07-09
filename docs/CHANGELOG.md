@@ -5,6 +5,20 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-09 — rename: scripts/windows_build.ps1 → scripts/build_win.ps1
+
+Renomeado o script de build do Windows para `build_win.ps1`, alinhando com o
+par `build.sh`. O replace foi global (docs + scripts + header do próprio
+script); nenhuma referência a `windows_build.ps1` permanece no repo.
+
+Nota de registro: o replace alcançou também as entradas históricas deste
+CHANGELOG — sessões anteriores a esta data mencionam `build_win.ps1` embora, à
+época, o arquivo se chamasse `windows_build.ps1`. Escolha consciente para manter
+todas as referências apontando ao arquivo vigente; esta entrada documenta o
+rename para que o nome novo nas entradas antigas tenha explicação. Sem mudança
+funcional no script.
+
+---
 ## 2026-07-09 — 12.17: alinha COV-EXCL-BR do dt_coalesce_scalar
 
 Os guards `if (!self)` (datetime:219) e `if (!r)` (datetime:222) do
