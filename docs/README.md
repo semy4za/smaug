@@ -5,6 +5,14 @@ Dtypes: `float64`, `int64`, `bool`, `string`, `datetime`, `categorical`. Null po
 
 ---
 
+## Estado atual
+
+Smaug esta no **pré-1.0**.  
+A API ainda muda.  
+O que falta antes do 1.0 está no [Roadmap](Roadmap.md).  
+
+---
+
 ## Começando
 
 Os valores nascem tipados por inferência — você só declara o dtype quando a
@@ -448,7 +456,10 @@ não `NaN`); divisão por zero → `null` (não `NaN`, não `Inf`).
 > chega truncado, porque o Lua o representa como `double` antes de entrar na
 > lib. Para preservar os 64 bits, use `ffi.new("int64_t", ...)` ou o sufixo
 > `LL`, e leia de volta com `s:get_raw(i)` (o `get` normal converte para
-> `double`). Valores acima de 2^53 disparam aviso.
+> `double`). As operações já no Anel 0 (aritmética, `fillna`, `combine_first`)
+> preservam o valor exato; as que ainda rodam no Anel 1 (`where`/`mask`/`ifelse`,
+> `astype`) **recusam** valores > 2^53 com erro visível em vez de corromper, até
+> serem migradas. A entrada por literal grande ainda dispara aviso.
 
 ---
 
