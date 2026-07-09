@@ -15,7 +15,7 @@ return function(I)
     local ffi              = I.ffi
     local wrap             = I.wrap
     local NA               = I.NA
-    local check_int64_lossless = I.check_int64_lossless   -- degrau família (10.6)
+    local DTYPES           = I.DTYPES
     local bool_mask_parts  = I.bool_mask_parts
     local bool_series_from_raw = I.bool_series_from_raw
     local kleene_binop     = I.kleene_binop
@@ -104,6 +104,34 @@ return function(I)
     -- =====================================================================
 
     -- where(cond, other): mantém valor onde cond=true, substitui onde false/NA.
+    -- resolve_operand: materializa um operando (série, escalar ou nil→NA) num
+    -- cdata de tamanho n e dtype dado. Série já pronta é usada direto (valida
+    -- dtype/tamanho); escalar vira série constante via create+coalesce_scalar
+    -- (ambos selados); nil→NA é a própria série toda-nula. Broadcast em Lua,
+    -- sem primitivo C novo. ffi.gc no cdata cru garante liberação.
+    local function resolve_operand(desc, dtype, x, n, ctx)
+        if type(x) == "table" and x._c ~= nil then
+            if x._dtype ~= dtype then
+                error("smaug: "..ctx.."() — dtype do operando ('"..tostring(x._dtype)
+                      .."') difere de '"..dtype.."'", 3)
+            end
+            if x:len() ~= n then
+                error("smaug: "..ctx.."() — tamanho do operando ("..x:len()
+                      ..") difere de "..n, 3)
+            end
+            return x._c
+        end
+        local tmp = ffi.gc(desc.create(n), desc.free)   -- toda-nula
+        if x == nil then return tmp end                  -- nil → NA
+        if dtype == "string" then
+            if type(x) ~= "string" then
+                error("smaug: "..ctx.."() — operando escalar de string espera string", 3)
+            end
+            return ffi.gc(desc.coalesce_scalar(tmp, x, #x), desc.free)
+        end
+        return ffi.gc(desc.coalesce_scalar(tmp, x), desc.free)
+    end
+
     function methods.where(self, cond, other)
         if type(cond) ~= "table" or cond._dtype ~= "bool" then
             error("smaug: where() espera Series<bool> como primeiro argumento", 2)
@@ -111,20 +139,23 @@ return function(I)
         if cond:len() ~= self:len() then
             error("smaug: where() — tamanhos diferentes ("..cond:len().." vs "..self:len()..")", 2)
         end
-        local n    = self:len()
-        local vals = {}
-        local is_series_other = type(other) == "table" and other._dtype ~= nil
-        for i = 1, n do
-            local c = cond:get(i)
-            if c == true then
-                check_int64_lossless(self, i, "where")
-                vals[i] = self:get(i)
-            else
-                if is_series_other then check_int64_lossless(other, i, "where") end
-                vals[i] = is_series_other and other:get(i) or (other == nil and NA or other)
+        local n = self:len()
+        -- bool como dtype de VALOR fica no Anel 1 até 10.8 (sem risco int64).
+        if self._dtype == "bool" then
+            local vals = {}
+            local is_series_other = type(other) == "table" and other._dtype ~= nil
+            for i = 1, n do
+                if cond:get(i) == true then
+                    vals[i] = self:get(i)
+                else
+                    vals[i] = is_series_other and other:get(i) or (other == nil and NA or other)
+                end
             end
+            return Series.from_table(vals, self._dtype, self._name)
         end
-        return Series.from_table(vals, self._dtype, self._name)
+        -- Anel 0: where = select(cond, self, other). Degrau sai.
+        local b = resolve_operand(self._d, self._dtype, other, n, "where")
+        return wrap(self._d.select(cond._c, self._c, b), self._dtype, self._name)
     end
 
     -- mask(cond, other): inverso de where — substitui onde cond=true.
@@ -135,20 +166,22 @@ return function(I)
         if cond:len() ~= self:len() then
             error("smaug: mask() — tamanhos diferentes ("..cond:len().." vs "..self:len()..")", 2)
         end
-        local n    = self:len()
-        local vals = {}
-        local is_series_other = type(other) == "table" and other._dtype ~= nil
-        for i = 1, n do
-            local c = cond:get(i)
-            if c == true then
-                if is_series_other then check_int64_lossless(other, i, "mask") end
-                vals[i] = is_series_other and other:get(i) or (other == nil and NA or other)
-            else
-                check_int64_lossless(self, i, "mask")
-                vals[i] = self:get(i)
+        local n = self:len()
+        if self._dtype == "bool" then
+            local vals = {}
+            local is_series_other = type(other) == "table" and other._dtype ~= nil
+            for i = 1, n do
+                if cond:get(i) == true then
+                    vals[i] = is_series_other and other:get(i) or (other == nil and NA or other)
+                else
+                    vals[i] = self:get(i)
+                end
             end
+            return Series.from_table(vals, self._dtype, self._name)
         end
-        return Series.from_table(vals, self._dtype, self._name)
+        -- Anel 0: mask = select(cond, other, self) (lados trocados).
+        local a = resolve_operand(self._d, self._dtype, other, n, "mask")
+        return wrap(self._d.select(cond._c, a, self._c), self._dtype, self._name)
     end
 
     -- Series.ifelse(cond, a, b): vetorizado — a onde cond=true, b onde false/NA.
@@ -167,18 +200,23 @@ return function(I)
         elseif type(a) == "number" and a % 1 == 0 and
                (b == nil or (type(b) == "number" and b % 1 == 0)) then dtype = "int64"
         end
-        local vals = {}
-        for i = 1, n do
-            local c = cond:get(i)
-            if c == true then
-                if is_a then check_int64_lossless(a, i, "ifelse") end
-                vals[i] = is_a and a:get(i) or (a == nil and NA or a)
-            else
-                if is_b then check_int64_lossless(b, i, "ifelse") end
-                vals[i] = is_b and b:get(i) or (b == nil and NA or b)
+        -- bool como dtype de VALOR fica no Anel 1 até 10.8.
+        if dtype == "bool" then
+            local vals = {}
+            for i = 1, n do
+                if cond:get(i) == true then
+                    vals[i] = is_a and a:get(i) or (a == nil and NA or a)
+                else
+                    vals[i] = is_b and b:get(i) or (b == nil and NA or b)
+                end
             end
+            return Series.from_table(vals, dtype)
         end
-        return Series.from_table(vals, dtype)
+        -- Anel 0: ifelse = select(cond, a, b).
+        local desc = DTYPES[dtype]
+        local ra   = resolve_operand(desc, dtype, a, n, "ifelse")
+        local rb   = resolve_operand(desc, dtype, b, n, "ifelse")
+        return wrap(desc.select(cond._c, ra, rb), dtype)
     end
 
     -- isna(i) / notna(i): aliases de is_null / not is_null.

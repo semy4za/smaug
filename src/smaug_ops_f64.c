@@ -196,6 +196,29 @@ smaug_series_f64_t *smaug_f64_coalesce(const smaug_series_f64_t *self,
     return r;
 }
 
+/* select (cond-bool, ternário posicional): cond[i] true → a[i], senão (false OU
+   NA — decisão 1a) → b[i], preservando a nulidade do operando escolhido. NaN
+   válido é valor presente. Unifica where/mask/ifelse. */
+smaug_series_f64_t *smaug_f64_select(const smaug_series_bool_t *cond,
+                                     const smaug_series_f64_t *a,
+                                     const smaug_series_f64_t *b) {
+    if (!cond || !a || !b || cond->size != a->size || a->size != b->size)  /* COV-EXCL-BR: frontend valida Series/tamanhos antes de delegar */
+        return NULL;
+
+    smaug_series_f64_t *r = smaug_f64_create(a->size);
+    if (!r) return NULL;  /* COV-EXCL-BR: OOM sem injecao */
+
+    for (size_t i = 0; i < a->size; i++) {
+        bool take_a = SMAUG_VALID(cond->null_mask, i) && cond->data[i];
+        const smaug_series_f64_t *src = take_a ? a : b;
+        if (SMAUG_VALID(src->null_mask, i)) {
+            r->data[i]      = src->data[i];
+            r->null_mask[i] = SMAUG_MASK_VALID;
+        }
+    }
+    return r;
+}
+
 /* ===================================================================
    REDUÇÕES
    ignore_na=false: retorna NAN ao encontrar o primeiro NULL.

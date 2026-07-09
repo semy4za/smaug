@@ -45,6 +45,12 @@ smaug_series_dt_t* smaug_dt_coalesce_scalar(const smaug_series_dt_t *self, int64
 /* coalesce (null-mask, série+série): onde self[i] é nulo entra other[i]
    (epoch_ms, se válido); senão self[i]. Ambos nulos → nulo. Serve combine_first. */
 smaug_series_dt_t* smaug_dt_coalesce(const smaug_series_dt_t *self, const smaug_series_dt_t *other);
+
+/* select (cond-bool): cond[i] true → a[i], senão (false/NA) → b[i]. Preserva a
+   nulidade do operando escolhido. Unifica where/mask/ifelse. */
+smaug_series_dt_t* smaug_dt_select(const smaug_series_bool_t *cond,
+                                   const smaug_series_dt_t *a,
+                                   const smaug_series_dt_t *b);
 smaug_series_dt_t* smaug_dt_view(smaug_series_dt_t *s, size_t start, size_t len);
 
 /* ===================== Acesso ===================== */

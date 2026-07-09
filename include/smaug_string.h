@@ -53,6 +53,13 @@ smaug_series_str_t* smaug_str_coalesce_scalar(const smaug_series_str_t *self,
 smaug_series_str_t* smaug_str_coalesce(const smaug_series_str_t *self,
                                        const smaug_series_str_t *other);
 
+/* select (cond-bool): cond[i] true → a[i], senão (false/NA) → b[i]. Preserva a
+   nulidade do operando escolhido (resultado PODE ter nulos). Unifica
+   where/mask/ifelse para string. */
+smaug_series_str_t* smaug_str_select(const smaug_series_bool_t *cond,
+                                     const smaug_series_str_t *a,
+                                     const smaug_series_str_t *b);
+
 /* View: janela zero-copy [start, start+len) sobre a série-pai (1-based no
    frontend; 0-based aqui). Diferente dos numéricos (buffer de tamanho fixo,
    view = soma de ponteiro O(1)), a string é offset-based, então a view usa um

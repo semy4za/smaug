@@ -486,6 +486,10 @@ escreve (mesma natureza da Sub-A do 9.1, reintroduzida na reconstrução).
     Anel 1 até 10.8; degrau sai). int64 > 2^53 exato; ambos-nulos → nulo. Fecha a
     primitiva **(a)** do Passo B (escalar + série); restam (b) cond-bool e (c)
     propagação. Selo Fedora: Valgrind 0, branch-alvo 94.26→94.33%. Detalhe no CHANGELOG.
+  - **Passo B.3 — cond-bool `select` CONCLUÍDO (2026-07-09):** `select(cond,a,b)`
+    por dtype (i64/f64/dt/str); cond true→a, false/NA→b (1a). Unifica
+    where/mask/ifelse; escalar/nil por broadcast em Lua. Degrau sai. **Fecha a
+    primitiva (b)**; resta (c). Windows OK; branch-alvo 94.38→94.49%. Selo Fedora pendente.
 - 10.7 **`astype` — matriz `src×dst` no Anel 0** (achado 2026-07-02, mesma
   natureza do 10.6). O loop geral do `astype` também round-tripa por `get()`:
   conversão de/para int64 com valores > 2^53 grava corrompido. **Decisão
@@ -635,6 +639,8 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
   `if (!r)` (datetime:222) receberam `COV-EXCL-BR` com a justificativa canônica
   dos irmãos i64/f64/str. Prévia Ubuntu: branch-alvo 94.33→94.38%. Selo Fedora
   `--all` pendente (mudança só de comentário, sem alteração funcional).
+ - 12.18 **guards `if(!s)` de `dt_get`/`dt_set` sem `COV-EXCL-BR`** — [Fedora]
+   (achado 2026-07-09, datetime:296/313). Mesma natureza do 12.17. Alinhar e reselar.
 
 ## 13. Reescrita de exemplos + docstrings  [Windows]
 

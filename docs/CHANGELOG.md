@@ -5,6 +5,19 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-09 — where/mask/ifelse → Anel 0 via select (cond-bool)
+
+Primitiva (b) ao Anel 0. `select(cond,a,b)` por dtype: cond true→a, senão
+(false ou NA)→b, preservando nulidade do escolhido. NA→false (decisão 1a).
+Unifica where=select(cond,self,other), mask=lados trocados, ifelse=select(cond,a,b).
+Escalar/nil por broadcast em Lua (reuso create+coalesce_scalar, sem C novo).
+Degrau sai das três; int64 > 2^53 exato. bool-valor no Anel 1 até 10.8.
+
+FFI: struct bool movido pra antes do f64 no cdef. Guards de entrada COV-EXCL-BR.
+Testes: degrau → paridade Anel 0 nas 4 dtypes (selection 48 checks). Windows
+12/12; prévia Ubuntu branch-alvo 94.38→94.49%. Selo Fedora pendente.
+
+---
 ## 2026-07-09 — rename: scripts/windows_build.ps1 → scripts/build_win.ps1
 
 Renomeado o script de build do Windows para `build_win.ps1`, alinhando com o

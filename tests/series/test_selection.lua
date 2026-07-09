@@ -105,20 +105,89 @@ do
 end
 
 -- ===================================================================
--- Degrau família (10.6): where/mask/ifelse recusam int64 > 2^53 que a
--- leitura via get() corromperia. <= 2^53 e float: intactos.
+-- 10.6 Passo (b): where/mask/ifelse delegam a select (Anel 0).
+-- cond true → a, false OU NA → b (decisão 1a). int64 > 2^53 exato nos
+-- dois ramos; degrau saiu. Broadcast de escalar/nil em Lua.
 -- ===================================================================
 do
     local ffi = require("ffi")
     local BIG = ffi.new("int64_t", 9007199254740993LL)  -- 2^53+1
-    local big = S.new("int64", 2, "b"); big:set(1, BIG); big:set(2, BIG)
-    local cond = S.from_table({true, false}, "bool")
-    check(not pcall(function() return big:where(cond, big) end),   "degrau: where i64>2^53 recusa")
-    check(not pcall(function() return big:mask(cond, big) end),    "degrau: mask i64>2^53 recusa")
-    check(not pcall(function() return S.ifelse(cond, big, big) end),"degrau: ifelse i64>2^53 recusa")
+
+    -- cond = [true, false, NA]
+    local cond = S.new("bool", 3, "c"); cond:set(1, true); cond:set(2, false); cond:set_null(3)
+
+    -- i64: BIG em ambos os ramos + valores distintos pra provar a fonte.
+    -- a=[BIG,5,5]  o=[7,BIG,NA]
+    local a = S.new("int64", 3, "a"); a:set(1, BIG); a:set(2, 5); a:set(3, 5)
+    local o = S.new("int64", 3, "o"); o:set(1, 7); o:set(2, BIG); o:set_null(3)
+
+    local w = a:where(cond, o)          -- true→a, false/NA→o
+    check(tostring(w:get_raw(1)) == tostring(BIG), "10.6b: where true→a (2^53+1 exato)")
+    check(tostring(w:get_raw(2)) == tostring(BIG), "10.6b: where false→o (2^53+1 exato)")
+    check(w:is_null(3),                            "10.6b: where NA→o (nulo)")
+
+    local m = a:mask(cond, o)           -- inverso: true→o, false/NA→a
+    check(m:get(1) == 7,                "10.6b: mask true→o")
+    check(m:get(2) == 5,                "10.6b: mask false→a")
+    check(m:get(3) == 5,                "10.6b: mask NA→a")
+
+    local fi = S.ifelse(cond, a, o)     -- = where(a,cond,o)
+    check(tostring(fi:get_raw(1)) == tostring(BIG) and
+          tostring(fi:get_raw(2)) == tostring(BIG) and fi:is_null(3),
+          "10.6b: ifelse = where (a,o)")
+
+    -- operando escalar (broadcast em Lua): false/NA → 0
+    local ws = a:where(cond, 0)
+    check(tostring(ws:get_raw(1)) == tostring(BIG), "10.6b: where escalar true→a")
+    check(ws:get(2) == 0 and ws:get(3) == 0,        "10.6b: where escalar false/NA→0")
+
+    -- operando nil → NA
+    local wn = a:where(cond, nil)
+    check(tostring(wn:get_raw(1)) == tostring(BIG), "10.6b: where nil true→a")
+    check(wn:is_null(2) and wn:is_null(3),          "10.6b: where nil false/NA→NA")
+
+    -- f64
+    local fa = S.new("float64", 3); fa:set(1, 1.5); fa:set(2, 9.0); fa:set(3, 9.0)
+    local fo = S.new("float64", 3); fo:set(1, 7.0); fo:set(2, 2.5); fo:set_null(3)
+    local fw = fa:where(cond, fo)
+    check(fw:get(1) == 1.5 and fw:get(2) == 2.5 and fw:is_null(3), "10.6b: where f64 tabela-verdade")
+
+    -- str: \0 embutido, ambos ramos, NA→b nulo
+    local sa = S.new("string", 3); sa:set(1, "abc"); sa:set(2, "z"); sa:set(3, "q")
+    local sb = S.new("string", 3); sb:set(1, "x"); sb:set(2, "a\0b"); sb:set_null(3)
+    local sw = sa:where(cond, sb)
+    check(sw:get(1) == "abc",  "10.6b: where str true→a")
+    check(sw:get(2) == "a\0b", "10.6b: where str false→b (\\0 preservado)")
+    check(sw:is_null(3),       "10.6b: where str NA→b nulo")
+
+    -- str: '' válida selecionada em ambos → len==0 nos dois lados e total==0
+    -- (exercita `if (len>0)` e o ramo `total>0 ? total : INIT`).
+    local ea = S.new("string", 2); ea:set(1, ""); ea:set_null(2)
+    local eb = S.new("string", 2); eb:set_null(1); eb:set(2, "")
+    local c2s = S.from_table({true, false}, "bool")
+    local ew = ea:where(c2s, eb)   -- [ea[1]="", eb[2]=""]
+    check(ew:get(1) == "" and ew:get(2) == "" and not ew:is_null(1) and not ew:is_null(2),
+          "10.6b: where str '' válida len==0 / total==0")
+
+    -- datetime (epoch_ms)
+    local da = S.new("datetime", 3); da:set(1, 1000); da:set(2, 9); da:set(3, 9)
+    local dob = S.new("datetime", 3); dob:set(1, 7); dob:set(2, 2000); dob:set_null(3)
+    local dw = da:where(cond, dob)
+    check(dw:get(1) == 1000 and dw:get(2) == 2000 and dw:is_null(3), "10.6b: where dt tabela-verdade")
+
+    -- não-regressão: int64 <= 2^53 intacto
     local sm = S.from_table({10, 20}, "int64")
-    check(sm:where(cond, sm):get(1) == 10,       "degrau: where i64<=2^53 intacto")
-    check(S.ifelse(cond, sm, sm):get(1) == 10,   "degrau: ifelse i64<=2^53 intacto")
+    local c2 = S.from_table({true, false}, "bool")
+    check(sm:where(c2, sm):get(1) == 10,     "10.6b: where i64<=2^53 intacto")
+    check(S.ifelse(c2, sm, sm):get(1) == 10, "10.6b: ifelse i64<=2^53 intacto")
+
+    -- falha visível: operando série de dtype diferente
+    local wrong = S.from_table({1.0, 2.0, 3.0}, "float64")
+    check(not pcall(function() return a:where(cond, wrong) end),
+          "10.6b: where dtype divergente → erro visível")
+    -- falha visível: cond de tamanho diferente
+    check(not pcall(function() return a:where(S.from_table({true}, "bool"), o) end),
+          "10.6b: where cond tamanho errado → erro visível")
 end
 
 

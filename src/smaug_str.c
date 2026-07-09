@@ -278,6 +278,49 @@ smaug_series_str_t *smaug_str_coalesce(const smaug_series_str_t *self,
     return r;
 }
 
+/* select (cond-bool, ternário posicional), string: cond[i] true → a[i], senão
+   (false OU NA — decisão 1a) → b[i], preservando a nulidade do operando
+   escolhido (resultado PODE ter nulos). Two-pass offset-based, preserva \0.
+   Unifica where/mask/ifelse para string. */
+smaug_series_str_t *smaug_str_select(const smaug_series_bool_t *cond,
+                                     const smaug_series_str_t *a,
+                                     const smaug_series_str_t *b) {
+    if (!cond || !a || !b || cond->size != a->size || a->size != b->size)  /* COV-EXCL-BR: frontend valida Series/tamanhos antes de delegar */
+        return NULL;
+
+    /* Passo 1: mede o buffer final a partir do operando escolhido por posição. */
+    size_t total = 0;
+    for (size_t i = 0; i < a->size; i++) {
+        bool take_a = SMAUG_VALID(cond->null_mask, i) && cond->data[i];
+        const smaug_series_str_t *src = take_a ? a : b;
+        if (SMAUG_VALID(src->null_mask, i))
+            total += src->offsets[i + 1] - src->offsets[i];
+    }
+
+    smaug_series_str_t *r =
+        smaug_str_create_with_capacity(a->size,
+                                       total > 0 ? total : SMAUG_STR_BUFFER_INIT);
+    if (!r) return NULL;  /* COV-EXCL-BR: OOM sem injecao */
+
+    /* Passo 2: copia do operando escolhido; máscara por caso. */
+    size_t pos = 0;
+    for (size_t i = 0; i < a->size; i++) {
+        bool take_a = SMAUG_VALID(cond->null_mask, i) && cond->data[i];
+        const smaug_series_str_t *src = take_a ? a : b;
+        size_t len = 0; bool valid = false;
+        if (SMAUG_VALID(src->null_mask, i)) {
+            len   = src->offsets[i + 1] - src->offsets[i];
+            valid = true;
+            if (len > 0) memcpy(r->buffer + pos, src->buffer + src->offsets[i], len);
+        }
+        pos += len;
+        r->null_mask[i]   = valid ? SMAUG_MASK_VALID : SMAUG_MASK_NULL;
+        r->offsets[i + 1] = pos;
+    }
+    r->buffer_len = pos;
+    return r;
+}
+
 /* Lê a string no índice idx. NÃO copia: devolve ponteiro para dentro do buffer
    e escreve o comprimento em *out_len. Retorna NULL se idx inválido ou elemento
    NULL (com *out_len = 0). Distingue "" (retorna ponteiro válido, *out_len=0,

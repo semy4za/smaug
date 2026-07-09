@@ -33,6 +33,12 @@ smaug_series_f64_t* smaug_f64_coalesce_scalar(const smaug_series_f64_t *self, do
    válido); senão self[i]. Ambos nulos → nulo. Serve combine_first. */
 smaug_series_f64_t* smaug_f64_coalesce(const smaug_series_f64_t *self, const smaug_series_f64_t *other);
 
+/* select (cond-bool): cond[i] true → a[i], senão (false/NA) → b[i]. Preserva a
+   nulidade do operando escolhido. Unifica where/mask/ifelse. */
+smaug_series_f64_t* smaug_f64_select(const smaug_series_bool_t *cond,
+                                     const smaug_series_f64_t *a,
+                                     const smaug_series_f64_t *b);
+
 /* Reduções (var/std são populacionais) */
 double smaug_f64_sum (const smaug_series_f64_t *s, bool ignore_na);
 double smaug_f64_mean(const smaug_series_f64_t *s, bool ignore_na);
@@ -95,6 +101,12 @@ smaug_series_i64_t* smaug_i64_coalesce_scalar(const smaug_series_i64_t *self, in
 /* coalesce (null-mask, série+série): onde self[i] é nulo entra other[i] (se
    válido); senão self[i]. Ambos nulos → nulo. Serve combine_first. */
 smaug_series_i64_t* smaug_i64_coalesce(const smaug_series_i64_t *self, const smaug_series_i64_t *other);
+
+/* select (cond-bool): cond[i] true → a[i], senão (false/NA) → b[i]. Preserva a
+   nulidade do operando escolhido. Unifica where/mask/ifelse. */
+smaug_series_i64_t* smaug_i64_select(const smaug_series_bool_t *cond,
+                                     const smaug_series_i64_t *a,
+                                     const smaug_series_i64_t *b);
 
 /* Reduções (sum/min/max retornam INT64_MIN como sentinela; mean/var/std → double) */
 int64_t smaug_i64_sum(const smaug_series_i64_t *s, bool ignore_na);

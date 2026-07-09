@@ -190,6 +190,30 @@ smaug_series_i64_t *smaug_i64_coalesce(const smaug_series_i64_t *self,
     return r;
 }
 
+/* select (cond-bool, ternário posicional): onde cond[i] é true entra a[i],
+   senão (false OU NA — decisão 1a) entra b[i], preservando a nulidade do
+   operando escolhido. Unifica where/mask/ifelse. NA da cond faz curto-circuito
+   natural via SMAUG_VALID(cond) && cond->data[i]. */
+smaug_series_i64_t *smaug_i64_select(const smaug_series_bool_t *cond,
+                                     const smaug_series_i64_t *a,
+                                     const smaug_series_i64_t *b) {
+    if (!cond || !a || !b || cond->size != a->size || a->size != b->size)  /* COV-EXCL-BR: frontend valida Series/tamanhos antes de delegar */
+        return NULL;
+
+    smaug_series_i64_t *r = smaug_i64_create(a->size);
+    if (!r) return NULL;  /* COV-EXCL-BR: OOM sem injecao */
+
+    for (size_t i = 0; i < a->size; i++) {
+        bool take_a = SMAUG_VALID(cond->null_mask, i) && cond->data[i];
+        const smaug_series_i64_t *src = take_a ? a : b;
+        if (SMAUG_VALID(src->null_mask, i)) {
+            r->data[i]      = src->data[i];
+            r->null_mask[i] = SMAUG_MASK_VALID;
+        }
+    }
+    return r;
+}
+
 /* ===================================================================
    REDUÇÕES
    Funções que retornam int64_t NÃO TÊM como representar NAN.

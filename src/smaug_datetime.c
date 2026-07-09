@@ -250,6 +250,29 @@ smaug_series_dt_t *smaug_dt_coalesce(const smaug_series_dt_t *self,
     return r;
 }
 
+/* select (cond-bool, ternário posicional): cond[i] true → a[i], senão (false OU
+   NA — decisão 1a) → b[i] (epoch_ms), preservando a nulidade do operando
+   escolhido. Unifica where/mask/ifelse. */
+smaug_series_dt_t *smaug_dt_select(const smaug_series_bool_t *cond,
+                                   const smaug_series_dt_t *a,
+                                   const smaug_series_dt_t *b) {
+    if (!cond || !a || !b || cond->size != a->size || a->size != b->size)  /* COV-EXCL-BR: frontend valida Series/tamanhos antes de delegar */
+        return NULL;
+
+    smaug_series_dt_t *r = smaug_dt_create(a->size);
+    if (!r) return NULL;  /* COV-EXCL-BR: OOM sem injecao */
+
+    for (size_t i = 0; i < a->size; i++) {
+        bool take_a = SMAUG_VALID(cond->null_mask, i) && cond->data[i];
+        const smaug_series_dt_t *src = take_a ? a : b;
+        if (SMAUG_VALID(src->null_mask, i)) {
+            r->data[i]      = src->data[i];
+            r->null_mask[i] = SMAUG_MASK_VALID;
+        }
+    }
+    return r;
+}
+
 smaug_series_dt_t *smaug_dt_view(smaug_series_dt_t *s, size_t start, size_t len) {
     if (!s || start > s->size || len > s->size - start) return NULL;  /* COV-EXCL-BR: args inválidos — start > size ou len > size-start */
     smaug_series_dt_t *v = malloc(sizeof(smaug_series_dt_t));

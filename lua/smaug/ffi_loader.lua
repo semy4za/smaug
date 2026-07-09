@@ -36,6 +36,18 @@ ffi.cdef([[
     } smaug_status_t;
 
     /* ===================================================================
+       Series Bool — declarado cedo: referenciado por *_select (cond-bool).
+       =================================================================== */
+
+    typedef struct {
+        uint8_t          *data;
+        smaug_mask_t     *null_mask;
+        size_t            size;
+        size_t            capacity;
+        smaug_metadata_t  meta;
+    } smaug_series_bool_t;
+
+    /* ===================================================================
        Series Float64
        =================================================================== */
 
@@ -55,6 +67,7 @@ ffi.cdef([[
     smaug_series_f64_t* smaug_f64_clone(const smaug_series_f64_t *s);
     smaug_series_f64_t* smaug_f64_coalesce_scalar(const smaug_series_f64_t *self, double value);
     smaug_series_f64_t* smaug_f64_coalesce(const smaug_series_f64_t *self, const smaug_series_f64_t *other);
+    smaug_series_f64_t* smaug_f64_select(const smaug_series_bool_t *cond, const smaug_series_f64_t *a, const smaug_series_f64_t *b);
     smaug_series_f64_t* smaug_f64_view(smaug_series_f64_t *s, size_t start, size_t len);
 
     /* --- Getters / Setters --- */
@@ -141,6 +154,7 @@ ffi.cdef([[
     smaug_series_i64_t* smaug_i64_clone(const smaug_series_i64_t *s);
     smaug_series_i64_t* smaug_i64_coalesce_scalar(const smaug_series_i64_t *self, int64_t value);
     smaug_series_i64_t* smaug_i64_coalesce(const smaug_series_i64_t *self, const smaug_series_i64_t *other);
+    smaug_series_i64_t* smaug_i64_select(const smaug_series_bool_t *cond, const smaug_series_i64_t *a, const smaug_series_i64_t *b);
     smaug_series_i64_t* smaug_i64_view(smaug_series_i64_t *s, size_t start, size_t len);
 
     /* --- Getters / Setters --- */
@@ -216,14 +230,6 @@ ffi.cdef([[
        Struct-based, espelha f64/i64. As funções raw abaixo (smaug_bool_and
        etc.) permanecem para a BoolSeries legada até a Fase 4.
        =================================================================== */
-
-    typedef struct {
-        uint8_t          *data;
-        smaug_mask_t     *null_mask;
-        size_t            size;
-        size_t            capacity;
-        smaug_metadata_t  meta;
-    } smaug_series_bool_t;
 
     /* --- Lifecycle --- */
     smaug_series_bool_t* smaug_bool_create(size_t size);
@@ -317,6 +323,7 @@ ffi.cdef([[
     smaug_series_str_t* smaug_str_clone(const smaug_series_str_t *s);
     smaug_series_str_t* smaug_str_coalesce_scalar(const smaug_series_str_t *self, const char *value, size_t value_len);
     smaug_series_str_t* smaug_str_coalesce(const smaug_series_str_t *self, const smaug_series_str_t *other);
+    smaug_series_str_t* smaug_str_select(const smaug_series_bool_t *cond, const smaug_series_str_t *a, const smaug_series_str_t *b);
     smaug_series_str_t* smaug_str_view(smaug_series_str_t *s, size_t start, size_t len);
 
     /* --- Acesso --- */
@@ -433,6 +440,7 @@ ffi.cdef([[
     smaug_series_dt_t* smaug_dt_clone(const smaug_series_dt_t *s);
     smaug_series_dt_t* smaug_dt_coalesce_scalar(const smaug_series_dt_t *self, int64_t value);
     smaug_series_dt_t* smaug_dt_coalesce(const smaug_series_dt_t *self, const smaug_series_dt_t *other);
+    smaug_series_dt_t* smaug_dt_select(const smaug_series_bool_t *cond, const smaug_series_dt_t *a, const smaug_series_dt_t *b);
     smaug_series_dt_t* smaug_dt_view(smaug_series_dt_t *s, size_t start, size_t len);
 
     /* Acesso */
