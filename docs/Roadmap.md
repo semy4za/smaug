@@ -490,6 +490,10 @@ escreve (mesma natureza da Sub-A do 9.1, reintroduzida na reconstrução).
     por dtype (i64/f64/dt/str); cond true→a, false/NA→b (1a). Unifica
     where/mask/ifelse; escalar/nil por broadcast em Lua. Degrau sai. **Fecha a
     primitiva (b)**; resta (c). Windows OK; branch-alvo 94.38→94.49%. Selo Fedora pendente.
+  - **Passo (c) — propagação `ffill`/`bfill`:** já no Anel 0 desde o item 7.1
+    (movimentação de dados agnóstica a tipo, 5 dtypes, Lua delega limpo).
+    Teste dirigido int64 > 2^53 adicionado (2026-07-09). **10.6 CONCLUÍDO:
+    (a) coalesce + (b) select + (c) ffill/bfill — família inteira no Anel 0.**
 - 10.7 **`astype` — matriz `src×dst` no Anel 0** (achado 2026-07-02, mesma
   natureza do 10.6). O loop geral do `astype` também round-tripa por `get()`:
   conversão de/para int64 com valores > 2^53 grava corrompido. **Decisão

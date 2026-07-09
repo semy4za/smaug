@@ -5,6 +5,15 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-09 — 10.6 fechado: teste int64 > 2^53 em ffill/bfill
+
+A primitiva (c) da família (`ffill`/`bfill`) já estava no Anel 0 desde o 7.1 —
+não exigiu migração. Adicionado teste dirigido de int64 > 2^53 (cópia C direta
+preserva exato) para fechar a prova da família com o mesmo rigor de (a)/(b).
+Fecha o 10.6: seleção/preenchimento por máscara inteiramente no Anel 0.
+Window 116→122 checks. Teste-only.
+
+---
 ## 2026-07-09 — where/mask/ifelse → Anel 0 via select (cond-bool)
 
 Primitiva (b) ao Anel 0. `select(cond,a,b)` por dtype: cond true→a, senão
