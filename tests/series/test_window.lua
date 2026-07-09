@@ -272,6 +272,23 @@ check(sdf:get(2) == sdf:get(1),        "dt ffill: [2] carrega [1]")
 local sdb = sd:bfill()
 check(sdb:get(3) == sdb:get(4),        "dt bfill: [3] carrega [4]")
 
+-- int64 > 2^53: ffill/bfill carregam o valor EXATO (cópia C direta de int64_t,
+-- sem round-trip por get()). Fecha a prova da família null-mask/seleção (10.6).
+do
+    local ffi = require("ffi")
+    local BIG = ffi.new("int64_t", 9007199254740993LL)  -- 2^53+1
+    local si  = S.new("int64", 4, "big")
+    si:set(1, BIG); si:set_null(2); si:set_null(3); si:set(4, 5LL)
+    local sif = si:ffill()   -- [BIG, BIG, BIG, 5]
+    check(tostring(sif:get_raw(1)) == tostring(BIG), "i64 ffill: [1] 2^53+1 exato")
+    check(tostring(sif:get_raw(2)) == tostring(BIG), "i64 ffill: [2] carrega 2^53+1 exato")
+    check(tostring(sif:get_raw(3)) == tostring(BIG), "i64 ffill: [3] carrega 2^53+1 exato")
+    check(sif:get(4) == 5,                            "i64 ffill: [4] mantém 5")
+    local sib = si:bfill()   -- [BIG, 5, 5, 5]
+    check(tostring(sib:get_raw(1)) == tostring(BIG), "i64 bfill: [1] 2^53+1 exato mantido")
+    check(sib:get(2) == 5 and sib:get(3) == 5,        "i64 bfill: [2]/[3] carregam 5")
+end
+
 -- série toda nula permanece toda nula
 local sn = S.from_table({NA, NA, NA}, "string")
 check(sn:ffill():count_nonnull() == 0, "str ffill all-null: 0 válidos")

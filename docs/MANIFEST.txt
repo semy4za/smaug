@@ -9,14 +9,14 @@ cfd9050ef0a0394ffc1acb1afacd2358274ffcd749e1846bab3a39ae7a448bc4     581  .\docs
 169580ce180057b12b223529ce84767b6ff0920a8773e7432fd6c6d91befaeb1     636  .\docs\API_Reference.md
 f86a0b4de99e5e911d631f16ecf7e1e7daee2661e885e93d715ff315b6b382cd     332  .\docs\ARCHITECTURE.md
 ef144b541b3c17465380a9dc7ec802faedee9fe48a229b85c7a69454bd2a981d     185  .\docs\Build_and_Testing.md
-780d5a2d809e7c6aa436956b3d838e9603e15f78a1c957a235b366c551d34df1    2517  .\docs\CHANGELOG.md
+bfbdc1704d991a8cc4b29876eecdd7983f77f3691e3591ab441ffa9bd6dc58cb    2530  .\docs\CHANGELOG.md
 9a5745e0953b96ecc14c62e02951b104b7e2575938630a0bde0a5cecafee14ee      98  .\docs\CODE_REVIEW.md
 3adf8081f63ec2c28d17e8a12deed2a6a8a1b5e81e6f3979234497c5cc2801f3     318  .\docs\CONTRACT.md
 9232c64b778cddf1bedc620dd7f5b77a8c09fbe288c3800d1ff6493a694bfa90     347  .\docs\COVERAGE.md
 9f89a9d98d9531648723af2b8aff51121dc75c71fb7bd0620ffb6b71938cbae3     173  .\docs\COW.md
-4a616e8ed1514c7df4970664588964dde724e04f36193f819b7ecd3c811c4753     790  .\docs\PARITY_REPORT.md
+46faccde4ae06da505c4dd78a83672bd01242194d09f1cdedd881c976996b1e0     790  .\docs\PARITY_REPORT.md
 bcf9d770ee3130f0dd9685e3145fb1d185816ab73655471ce55e1dd258442f34     509  .\docs\README.md
-c51f5e9c9aaebfc52cc2671e838abd2d315504411ac8c144f43f80778be5c025     691  .\docs\Roadmap.md
+d37b24ecb45a71baa5b91153d679d062a26ea225afe8251f1fe4dd7f53794c6e     697  .\docs\Roadmap.md
 aa9cae92e013e03bffaf812ce257644cc6f8d84b3a8eac0309c37279fe92e3b3      36  .\include\smaug.h
 963e21a0d5b9b1857da7bbe7310a4a9340057fcf7560272f062e4e83727c5da3      40  .\include\smaug_bool.h
 2ad9d17dc585dd81a2038c239e76613ec6a47b8ecfda8d60dddd86178b536630     107  .\include\smaug_core.h
@@ -114,6 +114,6 @@ bbb6b5e74977e8dba46c6a1c612920fa85f31689a0c5441920449b8f281a6122     809  .\test
 6efeea3ab41b666b1e704e3f1830343f2802de2c0f2014d7729ca1b6f127140a     194  .\tests\series\test_selection.lua
 552e96ac04f670d7477cd39f2ff3622f1413b14980cc9960bc8ef28100767f36     251  .\tests\series\test_stat.lua
 bdbb255bfad16e120f38ac46e5f9376e3efeb0dc126453c7991180952a0fb339     790  .\tests\series\test_str.lua
-543ef7f5ebac23b27d835477df9764c2661c383d89b7f78752f6334f542a4976     324  .\tests\series\test_window.lua
+e97b704853de3eb1d39bc0d16f8b75f92863193dc0c917e0743a4227c254d708     341  .\tests\series\test_window.lua
 #
 # total de arquivos: 113
