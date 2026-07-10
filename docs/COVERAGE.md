@@ -3,40 +3,40 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `b5047a0`  |  Data: 2026-07-08 17:10:47 -0300
+- Commit medido: `557fa7d`  |  Data: 2026-07-09 17:13:47 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `3745/4091 = 91.54%` -- 121 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- **Branch-bruto** (todos os ramos): `3825/4195 = 91.18%` -- 147 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 | Arquivo | Linhas | Branch-alvo (taken) |
 | :--- | :--- | :--- |
 | `smaug_core.c` | `402/402 = 100.00%` `[██████████]` | `290/290 = 100.00%` `[██████████]` |
-| `smaug_ops_f64.c` | `477/477 = 100.00%` `[██████████]` | `479/480 = 99.79%` `[██████████]` |
-| `smaug_ops_i64.c` | `465/468 = 99.36%` `[█████████░]` | `472/482 = 97.93%` `[█████████░]` |
+| `smaug_ops_f64.c` | `487/488 = 99.80%` `[██████████]` | `495/496 = 99.80%` `[██████████]` |
+| `smaug_ops_i64.c` | `475/479 = 99.16%` `[█████████░]` | `488/498 = 97.99%` `[█████████░]` |
 | `smaug_ops_bool.c` | `305/311 = 98.07%` `[█████████░]` | `373/400 = 93.25%` `[█████████░]` |
-| `smaug_str.c` | `270/270 = 100.00%` `[██████████]` | `210/210 = 100.00%` `[██████████]` |
+| `smaug_str.c` | `293/294 = 99.66%` `[██████████]` | `242/242 = 100.00%` `[██████████]` |
 | `smaug_ops_str.c` | `250/255 = 98.04%` `[█████████░]` | `266/283 = 93.99%` `[█████████░]` |
 | `smaug_csv.c` | `304/312 = 97.44%` `[█████████░]` | `349/387 = 90.18%` `[█████████░]` |
 | `smaug_json.c` | `347/360 = 96.39%` `[█████████░]` | `414/461 = 89.80%` `[█████████░]` |
-| `smaug_datetime.c` | `525/531 = 98.87%` `[█████████░]` | `548/598 = 91.64%` `[█████████░]` |
+| `smaug_datetime.c` | `535/542 = 98.71%` `[█████████░]` | `564/612 = 92.16%` `[█████████░]` |
 | `smaug_ops_window.c` | `329/334 = 98.50%` `[█████████░]` | `344/379 = 90.77%` `[█████████░]` |
-| **TOTAL** | `3674/3720 = 98.76%` `[█████████░]` | `3745/3970 = 94.33%` `[█████████░]` |
+| **TOTAL** | `3727/3777 = 98.68%` `[█████████░]` | `3825/4048 = 94.49%` `[█████████░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
 Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 
 **`smaug_ops_f64.c`** — 1 linha(s) com ramo descoberto:
-- `smaug_ops_f64.c:767` — if (!s || !out_n) return NULL;
+- `smaug_ops_f64.c:790` — if (!s || !out_n) return NULL;
 
 **`smaug_ops_i64.c`** — 7 linha(s) com ramo descoberto:
-- `smaug_ops_i64.c:628` — if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
-- `smaug_ops_i64.c:666` — if (!s || s->size == 0) return SIZE_MAX;
-- `smaug_ops_i64.c:680` — if (!s || s->size == 0) return SIZE_MAX;
-- `smaug_ops_i64.c:728` — if (!s || !out_n) return NULL;
-- `smaug_ops_i64.c:734` — if (n == 0) return NULL;
-- `smaug_ops_i64.c:771` — if (m == 0) return result;
-- `smaug_ops_i64.c:797` — switch (method) {
+- `smaug_ops_i64.c:652` — if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
+- `smaug_ops_i64.c:690` — if (!s || s->size == 0) return SIZE_MAX;
+- `smaug_ops_i64.c:704` — if (!s || s->size == 0) return SIZE_MAX;
+- `smaug_ops_i64.c:752` — if (!s || !out_n) return NULL;
+- `smaug_ops_i64.c:758` — if (n == 0) return NULL;
+- `smaug_ops_i64.c:795` — if (m == 0) return result;
+- `smaug_ops_i64.c:821` — switch (method) {
 
 **`smaug_ops_bool.c`** — 22 linha(s) com ramo descoberto:
 - `smaug_ops_bool.c:204` — if (out_mask) {
@@ -146,50 +146,48 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_json.c:625` — if (!buf) return -1;
 - `smaug_json.c:629` — return (w == len) ? 0 : -1;
 
-**`smaug_datetime.c`** — 43 linha(s) com ramo descoberto:
-- `smaug_datetime.c:219` — if (!self) return NULL;
-- `smaug_datetime.c:222` — if (!r) return NULL;
-- `smaug_datetime.c:273` — if (!s)             { if (status) *status = SMG_ERR_ARGUMENT; return DT_SENTINEL; }
-- `smaug_datetime.c:290` — if (!s)             return SMG_ERR_ARGUMENT;
-- `smaug_datetime.c:316` — if (!s) return -1;
-- `smaug_datetime.c:317` — if (dt_cow_detach(s) != 0) return -1;
-- `smaug_datetime.c:319` — if (dt_grow(s) != 0) return -1;
-- `smaug_datetime.c:358` — if (p < end && p[0] >= '0' && p[0] <= '9') {
-- `smaug_datetime.c:374` — if (p + 4 <= end && p[0] >= '0' && p[0] <= '9' && p[1] >= '0' && p[1] <= '9'
-- `smaug_datetime.c:378` — if (!(p = parse_digits(p, end, 4, y)))   return -1;
-- `smaug_datetime.c:381` — if (p >= end || *p++ != sep)             return -1;
-- `smaug_datetime.c:382` — if (!(p = parse_digits(p, end, 2, d)))   return -1;
-- `smaug_datetime.c:391` — if (p >= end || (*p != '-' && *p != '/'))    return -1;
-- `smaug_datetime.c:394` — if (p >= end || *p++ != sep)                 return -1;
-- `smaug_datetime.c:414` — if (p < end && (*p == 'T' || *p == ' ')) {
-- `smaug_datetime.c:416` — if (!(p = parse_digits(p, end, 2, &h)))   return -1;
-- `smaug_datetime.c:417` — if (p >= end || *p++ != ':')               return -1;
-- `smaug_datetime.c:418` — if (!(p = parse_digits(p, end, 2, &mi)))  return -1;
-- `smaug_datetime.c:419` — if (p >= end || *p++ != ':')               return -1;
-- `smaug_datetime.c:420` — if (!(p = parse_digits(p, end, 2, &sec))) return -1;
-- `smaug_datetime.c:429` — while (p < end && *p >= '0' && *p <= '9') {
-- `smaug_datetime.c:442` — } else if (*p == '+' || *p == '-') {
-- `smaug_datetime.c:445` — if (!(p = parse_digits(p, end, 2, &tz_h))) return -1;
-- `smaug_datetime.c:446` — if (p < end && *p == ':') p++;
-- `smaug_datetime.c:447` — if (!(p = parse_digits(p, end, 2, &tz_m))) return -1;
-- `smaug_datetime.c:492` — return (written > 0 && (size_t)written < buf_size) ? 0 : -1;
-- `smaug_datetime.c:630` — - (epoch_ms < 0 && epoch_ms % MS_PER_SECOND != 0 ? MS_PER_SECOND : 0);
-- `smaug_datetime.c:636` — - (epoch_ms < 0 && epoch_ms % MS_PER_HOUR != 0 ? MS_PER_HOUR : 0);
-- `smaug_datetime.c:692` — DT_CMP_IMPL(lt, < )
-- `smaug_datetime.c:693` — DT_CMP_IMPL(eq, ==)
-- `smaug_datetime.c:694` — DT_CMP_IMPL(ge, >=)
-- `smaug_datetime.c:695` — DT_CMP_IMPL(le, <=)
-- `smaug_datetime.c:696` — DT_CMP_IMPL(ne, !=)
-- `smaug_datetime.c:723` — if (!entries) return NULL;
-- `smaug_datetime.c:734` — if (!indices) { free(entries); return NULL; }
-- `smaug_datetime.c:854` — if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
-- `smaug_datetime.c:883` — if (!s || s->size == 0) return SIZE_MAX;
-- `smaug_datetime.c:904` — if (!s || s->size == 0) return DT_SENTINEL;
-- `smaug_datetime.c:921` — if (!s || s->size == 0) return DT_SENTINEL;
-- `smaug_datetime.c:930` — } else if (!ignore_na) {
-- `smaug_datetime.c:934` — return found ? result : DT_SENTINEL;
-- `smaug_datetime.c:958` — if (m == 0) return result;
-- `smaug_datetime.c:980` — switch (method) {
+**`smaug_datetime.c`** — 41 linha(s) com ramo descoberto:
+- `smaug_datetime.c:296` — if (!s)             { if (status) *status = SMG_ERR_ARGUMENT; return DT_SENTINEL; }
+- `smaug_datetime.c:313` — if (!s)             return SMG_ERR_ARGUMENT;
+- `smaug_datetime.c:339` — if (!s) return -1;
+- `smaug_datetime.c:340` — if (dt_cow_detach(s) != 0) return -1;
+- `smaug_datetime.c:342` — if (dt_grow(s) != 0) return -1;
+- `smaug_datetime.c:381` — if (p < end && p[0] >= '0' && p[0] <= '9') {
+- `smaug_datetime.c:397` — if (p + 4 <= end && p[0] >= '0' && p[0] <= '9' && p[1] >= '0' && p[1] <= '9'
+- `smaug_datetime.c:401` — if (!(p = parse_digits(p, end, 4, y)))   return -1;
+- `smaug_datetime.c:404` — if (p >= end || *p++ != sep)             return -1;
+- `smaug_datetime.c:405` — if (!(p = parse_digits(p, end, 2, d)))   return -1;
+- `smaug_datetime.c:414` — if (p >= end || (*p != '-' && *p != '/'))    return -1;
+- `smaug_datetime.c:417` — if (p >= end || *p++ != sep)                 return -1;
+- `smaug_datetime.c:437` — if (p < end && (*p == 'T' || *p == ' ')) {
+- `smaug_datetime.c:439` — if (!(p = parse_digits(p, end, 2, &h)))   return -1;
+- `smaug_datetime.c:440` — if (p >= end || *p++ != ':')               return -1;
+- `smaug_datetime.c:441` — if (!(p = parse_digits(p, end, 2, &mi)))  return -1;
+- `smaug_datetime.c:442` — if (p >= end || *p++ != ':')               return -1;
+- `smaug_datetime.c:443` — if (!(p = parse_digits(p, end, 2, &sec))) return -1;
+- `smaug_datetime.c:452` — while (p < end && *p >= '0' && *p <= '9') {
+- `smaug_datetime.c:465` — } else if (*p == '+' || *p == '-') {
+- `smaug_datetime.c:468` — if (!(p = parse_digits(p, end, 2, &tz_h))) return -1;
+- `smaug_datetime.c:469` — if (p < end && *p == ':') p++;
+- `smaug_datetime.c:470` — if (!(p = parse_digits(p, end, 2, &tz_m))) return -1;
+- `smaug_datetime.c:515` — return (written > 0 && (size_t)written < buf_size) ? 0 : -1;
+- `smaug_datetime.c:653` — - (epoch_ms < 0 && epoch_ms % MS_PER_SECOND != 0 ? MS_PER_SECOND : 0);
+- `smaug_datetime.c:659` — - (epoch_ms < 0 && epoch_ms % MS_PER_HOUR != 0 ? MS_PER_HOUR : 0);
+- `smaug_datetime.c:715` — DT_CMP_IMPL(lt, < )
+- `smaug_datetime.c:716` — DT_CMP_IMPL(eq, ==)
+- `smaug_datetime.c:717` — DT_CMP_IMPL(ge, >=)
+- `smaug_datetime.c:718` — DT_CMP_IMPL(le, <=)
+- `smaug_datetime.c:719` — DT_CMP_IMPL(ne, !=)
+- `smaug_datetime.c:746` — if (!entries) return NULL;
+- `smaug_datetime.c:757` — if (!indices) { free(entries); return NULL; }
+- `smaug_datetime.c:877` — if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
+- `smaug_datetime.c:906` — if (!s || s->size == 0) return SIZE_MAX;
+- `smaug_datetime.c:927` — if (!s || s->size == 0) return DT_SENTINEL;
+- `smaug_datetime.c:944` — if (!s || s->size == 0) return DT_SENTINEL;
+- `smaug_datetime.c:953` — } else if (!ignore_na) {
+- `smaug_datetime.c:957` — return found ? result : DT_SENTINEL;
+- `smaug_datetime.c:981` — if (m == 0) return result;
+- `smaug_datetime.c:1003` — switch (method) {
 
 **`smaug_ops_window.c`** — 27 linha(s) com ramo descoberto:
 - `smaug_ops_window.c:32` — switch (col->kind) {
@@ -236,12 +234,24 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_ops_f64.c:185` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
 - `smaug_ops_f64.c:185` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
 - `smaug_ops_f64.c:188` — falha de alloc do clone; OOM sem injecao
+- `smaug_ops_f64.c:205` — frontend valida Series/tamanhos antes de delegar
+- `smaug_ops_f64.c:205` — frontend valida Series/tamanhos antes de delegar
+- `smaug_ops_f64.c:205` — frontend valida Series/tamanhos antes de delegar
+- `smaug_ops_f64.c:205` — frontend valida Series/tamanhos antes de delegar
+- `smaug_ops_f64.c:205` — frontend valida Series/tamanhos antes de delegar
+- `smaug_ops_f64.c:209` — OOM sem injecao
 - `smaug_ops_i64.c:158` — o engine nao confia no caller; frontend nunca passa NULL (fillna valida antes)
 - `smaug_ops_i64.c:161` — falha de alloc do clone; OOM sem injecao
 - `smaug_ops_i64.c:179` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
 - `smaug_ops_i64.c:179` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
 - `smaug_ops_i64.c:179` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
 - `smaug_ops_i64.c:182` — falha de alloc do clone; OOM sem injecao
+- `smaug_ops_i64.c:200` — frontend valida Series/tamanhos antes de delegar
+- `smaug_ops_i64.c:200` — frontend valida Series/tamanhos antes de delegar
+- `smaug_ops_i64.c:200` — frontend valida Series/tamanhos antes de delegar
+- `smaug_ops_i64.c:200` — frontend valida Series/tamanhos antes de delegar
+- `smaug_ops_i64.c:200` — frontend valida Series/tamanhos antes de delegar
+- `smaug_ops_i64.c:204` — OOM sem injecao
 - `smaug_ops_bool.c:48` — at&&bt sempre true aqui (linhas 45/47 ja garantiram ambos validos-nao-false)
 - `smaug_ops_bool.c:48` — at&&bt sempre true aqui (linhas 45/47 ja garantiram ambos validos-nao-false)
 - `smaug_ops_bool.c:158` — m sempre fornecido pelas Kleene raw (out_mask != NULL); ramo :SMAUG_MASK_VALID defensivo, uso interno controlado
@@ -256,11 +266,17 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_str.c:242` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
 - `smaug_str.c:242` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
 - `smaug_str.c:256` — falha de alloc; OOM sem injecao
-- `smaug_str.c:315` — overflow na soma buffer_len+extra; so com buffer_len ~ SIZE_MAX
-- `smaug_str.c:317` — buffer_capacity==0 inalcancavel via API publica (create garante bufcap>=INIT)
-- `smaug_str.c:335` — overflow ao dobrar capacity; so com capacity ~ SIZE_MAX
-- `smaug_str.c:348` — realloc de shrink falhando; defensivo
-- `smaug_str.c:443` — len==0 inalcancavel aqui (bloco len>old_len implica len>0)
+- `smaug_str.c:288` — frontend valida Series/tamanhos antes de delegar
+- `smaug_str.c:288` — frontend valida Series/tamanhos antes de delegar
+- `smaug_str.c:288` — frontend valida Series/tamanhos antes de delegar
+- `smaug_str.c:288` — frontend valida Series/tamanhos antes de delegar
+- `smaug_str.c:288` — frontend valida Series/tamanhos antes de delegar
+- `smaug_str.c:303` — OOM sem injecao
+- `smaug_str.c:358` — overflow na soma buffer_len+extra; so com buffer_len ~ SIZE_MAX
+- `smaug_str.c:360` — buffer_capacity==0 inalcancavel via API publica (create garante bufcap>=INIT)
+- `smaug_str.c:378` — overflow ao dobrar capacity; so com capacity ~ SIZE_MAX
+- `smaug_str.c:391` — realloc de shrink falhando; defensivo
+- `smaug_str.c:486` — len==0 inalcancavel aqui (bloco len>old_len implica len>0)
 - `smaug_ops_str.c:81` — mode e enum interno (LT/GT/LE/GE aqui); case default inalcancavel
 - `smaug_ops_str.c:222` — ia==ib inalcancavel (indices sempre unicos no argsort)
 - `smaug_csv.c:37` — falha de syscall não simulável sem mock
@@ -338,10 +354,18 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_datetime.c:130` — view size==0 — caso degenerado de view vazia
 - `smaug_datetime.c:151` — size > capacity — invariante; create() nunca viola
 - `smaug_datetime.c:204` — size==0 — clone de série vazia tem size=0, memcpy não executado
+- `smaug_datetime.c:219` — o engine nao confia no caller; frontend nunca passa NULL (fillna valida antes)
+- `smaug_datetime.c:222` — falha de alloc do clone; OOM sem injecao
 - `smaug_datetime.c:239` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
 - `smaug_datetime.c:239` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
 - `smaug_datetime.c:239` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
 - `smaug_datetime.c:242` — falha de alloc do clone; OOM sem injecao
-- `smaug_datetime.c:254` — args inválidos — start > size ou len > size-start
+- `smaug_datetime.c:259` — frontend valida Series/tamanhos antes de delegar
+- `smaug_datetime.c:259` — frontend valida Series/tamanhos antes de delegar
+- `smaug_datetime.c:259` — frontend valida Series/tamanhos antes de delegar
+- `smaug_datetime.c:259` — frontend valida Series/tamanhos antes de delegar
+- `smaug_datetime.c:259` — frontend valida Series/tamanhos antes de delegar
+- `smaug_datetime.c:263` — OOM sem injecao
+- `smaug_datetime.c:277` — args inválidos — start > size ou len > size-start
 - `smaug_ops_window.c:410` — loop-body inalcançável — a if em 258-260 já trata o único item stale possível; by invariante de 266, no máximo um item envelhece por passo de null
 - `smaug_ops_window.c:467` — loop-body inalcançável — mesma invariante que linha 276 (rolling_min)
