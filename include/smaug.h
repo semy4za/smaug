@@ -20,6 +20,7 @@
      smaug_datetime.h   — tipo datetime (epoch_ms), parse ISO 8601, calendário. (inclui types)
      smaug_ops_window.h — ops de janela: multi_argsort, rolling, cumulativas.
      smaug_io.h         — leitura/escrita CSV e JSON (smaug_table_t). (inclui types)
+     smaug_astype.h     — conversão de tipo (matriz src×dst) no Anel 0. (inclui core)
      smaug.h            — este; inclui todos os públicos acima.
    (smaug_io_internal.h é interno — não entra no umbrella.)
    =================================================================== */
@@ -32,5 +33,6 @@
 #include "smaug_datetime.h"
 #include "smaug_ops_window.h"
 #include "smaug_io.h"
+#include "smaug_astype.h"
 
 #endif /* SMAUG_H */

@@ -17,7 +17,7 @@ TEST_CFLAGS = -std=c11 -g -O0 -Wall -Wextra -I./include
 #   C_TEST_WRAP   : teste(s) que exigem -Wl,--wrap (falha de alocação).
 #   LUA_TESTS     : suítes do frontend Lua.
 C_TESTS_PLAIN = test_alloc test_ops test_ops_edge test_bool test_bool_lifecycle test_string test_cow \
-                test_io_c test_datetime_c test_ops_window
+                test_io_c test_datetime_c test_ops_window test_astype
 C_TEST_WRAP   = test_allocfail
 C_TEST_STRESS = test_stress
 LUA_TESTS_SERIES  = series/test_constructors series/test_access series/test_reduce \

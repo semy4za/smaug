@@ -3,9 +3,9 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `d9a7f19`  |  Data: 2026-07-09 21:18:28 -0300
+- Commit medido: `bb989ce`  |  Data: 2026-07-10 13:16:03 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `3825/4195 = 91.18%` -- 147 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- **Branch-bruto** (todos os ramos): `3877/4253 = 91.16%` -- 153 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 | Arquivo | Linhas | Branch-alvo (taken) |
@@ -20,7 +20,8 @@
 | `smaug_json.c` | `347/360 = 96.39%` `[█████████░]` | `414/461 = 89.80%` `[█████████░]` |
 | `smaug_datetime.c` | `535/542 = 98.71%` `[█████████░]` | `564/612 = 92.16%` `[█████████░]` |
 | `smaug_ops_window.c` | `329/334 = 98.50%` `[█████████░]` | `344/379 = 90.77%` `[█████████░]` |
-| **TOTAL** | `3727/3777 = 98.68%` `[█████████░]` | `3825/4048 = 94.49%` `[█████████░]` |
+| `smaug_astype.c` | `58/58 = 100.00%` `[██████████]` | `52/52 = 100.00%` `[██████████]` |
+| **TOTAL** | `3785/3835 = 98.70%` `[█████████░]` | `3877/4100 = 94.56%` `[█████████░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
@@ -369,3 +370,9 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_datetime.c:277` — args inválidos — start > size ou len > size-start
 - `smaug_ops_window.c:410` — loop-body inalcançável — a if em 258-260 já trata o único item stale possível; by invariante de 266, no máximo um item envelhece por passo de null
 - `smaug_ops_window.c:467` — loop-body inalcançável — mesma invariante que linha 276 (rolling_min)
+- `smaug_astype.c:60` — OOM sem injecao de falha
+- `smaug_astype.c:74` — OOM
+- `smaug_astype.c:94` — OOM
+- `smaug_astype.c:109` — OOM
+- `smaug_astype.c:123` — OOM
+- `smaug_astype.c:142` — OOM

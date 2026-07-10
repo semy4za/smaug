@@ -31,6 +31,16 @@
 
 #include "smaug_core.h"
 
-/* Assinaturas das primitivas entram aqui nas Fases 1-3. */
+/* ---------- Grupo A: conversoes entre arrays diretos (i64/f64/dt) ----------
+   Retorno NULL apenas em self==NULL (contrato) ou OOM. Inconversivel por
+   elemento (NaN/inf/fora-do-range em ->i64/->dt) vira null, nunca erro. */
+smaug_series_f64_t *smaug_i64_to_f64(const smaug_series_i64_t *self);
+smaug_series_i64_t *smaug_f64_to_i64(const smaug_series_f64_t *self);
+smaug_series_dt_t  *smaug_i64_to_dt (const smaug_series_i64_t *self);
+smaug_series_i64_t *smaug_dt_to_i64 (const smaug_series_dt_t  *self);
+smaug_series_dt_t  *smaug_f64_to_dt (const smaug_series_f64_t *self);
+smaug_series_f64_t *smaug_dt_to_f64 (const smaug_series_dt_t  *self);
+
+/* Grupos B-out (-> string) e B-in (string ->) entram nas Fases 2-3. */
 
 #endif /* SMAUG_ASTYPE_H */
