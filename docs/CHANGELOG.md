@@ -5,6 +5,21 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-09 — selo Fedora `--all`: fecha 10.6 (select) e 12.17
+
+Sessão de validação. `build.sh --all` no Fedora selou os dois pendentes que
+sessões anteriores de hoje deixaram registrados: o Passo B.3 do 10.6 (`select`
+cond-bool — where/mask/ifelse ao Anel 0) e o 12.17 (`COV-EXCL-BR` nos guards do
+`dt_coalesce_scalar`). Sem mudança de código — só a prova.
+
+Resultado: Valgrind 0-errors nos 12 binários; linha 98.68% (3727/3777);
+branch-alvo 94.49% (3825/4048, 147 excluídos). O código do 10.6 já estava
+completo desde a entrada de ffill/bfill; faltava o **selo** (Valgrind + gcov no
+Fedora), que vem agora — família seleção/preenchimento por máscara
+**inteiramente selada** no Anel 0: (a) coalesce + (b) select + (c) ffill/bfill.
+Integridade 113/113 SHA256 no MANIFEST.
+
+---
 ## 2026-07-09 — 10.6 fechado: teste int64 > 2^53 em ffill/bfill
 
 A primitiva (c) da família (`ffill`/`bfill`) já estava no Anel 0 desde o 7.1 —

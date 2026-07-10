@@ -489,7 +489,8 @@ escreve (mesma natureza da Sub-A do 9.1, reintroduzida na reconstrução).
   - **Passo B.3 — cond-bool `select` CONCLUÍDO (2026-07-09):** `select(cond,a,b)`
     por dtype (i64/f64/dt/str); cond true→a, false/NA→b (1a). Unifica
     where/mask/ifelse; escalar/nil por broadcast em Lua. Degrau sai. **Fecha a
-    primitiva (b)**; resta (c). Windows OK; branch-alvo 94.38→94.49%. Selo Fedora pendente.
+    primitiva (b)**; resta (c). Windows OK; branch-alvo 94.38→94.49%. **Selo Fedora
+    obtido (2026-07-09):** Valgrind 12/12 clean, branch-alvo 94.49% (3825/4048).
   - **Passo (c) — propagação `ffill`/`bfill`:** já no Anel 0 desde o item 7.1
     (movimentação de dados agnóstica a tipo, 5 dtypes, Lua delega limpo).
     Teste dirigido int64 > 2^53 adicionado (2026-07-09). **10.6 CONCLUÍDO:
@@ -639,10 +640,10 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
   ISO no `fillna` de datetime, parseando via `dt_parse` antes de delegar —
   uniformiza `fillna` com `set`/`append`.
 - 12.17 **`dt_coalesce_scalar` guards sem `COV-EXCL-BR`** — [CONCLUÍDO
-  2026-07-09, selo Fedora pendente]. Os guards `if (!self)` (datetime:219) e
+  2026-07-09]. Os guards `if (!self)` (datetime:219) e
   `if (!r)` (datetime:222) receberam `COV-EXCL-BR` com a justificativa canônica
-  dos irmãos i64/f64/str. Prévia Ubuntu: branch-alvo 94.33→94.38%. Selo Fedora
-  `--all` pendente (mudança só de comentário, sem alteração funcional).
+  dos irmãos i64/f64/str. **Selo Fedora obtido (2026-07-09):** Valgrind 12/12
+  clean, branch-alvo 94.49% (mudança só de comentário, sem alteração funcional).
  - 12.18 **guards `if(!s)` de `dt_get`/`dt_set` sem `COV-EXCL-BR`** — [Fedora]
    (achado 2026-07-09, datetime:296/313). Mesma natureza do 12.17. Alinhar e reselar.
 
