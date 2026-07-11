@@ -600,10 +600,17 @@ do
         s:set(1, ffi.new("int64_t", 9007199254740993LL))   -- 2^53 + 1
         return s
     end
-    check(not pcall(function() return mk():astype("int64")  end),
-          "10.7: astype i64->i64 > 2^53 recusa (falha visivel)")
-    check(not pcall(function() return mk():astype("string") end),
-          "10.7: astype i64->string > 2^53 recusa (falha visivel)")
+    -- 10.7 Passo B: o degrau saiu — a conversão migrou ao Anel 0 e agora
+    -- PRESERVA exato (antes recusava). Exatidão verificada via ->string
+    -- (o get() de i64 converte a double; ->string mostra os dígitos reais).
+    check(mk():astype("string"):get(1) == "9007199254740993",
+          "10.7: astype i64->string > 2^53 EXATO (era recusa; conserto no Anel 0)")
+    check(mk():astype("int64"):astype("string"):get(1) == "9007199254740993",
+          "10.7: astype i64->i64 > 2^53 clone preserva exato (era recusa)")
+    -- round-trip str->i64->str > 2^53 exato ponta-a-ponta (Anel 0)
+    check(S.from_table({"9007199254740993"}, "string")
+            :astype("int64"):astype("string"):get(1) == "9007199254740993",
+          "10.7: round-trip str->i64->str > 2^53 EXATO")
     -- pares seguros permanecem funcionando
     check(mk():astype("float64")._dtype == "float64",
           "10.7: astype i64->f64 permitido (double e o destino correto)")
@@ -614,6 +621,18 @@ do
           "10.7: astype i64->bool 0/1 permitido")
     check(S.from_table({10, 20}, "int64"):astype("int64"):get(1) == 10,
           "10.7: astype i64->i64 <=2^53 intacto (nao-regressao)")
+end
+
+-- 10.7 Passo B: cantos datetime<->bool não têm semântica natural -> erro limpo
+do
+    local bb = S.from_table({true, false}, "bool")
+    local ok1, err1 = pcall(function() return bb:astype("datetime") end)
+    check(not ok1 and tostring(err1):match("não suportado") ~= nil,
+          "10.7: astype bool->datetime erro limpo")
+    local dd = S.from_table({0, 1}, "int64"):astype("datetime")
+    local ok2, err2 = pcall(function() return dd:astype("bool") end)
+    check(not ok2 and tostring(err2):match("não suportado") ~= nil,
+          "10.7: astype datetime->bool erro limpo")
 end
 
 -- ===================================================================

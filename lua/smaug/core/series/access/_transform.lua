@@ -16,9 +16,29 @@ return function(I)
     local C       = I.C
     local NA      = I.NA
     local is_na   = I.is_na
-    local is_nan  = I.is_nan
     local check_value = I.check_value                     -- porteiro canônico (9.1)
-    local check_int64_lossless = I.check_int64_lossless   -- degrau 10.6/10.7
+    -- (o degrau check_int64_lossless e o trunc_to_int saíram no 10.7 Passo B:
+    --  astype migrou ao Anel 0 e não faz mais round-trip por get())
+
+    -- =====================================================================
+    -- astype: matriz de conversão src×dst delegada ao Anel 0 (10.7 Passo B).
+    -- Tabela explícita [src][dst] -> primitiva C (diagonal usa clone; pares
+    -- com bool/categorical ficam no Anel 1 até 10.8). str->dt recebe dayfirst.
+    -- =====================================================================
+    local ASTYPE_C = {
+        int64    = { float64  = C.smaug_i64_to_f64,
+                     string   = C.smaug_i64_to_str,
+                     datetime = C.smaug_i64_to_dt  },
+        float64  = { int64    = C.smaug_f64_to_i64,
+                     string   = C.smaug_f64_to_str,
+                     datetime = C.smaug_f64_to_dt  },
+        string   = { int64    = C.smaug_str_to_i64,
+                     float64  = C.smaug_str_to_f64,
+                     datetime = C.smaug_str_to_dt  },
+        datetime = { int64    = C.smaug_dt_to_i64,
+                     float64  = C.smaug_dt_to_f64,
+                     string   = C.smaug_dt_to_str  },
+    }
 
     -- =====================================================================
     -- Ordenação
@@ -191,11 +211,6 @@ return function(I)
     -- astype
     -- =====================================================================
 
-    -- trunca em direção a zero (igual ao cast (int64_t) do C)
-    local function trunc_to_int(x)
-        return x >= 0 and math.floor(x) or math.ceil(x)
-    end
-
     -- astype(dtype): converte a série para outro dtype. Tolerante por elemento:
     -- inconversíveis → null. Nunca descarta a série inteira.
     function methods.astype(self, dtype, name)
@@ -207,6 +222,7 @@ return function(I)
             if opts.dayfirst == true then dayfirst = 1
             elseif opts.dayfirst == false then dayfirst = 0 end
         end
+
         -- categorical é Lua puro — não está em DTYPES, mas é suportado
         if dtype == "categorical" then
             local Cat = Series.Categorical
@@ -224,46 +240,44 @@ return function(I)
         if not DTYPES[dtype] then
             error("smaug: dtype desconhecido '" .. tostring(dtype) .. "'", 2)
         end
+
         local src = self._dtype
+
+        -- Zona 1 — mesmo dtype: clone (Anel 0). Sem round-trip por get():
+        -- int64 > 2^53 preservado exato (o degrau some).
+        if src == dtype then
+            return wrap(self._d.clone(self._c), dtype, name or self._name)
+        end
+
+        -- Zona 2 — matriz C (src×dst entre int64/float64/string/datetime).
+        local row  = ASTYPE_C[src]
+        local conv = row and row[dtype]
+        if conv then
+            local r
+            if src == "string" and dtype == "datetime" then
+                r = conv(self._c, dayfirst)
+            else
+                r = conv(self._c)
+            end
+            return wrap(r, dtype, name or self._name)
+        end
+
+        -- Zona 3 — cantos datetime<->bool: sem semântica natural, erro limpo.
+        if (src == "bool" and dtype == "datetime")
+        or (src == "datetime" and dtype == "bool") then
+            error("smaug: astype " .. src .. "->" .. dtype ..
+                  " não suportado; use :map(fn) para definir a regra", 2)
+        end
+
+        -- Zona 4 — pares com bool (bool<->int64/float64/string): Anel 1 até 10.8.
+        -- Loop reduzido: só os ramos que envolvem bool.
         local n   = self:len()
         local out = Series.new(dtype, n, name or self._name)
-
-        -- degrau 10.7: so os pares onde double perde e importa. int64->float64
-        -- NAO entra (double e o destino correto); int64->bool tambem nao (0/1).
-        local guard_int64 = (src == "int64") and (dtype == "int64" or dtype == "string")
         for i = 1, n do
             local v = self:get(i)
-            if v ~= nil and guard_int64 then
-                check_int64_lossless(self, i, "astype('" .. dtype .. "')")
-            end
             if v == nil then
                 out:set_null(i)
-            elseif src == "datetime" and dtype ~= "datetime" then
-                if dtype == "string" then
-                    local buf = ffi.new("char[26]")
-                    C.smaug_dt_format(v, buf, 26)
-                    out:set(i, ffi.string(buf))
-                elseif dtype == "int64" then
-                    out:set(i, trunc_to_int(v))
-                else -- float64
-                    out:set(i, tonumber(v))
-                end
-            elseif dtype == "datetime" and src ~= "datetime" then
-                if src == "string" then
-                    local ep = ffi.new("int64_t[1]")
-                    if C.smaug_dt_parse(v, #v, ep, dayfirst) == 0 then
-                        out:set(i, tonumber(ep[0]))
-                    else
-                        out:set_null(i)
-                    end
-                else
-                    if is_nan(v) or v == math.huge or v == -math.huge then
-                        out:set_null(i)
-                    else
-                        out:set(i, trunc_to_int(v))
-                    end
-                end
-            elseif src == "bool" and dtype ~= "bool" then
+            elseif src == "bool" then          -- bool -> int64/float64/string
                 if dtype == "string" then
                     out:set(i, tostring(v))
                 elseif dtype == "int64" then
@@ -271,12 +285,12 @@ return function(I)
                 else -- float64
                     out:set(i, v and 1.0 or 0.0)
                 end
-            elseif dtype == "bool" and src ~= "bool" then
+            else                                -- int64/float64/string -> bool
                 if src == "string" then
                     if v == "true" then out:set(i, true)
                     elseif v == "false" then out:set(i, false)
                     else out:set_null(i) end
-                else  -- int64/float64 → bool: rígido, só 0/1 (H.6.5.a)
+                else  -- int64/float64 -> bool: rígido, só 0/1 (H.6.5.a)
                     if v == 0 or v == 1 then
                         out:set(i, v == 1)
                     else
@@ -284,29 +298,6 @@ return function(I)
                               .. i .. " não é 0/1; use :map(fn) para definir a regra", 2)
                     end
                 end
-            elseif src == "string" and dtype ~= "string" then
-                local num = tonumber(v)
-                if num == nil then
-                    out:set_null(i)
-                elseif dtype == "int64" then
-                    if is_nan(num) or num == math.huge or num == -math.huge then
-                        out:set_null(i)
-                    else
-                        out:set(i, trunc_to_int(num))
-                    end
-                else
-                    out:set(i, num)
-                end
-            elseif dtype == "string" and src ~= "string" then
-                out:set(i, tostring(v))
-            elseif dtype == "int64" and src ~= "int64" then
-                if is_nan(v) or v == math.huge or v == -math.huge then
-                    out:set_null(i)
-                else
-                    out:set(i, trunc_to_int(v))
-                end
-            else
-                out:set(i, v)
             end
         end
         return out

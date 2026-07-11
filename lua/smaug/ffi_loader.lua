@@ -544,6 +544,22 @@ ffi.cdef([[
     smaug_series_f64_t* smaug_i64_rolling_std  (const smaug_series_i64_t *s, size_t window, size_t min_periods);
     smaug_series_f64_t* smaug_i64_rolling_var  (const smaug_series_i64_t *s, size_t window, size_t min_periods);
     smaug_series_i64_t* smaug_i64_rolling_count(const smaug_series_i64_t *s, size_t window, size_t min_periods);
+
+    /* ===== astype — matriz de conversão src×dst (Anel 0) =====
+       Espelha include/smaug_astype.h. Diagonal usa os *_clone acima.
+       str->dt recebe dayfirst (0/1). =================================== */
+    smaug_series_f64_t* smaug_i64_to_f64(const smaug_series_i64_t *self);
+    smaug_series_i64_t* smaug_f64_to_i64(const smaug_series_f64_t *self);
+    smaug_series_dt_t*  smaug_i64_to_dt (const smaug_series_i64_t *self);
+    smaug_series_i64_t* smaug_dt_to_i64 (const smaug_series_dt_t  *self);
+    smaug_series_dt_t*  smaug_f64_to_dt (const smaug_series_f64_t *self);
+    smaug_series_f64_t* smaug_dt_to_f64 (const smaug_series_dt_t  *self);
+    smaug_series_str_t* smaug_i64_to_str(const smaug_series_i64_t *self);
+    smaug_series_str_t* smaug_f64_to_str(const smaug_series_f64_t *self);
+    smaug_series_str_t* smaug_dt_to_str (const smaug_series_dt_t  *self);
+    smaug_series_i64_t* smaug_str_to_i64(const smaug_series_str_t *self);
+    smaug_series_f64_t* smaug_str_to_f64(const smaug_series_str_t *self);
+    smaug_series_dt_t*  smaug_str_to_dt (const smaug_series_str_t *self, int dayfirst);
 ]])
 
 -- Nome do arquivo da lib conforme o SO.
