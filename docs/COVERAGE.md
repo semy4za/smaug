@@ -3,9 +3,9 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `bb989ce`  |  Data: 2026-07-10 13:16:03 -0300
+- Commit medido: `6d1ea84`  |  Data: 2026-07-10 14:05:11 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `3877/4253 = 91.16%` -- 153 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- **Branch-bruto** (todos os ramos): `3954/4339 = 91.13%` -- 162 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 | Arquivo | Linhas | Branch-alvo (taken) |
@@ -20,8 +20,9 @@
 | `smaug_json.c` | `347/360 = 96.39%` `[█████████░]` | `414/461 = 89.80%` `[█████████░]` |
 | `smaug_datetime.c` | `535/542 = 98.71%` `[█████████░]` | `564/612 = 92.16%` `[█████████░]` |
 | `smaug_ops_window.c` | `329/334 = 98.50%` `[█████████░]` | `344/379 = 90.77%` `[█████████░]` |
-| `smaug_astype.c` | `58/58 = 100.00%` `[██████████]` | `52/52 = 100.00%` `[██████████]` |
-| **TOTAL** | `3785/3835 = 98.70%` `[█████████░]` | `3877/4100 = 94.56%` `[█████████░]` |
+| `smaug_convert.c` | `18/18 = 100.00%` `[██████████]` | `20/20 = 100.00%` `[██████████]` |
+| `smaug_astype.c` | `118/118 = 100.00%` `[██████████]` | `109/109 = 100.00%` `[██████████]` |
+| **TOTAL** | `3863/3913 = 98.72%` `[█████████░]` | `3954/4177 = 94.66%` `[█████████░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
@@ -370,9 +371,18 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_datetime.c:277` — args inválidos — start > size ou len > size-start
 - `smaug_ops_window.c:410` — loop-body inalcançável — a if em 258-260 já trata o único item stale possível; by invariante de 266, no máximo um item envelhece por passo de null
 - `smaug_ops_window.c:467` — loop-body inalcançável — mesma invariante que linha 276 (rolling_min)
-- `smaug_astype.c:60` — OOM sem injecao de falha
-- `smaug_astype.c:74` — OOM
-- `smaug_astype.c:94` — OOM
-- `smaug_astype.c:109` — OOM
-- `smaug_astype.c:123` — OOM
-- `smaug_astype.c:142` — OOM
+- `smaug_astype.c:63` — OOM sem injecao de falha
+- `smaug_astype.c:77` — OOM
+- `smaug_astype.c:97` — OOM
+- `smaug_astype.c:112` — OOM
+- `smaug_astype.c:126` — OOM
+- `smaug_astype.c:145` — OOM
+- `smaug_astype.c:171` — OOM sem injecao
+- `smaug_astype.c:181` — OOM no append
+- `smaug_astype.c:191` — OOM sem injecao
+- `smaug_astype.c:201` — OOM no append
+- `smaug_astype.c:213` — OOM sem injecao
+- `smaug_astype.c:225` — OOM no append
+- `smaug_astype.c:244` — OOM sem injecao
+- `smaug_astype.c:264` — OOM sem injecao
+- `smaug_astype.c:285` — OOM sem injecao

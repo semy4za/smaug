@@ -41,6 +41,19 @@ smaug_series_i64_t *smaug_dt_to_i64 (const smaug_series_dt_t  *self);
 smaug_series_dt_t  *smaug_f64_to_dt (const smaug_series_f64_t *self);
 smaug_series_f64_t *smaug_dt_to_f64 (const smaug_series_dt_t  *self);
 
-/* Grupos B-out (-> string) e B-in (string ->) entram nas Fases 2-3. */
+/* Grupo B-out (-> string): num->str usa o formato canonico dos writers C
+   (%.17g / %lld), nao o tostring %.14g do Lua — coerencia de aneis e
+   round-trip exato. dt->str via smaug_dt_format (paridade por construcao). */
+smaug_series_str_t *smaug_i64_to_str(const smaug_series_i64_t *self);
+smaug_series_str_t *smaug_f64_to_str(const smaug_series_f64_t *self);
+smaug_series_str_t *smaug_dt_to_str (const smaug_series_dt_t  *self);
+
+/* Grupo B-in (string -> {int64, float64, datetime}): parsing rigido via
+   smaug_convert (rejeita trailing/vazio/overflow; i64 sem hex, f64 com
+   hex/inf/nan). Inconversivel -> null. str->dt recebe `dayfirst` (0/1),
+   propagado do Anel 1 — excecao de assinatura. */
+smaug_series_i64_t *smaug_str_to_i64(const smaug_series_str_t *self);
+smaug_series_f64_t *smaug_str_to_f64(const smaug_series_str_t *self);
+smaug_series_dt_t  *smaug_str_to_dt (const smaug_series_str_t *self, int dayfirst);
 
 #endif /* SMAUG_ASTYPE_H */

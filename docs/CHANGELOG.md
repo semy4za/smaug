@@ -5,6 +5,58 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-09 — 10.7 Passo B: Fase 3 (Grupo B-in → string→num/dt)
+
+Fonte única de parsing `smaug_convert.c` (`smaug_parse_i64`/`smaug_parse_f64`):
+`strtoll` base-10 / `strtod`, rígidos — rejeitam trailing/vazio/overflow; i64 sem
+hex/float, f64 com hex/inf/nan. Cópia null-terminada obrigatória (slice de buffer
+concatenado). Três primitivas: `str→i64`, `str→f64`, `str→dt` (`dt_parse` +
+`dayfirst`, exceção de assinatura). Inconversível → null; `"9007199254740993"` →
+int64 exato (conserto). Semântica **rígida**, coerente com o `try_i64`/`try_f64`
+do CSV, divergindo do oráculo `tonumber` de propósito (*falha visível*).
+`test_astype` 90 checks (inclui teste direto de `smaug_convert` p/ ramos
+`!s`/`len==0`/`len≥64`/overflow). `smaug_convert.c` + `smaug_astype.c` 100% linha
+/ branch, Valgrind clean. Global: linha 98.72% (3863/3913), branch-alvo 94.66%
+(3954/4177). `astype` Lua intacto (rewire na Fase 4).
+
+---
+## 2026-07-09 — 10.7 Passo B: Fase 2 (Grupo B-out → string)
+
+Três primitivas `→str` no `smaug_astype.c`: `i64→str` (`%lld`, exato — conserta
+o > 2^53 do oráculo), `f64→str` (`%.17g`, round-trip, formato canônico do
+projeto), `dt→str` (ISO via `smaug_dt_format`). Construção single-pass
+(`create_with_capacity(0,est)` + `append`/`append_null`). `test_astype` agora 52
+checks (Grupos A+B-out); arquivo 100% linha / 100% branch, Valgrind clean.
+Global: linha 98.71% (3812/3862), branch-alvo 94.60% (3907/4130). `astype` Lua
+ainda intacto (rewire na Fase 4).
+
+---
+## 2026-07-09 — 10.7 Passo B: Fases 0-1 (infra + Grupo A do `astype` no Anel 0)
+
+Início da migração do `astype` para o Anel 0 (matriz `src×dst`). Arquivo dedicado
+`smaug_astype.c` (separação de responsabilidades — cast não se espalha pelos
+`ops_*`), uma primitiva type-safe por par.
+
+**Fase 0 (infra):** `smaug_astype.c`/`smaug_astype.h` criados e integrados ao
+build; header documenta a matriz e o contrato.
+
+**Fase 1 (Grupo A — arrays diretos):** 6 primitivas — `i64→f64`, `dt→f64`,
+`i64→dt`, `dt→i64`, `f64→i64`, `f64→dt`. As cópias `dt↔i64` são int64→int64
+diretas: **consertam** a corrupção > 2^53 do round-trip por `get()`/double
+(dirigido em 2^53+1). `f64→{i64,dt}`: trunc direção zero; NaN/±inf/fora-do-range
+→ null (Contrato 2, evita UB). Lógica de trunc+guarda em helper único
+`f64_to_i64_trunc`. `test_astype.c` (32 checks); guard `if(!self)` testado com
+NULL, OOM com `COV-EXCL-BR`. Arquivo em 100% linha / 100% branch (MC/DC),
+Valgrind clean. `astype` Lua **intacto** — sem rewire até a Fase 4.
+
+Selo [Fedora] `--all`: linha 98.70% (3785/3835), branch-alvo 94.56% (3877/4100),
+Valgrind 13/13, paridade 12/12.
+
+**Achado (12.19):** adicionar um `.c`+teste exigiu editar 5 listas de config
+duplicadas (`SRCS`/`C_TESTS` em Makefile/build.sh/make_coverage.sh) — registrado
+como dívida.
+
+---
 ## 2026-07-09 — selo Fedora `--all`: fecha 10.6 (select) e 12.17
 
 Sessão de validação. `build.sh --all` no Fedora selou os dois pendentes que

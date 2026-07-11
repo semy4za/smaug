@@ -33,6 +33,7 @@
 #include "smaug_datetime.h"
 #include "smaug_ops_window.h"
 #include "smaug_io.h"
+#include "smaug_convert.h"
 #include "smaug_astype.h"
 
 #endif /* SMAUG_H */

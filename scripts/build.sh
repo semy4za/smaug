@@ -120,7 +120,7 @@ fi
 SRCS=(src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c \
       src/smaug_ops_bool.c src/smaug_str.c src/smaug_ops_str.c \
       src/smaug_csv.c src/smaug_json.c src/smaug_datetime.c \
-      src/smaug_ops_window.c src/smaug_astype.c)
+      src/smaug_ops_window.c src/smaug_convert.c src/smaug_astype.c)
 
 C_TESTS_PLAIN=(test_alloc test_ops test_ops_edge test_bool \
                test_bool_lifecycle test_string test_cow test_io_c test_datetime_c \

@@ -512,14 +512,39 @@ escreve (mesma natureza da Sub-A do 9.1, reintroduzida na reconstrução).
     quando o Anel 0 (Passo B) entrar. Testes: +2 `fillna`, +5 `astype`.
     Desparidade registrada e não consertada aqui: `fillna` rejeita `value`
     cdata (validação divergente do `check_value`) — morre no Passo B ao delegar.
-  - **Passo B (plano, 2026-07-05):** matriz `src×dst` explícita no C. Cantos
-    `datetime↔bool` (hoje erram por acidente — `bool→datetime` vaza erro Lua cru)
-    → **erro limpo** ("conversão não suportada; use `:map`"), sem semântica
-    inventada. Paridade (opção 2): manter o `astype` Lua como referência
-    temporária lado a lado; property-based compara C vs Lua-ref nos 23 pares bons;
-    cantos e int64 > 2^53 como casos dirigidos com gabarito definido. Gabarito =
-    comportamento **intencional**, não o literal (não se copia o bug dos cantos).
-    Lua-ref e degrau saem quando a paridade fechar.
+  - **Passo B (em execução, 2026-07-05; escopo revisto 2026-07-09):** matriz
+    `src×dst` explícita no C, em arquivo dedicado `smaug_astype.c` (cast é
+    responsabilidade própria — não se espalha pelos `ops_*`), **uma função por
+    par** (type-safe no FFI). **Escopo (2026-07-09):** os 4 dtypes de struct
+    (int64/float64/string/datetime), matriz 4×4. `bool` fica no Anel 1 até o 10.8
+    — caminho-duplo temporário, débito conhecido e alinhado ao precedente da
+    família 10.6 (não é a desparidade permanente que o item combate);
+    `categorical` é Lua puro, fora do C. Cantos `datetime↔bool` → **erro limpo**
+    ("conversão não suportada; use `:map`"). Gabaritos **intencionais**:
+    `str→i64`/`str→f64` **rígidos** via fonte única `smaug_convert` (`strtoll`
+    base-10 / `strtod`; rejeitam trailing/vazio/overflow — i64 sem hex/float,
+    f64 com hex/inf/nan). Coerência com o `str→num` do CSV, divergindo do oráculo
+    `tonumber` de propósito (*falha visível*); `f64→{i64,dt}`
+    fora-do-range/NaN/±inf → null (Contrato 2 + evita UB do cast). Paridade
+    (opção 2): `astype` Lua como oráculo lado a lado; property-based onde o
+    oráculo é válido, dirigidos onde ele tem o bug (> 2^53) e nos cantos. Lua-ref
+    e degrau saem ao fechar. **Execução em 5 fases** (detalhe no CHANGELOG):
+    - **Fase 0 — infra:** `smaug_astype.c`/`.h` integrados ao build. Selo
+      [Fedora] 2026-07-09.
+    - **Fase 1 — Grupo A (arrays diretos):** 6 primitivas i64/f64/dt (`dt↔i64`
+      copia int64 exata — conserta o > 2^53). Arquivo 100%/100%, Valgrind clean.
+      Selo [Fedora] 2026-07-09 (global: linha 98.70%, branch-alvo 94.56%).
+    - **Fase 2 — Grupo B-out (`→str`) selada (2026-07-09):** `i64→str` (`%lld`
+      exato, conserta > 2^53), `f64→str` (`%.17g`), `dt→str` (`smaug_dt_format`).
+      Construção single-pass via `append`. Arquivo 100%/100%, Valgrind clean,
+      `test_astype` 52 checks; global linha 98.71% / branch-alvo 94.60%.
+    - **Fase 3 — Grupo B-in (`str→`) selada (2026-07-09):** `str→i64`/`str→f64`
+      via `smaug_convert` (parse rígido, fonte única), `str→dt` via
+      `dt_parse`+`dayfirst`. `test_astype` 90 checks; `smaug_convert.c` e
+      `smaug_astype.c` 100%/100%, Valgrind clean; global linha 98.72% /
+      branch-alvo 94.66%. **As 9 primitivas do Passo B completas.**
+    - **Fase 4 — rewire no Anel 1, Fase 5 — selo Fedora+Windows (FFI-ABI nova).
+      Pendentes.**
 - 10.8 **`BoolSeries` — coerência de caminho com o Anel 0** (achado 2026-07-02) —
   **precisa de bloco de design próprio antes de executar**. No mesmo arquivo,
   `count_true`/`any`/`all` delegam ao C, mas `describe` reconta nulos/trues em
@@ -529,6 +554,18 @@ escreve (mesma natureza da Sub-A do 9.1, reintroduzida na reconstrução).
   dependendo de qual representação bool devolveu o objeto. Questão arquitetural
   a resolver primeiro: o BoolSeries (par de arrays crus) delega às mesmas
   primitivas C, ou passa a encapsular o struct como `Series<bool>`?
+- 10.9 **Formatação de serialização canônica (`smaug_fmt_f64`/`smaug_fmt_i64`)** —
+  [decidido 2026-07-09, follow-up do 10.7]. Hoje `%.17g`/`%lld` estão hardcoded
+  em 3 pontos C que concordam mas duplicam: `astype`, `csv`, `json`. Criar fonte
+  única no Anel 0 e migrar os três (o `csv` aplica seu separador decimal em
+  cima). Elimina a redundância — mudar o formato passa a ser um ponto só. Não
+  migra o **display**: serialização (exata, `%.17g`) e apresentação (bonita) são
+  contratos distintos — ver 11.4/11.5. **Simétrico decidido 2026-07-09:**
+  unificar também `str→num`. A fonte única rígida já nasceu na Fase 3 do 10.7
+  (`smaug_convert`: `smaug_parse_i64`/`smaug_parse_f64`); falta refatorar o
+  `try_i64`/`try_f64` do CSV como thin wrappers dela. Adiado pra cá (não feito na
+  Fase 3) porque o CSV passaria a copiar cada campo — regressão de perf no hot
+  path de I/O que merece medição própria antes.
 
 ## 11. Ergonomia REPL  [Windows]
 
@@ -554,7 +591,10 @@ tiver.
   contêiner — provado: `3.14159265358979` sai `3.1415926535898` na Series e
   `3.142` no DataSet. Consolidar numa fonte única de formatação de célula
   (`I.cell_str` do DataSet já é exportado — candidato a canônico). Vínculo:
-  11.4, que consome `cell_str(get(i))`.
+  11.4, que consome `cell_str(get(i))`. **Decisão 2026-07-09:** a fonte canônica
+  de `cell_str` é de **apresentação** (bonita), distinta da serialização exata
+  (`%.17g`, ver 10.9). Consolidar o display não deve alinhá-lo ao `%.17g` —
+  "display ≠ serialização" é contrato.
 
 ## 12. Achados menores + débitos antigos  [Windows+Fedora]
 
@@ -646,6 +686,13 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
   clean, branch-alvo 94.49% (mudança só de comentário, sem alteração funcional).
  - 12.18 **guards `if(!s)` de `dt_get`/`dt_set` sem `COV-EXCL-BR`** — [Fedora]
    (achado 2026-07-09, datetime:296/313). Mesma natureza do 12.17. Alinhar e reselar.
+ - 12.19 **Fontes de verdade duplicadas de `SRCS`/`C_TESTS` (5 listas)** —
+   [achado 2026-07-09, Fase 1 do 10.7]. Acrescentar um `.c` + um teste exige
+   editar 5 listas: `Makefile:SRCS`, `build.sh:SRCS`, `build.sh:C_TESTS_PLAIN`,
+   `make_coverage.sh:SRCS`, `make_coverage.sh:C_TESTS`. Divergência silenciosa e
+   perigosa: esquecer a de coverage deixa o build **verde** enquanto o arquivo
+   novo reporta 0% e **não entra no selo**. Unificar numa fonte única lida pelos
+   3 scripts. Não bloqueia o 10.7; dívida de manutenibilidade.
 
 ## 13. Reescrita de exemplos + docstrings  [Windows]
 
