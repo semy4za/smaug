@@ -105,7 +105,7 @@ local function dataset_to_table(ds)
 
         -- nome: precisamos manter a string viva durante a escrita
         -- alocamos com strdup para ser gerenciado pelo C
-        local name_c = ffi.C.malloc(#cname + 1)  -- liberado por smaug_free via C.smaug_free
+        local name_c = ffi.C.malloc(#cname + 1)  -- heap do luajit → free com ffi.C.free (ver free_table_lua)
         ffi.copy(name_c, cname)
         t.columns[idx].name  = ffi.cast("const char*", name_c)
         t.columns[idx].dtype = dtype == "float64" and "float64"
@@ -159,16 +159,21 @@ local function dataset_to_table(ds)
 end
 
 local function free_table_lua(t, ncols)
-    -- libera recursos alocados por dataset_to_table (não usar smaug_table_free
-    -- porque os ponteiros C foram alocados aqui)
+    -- libera recursos alocados por dataset_to_table. IMPORTANTE (bug de heap
+    -- no Windows): `name` e `columns` foram alocados com ffi.C.malloc (heap do
+    -- luajit.exe), então DEVEM ser liberados com ffi.C.free — não com
+    -- C.smaug_free, que libera no heap da DLL. No Linux o heap é único e a
+    -- troca é inócua; no Windows luajit e smaug.dll têm heaps separados e
+    -- liberar no heap errado corrompe o heap (crash). As séries, ao contrário,
+    -- foram criadas pela lib (C.smaug_*_create) e saem por C.smaug_*_free.
     for ci = 0, ncols - 1 do
-        C.smaug_free(ffi.cast("void*", t.columns[ci].name))
+        ffi.C.free(ffi.cast("void*", t.columns[ci].name))
         if t.columns[ci].i64     ~= nil then C.smaug_i64_free(t.columns[ci].i64)     end
         if t.columns[ci].f64     ~= nil then C.smaug_f64_free(t.columns[ci].f64)     end
         if t.columns[ci].boolcol ~= nil then C.smaug_bool_free(t.columns[ci].boolcol) end
         if t.columns[ci].str     ~= nil then C.smaug_str_free(t.columns[ci].str)      end
     end
-    C.smaug_free(t.columns)
+    ffi.C.free(t.columns)
 end
 
 -- ===================================================================

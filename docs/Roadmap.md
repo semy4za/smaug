@@ -543,8 +543,17 @@ escreve (mesma natureza da Sub-A do 9.1, reintroduzida na reconstrução).
       `dt_parse`+`dayfirst`. `test_astype` 90 checks; `smaug_convert.c` e
       `smaug_astype.c` 100%/100%, Valgrind clean; global linha 98.72% /
       branch-alvo 94.66%. **As 9 primitivas do Passo B completas.**
-    - **Fase 4 — rewire no Anel 1, Fase 5 — selo Fedora+Windows (FFI-ABI nova).
-      Pendentes.**
+    - **Fase 4 — rewire no Anel 1 CONCLUÍDA (2026-07-09):** `cdef` +12
+      primitivas; `astype` Lua vira dispatch de 5 zonas (clone / matriz C /
+      erro limpo `datetime↔bool` / loop reduzido a bool / categorical);
+      degrau e loop elemento-a-elemento removidos. Comportamento: `num→str`
+      `%.17g`, `str→num` rígido, `datetime↔bool` erro limpo, int64 > 2^53 exato.
+    - **Fase 5 — selo:** Fedora `--all` (Valgrind 13/13, 98.72%/94.66%, parity
+      12/12) **+ Windows `build_win.ps1` verde** (o gate Windows revelou e
+      corrigiu um crash de heap cross-runtime no I/O, pré-existente e ortogonal
+      — ver CHANGELOG). **10.7 Passo B CONCLUÍDO nos dois ambientes.** `astype`
+      inteiramente no Anel 0, exceto pares com bool (Anel 1 até 10.8). Resta o
+      follow-up 10.9 (unificação de formatação).
 - 10.8 **`BoolSeries` — coerência de caminho com o Anel 0** (achado 2026-07-02) —
   **precisa de bloco de design próprio antes de executar**. No mesmo arquivo,
   `count_true`/`any`/`all` delegam ao C, mas `describe` reconta nulos/trues em
@@ -693,6 +702,11 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
    perigosa: esquecer a de coverage deixa o build **verde** enquanto o arquivo
    novo reporta 0% e **não entra no selo**. Unificar numa fonte única lida pelos
    3 scripts. Não bloqueia o 10.7; dívida de manutenibilidade.
+ - 12.20 **`03_c_lua_mirror` não audita `astype.h`/`convert.h`** — [achado
+   2026-07-09]. O eixo lê `smaug.h`+`_string/_datetime/_numeric/_bool/_core.h`,
+   mas não os headers do 10.7; as 12 primitivas + 2 parsers ficam fora do radar
+   C↔Lua. Adicionar `smaug_astype.h`/`smaug_convert.h` à lista do eixo. Não é
+   bug de código; lacuna de cobertura do próprio checker.
 
 ## 13. Reescrita de exemplos + docstrings  [Windows]
 

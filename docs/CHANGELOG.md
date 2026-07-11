@@ -5,6 +5,36 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-09 — fix: crash de heap cross-runtime no I/O (Windows)
+
+`io/csv.lua` alocava `name`/`columns` da `smaug_table_t` com `ffi.C.malloc`
+(heap do `luajit.exe`) mas liberava com `C.smaug_free` (heap da `smaug.dll`). No
+Linux (heap único glibc) é inócuo; no Windows (heaps separados luajit/DLL-UCRT)
+corrompe o heap → crash silencioso no `to_csv_mem`/`to_json_mem`. Correção:
+`name`/`columns` saem por `ffi.C.free` (casa com o `malloc`); séries seguem em
+`C.smaug_*_free` (alocadas pela lib). Ponto único (`free_table_lua`, compartilhado
+CSV+JSON). Pré-existente, ortogonal ao 10.7 — revelado pelo gate Windows.
+Verificado limpo sob ASan; varredura confirma que era o único cross-heap do
+projeto. Com isto o Windows fica verde: **10.7 Passo B concluído (Fedora+Windows).**
+
+---
+## 2026-07-09 — 10.7 Passo B Fase 4: rewire do `astype` ao Anel 0 (FFI-ABI)
+
+Religa o `astype` (Series) às 12 primitivas C da matriz `src×dst`; o loop
+elemento-a-elemento e o degrau saem. `cdef` +12 declarações (`str→dt` recebe
+`dayfirst`). Dispatch de 5 zonas: clone (`src==dst`), matriz C
+(`ASTYPE_C[src][dst]`), erro limpo `datetime↔bool`, loop Lua reduzido a
+`bool↔{i64,f64,str}` (Anel 1 até 10.8), categorical no topo. Remove
+`trunc_to_int`/`check_int64_lossless`/`is_nan` (órfãos). **Comportamento
+(mudanças intencionais):** `num→str` passa a `%.17g` (round-trip, formato dos
+writers); `str→num` fica rígido (`smaug_convert`, coerente com o CSV);
+`datetime↔bool` vira erro limpo. Conserta int64 > 2^53: `i64↔dt`, `str↔i64`
+exatos. Testes: bloco 10.7 troca recusa por conversão exata; +round-trip
+`str→i64→str` >2^53; +erro limpo. Selo Fedora `--all` verde (Valgrind 13/13,
+98.72%/94.66%, parity 12/12). O gate Windows expôs um crash de I/O pré-existente,
+corrigido na entrada acima.
+
+---
 ## 2026-07-09 — 10.7 Passo B: Fase 3 (Grupo B-in → string→num/dt)
 
 Fonte única de parsing `smaug_convert.c` (`smaug_parse_i64`/`smaug_parse_f64`):
