@@ -5,6 +5,18 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-09 — 10.9 Fase A: fonte única de formatação `num→str`
+
+`smaug_fmt_i64`/`smaug_fmt_f64` no `smaug_convert` (agora conversão texto↔número
+**bidirecional**): `i64`→`%lld`, `f64`→`%.17g`. Não-finitos normalizados na raiz
+— `NaN`→`"nan"`, `±inf`→`"inf"`/`"-inf"` — eliminando a divergência do `%g` entre
+libc (glibc vs UCRT). Os 8 pontos `snprintf` de `num→str` (astype 2, csv 2, json
+4) migrados; o caso `NaN` especial do CSV vira redundante e sai; o CSV mantém a
+troca de separador decimal por cima. Teste dirigido `test_fmt_direto`.
+`smaug_convert.c` 100%/100%, Valgrind clean. Selo Fedora `--all` (98.73%/94.67%,
+parity 12/12) **+ Windows verde**. Resta a Fase B (`str→num` via `_cstr`).
+
+---
 ## 2026-07-09 — fix: crash de heap cross-runtime no I/O (Windows)
 
 `io/csv.lua` alocava `name`/`columns` da `smaug_table_t` com `ffi.C.malloc`

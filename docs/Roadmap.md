@@ -575,6 +575,13 @@ escreve (mesma natureza da Sub-A do 9.1, reintroduzida na reconstrução).
   `try_i64`/`try_f64` do CSV como thin wrappers dela. Adiado pra cá (não feito na
   Fase 3) porque o CSV passaria a copiar cada campo — regressão de perf no hot
   path de I/O que merece medição própria antes.
+  - **Fase A CONCLUÍDA (2026-07-09, Fedora+Windows):** fonte única `num→str`
+    (`smaug_fmt_i64`/`smaug_fmt_f64` no `smaug_convert`, bidirecional) +
+    normalização NaN/inf/-inf (elimina divergência do `%g` entre glibc/UCRT);
+    8 pontos migrados; `smaug_convert.c` 100%/100%.
+  - **Fase B (pendente):** `str→num` — fatorar `smaug_parse_*_cstr` (núcleo sem
+    cópia), `try_i64`/`try_f64` viram `_cstr` (zero regressão no hot-path,
+    comportamento idêntico); medição de perf antes/depois. Selo Fedora+Windows.
 
 ## 11. Ergonomia REPL  [Windows]
 
@@ -707,6 +714,10 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
    mas não os headers do 10.7; as 12 primitivas + 2 parsers ficam fora do radar
    C↔Lua. Adicionar `smaug_astype.h`/`smaug_convert.h` à lista do eixo. Não é
    bug de código; lacuna de cobertura do próprio checker.
+ - 12.21 **JSON writer emite `nan`/`inf` (JSON inválido)** — [achado 2026-07-09,
+   Fase A do 10.9]. `to_json` trata `NaN→null` (json:588) mas não `inf` (vira
+   `"inf"`); e `nan`/`inf` não são JSON válido em nenhum caso. Corrigir: `NaN`
+   **e** `±inf` → `null` no writer JSON. Sem teste hoje; adicionar.
 
 ## 13. Reescrita de exemplos + docstrings  [Windows]
 
