@@ -10,6 +10,7 @@
 
 #include "../include/smaug_io.h"
 #include "smaug_io_internal.h"
+#include "../include/smaug_convert.h"
 #include "../include/smaug_core.h"
 #include "../include/smaug_string.h"
 #include <stdlib.h>
@@ -465,8 +466,8 @@ smaug_table_t *smaug_read_json_mem(const char *buf, size_t len) {
                 if (!v || v->type == 0) { smaug_str_set_null(s, r); } /* registro heterogêneo — ver test_json_short_record */
                 else if (v->type == 4) smaug_str_set(s, r, v->s, strlen(v->s)); /* v->s nunca é NULL aqui — TOK_STRING só é emitido com l->str_val não-nulo (linha 192) */
                 else { char tmp[64]; size_t n;
-                       if (v->type==1) n=snprintf(tmp,sizeof(tmp),"%lld",(long long)v->i);
-                       else if (v->type==2) n=snprintf(tmp,sizeof(tmp),"%.17g",v->d);
+                       if (v->type==1) n=smaug_fmt_i64(tmp,sizeof(tmp),v->i);
+                       else if (v->type==2) n=smaug_fmt_f64(tmp,sizeof(tmp),v->d);
                        else if (v->type==3) { strcpy(tmp,v->b?"true":"false"); n=strlen(tmp); }
                        else { tmp[0]='\0'; n=0; }
                        smaug_str_set(s, r, tmp, n); }
@@ -580,13 +581,13 @@ char *smaug_write_json_mem(const smaug_table_t *t,
                 smaug_status_t st;
                 int64_t v = smaug_i64_get(col->i64, r, &st);
                 if (st != SMG_OK) { if (wbj_pushz(&b,"null")) goto oom; } /* st==SMG_NULL_VALUE é subcaso de st!=SMG_OK — simplificado (ver csv.c) */ /* COV-EXCL-BR: ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541) */
-                else { snprintf(tmp,sizeof(tmp),"%lld",(long long)v); if (wbj_pushz(&b,tmp)) goto oom; } /* COV-EXCL-BR: ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541) */
+                else { smaug_fmt_i64(tmp,sizeof(tmp),v); if (wbj_pushz(&b,tmp)) goto oom; } /* COV-EXCL-BR: ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541) */
             } else if (col->f64) {
                 smaug_status_t st;
                 double v = smaug_f64_get(col->f64, r, &st);
                 if (st != SMG_OK) { if (wbj_pushz(&b,"null")) goto oom; } /* idem i64 */ /* COV-EXCL-BR: ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541) */
                 else if (v != v) { if (wbj_pushz(&b,"null")) goto oom; }  /* COV-EXCL-BR: OOM de wbuf + NaN→null: ramo oom inalcançável sem injeção */
-                else { snprintf(tmp,sizeof(tmp),"%.17g",v); if (wbj_pushz(&b,tmp)) goto oom; } /* COV-EXCL-BR: ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541) */
+                else { smaug_fmt_f64(tmp,sizeof(tmp),v); if (wbj_pushz(&b,tmp)) goto oom; } /* COV-EXCL-BR: ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541) */
             } else if (col->boolcol) {
                 smaug_status_t st;
                 uint8_t v = smaug_bool_get(col->boolcol, r, &st);

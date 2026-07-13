@@ -173,8 +173,8 @@ smaug_series_str_t *smaug_i64_to_str(const smaug_series_i64_t *self) {
     for (size_t i = 0; i < self->size; i++) {
         int rc;
         if (SMAUG_VALID(self->null_mask, i)) {
-            int n = snprintf(buf, sizeof(buf), "%lld", (long long)self->data[i]);
-            rc = smaug_str_append(r, buf, (size_t)n);
+            size_t n = smaug_fmt_i64(buf, sizeof(buf), self->data[i]);
+            rc = smaug_str_append(r, buf, n);
         } else {
             rc = smaug_str_append_null(r);
         }
@@ -193,8 +193,8 @@ smaug_series_str_t *smaug_f64_to_str(const smaug_series_f64_t *self) {
     for (size_t i = 0; i < self->size; i++) {
         int rc;
         if (SMAUG_VALID(self->null_mask, i)) {
-            int n = snprintf(buf, sizeof(buf), "%.17g", self->data[i]);
-            rc = smaug_str_append(r, buf, (size_t)n);
+            size_t n = smaug_fmt_f64(buf, sizeof(buf), self->data[i]);
+            rc = smaug_str_append(r, buf, n);
         } else {
             rc = smaug_str_append_null(r);
         }

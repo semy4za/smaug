@@ -263,10 +263,37 @@ static void test_convert_direto(void) {
       OK(smaug_parse_f64(big, 79, &dv) == 0, "parse_f64 len>=64 -> 0"); }
     OK(smaug_parse_f64("1e400", 5, &dv) == 0, "parse_f64 overflow (errno) -> 0");
     OK(smaug_parse_f64("3.14 ", 5, &dv) == 0, "parse_f64 trailing -> 0");
+
+    /* núcleos _cstr (hot-path do CSV): NULL, vazio, sucesso, trailing */
+    OK(smaug_parse_i64_cstr("42", &iv) == 1 && iv == 42, "parse_i64_cstr '42'");
+    OK(smaug_parse_i64_cstr(NULL, &iv) == 0, "parse_i64_cstr NULL -> 0");
+    OK(smaug_parse_i64_cstr("", &iv) == 0,   "parse_i64_cstr vazio -> 0");
+    OK(smaug_parse_i64_cstr("1x", &iv) == 0, "parse_i64_cstr trailing -> 0");
+    OK(smaug_parse_f64_cstr("3.14", &dv) == 1 && dv == 3.14, "parse_f64_cstr '3.14'");
+    OK(smaug_parse_f64_cstr(NULL, &dv) == 0, "parse_f64_cstr NULL -> 0");
+    OK(smaug_parse_f64_cstr("", &dv) == 0,   "parse_f64_cstr vazio -> 0");
+    OK(smaug_parse_f64_cstr("1x", &dv) == 0, "parse_f64_cstr trailing -> 0");
+}
+
+/* ---------- fonte única de formatação (smaug_fmt) — teste direto ----------
+   Cobre i64, f64 finito (%.17g) e a normalização de não-finitos. */
+static void test_fmt_direto(void) {
+    char b[32];
+    OK(smaug_fmt_i64(b, sizeof(b), 42) == 2 && strcmp(b, "42") == 0, "fmt_i64 42");
+    OK(smaug_fmt_i64(b, sizeof(b), -7) == 2 && strcmp(b, "-7") == 0, "fmt_i64 -7");
+    OK(smaug_fmt_i64(b, sizeof(b), TWO53_PLUS_1) == 16
+       && strcmp(b, "9007199254740993") == 0, "fmt_i64 2^53+1 exato");
+    OK(smaug_fmt_f64(b, sizeof(b), 1.5) == 3 && strcmp(b, "1.5") == 0, "fmt_f64 1.5");
+    OK(smaug_fmt_f64(b, sizeof(b), 3.14) > 0
+       && strcmp(b, "3.1400000000000001") == 0, "fmt_f64 3.14 -> %.17g");
+    OK(smaug_fmt_f64(b, sizeof(b), NAN) == 3 && strcmp(b, "nan") == 0, "fmt_f64 NaN -> nan");
+    OK(smaug_fmt_f64(b, sizeof(b), INFINITY) == 3 && strcmp(b, "inf") == 0, "fmt_f64 +inf -> inf");
+    OK(smaug_fmt_f64(b, sizeof(b), -INFINITY) == 4 && strcmp(b, "-inf") == 0, "fmt_f64 -inf -> -inf");
 }
 
 int main(void) {
     test_convert_direto();
+    test_fmt_direto();
     test_grupo_a_basico();
     test_exatidao_2e53();
     test_f64_i64_edge();

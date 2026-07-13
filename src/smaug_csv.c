@@ -7,6 +7,7 @@
 #include "../include/smaug_core.h"
 #include "../include/smaug_string.h"
 #include "smaug_io_internal.h"
+#include "../include/smaug_convert.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -79,43 +80,32 @@ static int is_na(const char *s, const char **na_values, size_t na_count) {
     return 0;
 }
 
+/* try_i64/try_f64: wrappers finos sobre o núcleo _cstr do smaug_convert
+   (fonte única de parsing). Zero cópia no caso comum — o campo do CSV já
+   vem null-terminado. O _cstr trata s==NULL e "" (vazio). */
 static int try_i64(const char *s, int64_t *out) {
-    if (!s) return 0; /* COV-EXCL-BR: s nunca é NULL — única origem é row[c] (sempre alocado por next_field) ou "" literal */
-    if (!*s) return 0; /* "": alcançável com na_values customizado sem "" — ver test_csv_na_custom_empty_field */
-    char *end; errno = 0;
-    long long v = strtoll(s, &end, 10);
-    if (errno || *end != '\0') return 0;
-    *out = (int64_t)v; return 1;
+    return smaug_parse_i64_cstr(s, out);
 }
 
 static int try_f64(const char *s, double *out, char decimal) {
-    if (!s) return 0; /* COV-EXCL-BR: s nunca é NULL — mesmo argumento de try_i64 */
-    if (!*s) return 0; /* "": alcançável — ver test_csv_na_custom_empty_field */
-    char *end; errno = 0;
-
     /* decimal customizado (ex.: ','): strtod só entende '.', então troca-se
-       o caractere decimal por '.' numa cópia local. Se decimal == '.', segue
-       o caminho direto sem cópia (zero overhead no caso comum). Um '.' literal
-       na string com decimal ',' não é dígito decimal válido e seria rejeitado
-       pelo strtod via *end, preservando o rigor. */
+       o caractere decimal por '.' numa cópia local e delega ao _cstr. Se
+       decimal == '.', vai direto ao _cstr sem cópia (zero overhead comum).
+       Um '.' literal onde decimal é ',' é inválido — rejeitado abaixo. */
     if (decimal != '.') {
+        if (!s) return 0; /* COV-EXCL-BR: s nunca é NULL — origem é row[c] ou "" literal */
         char buf[64];
         size_t n = strlen(s);
-        if (n >= sizeof(buf)) return 0;  /* número absurdamente longo → não-float */
+        if (n >= sizeof(buf)) return 0;  /* número absurdamente longo → não-float; vazio é tratado pelo _cstr */
         for (size_t i = 0; i < n; i++) {
             if (s[i] == decimal)      buf[i] = '.';
             else if (s[i] == '.')     return 0;  /* '.' onde decimal é ',' → inválido */
             else                      buf[i] = s[i];
         }
         buf[n] = '\0';
-        double v = strtod(buf, &end);
-        if (errno || *end != '\0') return 0;
-        *out = v; return 1;
+        return smaug_parse_f64_cstr(buf, out);
     }
-
-    double v = strtod(s, &end);
-    if (errno || *end != '\0') return 0;
-    *out = v; return 1;
+    return smaug_parse_f64_cstr(s, out);
 }
 
 static int try_bool(const char *s, uint8_t *out) {
@@ -483,15 +473,14 @@ char *smaug_write_csv_mem(const smaug_table_t *t,
                  * status possíveis aqui: col->i64 não-NULL e r<nrows sempre,
                  * então ERR_ARGUMENT/ERR_OOB são inalcançáveis) — simplificado. */
                 if (st != SMG_OK) { s=""; n=0; }
-                else { n=(size_t)snprintf(tmp,sizeof(tmp),"%lld",(long long)v); s=tmp; }
+                else { n=smaug_fmt_i64(tmp,sizeof(tmp),v); s=tmp; }
             } else if (col->f64) {
                 smaug_status_t st; double v = smaug_f64_get(col->f64, r, &st);
                 if (st != SMG_OK) { s=""; n=0; } /* idem i64: subcaso redundante removido */
-                else if (v!=v) { s="nan"; n=3; }
                 else {
-                    n=(size_t)snprintf(tmp,sizeof(tmp),"%.17g",v);
-                    /* decimal customizado: troca o '.' do snprintf pelo separador
-                       configurado. "%.17g" produz no máximo um '.'. */
+                    n = smaug_fmt_f64(tmp, sizeof(tmp), v);  /* normaliza NaN/inf */
+                    /* decimal customizado: troca o '.' do fmt pelo separador
+                       configurado. "%.17g" produz no máximo um '.' (nan/inf não têm). */
                     if (decimal != '.') {
                         for (size_t k = 0; k < n; k++)
                             if (tmp[k] == '.') { tmp[k] = decimal; break; }
