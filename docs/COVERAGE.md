@@ -3,9 +3,9 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `4ca12eb`  |  Data: 2026-07-12 15:00:53 -0300
+- Commit medido: `3f3fa66`  |  Data: 2026-07-13 13:52:15 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `3953/4339 = 91.10%` -- 164 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- **Branch-bruto** (todos os ramos): `3960/4347 = 91.10%` -- 165 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 | Arquivo | Linhas | Branch-alvo (taken) |
@@ -13,7 +13,7 @@
 | `smaug_core.c` | `402/402 = 100.00%` `[██████████]` | `290/290 = 100.00%` `[██████████]` |
 | `smaug_ops_f64.c` | `487/488 = 99.80%` `[██████████]` | `495/496 = 99.80%` `[██████████]` |
 | `smaug_ops_i64.c` | `475/479 = 99.16%` `[█████████░]` | `488/498 = 97.99%` `[█████████░]` |
-| `smaug_ops_bool.c` | `305/311 = 98.07%` `[█████████░]` | `373/400 = 93.25%` `[█████████░]` |
+| `smaug_ops_bool.c` | `314/320 = 98.12%` `[█████████░]` | `380/407 = 93.37%` `[█████████░]` |
 | `smaug_str.c` | `293/294 = 99.66%` `[██████████]` | `242/242 = 100.00%` `[██████████]` |
 | `smaug_ops_str.c` | `250/255 = 98.04%` `[█████████░]` | `266/283 = 93.99%` `[█████████░]` |
 | `smaug_csv.c` | `293/301 = 97.34%` `[█████████░]` | `331/368 = 89.95%` `[█████████░]` |
@@ -22,7 +22,7 @@
 | `smaug_ops_window.c` | `329/334 = 98.50%` `[█████████░]` | `344/379 = 90.77%` `[█████████░]` |
 | `smaug_convert.c` | `37/37 = 100.00%` `[██████████]` | `37/37 = 100.00%` `[██████████]` |
 | `smaug_astype.c` | `118/118 = 100.00%` `[██████████]` | `109/109 = 100.00%` `[██████████]` |
-| **TOTAL** | `3871/3921 = 98.72%` `[█████████░]` | `3953/4175 = 94.68%` `[█████████░]` |
+| **TOTAL** | `3880/3930 = 98.73%` `[█████████░]` | `3960/4182 = 94.69%` `[█████████░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
@@ -47,22 +47,22 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_ops_bool.c:228` — if (out_mask) {
 - `smaug_ops_bool.c:237` — if (mask) mask[i] = SMAUG_MASK_VALID;
 - `smaug_ops_bool.c:240` — if (mask) mask[i] = SMAUG_MASK_NULL;
-- `smaug_ops_bool.c:389` — if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
-- `smaug_ops_bool.c:403` — if (!s || s->size == 0) return SIZE_MAX;
-- `smaug_ops_bool.c:417` — if (!s || s->size == 0) return SIZE_MAX;
-- `smaug_ops_bool.c:440` — if (!s || s->size == 0) {
-- `smaug_ops_bool.c:441` — if (status) *status = SMG_NULL_VALUE;
-- `smaug_ops_bool.c:451` — if (status) *status = SMG_NULL_VALUE;
-- `smaug_ops_bool.c:461` — if (!s || s->size == 0) {
-- `smaug_ops_bool.c:462` — if (status) *status = SMG_NULL_VALUE;
-- `smaug_ops_bool.c:468` — if (SMAUG_VALID(s->null_mask, i)) {
-- `smaug_ops_bool.c:470` — if (!found || v > result) { result = v; found = true; }
-- `smaug_ops_bool.c:471` — } else if (!ignore_na) {
-- `smaug_ops_bool.c:472` — if (status) *status = SMG_NULL_VALUE;
-- `smaug_ops_bool.c:476` — if (status) *status = found ? SMG_OK : SMG_NULL_VALUE;
-- `smaug_ops_bool.c:477` — return found ? result : 0;
-- `smaug_ops_bool.c:500` — if (nf + nt == 0) return result;
-- `smaug_ops_bool.c:507` — switch (method) {
+- `smaug_ops_bool.c:408` — if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
+- `smaug_ops_bool.c:422` — if (!s || s->size == 0) return SIZE_MAX;
+- `smaug_ops_bool.c:436` — if (!s || s->size == 0) return SIZE_MAX;
+- `smaug_ops_bool.c:459` — if (!s || s->size == 0) {
+- `smaug_ops_bool.c:460` — if (status) *status = SMG_NULL_VALUE;
+- `smaug_ops_bool.c:470` — if (status) *status = SMG_NULL_VALUE;
+- `smaug_ops_bool.c:480` — if (!s || s->size == 0) {
+- `smaug_ops_bool.c:481` — if (status) *status = SMG_NULL_VALUE;
+- `smaug_ops_bool.c:487` — if (SMAUG_VALID(s->null_mask, i)) {
+- `smaug_ops_bool.c:489` — if (!found || v > result) { result = v; found = true; }
+- `smaug_ops_bool.c:490` — } else if (!ignore_na) {
+- `smaug_ops_bool.c:491` — if (status) *status = SMG_NULL_VALUE;
+- `smaug_ops_bool.c:495` — if (status) *status = found ? SMG_OK : SMG_NULL_VALUE;
+- `smaug_ops_bool.c:496` — return found ? result : 0;
+- `smaug_ops_bool.c:519` — if (nf + nt == 0) return result;
+- `smaug_ops_bool.c:526` — switch (method) {
 
 **`smaug_ops_str.c`** — 13 linha(s) com ramo descoberto:
 - `smaug_ops_str.c:315` — size_t *src = malloc((s->size ? s->size : 1) * sizeof(size_t));
@@ -256,6 +256,7 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_ops_bool.c:48` — at&&bt sempre true aqui (linhas 45/47 ja garantiram ambos validos-nao-false)
 - `smaug_ops_bool.c:48` — at&&bt sempre true aqui (linhas 45/47 ja garantiram ambos validos-nao-false)
 - `smaug_ops_bool.c:158` — m sempre fornecido pelas Kleene raw (out_mask != NULL); ramo :SMAUG_MASK_VALID defensivo, uso interno controlado
+- `smaug_ops_bool.c:267` — falha de alloc do clone; OOM sem injecao
 - `smaug_str.c:104` — offsets_owned=false nao existe na API atual; o campo separa a posse do offsets da do buffer (modelo A1, smaug_types.h) — sem ele o free inferiria posse por acoplamento external_alloc+is_view
 - `smaug_str.c:164` — total ~ SIZE_MAX; inalcancavel
 - `smaug_str.c:199` — o engine nao confia no caller; frontend nunca passa NULL (fillna valida antes)

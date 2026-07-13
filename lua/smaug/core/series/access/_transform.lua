@@ -315,18 +315,15 @@ return function(I)
         end
         local dt = self._dtype
 
-        -- bool continua no Anel 1 até o 10.8 (tipo paralelo, arrays crus).
+        -- bool (10.8): guarda de tipo + Anel 0 (smaug_bool_coalesce_scalar).
+        -- value normalizado a 0/1 na fronteira FFI — não depende de coerção
+        -- implícita boolean→número do LuaJIT. Sem loop/travessia por elemento.
         if dt == "bool" then
             if type(value) ~= "boolean" then
                 error("smaug: fillna em série bool espera boolean (true/false); "
                       .. "recebido " .. type(value), 2)
             end
-            local n   = self:len()
-            local out = Series.new(dt, n, self._name)
-            for i = 1, n do
-                if self:is_null(i) then out:set(i, value) else out:set(i, self:get(i)) end
-            end
-            return out
+            return wrap(self._d.coalesce_scalar(self._c, value and 1 or 0), dt, self._name)
         end
 
         -- datetime restrito a number (epoch_ms) nesta leva; string ISO → 12.16.

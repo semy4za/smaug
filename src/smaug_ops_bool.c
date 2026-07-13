@@ -257,6 +257,25 @@ bool smaug_bool_series_all(const smaug_series_bool_t *s) {
     return smaug_bool_all(s->data, s->null_mask, s->size);
 }
 
+/* --- coalesce_scalar: espelha smaug_i64_coalesce_scalar. Preenche posições
+   nulas com value (normalizado 0/1) e as revalida; não-nulas inalteradas. --- */
+smaug_series_bool_t *smaug_bool_coalesce_scalar(const smaug_series_bool_t *self,
+                                                uint8_t value) {
+    if (!self) return NULL;  /* guarda coberta por test_coalesce (coalesce(NULL)) */
+
+    smaug_series_bool_t *r = smaug_bool_clone(self);
+    if (!r) return NULL;  /* COV-EXCL-BR: falha de alloc do clone; OOM sem injecao */
+
+    uint8_t v = value ? 1 : 0;
+    for (size_t i = 0; i < self->size; i++) {
+        if (SMAUG_NULL(r->null_mask, i)) {
+            r->data[i]      = v;
+            r->null_mask[i] = SMAUG_MASK_VALID;
+        }
+    }
+    return r;
+}
+
 /* --- count_nonnull / seleção (espelham i64) --- */
 size_t smaug_bool_count_nonnull(const smaug_series_bool_t *s) {
     if (!s) return 0;

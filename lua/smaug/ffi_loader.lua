@@ -253,6 +253,7 @@ ffi.cdef([[
     size_t               smaug_bool_count_nonnull(const smaug_series_bool_t *s);
     smaug_series_bool_t* smaug_bool_take  (const smaug_series_bool_t *s, const size_t *idx, size_t len);
     smaug_series_bool_t* smaug_bool_filter(const smaug_series_bool_t *s, const uint8_t *mask);
+    smaug_series_bool_t* smaug_bool_coalesce_scalar(const smaug_series_bool_t *self, uint8_t value);
 
     /* --- Agregacoes struct-based --- */
     size_t smaug_bool_series_count_true(const smaug_series_bool_t *s);

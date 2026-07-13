@@ -262,6 +262,7 @@ return function(I)
             end,
             append_null = C.smaug_bool_append_null,
             count_nonnull = C.smaug_bool_count_nonnull,
+            coalesce_scalar = C.smaug_bool_coalesce_scalar,
             filter  = C.smaug_bool_filter,
             take    = C.smaug_bool_take,
             view    = C.smaug_bool_view,   -- bool é mutável (tem set); view + COW idênticos a f64/i64/dt

@@ -5,6 +5,54 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-13 — 10.8: `BoolSeries` — coerência de caminho com o Anel 0
+
+O achado 2026-07-02 mirava loops Lua no `boolseries.lua`. A leitura do código
+atual reenquadrou o item: o caminho bool **vivo** virou a `Series<bool>`
+struct-based (dtype de primeira classe, delega `take`/`filter`/`argsort`/`sort`/
+`ffill`/`rank`/`count_nonnull` ao Anel 0 via descritor), e o `boolseries.lua`
+(par de arrays crus, "legada") ficou **órfão** — nenhum `require` em `lua/`,
+`tests/` ou `scripts/`, nenhum caller de `_own`/`from_lua_arrays`, nenhum teste.
+Confirmado por leitura caso-a-caso, não por grep. A "questão arquitetural" do
+roadmap (delegar às mesmas primitivas vs. encapsular o struct) já estava
+respondida no código: `Series<bool>` venceu; a tensão "dois caminhos" existia só
+porque o cadáver não fora removido.
+
+Três incrementos, cada um selado antes do próximo:
+
+- **(a) Remoção do código morto.** Deletado `lua/smaug/core/boolseries.lua`.
+  Coverage **idêntico** pós-remoção (98.72%/94.68%) — prova de que nunca era
+  executado. As primitivas C raw (`smaug_bool_and/or/xor/not/count_true/any/all`
+  sobre `uint8_t*`) **permanecem**: não são código morto, são o motor que as
+  `smaug_bool_series_*` reusam (`smaug_bool_series_and` → `smaug_bool_and`).
+  Removê-las duplicaria a lógica Kleene 7× inline — o oposto do objetivo. O que o
+  comentário do `ffi_loader` chamava de "legada até a Fase 4" era a exposição ao
+  Lua (via `BoolSeries`), não a existência em C.
+
+- **(b) `describe(bool)` → Anel 0.** Trocado o loop Lua que recontava trues
+  posição-a-posição por `self:count_true()` (`smaug_bool_series_count_true`).
+  Nulos já vinham de `count_nonnull`. Guardado por `describe count_true/false`
+  (`test_constructors`) e DataSet describe bool (`test_core`).
+
+- **(c) `fillna(bool)` → Anel 0.** Era o único resíduo real no caminho vivo:
+  fazia `Series.new` + loop `set()` enquanto i64/f64/dt/str delegavam a
+  `coalesce_scalar` (família 10.6) — bool ficara de fora de propósito. Criada
+  `smaug_bool_coalesce_scalar` (espelho exato do `smaug_i64_coalesce_scalar`:
+  `clone` + preenche nulos com value, revalida). `value` normalizado a 0/1 nas
+  **duas pontas** — Lua passa `value and 1 or 0` (sem depender da coerção
+  implícita boolean→número do LuaJIT) e o C faz `value ? 1 : 0` (engine não confia
+  no caller). `fillna(bool)` perde o loop e delega via descritor, mantendo a
+  guarda de tipo com erro claro. Teste C novo `test_coalesce` em
+  `test_bool_lifecycle` (NA→value, não-nulos intactos, origem preservada,
+  sem-NA no-op, vazia, guarda NULL). Um único `COV-EXCL-BR` (OOM do clone); a
+  guarda `!self` **não** é excluída porque `test_coalesce` a cobre.
+
+Selo Fedora `--all`: Valgrind 0 erros (13 binários), 18 suites Lua +
+property-based (360862 checks), coverage 98.73%/94.69%, parity 12/12.
+**Windows (`build_win.ps1`) é follow-up obrigatório** antes de considerar o 10.8
+fechado de vez — (c) introduz símbolo C novo (ABI/FFI).
+
+---
 ## 2026-07-09 — 10.9 Fase B: `str→num` unificado via `_cstr`
 
 `smaug_parse_i64_cstr`/`smaug_parse_f64_cstr` no `smaug_convert`: núcleo de

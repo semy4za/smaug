@@ -554,15 +554,15 @@ escreve (mesma natureza da Sub-A do 9.1, reintroduzida na reconstrução).
       — ver CHANGELOG). **10.7 Passo B CONCLUÍDO nos dois ambientes.** `astype`
       inteiramente no Anel 0, exceto pares com bool (Anel 1 até 10.8). Resta o
       follow-up 10.9 (unificação de formatação).
-- 10.8 **`BoolSeries` — coerência de caminho com o Anel 0** (achado 2026-07-02) —
-  **precisa de bloco de design próprio antes de executar**. No mesmo arquivo,
-  `count_true`/`any`/`all` delegam ao C, mas `describe` reconta nulos/trues em
-  loop Lua (podia usar `count_true`) e `filter`/`dropna`/`fillna`/`argsort` fazem
-  loop por elemento — sendo que `C.smaug_bool_argsort` existe e está registrado
-  no descritor de `Series<bool>`. Mesma categoria de operação, dois caminhos,
-  dependendo de qual representação bool devolveu o objeto. Questão arquitetural
-  a resolver primeiro: o BoolSeries (par de arrays crus) delega às mesmas
-  primitivas C, ou passa a encapsular o struct como `Series<bool>`?
+- 10.8 **`BoolSeries` — coerência de caminho com o Anel 0** —
+  **CONCLUÍDO (2026-07-13, Fedora; Windows follow-up).** O achado 2026-07-02
+  apontava loops Lua no `boolseries.lua`; desde então o caminho vivo passou a ser
+  a `Series<bool>` struct e o `boolseries.lua` ficou **órfão** (sem `require`, sem
+  teste). Resolução em 3 incrementos: (a) removido o módulo morto; (b)
+  `describe(bool)` usa `:count_true()` (Anel 0) no lugar do loop; (c) criada
+  `smaug_bool_coalesce_scalar` — fecha a família `coalesce_scalar` (i64/f64/dt/str)
+  — e `fillna(bool)` delega a ela. As primitivas C raw permanecem (são o motor que
+  as `smaug_bool_series_*` reusam). Detalhe no CHANGELOG.
 - 10.9 **Formatação de serialização canônica (`smaug_fmt_f64`/`smaug_fmt_i64`)** —
   [decidido 2026-07-09, follow-up do 10.7]. Hoje `%.17g`/`%lld` estão hardcoded
   em 3 pontos C que concordam mas duplicam: `astype`, `csv`, `json`. Criar fonte

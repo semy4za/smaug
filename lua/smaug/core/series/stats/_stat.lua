@@ -263,11 +263,9 @@ return function(I)
         local nulls = n - self:count_nonnull()
 
         if self._dtype == "bool" then
-            local count_true = 0
-            for i = 1, n do
-                local v = self:get(i)
-                if v == true then count_true = count_true + 1 end
-            end
+            -- count_true desce ao Anel 0 (smaug_bool_series_count_true, ignora NA);
+            -- nulos já vêm de count_nonnull. Sem loop Lua/travessia FFI por elemento.
+            local count_true = self:count_true()
             return {
                 count       = n - nulls,
                 nulls       = nulls,

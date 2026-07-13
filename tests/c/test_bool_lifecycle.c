@@ -325,6 +325,48 @@ static int test_eq_ne(void) {
     return 0;
 }
 
+/* ---- coalesce_scalar: preenche nulos com value (0/1), mantém não-nulos ---- */
+static int test_coalesce(void) {
+    /* fill com false: NA -> 0, validos inalterados */
+    smaug_series_bool_t *b = mk("01N1");
+    smaug_series_bool_t *r = smaug_bool_coalesce_scalar(b, 0);
+    OK(r != NULL, "coalesce retorna clone");
+    OK(r != b, "coalesce nao muta a origem");
+    OK(rd(r, 0) == '0' && rd(r, 1) == '1' && rd(r, 3) == '1', "coalesce: validos inalterados");
+    OK(rd(r, 2) == '0', "coalesce false: NA -> false");
+    OK(smaug_bool_count_nonnull(r) == 4, "coalesce: sem nulos restantes");
+    OK(rd(b, 2) == 'N', "origem preservada (NA intacto)");
+    smaug_bool_free(r);
+
+    /* fill com true */
+    r = smaug_bool_coalesce_scalar(b, 1);
+    OK(rd(r, 2) == '1', "coalesce true: NA -> true");
+    OK(rd(r, 0) == '0' && rd(r, 1) == '1', "coalesce true: validos inalterados");
+    smaug_bool_free(r);
+
+    /* value nao-normalizado: qualquer != 0 vira 1 */
+    r = smaug_bool_coalesce_scalar(b, 42);
+    OK(rd(r, 2) == '1', "coalesce: value 42 normaliza para true");
+    smaug_bool_free(r);
+    smaug_bool_free(b);
+
+    /* série sem NA: no-op semântico */
+    b = mk("010");
+    r = smaug_bool_coalesce_scalar(b, 1);
+    OK(rd(r, 0) == '0' && rd(r, 1) == '1' && rd(r, 2) == '0', "coalesce sem NA: inalterada");
+    smaug_bool_free(r); smaug_bool_free(b);
+
+    /* série vazia */
+    b = smaug_bool_create(0);
+    r = smaug_bool_coalesce_scalar(b, 1);
+    OK(r != NULL && r->size == 0, "coalesce de vazia -> vazia");
+    smaug_bool_free(r); smaug_bool_free(b);
+
+    /* guarda NULL */
+    OK(smaug_bool_coalesce_scalar(NULL, 1) == NULL, "coalesce(NULL) -> NULL");
+    return 0;
+}
+
 int main(void) {
     if (test_lifecycle())  return 1;
     if (test_guards())     return 1;
@@ -335,6 +377,7 @@ int main(void) {
     if (test_selection())  return 1;
     if (test_sort())       return 1;
     if (test_eq_ne())      return 1;
+    if (test_coalesce())   return 1;
     printf("PASS: bool lifecycle (%d checks)\n", n_checks);
     return 0;
 }
