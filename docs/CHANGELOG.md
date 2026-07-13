@@ -5,6 +5,21 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-09 — 10.9 Fase B: `str→num` unificado via `_cstr`
+
+`smaug_parse_i64_cstr`/`smaug_parse_f64_cstr` no `smaug_convert`: núcleo de
+parsing **sem cópia** (C-string já terminada, hot-path do CSV).
+`smaug_parse_*(s,len)` passa a copiar pra buffer local e delegar ao `_cstr`.
+`try_i64`/`try_f64` do CSV viram wrappers `_cstr` — comportamento idêntico, sem
+o `strtoll`/`strtod` duplicado. **Perf provada sem regressão**: `read_csv` 100k
+linhas medido 2613 (baseline) vs 2618 ms (refactor), diferença 0.2% (ruído) — o
+`_cstr` faz o mesmo trabalho do `try_*` original, evitando a cópia por campo que
+um wrapper ingênuo custaria. Testes diretos dos `_cstr` (NULL/vazio/sucesso/
+trailing) em `test_astype` (106 checks). `smaug_convert.c` 100%/100%. Selo Fedora
+`--all` (98.72%/94.68%, parity 12/12) **+ Windows verde. 10.9 concluído**
+(`smaug_convert` é agora a fonte única bidirecional texto↔número).
+
+---
 ## 2026-07-09 — 10.9 Fase A: fonte única de formatação `num→str`
 
 `smaug_fmt_i64`/`smaug_fmt_f64` no `smaug_convert` (agora conversão texto↔número

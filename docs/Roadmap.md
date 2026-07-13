@@ -579,9 +579,12 @@ escreve (mesma natureza da Sub-A do 9.1, reintroduzida na reconstrução).
     (`smaug_fmt_i64`/`smaug_fmt_f64` no `smaug_convert`, bidirecional) +
     normalização NaN/inf/-inf (elimina divergência do `%g` entre glibc/UCRT);
     8 pontos migrados; `smaug_convert.c` 100%/100%.
-  - **Fase B (pendente):** `str→num` — fatorar `smaug_parse_*_cstr` (núcleo sem
-    cópia), `try_i64`/`try_f64` viram `_cstr` (zero regressão no hot-path,
-    comportamento idêntico); medição de perf antes/depois. Selo Fedora+Windows.
+  - **Fase B CONCLUÍDA (2026-07-09, Fedora+Windows):** `str→num` — núcleos
+    `smaug_parse_*_cstr` (sem cópia, hot-path); `smaug_parse_*(s,len)` copia e
+    delega; `try_i64`/`try_f64` do CSV viram wrappers `_cstr`. Perf provada sem
+    regressão (2613 vs 2618 ms em `read_csv` 100k). **10.9 CONCLUÍDO:**
+    `smaug_convert` é a fonte única bidirecional texto↔número (`num→str` via
+    `fmt`, `str→num` via `parse`/`_cstr`). Resta o débito 12.21 (JSON não-finitos).
 
 ## 11. Ergonomia REPL  [Windows]
 
