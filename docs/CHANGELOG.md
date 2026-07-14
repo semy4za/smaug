@@ -5,6 +5,28 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-14 — 12.4: dedup do `tostring` + guard de unicidade em `from_codes`
+
+O cosmético registrado era `tostring(v)` chamado 2× na normalização de níveis do
+`from_codes` (içado para um local). Durante o step, achado maior: `from_codes`
+**não validava unicidade dos níveis**. Dois níveis que normalizam para a mesma
+string — duplicata literal `{"a","a"}` ou colisão de tipo `{1,"1"}` —
+sobrescreviam o `lmap` silenciosamente, deixando dois códigos apontando para o
+mesmo nível: categorical corrompido, sem aviso.
+
+Decisão (Gui): não faz sentido arrumar só o visual e deixar o furo. Adicionado
+guard falha-visível — erro em nível duplicado após normalização, com os dois
+índices. O path de construção por dados já dedupe naturalmente (via `level_map`
+no append); o furo era exclusivo do `from_codes`. Teste cobre os dois casos de
+colisão + controle positivo (níveis numéricos distintos normalizam sem colidir).
+
+Achado colateral registrado (12.22): o padrão de `n_ok` subcontado do 12.7 é
+sistêmico — 9 outras suites concatenadas têm o mesmo relato enganoso. Não tocado
+neste step (fora de escopo); registrado para varredura própria.
+
+Lua puro. Fedora `--all` verde (parity 13/13).
+
+---
 ## 2026-07-14 — 12.7: contador de checks unificado em `test_constructors`
 
 O arquivo é 4 suites concatenadas; cada uma redeclarava `local n_ok = 0` +

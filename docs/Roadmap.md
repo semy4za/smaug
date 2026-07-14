@@ -633,7 +633,12 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
     `decimal=','` (o C troca por `.` em `try_f64`); ler `34,12` como string foi
     default `.`. Mesma natureza do E9 (12.10): default não-BR, não defeito.
     Documentar; conecta com 12.8 (fixtures BR).
-- 12.4 categorical hash via `tostring` (cosmético)
+- 12.4 **CONCLUÍDO (2026-07-14).** `from_codes` chamava `tostring(v)` 2× (içado
+  para um local) e — achado durante o step — **não validava unicidade de níveis**:
+  `{"a","a"}` ou `{1,"1"}` (colisão pós-normalização) sobrescreviam o `lmap`
+  silenciosamente, corrompendo o categorical. Adicionado guard falha-visível
+  (erro em nível duplicado após normalização). O path de dados já dedupe via
+  `level_map`; o furo era exclusivo do `from_codes`. Lua puro.
 - 12.5 I3 — `g_sort_series` global em `ops_str` (single-thread: sem bug)
 - 12.6 I4 — `get_value` passa `nil` como status (assimetria; sem bug)
 - 12.7 **CONCLUÍDO (2026-07-14).** `test_constructors.lua` redeclarava
@@ -725,6 +730,14 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
    Fase A do 10.9]. `to_json` trata `NaN→null` (json:588) mas não `inf` (vira
    `"inf"`); e `nan`/`inf` não são JSON válido em nenhum caso. Corrigir: `NaN`
    **e** `±inf` → `null` no writer JSON. Sem teste hoje; adicionar.
+ - 12.22 **`n_ok` subcontado em 9 suites concatenadas** — [achado 2026-07-14,
+   durante o 12.4]. Mesmo padrão do 12.7 (já corrigido em `test_constructors`),
+   mas sistêmico: `test_categorical` (3×), `test_access` (3×), `test_predicates`
+   (3×), `test_str` (4×), `test_relational` (4×), `test_selection` (2×),
+   `test_reduce` (2×), `test_window` (2×), `test_csv` (3×) redeclaram
+   `local n_ok`/`check` por seção e imprimem só o último → headline subconta.
+   Validação é real (cada `check` aborta em falha); só o número engana. Fix:
+   contador único por arquivo, como no 12.7. Lua puro, cosmético.
 
 ## 13. Reescrita de exemplos + docstrings  [Windows]
 

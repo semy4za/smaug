@@ -69,6 +69,16 @@ local ok, err = pcall(function()
 end)
 check(not ok, "from_codes: code fora do range → erro")
 
+-- 12.4: guard de unicidade de níveis (falha-visível em vez de corromper)
+local okd = pcall(function() S.Categorical.from_codes({1, 2}, {"a", "a"}) end)
+check(not okd, "from_codes: nível duplicado literal → erro")
+local okm = pcall(function() S.Categorical.from_codes({1, 2}, {1, "1"}) end)
+check(not okm, "from_codes: colisão de tipo misto (1 vs \"1\") → erro")
+-- controle positivo: níveis numéricos distintos normalizam sem colidir
+local fcn = S.Categorical.from_codes({1, 2}, {1, 2})
+check(fcn:get(1) == "1" and fcn:get(2) == "2",
+      "from_codes: níveis numéricos distintos normalizam para \"1\"/\"2\"")
+
 -- Series vazia
 local c0 = S.from_table({}, "categorical")
 check(c0:len() == 0,                "vazio: len=0")

@@ -69,8 +69,13 @@ return function(I)
         local lev  = {}
         local lmap = {}
         for i, v in ipairs(levels_arr) do
-            lev[i]       = tostring(v)
-            lmap[tostring(v)] = i
+            local sv = tostring(v)
+            if lmap[sv] ~= nil then
+                error("smaug: from_codes — nível duplicado após normalização: '"
+                      .. sv .. "' (índices " .. lmap[sv] .. " e " .. i .. ")", 2)
+            end
+            lev[i]   = sv
+            lmap[sv] = i
         end
         local codes = {}
         for i = 1, n do
