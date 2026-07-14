@@ -878,5 +878,17 @@ check(not ok_m,                     "mask tamanhos diferentes = erro")
 -- Resultado
 -- ================================================================
 
+do
+    -- 11.1/11.2: CategoricalSeries e .cat proxy se auto-mostram legíveis
+    local c = Series({"a", "b", "a", "c"}, "categorical"); c._name = "cor"
+    local tc = tostring(c)
+    check(tc:find("^table:") == nil, "11.1 CategoricalSeries __tostring não vaza table:")
+    check(tc:find("Categorias", 1, true) ~= nil, "11.1 __tostring tem rodapé de categorias")
+    check(tc:find("(3)", 1, true) ~= nil, "11.1 __tostring conta 3 categorias")
+    local tp = tostring(c.cat)
+    check(tp:find("^table:") == nil and tp:find(".cat", 1, true) ~= nil,
+          "11.2 .cat proxy __tostring legível")
+end
+
 
 print(string.format("OK — %d checks passaram (Series: categorical + completude datetime/categorical)", n_ok))

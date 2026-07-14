@@ -11,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-07-13 22:44:53 UTC
+Gerado em: 2026-07-14 13:20:54 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -723,7 +723,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | arquivo | checks | float64 | int64 | bool | string | datetime | categorical |
 | :--- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
 | `series/test_constructors` | 347 | 38 | 62 | 22 | 16 | 2 | 1 |
-| `series/test_access` | 108 | 15 | 11 | — | 6 | — | — |
+| `series/test_access` | 116 | 18 | 12 | — | 9 | 1 | — |
 | `series/test_reduce` | 58 | 7 | 2 | 3 | 4 | 2 | — |
 | `series/test_stat` | 70 | 6 | 12 | — | 9 | — | — |
 | `series/test_window` | 124 | 10 | 12 | 2 | 5 | 2 | — |
@@ -731,28 +731,28 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `series/test_selection` | 50 | 6 | 4 | 6 | 5 | 2 | — |
 | `series/test_str` | 276 | 4 | 9 | 1 | 50 | — | — |
 | `series/test_dt` | 272 | 3 | 6 | 2 | 12 | 62 | — |
-| `series/test_categorical` | 295 | 7 | 7 | 8 | 5 | 13 | 57 |
+| `series/test_categorical` | 299 | 7 | 7 | 8 | 5 | 13 | 58 |
 | `dataset/test_core` | 229 | 30 | 32 | 8 | 13 | — | 1 |
 | `dataset/test_relational` | 172 | 10 | 50 | 4 | 34 | — | — |
 | `dataset/test_stat` | 91 | 10 | 16 | 1 | 13 | — | — |
-| `dataset/test_io_support` | 44 | 2 | 13 | 1 | 6 | — | — |
+| `dataset/test_io_support` | 53 | 4 | 15 | 1 | 7 | — | — |
 | `io/test_csv` | 101 | 2 | 3 | 2 | 9 | — | — |
 | `io/test_json` | 28 | 1 | 1 | 1 | 2 | — | — |
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 79 | 19 | 2 | 2 | 4 | 1 | 1 |
 
-**Total de checks:** 2554
+**Total de checks:** 2575
 
 ### Menções totais por dtype (toda a suite)
 
 | dtype | menções |
 | :--- | :-: |
-| float64 | 188 |
-| int64 | 320 |
+| float64 | 193 |
+| int64 | 323 |
 | bool | 66 |
-| string | 215 |
-| datetime | 86 |
-| categorical | 60 |
+| string | 219 |
+| datetime | 87 |
+| categorical | 61 |
 
 ## Eixo 12 — Sincronização docs ↔ código
 
@@ -769,6 +769,25 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 | `StrProxy:*` (.str) | 28 | 28 | 0 | 100% | 🟩 completo |
 | `SeriesDT:*` (.dt) | 33 | 33 | 0 | 100% | 🟩 completo |
 
+## Eixo 13 — Ergonomia REPL — __tostring de objetos expostos
+
+🟩 = objeto tem __tostring (não vaza 'table: 0x…'). 🟥 = ausente. Invariante do item 11.3: todo objeto que o usuário segura se auto-mostra legível. A formatação de células segue a fonte única `core/display.lua` (itens 11.4/11.5).
+
+
+| objeto exposto | __tostring |
+| :--- | :-: |
+| `Series` | 🟩 |
+| `DataSet` | 🟩 |
+| `CategoricalSeries` | 🟩 |
+| `StrProxy (.str)` | 🟩 |
+| `SeriesDT (.dt)` | 🟩 |
+| `SeriesAt (.at)` | 🟩 |
+| `CatProxy (.cat)` | 🟩 |
+| `SeriesRolling` | 🟩 |
+| `SeriesExpanding` | 🟩 |
+| `GroupBy` | 🟩 |
+| `Rolling (DataSet)` | 🟩 |
+
 ---
 
 ## Resumo executivo
@@ -776,10 +795,10 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 985
+- 🟩 paridade: 997
 - ⬜ exceção registrada: 215
 - 🟨 suspeita (revisar): 270
-- 🟥 inconsistência clara: 12
+- 🟥 inconsistência clara: 13
 
 
 ## Como usar este relatório

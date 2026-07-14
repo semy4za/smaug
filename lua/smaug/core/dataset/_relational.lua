@@ -281,6 +281,10 @@ return function(I)
     -- =====================================================================
     local GroupBy = {}
     GroupBy.__index = GroupBy
+    GroupBy.__tostring = function(self)
+        return string.format("<DataSet.groupby([%s]) de '%s'>",
+            table.concat(self._key_names or {}, ", "), self._ds._name or "DataSet")
+    end
 
     local function key_eq(a, b)
         if type(a) ~= type(b) then return false end

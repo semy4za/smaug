@@ -323,6 +323,11 @@ return function(I)
     -- ganha std/var/count de graça (a Series já os tem via C).
     local Rolling = {}
     Rolling.__index = Rolling
+    Rolling.__tostring = function(self)
+        return string.format("<DataSet.rolling(window=%s, min_periods=%s) de '%s'>",
+            tostring(self._window), tostring(self._min_periods or self._window),
+            self._ds._name or "DataSet")
+    end
 
     local function ds_roll(self, col_name)
         local r = self._ds:_raw_column(col_name):rolling(self._window)

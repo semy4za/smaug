@@ -5,6 +5,43 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-13 — 11: Ergonomia REPL (display canônico + __tostring universal)
+
+Análise profunda comparando com pandas revelou que o item era maior que
+"faltam __tostring": havia **valor quebrado na apresentação** e três formatações
+de célula divergentes. Provado rodando: int64 `2^53+1` saía `9.007…e+15` (não o
+valor no buffer); `3.14159265358979` saía `3.1415926535898` na Series e `3.142`
+no DataSet; texto acentuado desalinhava (largura por byte).
+
+**Fonte única `lua/smaug/core/display.lua`** consolidando o que eram 3 `cell_str`
+divergentes + 5 `pad` duplicados:
+- `cell_str`: int64 exato (via `cell_of`->`get_raw`, cdata cru — nunca o double de
+  `get()`), float `%.6g` de apresentação (distinto da serialização `%.17g` do
+  10.9, contrato "display != serialização"), NaN/±inf normalizados ("nan"/"inf"/
+  "-inf", eliminando divergência de libc no display).
+- `dwidth`: largura em codepoints UTF-8, não bytes — alinhamento correto com
+  acento/unicode.
+- `pad`+`align_for`: número à direita, texto à esquerda (estilo pandas).
+- `plan_rows`: truncamento cabeça+cauda com marcador "..." no meio (só nas vistas
+  humanas `to_string`/`__tostring`; `to_markdown` não trunca — é exportação).
+Os 6 consumidores religados; `I.cell_str` (export órfão) removido.
+
+**11.1/11.2 — __tostring universal:** CategoricalSeries (valores + rodapé de
+categorias) e os 8 proxies (`.str`/`.dt`/`.at`/`.cat`, Series rolling/expanding,
+DataSet groupby/rolling) ganharam `__tostring` — nenhum vaza mais `table: 0x…`.
+
+**11.3 — invariante + auditoria:** eixo de parity **13** (`13_tostring`) verifica
+estaticamente que cada objeto exposto tem `__tostring`; roda a cada build (11
+objetos, todos verde).
+
+Item 11 é **Lua puro** (nenhum C tocado): selo Fedora `--all` (Valgrind 0,
+parity 13/13). **Fechado por equivalência Fedora; Windows dispensado** — a única
+superfície de divergência libc (`%g` em nan/inf) foi eliminada por construção
+(cell_str intercepta nan/±inf como literais antes de qualquer `%.6g`/`%d`,
+guardado por teste no Fedora); o resto é Lua puro ou LuaJIT-interno, e o eixo 13
+é Lua puro.
+
+---
 ## 2026-07-13 — 10.8: `BoolSeries` — coerência de caminho com o Anel 0
 
 O achado 2026-07-02 mirava loops Lua no `boolseries.lua`. A leitura do código

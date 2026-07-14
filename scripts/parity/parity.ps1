@@ -53,7 +53,7 @@ Write-Utf8 -Path $out -Text $header
 $eixos = @(
     "01_dtypes", "02_series_dataset", "03_c_lua_mirror", "04_anel2",
     "05_io_dtypes", "06_return_types", "07_null_handling", "08_naming",
-    "09_sentinels", "10_lifecycle", "11_test_coverage", "12_docs_sync"
+    "09_sentinels", "10_lifecycle", "11_test_coverage", "12_docs_sync", "13_tostring"
 )
 
 $failed = @()

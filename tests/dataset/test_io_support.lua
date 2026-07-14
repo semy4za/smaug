@@ -160,9 +160,35 @@ local str = dts:to_string()
 check(type(str) == "string",        "to_string → string")
 check(str:find("a") ~= nil,         "to_string contém nome da coluna")
 
--- max_rows limita
+-- max_rows limita com truncamento cabeça+cauda (marcador "..." no meio)
 local str2 = dts:to_string({max_rows = 2})
-check(str2:find("linhas a mais") ~= nil, "to_string max_rows trunca com aviso")
+check(str2:find("%.%.%.") ~= nil, "to_string max_rows: marcador de corte '...'")
+local l2 = {}; for line in str2:gmatch("[^\n]+") do l2[#l2+1] = line end
+check(#l2 == 4, "to_string cabeça+cauda: header + 1 topo + ... + 1 base")
+check(l2[2]:find("^1%s"), "to_string cabeça+cauda: primeira linha de dados é o índice 1")
+check(l2[4]:find("^5%s"), "to_string cabeça+cauda: última linha de dados é o índice 5")
+
+-- 11.5/11.4 invariantes de display do DataSet (fonte única compartilhada)
+local BIG = require("ffi").new("int64_t", 9007199254740993LL)
+local dbig = smaug.DataSet({ {"n", {BIG}, "int64"} })
+check(dbig:to_string():find("9007199254740993", 1, true) ~= nil,
+      "11.4 DataSet:to_string int64 > 2^53 EXATO")
+check(tostring(dbig):find("9007199254740993", 1, true) ~= nil,
+      "11.4 DataSet __tostring int64 > 2^53 EXATO")
+check(dbig:to_string():find("e+", 1, true) == nil,
+      "11.4 DataSet: sem notação científica no int64 grande")
+local dpi = smaug.DataSet({ {"x", {3.14159265358979}, "float64"} })
+local spi = smaug.Series({3.14159265358979}, "float64")
+local function cellnum(s) return s:match("3%.%d+") end
+check(cellnum(dpi:to_string()) == cellnum(spi:to_string()),
+      "11.5 float: DataSet e Series rendem o MESMO texto (%.6g canônico)")
+local dgb = smaug.DataSet({ {"g", {"x","y","x"}, "string"}, {"v", {1,2,3}, "int64"} })
+local tgb = tostring(dgb:groupby("g"))
+check(tgb:find("^table:") == nil and tgb:find("groupby", 1, true) ~= nil,
+      "11.2 DataSet.groupby proxy __tostring legível")
+local trl = tostring(dgb:rolling(2))
+check(trl:find("^table:") == nil and trl:find("rolling", 1, true) ~= nil,
+      "11.2 DataSet.rolling proxy __tostring legível")
 
 -- ================================================================
 -- Resultado

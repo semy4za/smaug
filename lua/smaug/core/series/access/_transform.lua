@@ -7,6 +7,8 @@
 -- Contribui: methods.sort, argsort, view, take, dropna, head, tail,
 --            to_table, astype, fillna, map, abs, round, clip
 
+local Display = require("smaug.core.display")
+
 return function(I)
     local methods = I.methods
     local Series  = I.Series
@@ -164,28 +166,29 @@ return function(I)
         return self:take(idx)
     end
 
-    local function cell_str(v) return v == nil and "NA" or tostring(v) end
-
     -- to_string([opts]): texto plano, índice + valor. opts.max_rows limita.
-    -- Espelha DataSet:to_string (que mostra índice de linha), em 1 coluna.
+    -- Formatação e largura vêm do módulo display (fonte única).
     function methods.to_string(self, opts)
         opts = opts or {}
         local n     = self:len()
         local name  = self._name or "value"
-        local limit = opts.max_rows and math.min(n, opts.max_rows) or n
-        local w     = #name
+        local align = Display.align_for(self._dtype)
+        local idx, brk = Display.plan_rows(n, opts.max_rows)
+        local w     = Display.dwidth(name)
         local cells = {}
-        for i = 1, limit do
-            local s = cell_str(self:get(i)); cells[i] = s
-            if #s > w then w = #s end
+        for _, i in ipairs(idx) do
+            local s = Display.cell_str(Display.cell_of(self, i)); cells[i] = s
+            local dw = Display.dwidth(s)
+            if dw > w then w = dw end
         end
-        local idxw = math.max(#tostring(limit > 0 and limit or 1), 1)
-        local function pad(s, ww) return s .. string.rep(" ", ww - #s) end
-        local out = { pad("", idxw) .. "  " .. name }
-        for i = 1, limit do
-            out[#out + 1] = pad(tostring(i), idxw) .. "  " .. pad(cells[i], w)
+        local idxw = math.max(#tostring(n > 0 and n or 1), 1)
+        local out = { Display.pad("", idxw) .. "  " .. name }
+        for pos, i in ipairs(idx) do
+            out[#out + 1] = Display.pad(tostring(i), idxw) .. "  " .. Display.pad(cells[i], w, align)
+            if brk and pos == brk then
+                out[#out + 1] = Display.pad("...", idxw) .. "  " .. Display.pad("...", w, align)
+            end
         end
-        if n > limit then out[#out + 1] = "... ("..(n - limit).." linhas a mais)" end
         return table.concat(out, "\n")
     end
 
@@ -193,17 +196,18 @@ return function(I)
     function methods.to_markdown(self)
         local n    = self:len()
         local name = self._name or "value"
-        local w    = #name
+        local align = Display.align_for(self._dtype)
+        local w    = Display.dwidth(name)
         local cells = {}
         for i = 1, n do
-            local s = cell_str(self:get(i)); cells[i] = s
-            if #s > w then w = #s end
+            local s = Display.cell_str(Display.cell_of(self, i)); cells[i] = s
+            local dw = Display.dwidth(s)
+            if dw > w then w = dw end
         end
-        local function pad(s, ww) return s .. string.rep(" ", ww - #s) end
         local out = {}
-        out[#out + 1] = "| " .. pad(name, w) .. " |"
+        out[#out + 1] = "| " .. Display.pad(name, w) .. " |"
         out[#out + 1] = "| " .. string.rep("-", w) .. " |"
-        for i = 1, n do out[#out + 1] = "| " .. pad(cells[i], w) .. " |" end
+        for i = 1, n do out[#out + 1] = "| " .. Display.pad(cells[i], w, align) .. " |" end
         return table.concat(out, "\n")
     end
 

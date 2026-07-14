@@ -5,6 +5,8 @@
 -- Produz em I: I.bool_mask_parts, I.bool_series_from_raw, I.binop, I.kleene_binop
 -- Contribui: Series.__add, __mul, __sub, __div, __len, __tostring, __newindex
 
+local Display = require("smaug.core.display")
+
 return function(I)
     local Series  = I.Series
     local C       = I.C
@@ -199,13 +201,12 @@ return function(I)
     Series.__tostring = function(self)
         local n = tonumber(self._c.size)
         local parts = {}
-        local limit = math.min(n, 10)
-        for i = 1, limit do
-            local v = self:get(i)
+        local idx, brk = Display.plan_rows(n, 10)
+        for pos, i in ipairs(idx) do
             parts[#parts + 1] = string.format("  [%d] %s", i,
-                v == nil and "NA" or tostring(v))
+                Display.cell_str(Display.cell_of(self, i)))
+            if brk and pos == brk then parts[#parts + 1] = "  ..." end
         end
-        if n > limit then parts[#parts + 1] = "  ... ("..(n - limit).." mais)" end
         return string.format("Series '%s' (%s, len=%d)\n%s",
             self._name, self._dtype, n, table.concat(parts, "\n"))
     end

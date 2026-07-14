@@ -19,6 +19,11 @@ return function(I)
     -- =====================================================================
     local SeriesRolling = {}
     SeriesRolling.__index = SeriesRolling
+    SeriesRolling.__tostring = function(self)
+        return string.format("<Series.rolling(window=%s, min_periods=%s) de '%s'>",
+            tostring(self._window), tostring(self._min_periods or self._window),
+            self._s._name or "unnamed")
+    end
     I.SeriesRolling = SeriesRolling
 
     -- _agg: agregação genérica com suporte a min_periods.
@@ -145,6 +150,10 @@ return function(I)
     -- =====================================================================
     local SeriesExpanding = {}
     SeriesExpanding.__index = SeriesExpanding
+    SeriesExpanding.__tostring = function(self)
+        return string.format("<Series.expanding(min_periods=%s) de '%s'>",
+            tostring(self._min_periods or 1), self._s._name or "unnamed")
+    end
     I.SeriesExpanding = SeriesExpanding
 
     function SeriesExpanding:_agg(fn)

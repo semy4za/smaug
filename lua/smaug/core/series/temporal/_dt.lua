@@ -26,6 +26,9 @@ return function(I)
     -- =====================================================================
     local SeriesDT = {}
     SeriesDT.__index = SeriesDT
+    SeriesDT.__tostring = function(self)
+        return string.format("<accessor .dt de Series '%s'>", self._s._name or "unnamed")
+    end
     I.SeriesDT = SeriesDT
 
     -- Helper: aplica fn(epoch_ms) por elemento → Series<dtype>. Nulos propagam.
@@ -347,6 +350,9 @@ return function(I)
         end,
         __call = function(self, i)
             return methods.get(self._s, i)
+        end,
+        __tostring = function(self)
+            return string.format("<accessor .at de Series '%s'>", self._s._name or "unnamed")
         end,
     }
     I.SeriesAt = SeriesAt

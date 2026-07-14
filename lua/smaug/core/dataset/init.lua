@@ -7,7 +7,7 @@
 --   1. _core.lua       → DataSet.new, from_columns, CRUD, acesso,
 --                         seleção, assign, nunique, rename, describe,
 --                         to_table, __tostring, __index, __newindex,
---                         __len, __call. Produz I.map_columns, I.cell_str.
+--                         __len, __call. Produz I.map_columns.
 --   2. _relational.lua → DataSet.concat, methods.concat, methods.join,
 --                         methods.groupby, methods.pivot, methods.melt,
 --                         methods.pivot_table, methods.stack, methods.unstack,
@@ -48,7 +48,7 @@ local I = {
 
 -- 1. Core: factories, CRUD, acesso, seleção, assign, nunique, rename,
 --          describe, to_table, metamétodos.
---    Produz: I.map_columns, I.cell_str
+--    Produz: I.map_columns
 require("smaug.core.dataset._core")(I)
 
 -- 2. Relational: concat, join, GroupBy, pivot, melt, pivot_table,

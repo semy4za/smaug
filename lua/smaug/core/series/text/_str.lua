@@ -14,6 +14,9 @@ return function(I)
 
     local StrProxy = {}
     StrProxy.__index = StrProxy
+    StrProxy.__tostring = function(self)
+        return string.format("<accessor .str de Series '%s'>", self._s._name or "unnamed")
+    end
     I.StrProxy = StrProxy
 
     -- =====================================================================

@@ -588,6 +588,11 @@ escreve (mesma natureza da Sub-A do 9.1, reintroduzida na reconstrução).
 
 ## 11. Ergonomia REPL  [Windows]
 
+**CONCLUÍDO (2026-07-13, Fedora — Windows dispensado por equivalência: Lua puro,
+sem caminho libc-divergente).** Fonte única `core/display.lua`
+(cell_str/dwidth/pad/align/plan_rows); todos os objetos expostos com
+`__tostring`; eixo de parity 13 audita o invariante. Detalhe no CHANGELOG.
+
 Objetos que o usuário segura devem se auto-mostrar legíveis — para exploração e
 para debug quando dá erro. Requisito de v1.0: a API congela com a ergonomia que
 tiver.

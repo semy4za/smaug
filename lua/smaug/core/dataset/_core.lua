@@ -9,6 +9,8 @@
 -- Contribui: DataSet.new, from_columns, from_dict (factory),
 --            todos os methods.* acima, metamétodos DataSet.*
 
+local Display = require("smaug.core.display")
+
 return function(I)
     local Series        = I.Series
     local DataSet       = I.DataSet
@@ -387,47 +389,44 @@ return function(I)
     end
 
     -- =====================================================================
-    -- Pretty-print (__tostring)
+    -- Pretty-print (__tostring) — formatação via módulo display (fonte única)
     -- =====================================================================
-    local function cell_str(v)
-        if v == nil then return "NA" end
-        if type(v) == "number" then
-            if v % 1 == 0 then return string.format("%d", v) end
-            return string.format("%.4g", v)
-        end
-        return tostring(v)
-    end
-    I.cell_str = cell_str   -- exporta para _io_support
-
     DataSet.__tostring = function(self)
         local names = self._col_names
         local nrows = self:nrows()
         if #names == 0 then return "DataSet '"..self._name.."' (vazio)" end
-        local limit = math.min(nrows, 10)
         local widths = {}
-        for _, n in ipairs(names) do widths[n] = #n end
+        local aligns = {}
+        for _, n in ipairs(names) do
+            widths[n] = Display.dwidth(n)
+            aligns[n] = Display.align_for(self._columns[n]._dtype)
+        end
+        local idx, brk = Display.plan_rows(nrows, 10)
         local idxw = #tostring(nrows)
         local rows = {}
-        for i = 1, limit do
-            local row = {}
+        for _, i in ipairs(idx) do
+            rows[i] = {}
             for _, n in ipairs(names) do
-                local s = cell_str(self._columns[n]:get(i))
-                row[n] = s
-                if #s > widths[n] then widths[n] = #s end
+                local s = Display.cell_str(Display.cell_of(self._columns[n], i))
+                rows[i][n] = s
+                local dw = Display.dwidth(s)
+                if dw > widths[n] then widths[n] = dw end
             end
-            rows[i] = row
         end
-        local function pad(s, w) return s .. string.rep(" ", w - #s) end
         local out = {}
         local header = { string.rep(" ", idxw) }
-        for _, n in ipairs(names) do header[#header + 1] = pad(n, widths[n]) end
+        for _, n in ipairs(names) do header[#header + 1] = Display.pad(n, widths[n], aligns[n]) end
         out[#out + 1] = table.concat(header, "  ")
-        for i = 1, limit do
-            local line = { pad(tostring(i), idxw) }
-            for _, n in ipairs(names) do line[#line + 1] = pad(rows[i][n], widths[n]) end
+        for pos, i in ipairs(idx) do
+            local line = { Display.pad(tostring(i), idxw) }
+            for _, n in ipairs(names) do line[#line + 1] = Display.pad(rows[i][n], widths[n], aligns[n]) end
             out[#out + 1] = table.concat(line, "  ")
+            if brk and pos == brk then
+                local mk = { Display.pad("...", idxw) }
+                for _, n in ipairs(names) do mk[#mk + 1] = Display.pad("...", widths[n], aligns[n]) end
+                out[#out + 1] = table.concat(mk, "  ")
+            end
         end
-        if nrows > limit then out[#out + 1] = "... ("..(nrows - limit).." linhas a mais)" end
         return string.format("DataSet '%s' [%d linhas x %d colunas]\n%s",
             self._name, nrows, #names, table.concat(out, "\n"))
     end

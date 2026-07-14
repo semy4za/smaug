@@ -339,6 +339,28 @@ do
     local md = y:to_markdown()
     check(md:find("|") ~= nil and md:find("%-%-") ~= nil, "6.3 to_markdown tem cabeçalho/separador")
     check(select(2, md:gsub("\n", "\n")) == 3, "6.3 to_markdown: 4 linhas (header+sep+2 dados)")
+
+    -- 11.5/11.4 invariantes de display (fonte única, nenhum valor quebrado)
+    local BIG = require("ffi").new("int64_t", 9007199254740993LL)  -- 2^53 + 1
+    local sb  = S.new("int64", 1, "big"); sb:set(1, BIG)
+    check(sb:to_string():find("9007199254740993", 1, true) ~= nil,
+          "11.4 to_string: int64 > 2^53 EXATO (sem notação científica)")
+    check(tostring(sb):find("9007199254740993", 1, true) ~= nil,
+          "11.4 __tostring: int64 > 2^53 EXATO")
+    check(sb:to_string():find("e+", 1, true) == nil,
+          "11.4 to_string: sem notação científica no int64 grande")
+    local sf = S.from_table({3.14159265358979}, "float64")
+    check(sf:to_string():find("3.14159", 1, true) ~= nil,
+          "11.5 to_string: float via %.6g")
+    local sp2 = S.from_table({0/0, 1/0, -1/0}, "float64")
+    local tsp = sp2:to_string()
+    check(tsp:find("nan", 1, true) and tsp:find("inf", 1, true) and tsp:find("-inf", 1, true),
+          "11.5 to_string: NaN/inf normalizados")
+    local su = S.from_table({"José", "François"}, "string")
+    local ul = {}; for line in (su:to_string().."\n"):gmatch("(.-)\n") do ul[#ul+1] = line end
+    local Display = require("smaug.core.display")
+    check(Display.dwidth(ul[2]) == Display.dwidth(ul[3]),
+          "11.5 to_string: alinhamento UTF-8 por codepoint (José vs François)")
 end
 
 -- =====================================================================
@@ -376,6 +398,24 @@ do
     local sm = S.new("string", 2, "sm"); sm:set_null(1); sm:set(2, "abc")
     local rm = sm:fillna("")
     check(rm:get(1) == "" and rm:get(2) == "abc", "10.6B: fillna string mistura buraco/'abc'")
+end
+
+
+do
+    -- 11.2: proxies expostos têm __tostring legível (nunca "table: 0x…")
+    local function notleaky(x, tag)
+        local t = tostring(x)
+        check(type(t) == "string" and t:find("^table:") == nil and #t > 0, tag)
+    end
+    local sstr = S.from_table({"a", "b"}, "string"); sstr._name = "s"
+    local sdt  = S.from_table({1000, 2000}, "datetime"); sdt._name = "t"
+    local snum = S.from_table({1, 2, 3, 4}, "float64"); snum._name = "v"
+    notleaky(sstr.str,          "11.2 .str proxy __tostring")
+    notleaky(sdt.dt,            "11.2 .dt proxy __tostring")
+    notleaky(sstr.at,           "11.2 .at proxy __tostring")
+    notleaky(snum:rolling(2),   "11.2 rolling proxy __tostring")
+    notleaky(snum:expanding(),  "11.2 expanding proxy __tostring")
+    check(tostring(sstr.str):find(".str", 1, true) ~= nil, "11.2 .str rótulo referencia acessor")
 end
 
 

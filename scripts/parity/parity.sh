@@ -41,6 +41,7 @@ EIXOS=(
     10_lifecycle
     11_test_coverage
     12_docs_sync
+    13_tostring
 )
 
 FAILED=()

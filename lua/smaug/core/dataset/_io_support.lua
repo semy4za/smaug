@@ -1,16 +1,17 @@
 -- lua/smaug/core/dataset/_io_support.lua
 --
 -- F.5 acesso escalar, I/O e pretty-print estendido.
--- Recebe I com: I.Series, I.DataSet, I.methods, I.cell_str,
+-- Recebe I com: I.Series, I.DataSet, I.methods,
 --               I.is_series, I.is_boolseries, I.is_categorical
 -- Contribui: methods.at, iat, insert, to_dict, DataSet.from_dict,
 --            methods.to_markdown, to_string
+
+local Display = require("smaug.core.display")
 
 return function(I)
     local Series        = I.Series
     local DataSet       = I.DataSet
     local methods       = I.methods
-    local cell_str      = I.cell_str
     local is_series     = I.is_series
     local is_boolseries = I.is_boolseries
     local is_categorical = I.is_categorical
@@ -149,68 +150,81 @@ return function(I)
     -- =====================================================================
 
     -- to_markdown(): tabela em formato Markdown. Inclui todas as linhas.
+    -- Formatação/largura/alinhamento via módulo display (fonte única).
     function methods.to_markdown(self)
         local names = self._col_names
         if #names == 0 then return "" end
         local nrows = self:nrows()
         local widths = {}
-        for _, n in ipairs(names) do widths[n] = #n end
+        local aligns = {}
+        for _, n in ipairs(names) do
+            widths[n] = Display.dwidth(n)
+            aligns[n] = Display.align_for(self._columns[n]._dtype)
+        end
         local cells = {}
         for i = 1, nrows do
             cells[i] = {}
             for _, n in ipairs(names) do
-                local s = cell_str(self._columns[n]:get(i))
+                local s = Display.cell_str(Display.cell_of(self._columns[n], i))
                 cells[i][n] = s
-                if #s > widths[n] then widths[n] = #s end
+                local dw = Display.dwidth(s)
+                if dw > widths[n] then widths[n] = dw end
             end
         end
-        local function pad(s, w) return s .. string.rep(" ", w - #s) end
         local out = {}
         local header = {}
-        for _, n in ipairs(names) do header[#header + 1] = pad(n, widths[n]) end
+        for _, n in ipairs(names) do header[#header + 1] = Display.pad(n, widths[n]) end
         out[#out + 1] = "| " .. table.concat(header, " | ") .. " |"
         local sep = {}
         for _, n in ipairs(names) do sep[#sep + 1] = string.rep("-", widths[n]) end
         out[#out + 1] = "| " .. table.concat(sep, " | ") .. " |"
         for i = 1, nrows do
             local line = {}
-            for _, n in ipairs(names) do line[#line + 1] = pad(cells[i][n], widths[n]) end
+            for _, n in ipairs(names) do line[#line + 1] = Display.pad(cells[i][n], widths[n], aligns[n]) end
             out[#out + 1] = "| " .. table.concat(line, " | ") .. " |"
         end
         return table.concat(out, "\n")
     end
 
-    -- to_string([opts]): render tabular em texto plano. opts.max_rows limita linhas.
+    -- to_string([opts]): render tabular em texto plano. opts.max_rows limita
+    -- linhas com truncamento cabeça+cauda (estilo pandas), marcador "..." no meio.
     function methods.to_string(self, opts)
         opts = opts or {}
         local names = self._col_names
         local nrows = self:nrows()
         if #names == 0 then return "DataSet '"..self._name.."' (vazio)" end
-        local limit = opts.max_rows and math.min(nrows, opts.max_rows) or nrows
         local widths = {}
-        for _, n in ipairs(names) do widths[n] = #n end
-        local idxw = math.max(#tostring(limit), 1)
-        local rows = {}
-        for i = 1, limit do
-            local row = {}
-            for _, n in ipairs(names) do
-                local s = cell_str(self._columns[n]:get(i))
-                row[n] = s
-                if #s > widths[n] then widths[n] = #s end
-            end
-            rows[i] = row
+        local aligns = {}
+        for _, n in ipairs(names) do
+            widths[n] = Display.dwidth(n)
+            aligns[n] = Display.align_for(self._columns[n]._dtype)
         end
-        local function pad(s, w) return s .. string.rep(" ", w - #s) end
+        local idx, brk = Display.plan_rows(nrows, opts.max_rows)
+        local idxw = math.max(#tostring(nrows), 1)
+        local rows = {}
+        for _, i in ipairs(idx) do
+            rows[i] = {}
+            for _, n in ipairs(names) do
+                local s = Display.cell_str(Display.cell_of(self._columns[n], i))
+                rows[i][n] = s
+                local dw = Display.dwidth(s)
+                if dw > widths[n] then widths[n] = dw end
+            end
+        end
         local out = {}
         local header = { string.rep(" ", idxw) }
-        for _, n in ipairs(names) do header[#header + 1] = pad(n, widths[n]) end
+        for _, n in ipairs(names) do header[#header + 1] = Display.pad(n, widths[n], aligns[n]) end
         out[#out + 1] = table.concat(header, "  ")
-        for i = 1, limit do
-            local line = { pad(tostring(i), idxw) }
-            for _, n in ipairs(names) do line[#line + 1] = pad(rows[i][n], widths[n]) end
+        for pos, i in ipairs(idx) do
+            local line = { Display.pad(tostring(i), idxw) }
+            for _, n in ipairs(names) do line[#line + 1] = Display.pad(rows[i][n], widths[n], aligns[n]) end
             out[#out + 1] = table.concat(line, "  ")
+            if brk and pos == brk then
+                local mk = { Display.pad("...", idxw) }
+                for _, n in ipairs(names) do mk[#mk + 1] = Display.pad("...", widths[n], aligns[n]) end
+                out[#out + 1] = table.concat(mk, "  ")
+            end
         end
-        if nrows > limit then out[#out + 1] = "... ("..(nrows - limit).." linhas a mais)" end
         return table.concat(out, "\n")
     end
 end

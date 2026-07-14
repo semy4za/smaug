@@ -6,6 +6,8 @@
 -- Recebe I com: I.Series, I.NA
 -- Produz em I: I.CategoricalSeries
 
+local Display = require("smaug.core.display")
+
 return function(I)
     local Series = I.Series
     local NA     = I.NA
@@ -90,6 +92,25 @@ return function(I)
 
     function CategoricalSeries:len()  return self._size end
     function CategoricalSeries:size() return self._size end
+
+    -- __tostring (11.1): objeto de 1ª classe se auto-mostra. Valores via display
+    -- canônico (cabeça+cauda) + rodapé de categorias, estilo pandas.
+    CategoricalSeries.__tostring = function(self)
+        local n = self._size
+        local parts = {}
+        local idx, brk = Display.plan_rows(n, 10)
+        for pos, i in ipairs(idx) do
+            parts[#parts + 1] = string.format("  [%d] %s", i, Display.cell_str(self:get(i)))
+            if brk and pos == brk then parts[#parts + 1] = "  ..." end
+        end
+        local k = #self._levels
+        local shown = {}
+        for j = 1, math.min(k, 10) do shown[j] = self._levels[j] end
+        local cats = table.concat(shown, ", ")
+        if k > 10 then cats = cats .. ", ..." end
+        return string.format("CategoricalSeries '%s' (len=%d)\n%s\nCategorias (%d): %s",
+            self._name or "unnamed", n, table.concat(parts, "\n"), k, cats)
+    end
 
     function CategoricalSeries:get(i)
         if type(i) ~= "number" or i < 1 or i > self._size then
@@ -547,6 +568,9 @@ return function(I)
     -- ----------------------------------------------------------------
     local CatProxy = {}
     CatProxy.__index = CatProxy
+    CatProxy.__tostring = function(self)
+        return string.format("<accessor .cat de CategoricalSeries '%s'>", self._s._name or "unnamed")
+    end
 
     function CatProxy:codes()
         local vals = {}
