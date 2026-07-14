@@ -5,6 +5,24 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-14 — 12.7: contador de checks unificado em `test_constructors`
+
+O arquivo é 4 suites concatenadas; cada uma redeclarava `local n_ok = 0` +
+`local function check` no seu preâmbulo. Como são `local` top-level, cada uma
+sombreava a anterior, e o único `print` no fim via só o contador da última seção
+→ headline "98 checks" quando 343 rodavam de fato. A validação sempre foi real
+(cada `check` aborta em falha); só o número enganava — mesma família do "teatro
+de números" do 12.8.
+
+Fix: contador único. Removidas as 3 redeclarações de `n_ok`/`check` (os corpos
+eram idênticos, então todas as chamadas resolvem para o `check` da linha 14); os
+demais preâmbulos de seção (`require`, `Series`, `approx`, `NA`) ficaram intactos
+— fora do escopo do 12.7. Escolhido contador único (não print-por-seção) porque o
+harness do `build.sh` espera uma linha `OK — N checks...` por suite.
+
+Lua puro. Fedora `--all` verde (parity 13/13). Headline agora reporta 343.
+
+---
 ## 2026-07-13 — 11: Ergonomia REPL (display canônico + __tostring universal)
 
 Análise profunda comparando com pandas revelou que o item era maior que

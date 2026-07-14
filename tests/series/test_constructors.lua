@@ -22,11 +22,6 @@ local smaug  = require("smaug")
 local Series = smaug.Series
 
 local function approx(a, b) return math.abs(a - b) < 1e-9 end
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
-end
 
 -- ---- factories + acesso 1-based ----
 local s = Series.float64(3, "x")
@@ -403,11 +398,6 @@ test_map()
 local smaug = require("smaug")
 local S     = smaug.Series
 
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
-end
 local function approx(a, b) return math.abs(a - b) < 1e-9 end
 
 -- ===================================================================
@@ -713,11 +703,6 @@ local smaug  = require("smaug")
 local Series = smaug.Series
 local NA     = Series.NA
 
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
-end
 
 -- ---- from_table + acesso ----
 local s = Series.from_table({true, NA, false, true}, "bool")

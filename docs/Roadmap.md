@@ -636,12 +636,11 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
 - 12.4 categorical hash via `tostring` (cosmético)
 - 12.5 I3 — `g_sort_series` global em `ops_str` (single-thread: sem bug)
 - 12.6 I4 — `get_value` passa `nil` como status (assimetria; sem bug)
-- 12.7 `tests/series/test_constructors.lua` re-declara `local n_ok` por seção
-  (linhas 14/25/394/616) mas só imprime uma vez no fim → o headline "98 checks"
-  subconta o real (~328 `check()` rodam de fato; cada um aborta em falha, então a
-  cobertura é real, só o número impresso engana). Achado durante o item 3.
-  Corrigir o relato (um contador único ou um print por seção) — cosmético, não
-  afeta validação.
+- 12.7 **CONCLUÍDO (2026-07-14).** `test_constructors.lua` redeclarava
+  `local n_ok`/`check` 4× (suites concatenadas) e só imprimia no fim → headline
+  subcontava (98 vs 343 reais). Unificado num contador único (removidas as 3
+  redeclarações; preâmbulos de seção intactos). Contagem real agora: 343. Lua
+  puro, cobertura sempre foi real — só o número enganava.
 - 12.8 **Fixtures de I/O órfãos + teatro de "dados reais"** (achado 2026-06-30).
   `tests/fixtures/` tem 5 arquivos; os testes em `tests/io/` abrem só 1
   (`pedidos_digitados.csv`, 917 linhas). Os outros 4 (`cotacoes.csv`,
