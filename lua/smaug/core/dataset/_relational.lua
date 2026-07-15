@@ -10,6 +10,8 @@
 --            methods.pivot_table, methods.stack, methods.unstack,
 --            methods.explode
 
+local Err = require("smaug.core.errors")
+
 return function(I)
     local Series        = I.Series
     local DataSet       = I.DataSet
@@ -591,7 +593,7 @@ return function(I)
             for _, fn in ipairs(fns) do
                 local fn_real = type(fn) == "string" and builtin[fn] or fn
                 if not fn_real then
-                    error("smaug: groupby:agg() — função desconhecida '"..tostring(fn).."'", 2)
+                    error("smaug: groupby:agg() — função desconhecida "..Err.describe(fn), 2)
                 end
                 local out_name = type(fn) == "string" and (cname.."_"..fn) or cname
                 local vals = {}
@@ -617,7 +619,7 @@ return function(I)
         }
         local fn = type(fn_name) == "string" and builtin[fn_name] or fn_name
         if not fn then
-            error("smaug: groupby:transform() — função desconhecida '"..tostring(fn_name).."'", 2)
+            error("smaug: groupby:transform() — função desconhecida "..Err.describe(fn_name), 2)
         end
         local src  = ds:_raw_column(col_name)
         local n    = ds:nrows()

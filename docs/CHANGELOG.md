@@ -5,6 +5,52 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-14 — 12.9: `core/errors.lua` — descrição segura em mensagens de erro
+
+O registro dizia "`s:iat(i)` despeja a Series inteira no erro". A avaliação
+profunda (pedida antes do aval) mostrou que o `iat` era só a porta mais fácil de
+uma classe sistêmica: **`error("... " .. tostring(v))` com `v` do usuário dispara
+o `__tostring` do objeto e despeja os dados na mensagem**.
+
+Medido, não suposto:
+- os **5 métodos públicos** de acesso vazavam igual (`s:get(s)`, `s:set(s,1)`,
+  `s:is_null(s)`, `s:set_null(s)`, `s:get_raw(s)`) — não era exclusividade do iat;
+- escala real: Series string 100k → 428 chars; **DataSet 20x1000 como índice →
+  2459 chars** com o conteúdo das colunas. O truncamento do item 11 limitava mas
+  não impedia (um DataSet largo é grande por definição);
+- o padrão aparecia em 26 pontos; dos 8 testados onde o usuário pode passar
+  objeto, **os 8 vazavam** (`view`, `take`, `astype`, `str:pad`, `str:rep`,
+  `cat:get`, `cat:take`, `Series.new`).
+
+Decisão (Gui): opção 3 — helper canônico, não fix por callsite (senão o furo volta
+no próximo `error()` que alguém escrever). Criado **`lua/smaug/core/errors.lua`**
+com `describe(v)`: número/bool/nil literais; string entre aspas truncada em 60
+chars; cdata direto (int64 é curto e informativo); Series/CategoricalSeries/
+DataSet identificados **pela estrutura** e renderizados como
+`<Series 'x' (int64, len=200)>` — sem chamar o `__tostring`, que é justamente o
+que despejaria os dados; outra table vira `"table"`.
+
+Contrato: **descrição-em-erro ≠ apresentação**. `display.lua` responde "como o
+usuário vê este valor numa tabela" (e deve mostrar o dado); `errors.lua` responde
+"como referenciar sem vazar". Separação deliberada, mesma lógica de fonte única do
+item 11.
+
+Escopo definido por leitura, não por grep: 3 dos 26 pontos ficaram de fora por
+serem seguros (`_selection.lua:115` usa `x._dtype`, string interna, com o `if`
+acima garantindo que `x` é Series; `_core.lua:73/117` usam cdata int64 já
+type-checado, onde o número É a informação). `SeriesAt.__call` ganhou guarda:
+`s:iat(3)` é açúcar de `s.iat(s, 3)` — o proxy vira `self`, a Series cai em `i` e
+o `3` é descartado; agora erra com "use s.iat[i]" em vez de tratar a Series como
+índice. `s.at(i)`/`s.iat(i)` com número seguem suportados (contrato testado em
+`test_selection` preservado).
+
+Resultado: 2459 → **109** chars no pior caso; os 5 métodos, 181 → 87; os 8 pontos
+de risco, todos limpos. Testes novos em `test_selection` (orientação do iat + a
+classe inteira: nenhum método de acesso vaza valores).
+
+Lua puro. Fedora `--all` verde (Valgrind 0, parity 13/13, 120 arquivos).
+
+---
 ## 2026-07-14 — 12.11: `Series:nrows()` — decisão de não fazer
 
 O sub-item pedia `methods.nrows = methods.len` na Series ("alias faltando").

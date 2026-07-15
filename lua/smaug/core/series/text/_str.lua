@@ -12,6 +12,8 @@ return function(I)
     local wrap   = I.wrap
     local NA     = I.NA
 
+    local Err = require("smaug.core.errors")
+
     local StrProxy = {}
     StrProxy.__index = StrProxy
     StrProxy.__tostring = function(self)
@@ -167,7 +169,7 @@ return function(I)
     -- pad(width, [side], [fillchar]): preenche até width caracteres.
     function StrProxy:pad(width, side, fillchar)
         if type(width) ~= "number" or width < 0 then
-            error("smaug: str:pad espera width >= 0; recebido " .. tostring(width), 2)
+            error("smaug: str:pad espera width >= 0; recebido " .. Err.describe(width), 2)
         end
         side     = side     or "left"
         fillchar = fillchar or " "
@@ -198,7 +200,7 @@ return function(I)
     -- rep(n, [sep]): repete a string n vezes.
     function StrProxy:rep(n, sep)
         if type(n) ~= "number" or n < 0 or n ~= math.floor(n) then
-            error("smaug: str:rep espera inteiro >= 0; recebido " .. tostring(n), 2)
+            error("smaug: str:rep espera inteiro >= 0; recebido " .. Err.describe(n), 2)
         end
         sep = sep or ""
         return str_map(self._s, function(v)

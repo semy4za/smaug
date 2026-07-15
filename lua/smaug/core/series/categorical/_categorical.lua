@@ -7,6 +7,7 @@
 -- Produz em I: I.CategoricalSeries
 
 local Display = require("smaug.core.display")
+local Err     = require("smaug.core.errors")
 
 return function(I)
     local Series = I.Series
@@ -83,7 +84,7 @@ return function(I)
             if c == nil or c == NA then
                 codes[i] = nil
             elseif type(c) ~= "number" or c < 1 or c > #lev then
-                error("smaug: from_codes — code "..tostring(c).." fora do intervalo [1,"..#lev.."]", 2)
+                error("smaug: from_codes — code "..Err.describe(c).." fora do intervalo [1,"..#lev.."]", 2)
             else
                 codes[i] = c
             end
@@ -119,7 +120,7 @@ return function(I)
 
     function CategoricalSeries:get(i)
         if type(i) ~= "number" or i < 1 or i > self._size then
-            error("smaug: índice "..tostring(i).." fora dos limites [1, "..self._size.."]", 2)
+            error("smaug: índice "..Err.describe(i).." fora dos limites [1, "..self._size.."]", 2)
         end
         local c = self._codes[i]
         if c == nil then return nil end
@@ -128,14 +129,14 @@ return function(I)
 
     function CategoricalSeries:is_null(i)
         if type(i) ~= "number" or i < 1 or i > self._size then
-            error("smaug: índice "..tostring(i).." fora dos limites [1, "..self._size.."]", 2)
+            error("smaug: índice "..Err.describe(i).." fora dos limites [1, "..self._size.."]", 2)
         end
         return self._codes[i] == nil
     end
 
     function CategoricalSeries:set(i, v)
         if type(i) ~= "number" or i < 1 or i > self._size then
-            error("smaug: índice "..tostring(i).." fora dos limites [1, "..self._size.."]", 2)
+            error("smaug: índice "..Err.describe(i).." fora dos limites [1, "..self._size.."]", 2)
         end
         if v == nil or v == NA then self._codes[i] = nil; return end
         local s   = tostring(v)
@@ -150,7 +151,7 @@ return function(I)
 
     function CategoricalSeries:set_null(i)
         if type(i) ~= "number" or i < 1 or i > self._size then
-            error("smaug: índice "..tostring(i).." fora dos limites [1, "..self._size.."]", 2)
+            error("smaug: índice "..Err.describe(i).." fora dos limites [1, "..self._size.."]", 2)
         end
         self._codes[i] = nil
     end
@@ -219,7 +220,7 @@ return function(I)
         local codes = {}
         for j, i in ipairs(idx) do
             if type(i) ~= "number" or i < 1 or i > self._size then
-                error("smaug: take — índice "..tostring(i).." fora dos limites", 2)
+                error("smaug: take — índice "..Err.describe(i).." fora dos limites", 2)
             end
             codes[j] = self._codes[i]
         end
@@ -565,7 +566,7 @@ return function(I)
             end
             return Series.from_table(vals, dtype == "int32" and "int64" or dtype, name)
         end
-        error("smaug: astype categorical → '"..tostring(dtype).."' não suportado", 2)
+        error("smaug: astype categorical → "..Err.describe(dtype).." não suportado", 2)
     end
 
     -- ----------------------------------------------------------------

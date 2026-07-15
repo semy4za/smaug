@@ -5,6 +5,8 @@
 -- Produz em I: I.Series, I.methods, I.wrap, I.check_index, I.check_value,
 --              I.checkrc, I.require_op, I.reduce_num, I.SMG_ERR_NOMEM
 
+local Err = require("smaug.core.errors")
+
 return function(I)
     local C      = I.C
     local ffi    = I.ffi
@@ -42,9 +44,12 @@ return function(I)
     end
     I.wrap = wrap
 
+    -- check_index: descreve o índice via Err.describe — nunca tostring cru.
+    -- Um índice não-numérico (ex.: a própria Series, via `s:iat(i)`) dispararia
+    -- o __tostring do objeto e despejaria os DADOS na mensagem (item 12.9).
     local function check_index(self, i)
         if type(i) ~= "number" or i < 1 or i > self._c.size or i % 1 ~= 0 then
-            error("smaug: índice "..tostring(i).." fora dos limites [1, "..
+            error("smaug: índice "..Err.describe(i).." fora dos limites [1, "..
                   tonumber(self._c.size).."]", 3)
         end
     end

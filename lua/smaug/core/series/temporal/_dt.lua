@@ -7,6 +7,8 @@
 --               I.I64_MIN, I.DTYPES (para is_int_sentinel de datetime)
 -- Produz em I: I.SeriesDT, I.SeriesAt
 
+local Err = require("smaug.core.errors")
+
 return function(I)
     local Series  = I.Series
     local methods = I.methods
@@ -344,11 +346,20 @@ return function(I)
     local SeriesAt = {
         __index = function(self, i)
             if type(i) ~= "number" then
-                error("smaug: at/iat espera índice numérico (1-based)", 2)
+                error("smaug: at/iat espera índice numérico (1-based); recebido "
+                      .. Err.describe(i), 2)
             end
             return methods.get(self._s, i)
         end,
+        -- s:iat(3) é açúcar de s.iat(s, 3): o proxy vira `self`, a Series cai em
+        -- `i` e o 3 é descartado. Detecta e orienta, em vez de deixar a Series
+        -- seguir como "índice" (item 12.9).
         __call = function(self, i)
+            if i ~= nil and type(i) ~= "number" then
+                error("smaug: at/iat é acessor por colchete — use s.iat[i] "
+                      .. "(recebido " .. Err.describe(i) .. " como índice; "
+                      .. "a forma s:iat(i) passa a própria Series)", 2)
+            end
             return methods.get(self._s, i)
         end,
         __tostring = function(self)

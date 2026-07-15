@@ -10,6 +10,7 @@
 --            todos os methods.* acima, metamétodos DataSet.*
 
 local Display = require("smaug.core.display")
+local Err     = require("smaug.core.errors")
 
 return function(I)
     local Series        = I.Series
@@ -166,7 +167,7 @@ return function(I)
 
     function methods.row(self, i, na_value)
         if type(i) ~= "number" or i < 1 or i > self:nrows() then
-            error("smaug: linha "..tostring(i).." fora dos limites [1, "..self:nrows().."]", 2)
+            error("smaug: linha "..Err.describe(i).." fora dos limites [1, "..self:nrows().."]", 2)
         end
         local r = {}
         for _, n in ipairs(self._col_names) do
@@ -358,7 +359,7 @@ return function(I)
                 error("smaug: rename() — coluna '"..old.."' não existe", 2)
             end
             if type(new) ~= "string" or new == "" then
-                error("smaug: rename() — nome inválido para '"..old.."': "..tostring(new), 2)
+                error("smaug: rename() — nome inválido para '"..old.."': "..Err.describe(new), 2)
             end
         end
         local result = DataSet.new(self._name)

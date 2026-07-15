@@ -662,11 +662,20 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
   o `dayfirst` (item F.3); aspas com vírgula interna; separador de milhar; linha
   malformada. **Invariante:** fixture sem asserção que o exercite é decoração —
   cada arquivo novo entra junto com os `check()` que justificam sua presença.
-- 12.9 **`s:iat(i)` produz erro que despeja a Series inteira** (E8) — [Windows].
-  `at`/`iat` são acessores por colchete (`s.iat[i]`, estilo pandas). A forma
-  method `s:iat(i)` faz `self` cair como índice no `check_index` e, como a
-  mensagem usa `tostring(i)`, imprime a Series toda (numa série grande, milhares
-  de linhas). Detectar a chamada-método e orientar "use s.iat[i]".
+- 12.9 **CONCLUÍDO (2026-07-14).** A avaliação profunda mostrou que o `iat` era
+  só o sintoma mais visível de uma classe: **mensagens de erro interpolavam
+  `tostring()` de argumento do usuário**, disparando o `__tostring` do objeto e
+  despejando DADOS na mensagem. Medido: os 5 métodos de acesso
+  (`get`/`get_raw`/`set`/`is_null`/`set_null`) vazavam igual, e um DataSet 20x1000
+  como índice gerava **2459 chars** de erro com o conteúdo das colunas; 8 outros
+  pontos (`view`/`take`/`astype`/`str:pad`/`str:rep`/`cat:get`/`cat:take`/
+  `Series.new`) idem. Criado `core/errors.lua` (fonte única de descrição segura,
+  espelhando o padrão do `display.lua`): objetos viram
+  `<Series 'x' (int64, len=200)>`, strings truncam em 60 chars, nada de conteúdo.
+  Religados todos os pontos de risco; `SeriesAt.__call` agora detecta a
+  chamada-método e orienta "use s.iat[i]". Pós-fix: 2459 → 109 chars. A forma
+  `s.at(i)`/`s.iat(i)` (chamada com número) segue suportada — contrato testado
+  preservado.
 - 12.10 **`read_csv` — aviso passivo quando lê 1 coluna com separador suspeito**
   (E9) — [Windows]. Default `sep=','` num CSV com `;` lê N colunas como 1, sem
   erro. **Decisão tomada:** NÃO detectar/escolher separador sozinho (esperto

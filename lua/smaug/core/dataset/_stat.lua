@@ -5,6 +5,8 @@
 -- Contribui: methods.corr, cov, equals, compare,
 --            methods.duplicated, drop_duplicates, methods.rolling
 
+local Err = require("smaug.core.errors")
+
 return function(I)
     local Series  = I.Series
     local DataSet = I.DataSet
@@ -278,7 +280,7 @@ return function(I)
         end
         for _, name in ipairs(subset) do
             if self._columns[name] == nil then
-                error("smaug: duplicated() coluna '"..tostring(name).."' não existe", 2)
+                error("smaug: duplicated() coluna "..Err.describe(name).." não existe", 2)
             end
         end
         local n    = self:nrows()

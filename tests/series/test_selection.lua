@@ -49,6 +49,32 @@ check(s.iat(4) == 40,               "iat(4) = 40")
 -- iat equivalente a at em Series 1-D
 check(s.iat[2] == s.at[2],          "iat[2] == at[2]")
 
+-- 12.9: s:iat(i) (forma method) orienta em vez de passar a Series como índice
+do
+    local ok, err = pcall(function() return s:iat(3) end)
+    err = tostring(err)
+    check(not ok,                          "12.9 s:iat(3) → erro")
+    check(err:find("s.iat[i]", 1, true) ~= nil,
+                                           "12.9 s:iat(3) orienta a forma correta")
+    check(err:find("[1] 10", 1, true) == nil,
+                                           "12.9 s:iat(3) NÃO despeja os valores da Series")
+    check(err:find("<Series", 1, true) ~= nil,
+                                           "12.9 s:iat(3) descreve a Series sem conteúdo")
+    -- a classe toda: nenhum método de acesso vaza dados na mensagem
+    local big = S.from_table({"aaa", "bbb", "ccc"}, "string")
+    for _, case in ipairs({
+        { "get",      function() big:get(big) end },
+        { "set",      function() big:set(big, "x") end },
+        { "is_null",  function() big:is_null(big) end },
+        { "set_null", function() big:set_null(big) end },
+    }) do
+        local _, e = pcall(case[2])
+        e = tostring(e)
+        check(e:find("aaa", 1, true) == nil,
+              "12.9 " .. case[1] .. "(Series) não vaza valores no erro")
+    end
+end
+
 -- string e datetime
 local ss = S.from_table({"x", "y"}, "string")
 check(ss.at[1] == "x",              "at[1] string = x")

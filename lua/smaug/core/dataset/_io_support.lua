@@ -7,6 +7,7 @@
 --            methods.to_markdown, to_string
 
 local Display = require("smaug.core.display")
+local Err     = require("smaug.core.errors")
 
 return function(I)
     local Series        = I.Series
@@ -26,7 +27,7 @@ return function(I)
             error("smaug: df:at(i, col) — col deve ser nome de coluna (string)", 2)
         end
         local c = self._columns[col]
-        if c == nil then error("smaug: coluna '"..tostring(col).."' não existe", 2) end
+        if c == nil then error("smaug: coluna "..Err.describe(col).." não existe", 2) end
         return c:get(i)
     end
 

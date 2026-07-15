@@ -8,6 +8,8 @@
 --            (Bloco H, H.2/H.6: fonte única de inferência de dtype, reusada por
 --             Series.full/from_table/__call, DataSet.from_columns/__call e Series:map)
 
+local Err = require("smaug.core.errors")
+
 return function(I)
     local Series = I.Series
     local DTYPES = I.DTYPES
@@ -68,8 +70,8 @@ return function(I)
 
     function Series.new(dtype, size, name)
         if not DTYPES[dtype] then
-            error("smaug: dtype desconhecido '"..tostring(dtype)..
-                  "'. Suportados: float64, int64, string.", 2)
+            error("smaug: dtype desconhecido "..Err.describe(dtype)..
+                  ". Suportados: float64, int64, string.", 2)
         end
         return wrap(DTYPES[dtype].create(size or 0), dtype, name)
     end
@@ -110,7 +112,7 @@ return function(I)
     function Series.from_table(arr, dtype, name)
         dtype = dtype or infer_dtype(arr)
         if not DTYPES[dtype] then
-            error("smaug: dtype desconhecido '"..tostring(dtype).."'", 2)
+            error("smaug: dtype desconhecido "..Err.describe(dtype), 2)
         end
         local n = #arr
         local s = Series.new(dtype, n, name)

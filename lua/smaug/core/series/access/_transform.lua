@@ -8,6 +8,7 @@
 --            to_table, astype, fillna, map, abs, round, clip
 
 local Display = require("smaug.core.display")
+local Err     = require("smaug.core.errors")
 
 return function(I)
     local methods = I.methods
@@ -82,7 +83,7 @@ return function(I)
         local n = self:len()
         if type(start) ~= "number" or type(len) ~= "number"
            or start < 1 or len < 0 or start + len - 1 > n then
-            error("smaug: view("..tostring(start)..", "..tostring(len)..
+            error("smaug: view("..Err.describe(start)..", "..Err.describe(len)..
                   ") fora dos limites [1, "..n.."]", 2)
         end
         local r = self._d.view(self._c, start - 1, len)
@@ -98,7 +99,7 @@ return function(I)
         for i = 1, len do
             local k = idx[i]
             if type(k) ~= "number" or k < 1 or k > n or k % 1 ~= 0 then
-                error("smaug: take índice "..tostring(k).." fora dos limites [1, "..n.."]", 2)
+                error("smaug: take índice "..Err.describe(k).." fora dos limites [1, "..n.."]", 2)
             end
             cidx[i - 1] = k - 1
         end
@@ -242,7 +243,7 @@ return function(I)
             return Cat.from_table(vals, name or self._name)
         end
         if not DTYPES[dtype] then
-            error("smaug: dtype desconhecido '" .. tostring(dtype) .. "'", 2)
+            error("smaug: dtype desconhecido " .. Err.describe(dtype), 2)
         end
 
         local src = self._dtype
@@ -298,7 +299,7 @@ return function(I)
                     if v == 0 or v == 1 then
                         out:set(i, v == 1)
                     else
-                        error("smaug: astype('bool'): valor " .. tostring(v) .. " no índice "
+                        error("smaug: astype('bool'): valor " .. Err.describe(v) .. " no índice "
                               .. i .. " não é 0/1; use :map(fn) para definir a regra", 2)
                     end
                 end
@@ -391,7 +392,7 @@ return function(I)
             error("smaug: map espera uma função como 1º argumento", 2)
         end
         if dtype ~= nil and not DTYPES[dtype] then
-            error("smaug: map: dtype desconhecido '" .. tostring(dtype) .. "'", 2)
+            error("smaug: map: dtype desconhecido " .. Err.describe(dtype), 2)
         end
 
         local n       = self:len()
