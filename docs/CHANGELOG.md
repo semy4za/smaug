@@ -5,6 +5,43 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-14 — 12.10: aviso de separador suspeito no `read_csv` + `core/warn.lua`
+
+Implementado o aviso passivo conforme a decisão já registrada: **não** detectar
+nem escolher separador sozinho (esperto demais; falso-positivo pior que o
+problema) — apenas iluminar quando o arquivo virou 1 coluna e os dados sugerem
+outro `sep`. O usuário ignora se foi intencional.
+
+**Promoção do `warn` a módulo (`core/warn.lua`).** O `warn` era `local` no
+`core/series/init.lua` e só alcançava os submódulos da Series via a tabela `I`;
+o `io/csv.lua` (Anel 3) não tinha acesso. Escrever um `io.stderr:write` direto
+ali criaria um **segundo** canal de aviso — contra o "canal único" que o próprio
+comentário do `warn` declara, e a mesma classe de duplicação que o item 11 (3
+`cell_str`) e o 12.9 (26 `tostring`) mataram. Auditado antes de mover: havia
+exatamente um canal e um consumidor (o aviso de int64 > 2^53), então a migração
+é transparente — `I.warn` segue igual, `_core.lua` intacto, aviso do int64 sai
+idêntico. Terceiro utilitário transversal, mesmo padrão de `display.lua`
+(apresentação) e `errors.lua` (descrição-em-erro).
+
+**Regra do aviso:** `ncols == 1` **e** o separador suspeito (`;`, `\t`, `|`,
+exceto o que foi usado) presente em **todas** as amostras (header + até 5
+valores, mínimo 2 amostras). O "todas" é o que evita o falso-positivo: um `;`
+solto em texto livre (`obs = "a; b"`) não dispara — testado.
+
+**Onde o hook mora (achado que evitou um bug):** nos pontos de entrada do CSV
+(`M.read`/`M.read_mem`), **não** no `table_to_dataset`. Aquele é reusado pelo
+`json.lua` (`csv._table_to_dataset`), então o hook lá dentro faria um
+`read_json` de 1 coluna com `;` nos valores sugerir "verifique o separador" —
+nonsense para JSON. Verificado na prática: `read_json` fica silencioso.
+
+Testes em `test_csv` (55 → 64): caso-alvo `;` e `\t`, mais 5 casos que **não**
+devem avisar (sep correto, CSV multi-coluna, 1 coluna legítima, `;` esporádico
+em texto livre, e `read_json`). Captura de stderr trocando `io.stderr` pelo stub
+(o objeto é userdata; não aceita atribuição de campo).
+
+Lua puro. Fedora `--all` verde (Valgrind 0, parity 13/13, 121 arquivos).
+
+---
 ## 2026-07-14 — 12.9: `core/errors.lua` — descrição segura em mensagens de erro
 
 O registro dizia "`s:iat(i)` despeja a Series inteira no erro". A avaliação

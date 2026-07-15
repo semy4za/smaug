@@ -676,13 +676,17 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
   chamada-método e orienta "use s.iat[i]". Pós-fix: 2459 → 109 chars. A forma
   `s.at(i)`/`s.iat(i)` (chamada com número) segue suportada — contrato testado
   preservado.
-- 12.10 **`read_csv` — aviso passivo quando lê 1 coluna com separador suspeito**
-  (E9) — [Windows]. Default `sep=','` num CSV com `;` lê N colunas como 1, sem
-  erro. **Decisão tomada:** NÃO detectar/escolher separador sozinho (esperto
-  demais, falso-positivo pior que o problema); apenas, quando `ncols==1` e a
-  coluna contém `;`/`\t` repetido, emitir `warn` "lido como 1 coluna; se
-  esperava mais, verifique o separador (sep=';'?)". Ilumina cedo sem adivinhar;
-  o usuário ignora se foi intencional. Vínculo: 12.8 (dados BR), 12.3.
+- 12.10 **CONCLUÍDO (2026-07-14).** Aviso passivo implementado conforme a
+  decisão registrada (não adivinha separador; só ilumina). Dispara quando
+  `ncols==1` **e** o separador suspeito (`;`, `\t`, `|`) aparece em TODAS as
+  amostras (header + até 5 valores) — a regra "todas" evita o falso-positivo de
+  um `;` solto em texto livre. Hook nos pontos de entrada do CSV
+  (`M.read`/`M.read_mem`), **não** no `table_to_dataset`: aquele é compartilhado
+  com o `json.lua`, e "verifique o separador" não faz sentido para JSON
+  (verificado: `read_json` fica silencioso). Requereu promover o `warn` a módulo
+  (`core/warn.lua`) — era `local` no `series/init.lua` e não alcançava o Anel 3;
+  escrever um segundo `io.stderr` ali criaria dois canais divergentes, contra o
+  "canal único" que o próprio comentário declarava.
 - 12.11 **`Series:nrows()` — NÃO FAZER (decisão 2026-07-14).** A leitura do
   código mostrou que o "gap" contradiz uma convenção deliberada: o eixo 08
   registra "Series tem len+size (size = alias de len); DataSet tem nrows+ncols" —

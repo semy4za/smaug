@@ -11,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-07-15 13:42:57 UTC
+Gerado em: 2026-07-15 20:40:52 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -736,12 +736,12 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `dataset/test_relational` | 172 | 10 | 50 | 4 | 34 | — | — |
 | `dataset/test_stat` | 91 | 10 | 16 | 1 | 13 | — | — |
 | `dataset/test_io_support` | 53 | 4 | 15 | 1 | 7 | — | — |
-| `io/test_csv` | 101 | 2 | 3 | 2 | 9 | — | — |
+| `io/test_csv` | 110 | 2 | 3 | 2 | 9 | — | — |
 | `io/test_json` | 28 | 1 | 1 | 1 | 2 | — | — |
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 79 | 19 | 2 | 2 | 4 | 1 | 1 |
 
-**Total de checks:** 2580
+**Total de checks:** 2589
 
 ### Menções totais por dtype (toda a suite)
 

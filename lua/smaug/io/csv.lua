@@ -14,6 +14,53 @@ local Series  = require("smaug.core.series")
 local DataSet = require("smaug.core.dataset")
 
 local NA = Series.NA
+local warn = require("smaug.core.warn")
+
+-- 12.10: aviso passivo de separador suspeito.
+--
+-- Decisão registrada: NÃO detectar/escolher separador sozinho (esperto demais;
+-- falso-positivo pior que o problema). Apenas ilumina: se o arquivo virou UMA
+-- coluna e os valores contêm outro separador comum repetido, provavelmente o
+-- `sep` está errado — mas pode ser intencional, então é warn, não erro.
+--
+-- Fica nos pontos de entrada do CSV (M.read/M.read_mem), NÃO no
+-- table_to_dataset: aquele é compartilhado com o json.lua, e "verifique o
+-- separador" não faz sentido para JSON.
+local SUSPECT_SEPS = { [";"] = "';'", ["\t"] = "'\\t'", ["|"] = "'|'" }
+
+local function warn_if_suspect_sep(ds, copts)
+    if ds:ncols() ~= 1 then return end
+    local name = ds._col_names[1]
+    local col  = ds._columns[name]
+    local used = string.char(copts.sep)
+
+    -- amostra: o header (nome da coluna) + até 5 valores. O header sozinho já
+    -- denuncia o caso típico ("a;b;c" virando um nome de coluna só).
+    local sample = { name }
+    if col._dtype == "string" then
+        for i = 1, math.min(col:len(), 5) do
+            local v = col:get(i)
+            if v ~= nil then sample[#sample + 1] = v end
+        end
+    end
+
+    for sep, label in pairs(SUSPECT_SEPS) do
+        if sep ~= used then
+            local hits = 0
+            for _, s in ipairs(sample) do
+                local _, n = s:gsub(sep, "")
+                if n >= 1 then hits = hits + 1 end
+            end
+            -- exige o separador em TODAS as linhas amostradas (>=2 amostras):
+            -- um ';' solto num texto livre não dispara.
+            if hits == #sample and #sample >= 2 then
+                warn("read_csv leu o arquivo como 1 coluna; se esperava mais, "
+                     .. "verifique o separador (sep=" .. label .. "?)")
+                return
+            end
+        end
+    end
+end
 
 -- ===================================================================
 -- smaug_table_t → DataSet
@@ -195,7 +242,9 @@ function M.read(path, opts)
         if opts.header ~= nil then copts.header = opts.header and 1 or 0 end
     end
     local t = C.smaug_read_csv(path, copts)
-    return table_to_dataset(t)
+    local ds = table_to_dataset(t)
+    warn_if_suspect_sep(ds, copts)
+    return ds
 end
 
 function M.read_mem(buf, opts)
@@ -210,7 +259,9 @@ function M.read_mem(buf, opts)
         if opts.header ~= nil then copts.header = opts.header and 1 or 0 end
     end
     local t = C.smaug_read_csv_mem(buf, #buf, copts)
-    return table_to_dataset(t)
+    local ds = table_to_dataset(t)
+    warn_if_suspect_sep(ds, copts)
+    return ds
 end
 
 -- ds:to_csv(path, [opts])

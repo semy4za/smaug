@@ -68,13 +68,9 @@ local function is_nan(v) return v ~= v end
 local NA = setmetatable({}, { __tostring = function() return "NA" end })
 local function is_na(v) return v == nil or v == NA end
 
--- Aviso não-fatal (stderr) — canal único para "falha visível > acerto
--- adivinhado" quando o dado é aceito mas merece atenção do usuário (ex.:
--- precisão de int64 > 2^53). Não interrompe o fluxo; quem quiser silenciar
--- redireciona stderr por fora.
-local function warn(msg)
-    io.stderr:write("smaug: aviso — " .. msg .. "\n")
-end
+-- Aviso não-fatal (stderr) — canal único, agora em core/warn.lua (item 12.10),
+-- para que o Anel 3 (io/csv) use o MESMO canal em vez de um segundo stderr.
+local warn = require("smaug.core.warn")
 
 -- =====================================================================
 -- Módulo interno _internal (I): ponto de encontro entre submódulos

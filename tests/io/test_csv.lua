@@ -321,4 +321,58 @@ check(ds3:ncols() == 15,              "json roundtrip: 15 colunas")
 check(ds3:col("N_PEDIDO_SAP"):get(1) == 51208236, "json roundtrip: N_PEDIDO_SAP[1]")
 
 
+-- ================================================================
+-- 12.10: aviso passivo de separador suspeito
+-- ================================================================
+do
+    -- captura o stderr do canal de warn (core/warn.lua escreve em io.stderr).
+    -- io.stderr é userdata (não aceita atribuição de campo), então trocamos o
+    -- objeto inteiro por um stub com :write e restauramos depois.
+    local function capture(fn)
+        local buf = {}
+        local real = io.stderr
+        io.stderr = { write = function(_, s) buf[#buf+1] = s end }
+        local ok, err = pcall(fn)
+        io.stderr = real
+        if not ok then error(err, 0) end
+        return table.concat(buf)
+    end
+
+    -- caso-alvo: CSV com ';' lido com sep=',' default → 1 coluna + aviso
+    local w1 = capture(function()
+        local ds = smaug.read_csv_mem("a;b;c\n1;2;3\n4;5;6\n")
+        check(ds:ncols() == 1, "12.10 CSV com ';' e sep=',' vira 1 coluna")
+    end)
+    check(w1:find("verifique o separador", 1, true) ~= nil,
+          "12.10 avisa sobre separador suspeito (';')")
+    check(w1:find("sep=';'", 1, true) ~= nil, "12.10 aviso sugere o sep provável")
+
+    -- tab
+    local w2 = capture(function() smaug.read_csv_mem("a\tb\n1\t2\n3\t4\n") end)
+    check(w2:find("verifique o separador", 1, true) ~= nil, "12.10 avisa para tab")
+
+    -- NÃO avisa: sep correto (multi-coluna)
+    local w3 = capture(function() smaug.read_csv_mem("a;b;c\n1;2;3\n", {sep=";"}) end)
+    check(w3 == "", "12.10 sep=';' explícito não avisa")
+
+    -- NÃO avisa: CSV normal multi-coluna
+    local w4 = capture(function() smaug.read_csv_mem("a,b,c\n1,2,3\n") end)
+    check(w4 == "", "12.10 CSV multi-coluna não avisa")
+
+    -- NÃO avisa: 1 coluna legítima, sem separador suspeito
+    local w5 = capture(function() smaug.read_csv_mem("nome\njoao\nmaria\n") end)
+    check(w5 == "", "12.10 1 coluna legítima não avisa")
+
+    -- NÃO avisa: ';' em apenas um valor (texto livre) — exige em todas as amostras
+    local w6 = capture(function() smaug.read_csv_mem('obs\n"a; b"\nsem ponto\n') end)
+    check(w6 == "", "12.10 ';' esporádico em texto livre não avisa (falso-positivo)")
+
+    -- NÃO avisa: read_json reusa table_to_dataset, mas o hook é só do CSV
+    local w7 = capture(function()
+        smaug.read_json_mem('[{"obs":"a;b;c"},{"obs":"d;e;f"}]')
+    end)
+    check(w7 == "", "12.10 read_json não avisa sobre separador (hook é do CSV)")
+end
+
+
 print(string.format("OK — %d checks passaram (I/O CSV + dados reais)", n_ok))
