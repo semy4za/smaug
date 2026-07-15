@@ -5,6 +5,22 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-14 — 12.11: `Series:nrows()` — decisão de não fazer
+
+O sub-item pedia `methods.nrows = methods.len` na Series ("alias faltando").
+A leitura do código mostrou que o gap contradiz uma convenção deliberada já
+registrada no eixo 08 de paridade: *"Series tem len+size (size = alias de len);
+DataSet tem nrows+ncols"*. `nrows` é vocabulário tabular — uma Series não tem
+linhas, tem elementos; `len`/`size` é vocabulário de sequência. Não é ausência,
+é separação de domínio. Pandas segue a mesma linha (`Series` não tem `nrows`;
+contagem de linhas é `DataFrame.shape[0]`).
+
+Adicionar o alias violaria a convenção que o próprio parity audita, e exigiria
+reescrever a regra do `08_naming.lua` — doc e código passariam a divergir do
+conceito. Decisão (Gui): não fazer. Sub-item encerrado sem código; nenhum
+arquivo de código tocado.
+
+---
 ## 2026-07-14 — 12.4: dedup do `tostring` + guard de unicidade em `from_codes`
 
 O cosmético registrado era `tostring(v)` chamado 2× na normalização de níveis do

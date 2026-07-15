@@ -674,10 +674,14 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
   coluna contém `;`/`\t` repetido, emitir `warn` "lido como 1 coluna; se
   esperava mais, verifique o separador (sep=';'?)". Ilumina cedo sem adivinhar;
   o usuário ignora se foi intencional. Vínculo: 12.8 (dados BR), 12.3.
-- 12.11 **`Series:nrows()` — alias faltando** (E11) — [Windows]. Series tem `len`
-  e `size`; DataSet tem `nrows` e `len`. Falta só `methods.nrows = methods.len`
-  na Series (confirmado: não falta lógica, só o alias). Considerar alinhar os três
-  nomes (len/size/nrows) nos dois lados para simetria total.
+- 12.11 **`Series:nrows()` — NÃO FAZER (decisão 2026-07-14).** A leitura do
+  código mostrou que o "gap" contradiz uma convenção deliberada: o eixo 08
+  registra "Series tem len+size (size = alias de len); DataSet tem nrows+ncols" —
+  `nrows` é vocabulário tabular (uma Series não tem linhas, tem elementos),
+  `len`/`size` é vocabulário de sequência. Não é ausência, é separação de
+  domínio. Pandas faz igual: `Series` não tem `nrows` (é `DataFrame.shape[0]`).
+  Adicionar o alias violaria a convenção que o próprio parity audita. Sub-item
+  encerrado sem código.
 - 12.12 **sugestão em método errado** (E12) — [Windows]. `df:group_by()` cai no
   erro cru do Lua (`attempt to call method ... (nil)`). Polish: sugerir "você quis
   dizer groupby?" no `__index` quando o método não existe. Não é defeito; melhora
