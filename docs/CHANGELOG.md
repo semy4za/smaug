@@ -5,6 +5,39 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-14 — 12.22: contador unificado nas 9 suites restantes
+
+Generalização do 12.7 (que corrigiu só `test_constructors`). Achado durante o
+12.4: o padrão de `local n_ok`/`check` redeclarado por seção era sistêmico.
+
+Verificação antes de aplicar (o 12.7 ensinou o que checar): (a) as cópias são
+**idênticas** dentro de cada arquivo — então todas as chamadas resolvem para o
+primeiro `check`; (b) todas as declarações são **top-level**, nenhuma aninhada em
+`do...end` — remover não quebra escopo; (c) **um único `print`** por arquivo.
+Só com as três confirmadas o fix é seguro e uniforme.
+
+Ganhos de honestidade no relato:
+
+| suite | antes | real |
+|---|---|---|
+| `test_str` | 66 | **272** |
+| `test_categorical` | 97 | **299** |
+| `test_relational` | 60 | **168** |
+| `test_predicates` | 89 | **167** |
+| `test_access` | 61 | **127** |
+| `test_csv` | 64 | **107** |
+
+Em `test_selection` (56), `test_reduce` (57) e `test_window` (122) o número não
+mudou: ali a 2ª declaração estava no preâmbulo, não no meio do arquivo, então
+quase todos os checks já caíam no mesmo contador. A remoção só tirou a
+redundância.
+
+Nenhum check novo foi escrito — a validação sempre foi real (cada `check` aborta
+em falha). Só o número enganava. Total do relato Lua sobe de ~1958 para ~2465.
+
+Lua puro. Fedora `--all` verde (18 suites, parity 13/13).
+
+---
 ## 2026-07-14 — 12.12: chave desconhecida com sugestão ("você quis dizer X?")
 
 **Um diagnóstico errado meu, corrigido pela verificação empírica.** Eu havia

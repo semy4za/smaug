@@ -24,11 +24,6 @@ local smaug = require("smaug")
 local S  = smaug.Series
 local NA = smaug.NA
 
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
-end
 
 -- ================================================================
 -- 1. Series:at / iat — acesso escalar (indexação e chamada)

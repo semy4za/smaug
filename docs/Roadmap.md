@@ -754,14 +754,16 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
    Fase A do 10.9]. `to_json` trata `NaN→null` (json:588) mas não `inf` (vira
    `"inf"`); e `nan`/`inf` não são JSON válido em nenhum caso. Corrigir: `NaN`
    **e** `±inf` → `null` no writer JSON. Sem teste hoje; adicionar.
- - 12.22 **`n_ok` subcontado em 9 suites concatenadas** — [achado 2026-07-14,
-   durante o 12.4]. Mesmo padrão do 12.7 (já corrigido em `test_constructors`),
-   mas sistêmico: `test_categorical` (3×), `test_access` (3×), `test_predicates`
-   (3×), `test_str` (4×), `test_relational` (4×), `test_selection` (2×),
-   `test_reduce` (2×), `test_window` (2×), `test_csv` (3×) redeclaram
-   `local n_ok`/`check` por seção e imprimem só o último → headline subconta.
-   Validação é real (cada `check` aborta em falha); só o número engana. Fix:
-   contador único por arquivo, como no 12.7. Lua puro, cosmético.
+ - 12.22 **CONCLUÍDO (2026-07-14).** Contador unificado nas 9 suites, mesmo fix
+   do 12.7. Verificado antes: as cópias são idênticas dentro de cada arquivo,
+   todas as declarações são top-level (nenhuma aninhada em `do...end`) e há um
+   único `print` por arquivo — condições que tornam a remoção segura e uniforme.
+   Ganhos: `test_str` 66→272, `test_categorical` 97→299, `test_relational`
+   60→168, `test_predicates` 89→167, `test_access` 61→127, `test_csv` 64→107.
+   Em `test_selection`/`test_reduce`/`test_window` o número não mudou (a 2ª
+   declaração estava no preâmbulo, não no meio: quase todos os checks já
+   contavam) — a remoção só tirou a redundância. Nenhum check novo: a validação
+   sempre foi real, só o relato subcontava.
 
 ## 13. Reescrita de exemplos + docstrings  [Windows]
 

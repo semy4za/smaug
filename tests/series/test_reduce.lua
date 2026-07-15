@@ -27,11 +27,6 @@ local S     = smaug.Series
 local inf, ninf, nan = math.huge, -math.huge, 0/0
 local function is_nan(x) return x ~= x end
 
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
-end
 local function check_err(fn, msg)
     local ok = pcall(fn)
     check(not ok, msg .. " (deveria lançar erro)")

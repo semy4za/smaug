@@ -26,11 +26,6 @@ local smaug  = require("smaug")
 local S      = smaug.Series
 
 local function approx(a, b) return math.abs(a - b) < 1e-9 end
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
-end
 -- Verifica que uma chamada lança erro (para casos que devem ser recusados).
 local function check_err(fn, msg)
     local ok = pcall(fn)
@@ -217,11 +212,6 @@ local D     = smaug.DataSet
 
 local nan = 0/0
 local function is_nan(x) return x ~= x end
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
-end
 local function check_err(fn, msg)
     local ok = pcall(fn)
     check(not ok, msg .. " (deveria lançar erro)")

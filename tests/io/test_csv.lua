@@ -20,11 +20,6 @@ end
 local smaug = require("smaug")
 local NA    = smaug.Series.NA
 
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
-end
 local function approx(a, b) return math.abs(a - b) < 1e-9 end
 
 -- Diretório temporário portátil: respeita TMPDIR/TMP/TEMP (Windows usa TEMP),
@@ -147,11 +142,6 @@ package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 local smaug = require("smaug")
 local NA    = smaug.Series.NA
 
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
-end
 
 -- Diretório temporário portátil (ver test_io.lua): TMPDIR/TMP/TEMP, fallback /tmp.
 -- Trata var vazia como ausente.

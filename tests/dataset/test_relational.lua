@@ -22,11 +22,6 @@ package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 local smaug = require("smaug")
 local NA    = smaug.Series.NA
 
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
-end
 local function approx(a, b) return math.abs(a - b) < 1e-9 end
 
 -- helper: lê coluna como map key->valor
@@ -286,11 +281,6 @@ check(approx(tr:get(mg_pos), 40.0), "transform MG=40 (média do grupo)")
 local smaug = require("smaug")
 local NA    = smaug.Series.NA
 
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
-end
 
 local a = smaug.DataSet({
     {"uf",  {"SP","RJ"},  "string"},
@@ -414,11 +404,6 @@ package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 local smaug = require("smaug")
 local NA    = smaug.Series.NA
 
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
-end
 
 -- Datasets base
 local pedidos = smaug.DataSet({

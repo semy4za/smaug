@@ -23,11 +23,6 @@ package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 local smaug = require("smaug")
 local S     = smaug.Series
 
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
-end
 local function rejects(fn) return pcall(fn) == false end
 
 -- ===================================================================
@@ -424,11 +419,6 @@ test_str_replace()
 local smaug = require("smaug")
 local NA    = smaug.Series.NA
 
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
-end
 
 local s = smaug.Series.from_table({"hello world","foo bar","baz",NA}, "string")
 
@@ -614,11 +604,6 @@ local smaug = require("smaug")
 local S  = smaug.Series
 local NA = smaug.NA
 
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
-end
 
 -- ================================================================
 -- 1. count — ocorrências literais não-sobrepostas

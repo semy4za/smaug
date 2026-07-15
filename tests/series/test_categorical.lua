@@ -22,11 +22,6 @@ local smaug = require("smaug")
 local S  = smaug.Series
 local NA = smaug.NA
 
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
-end
 
 -- ================================================================
 -- 1. Factories
@@ -587,11 +582,6 @@ local smaug = require("smaug")
 local S  = smaug.Series
 local NA = smaug.NA
 
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
-end
 local function approx(a, b, tol)
     tol = tol or 1.0   -- 1 ms de tolerância para epoch_ms
     return type(a) == "number" and type(b) == "number" and math.abs(a - b) <= tol
