@@ -752,4 +752,30 @@ do
     check(extracted ~= nil,             "9.2 categorical: col() retorna cópia protegida")
 end
 
+do
+    -- 12.12: chave desconhecida erra com sugestão (método OU coluna)
+    local dfx = smaug.DataSet({ {"vendas", {10, 20}, "int64"},
+                                {"regiao", {"SP", "RJ"}, "string"} })
+    local function msg(fn) local _, e = pcall(fn); return tostring(e) end
+
+    local m1 = msg(function() return dfx:group_by("regiao") end)
+    check(m1:find("não existe", 1, true) ~= nil, "12.12 DataSet: método inexistente erra")
+    check(m1:find("'groupby'", 1, true) ~= nil,  "12.12 DataSet: sugere 'groupby' para 'group_by'")
+
+    -- typo de COLUNA sugere a coluna (candidatos incluem os nomes reais)
+    local m2 = msg(function() return dfx.vendass end)
+    check(m2:find("'vendas'", 1, true) ~= nil,   "12.12 DataSet: sugere coluna 'vendas' para 'vendass'")
+
+    local m3 = msg(function() return dfx.xyzabc end)
+    check(m3:find("não existe", 1, true) ~= nil, "12.12 DataSet: nome distante erra")
+    check(m3:find("quis dizer", 1, true) == nil, "12.12 DataSet: nome distante NÃO sugere")
+
+    -- contratos preservados
+    check(dfx._inexistente == nil,               "12.12 DataSet: chave _interna devolve nil")
+    check(dfx:has_column("foo") == false,        "12.12 DataSet: has_column('foo') = false (não erra)")
+    check(dfx.vendas ~= nil,                     "12.12 DataSet: coluna real intacta")
+    check(dfx:nrows() == 2,                      "12.12 DataSet: método real intacto")
+end
+
+
 print(string.format("OK — %d checks passaram (DataSet: core, ops, rename, pivot_table, stack, unstack, explode)", n_ok))

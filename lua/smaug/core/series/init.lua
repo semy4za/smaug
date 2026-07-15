@@ -48,6 +48,7 @@
 
 local ffi = require("ffi")
 local C   = require("smaug.ffi_loader")
+local Err = require("smaug.core.errors")
 
 -- Sentinelas globais (usados por múltiplos módulos)
 local NAN     = 0 / 0
@@ -195,7 +196,14 @@ Series.__index = function(self, k)
     if k == "at" or k == "iat" then
         return setmetatable({ _s = self }, SeriesAt)
     end
-    return methods[k]
+    local m = methods[k]
+    if m ~= nil then return m end
+    -- 12.12: método desconhecido falha visível, com sugestão. Chaves com "_"
+    -- seguem devolvendo nil (campos internos: _c, _dtype, _name...).
+    if type(k) == "string" and k:sub(1, 1) ~= "_" then
+        error(Err.unknown_key("método", k, methods), 2)
+    end
+    return nil
 end
 
 return Series

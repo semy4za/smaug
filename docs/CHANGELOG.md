@@ -5,6 +5,49 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-14 — 12.12: chave desconhecida com sugestão ("você quis dizer X?")
+
+**Um diagnóstico errado meu, corrigido pela verificação empírica.** Eu havia
+concluído que interceptar o `__index` do DataSet quebraria o `has_column` —
+raciocinando que ambos passam pelo mesmo ramo de "chave string desconhecida".
+Errado: `has_column` é `self._columns[name] ~= nil`, acessa o campo `_columns`
+diretamente e **nunca passa pelo `__index`** (o campo existe). Só descobri porque
+o Gui pediu para ver o exemplo rodando em vez do argumento. Lição registrada: a
+dedução sobre o próprio código não substitui executá-lo.
+
+Verificação antes do martelo: apliquei o erro no `__index` como experimento e
+rodei as 4 suites do DataSet — **430 checks passaram**, antes de escrever
+qualquer teste novo. Grep no código e nos testes: ninguém dependia de
+`df.chave_inexistente == nil`. Só então a mudança foi aprovada.
+
+**Mudança de contrato deliberada** (decisão do Gui): chave desconhecida passa de
+`nil` silencioso para erro. Alinha com "falha visível > acerto adivinhado" —
+`df.vendass` (typo de coluna) falhava 3 linhas depois com um `nil` misterioso;
+agora falha no ponto, sugerindo `vendas`. Chaves com `_` seguem devolvendo `nil`
+(campos internos: `_columns`, `_c`, `_dtype`…).
+
+**Implementação:** `Err.suggest(name, candidates)` + `Err.unknown_key(...)` em
+`core/errors.lua` — não um quarto módulo, porque isto é mensagem de erro e o
+`errors.lua` já é a fonte única desse domínio (verificado: não havia nenhum
+helper de distância/sugestão no projeto). Levenshtein com early-exit (só importa
+se está PERTO, não a distância exata); tolerância proporcional (2 para nomes >= 5
+chars, 1 para curtos) para não sugerir "sum" para "abs"; normaliza `_` e caixa
+antes de comparar, o que faz `group_by`, `groupBy` e `GROUPBY` caírem em
+`groupby` com distância 0 — o caso mais comum de confusão de convenção.
+
+Nos dois `__index`. No DataSet os candidatos incluem **as colunas reais** do
+DataSet, além dos métodos: `df.vendass` sugere a coluna `vendas`. Nomes
+distantes (`xyz`) erram sem sugestão — testado, incluindo que nomes de coluna
+legítimos não recebem sugestão de método.
+
+Testes: `test_access` 54 → 61, `test_core` 228 → 237 (sugestão certa, ausência de
+sugestão para nome distante, `_interna` → nil, `has_column` intacto, métodos e
+acessores reais intactos).
+
+Lua puro. Fedora `--all` verde (Valgrind 0, parity 13/13, 18 suites incluindo
+property-based e integração).
+
+---
 ## 2026-07-14 — 12.10: aviso de separador suspeito no `read_csv` + `core/warn.lua`
 
 Implementado o aviso passivo conforme a decisão já registrada: **não** detectar

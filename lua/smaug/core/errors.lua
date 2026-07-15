@@ -75,4 +75,70 @@ function M.describe(v)
     return tv   -- function, userdata, thread
 end
 
+-- =====================================================================
+-- suggest: "você quis dizer X?" (item 12.12)
+-- =====================================================================
+
+-- Distância de Levenshtein com early-exit: se passar de `max`, devolve max+1.
+-- Só precisamos saber se está PERTO, não a distância exata.
+local function levenshtein(a, b, max)
+    local la, lb = #a, #b
+    if math.abs(la - lb) > max then return max + 1 end
+    local prev, cur = {}, {}
+    for j = 0, lb do prev[j] = j end
+    for i = 1, la do
+        cur[0] = i
+        local best = cur[0]
+        local ai = a:byte(i)
+        for j = 1, lb do
+            local cost = (ai == b:byte(j)) and 0 or 1
+            local d = prev[j] + 1
+            local e = cur[j-1] + 1
+            local f = prev[j-1] + cost
+            if e < d then d = e end
+            if f < d then d = f end
+            cur[j] = d
+            if d < best then best = d end
+        end
+        if best > max then return max + 1 end
+        prev, cur = cur, prev
+    end
+    return prev[lb]
+end
+
+-- suggest(name, candidates): nome mais próximo de `name` entre as CHAVES de
+-- `candidates`, ou nil se nada estiver perto o bastante.
+--
+-- Tolerância proporcional ao tamanho (2 para nomes >= 5 chars, 1 para curtos):
+-- evita sugerir "sum" para "abs". Normaliza `_` e caixa antes de comparar, para
+-- pegar o caso mais comum de confusão de convenção — `group_by`/`groupBy` vs
+-- `groupby` — que sai com distância 0 na forma normalizada.
+function M.suggest(name, candidates)
+    if type(name) ~= "string" or #name == 0 then return nil end
+    local function norm(s) return (s:gsub("_", ""):lower()) end
+    local target = norm(name)
+    local max    = (#name >= 5) and 2 or 1
+
+    local best, best_d = nil, math.huge
+    for cand in pairs(candidates) do
+        if type(cand) == "string" and cand:sub(1, 1) ~= "_" then
+            local d = levenshtein(target, norm(cand), max)
+            if d < best_d then best, best_d = cand, d end
+        end
+    end
+    if best_d <= max then return best end
+    return nil
+end
+
+-- unknown_key(kind, name, candidates, extra): mensagem canônica de chave
+-- desconhecida, com sugestão quando houver. `extra` é um complemento opcional
+-- (ex.: mencionar que em DataSet a chave também poderia ser uma coluna).
+function M.unknown_key(kind, name, candidates, extra)
+    local msg = "smaug: " .. kind .. " '" .. tostring(name) .. "' não existe"
+    local s = M.suggest(name, candidates)
+    if s then msg = msg .. " — você quis dizer '" .. s .. "'?" end
+    if extra then msg = msg .. " " .. extra end
+    return msg
+end
+
 return M

@@ -435,11 +435,27 @@ return function(I)
     -- =====================================================================
     -- Metamétodos de acesso
     -- =====================================================================
+    -- 12.12: chave desconhecida falha visível, com sugestão. Antes devolvia nil
+    -- silencioso: `df:group_by()` virava "attempt to call method (a nil value)"
+    -- e `df.vendass` (typo de coluna) só estourava linhas depois. Chaves com "_"
+    -- seguem devolvendo nil (campos internos: _columns, _name, _length...).
     DataSet.__index = function(self, k)
         local m = methods[k]
         if m ~= nil then return m end
         if is_boolseries(k) then return self:filter(k) end
-        if type(k) == "string" then return rawget(self, "_columns")[k] end
+        if type(k) == "string" then
+            local c = rawget(self, "_columns")[k]
+            if c ~= nil then return c end
+            if k:sub(1, 1) ~= "_" then
+                -- candidatos: métodos + colunas reais deste DataSet
+                local cands = {}
+                for name in pairs(methods) do cands[name] = true end
+                for _, name in ipairs(rawget(self, "_col_names") or {}) do
+                    cands[name] = true
+                end
+                error(Err.unknown_key("método/coluna", k, cands), 2)
+            end
+        end
         return nil
     end
 

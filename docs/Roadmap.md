@@ -695,10 +695,17 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
   domínio. Pandas faz igual: `Series` não tem `nrows` (é `DataFrame.shape[0]`).
   Adicionar o alias violaria a convenção que o próprio parity audita. Sub-item
   encerrado sem código.
-- 12.12 **sugestão em método errado** (E12) — [Windows]. `df:group_by()` cai no
-  erro cru do Lua (`attempt to call method ... (nil)`). Polish: sugerir "você quis
-  dizer groupby?" no `__index` quando o método não existe. Não é defeito; melhora
-  a descoberta.
+- 12.12 **CONCLUÍDO (2026-07-14).** `Err.suggest`/`Err.unknown_key` em
+  `core/errors.lua` (Levenshtein com early-exit, tolerância proporcional ao
+  tamanho, normalizando `_`/caixa — pega `group_by`/`groupBy`/`GROUPBY` →
+  `groupby`). Plugado nos dois `__index`. **Mudança de contrato deliberada:**
+  chave desconhecida agora ERRA em vez de devolver `nil` silencioso —
+  `df.vendass` (typo de coluna) falha na hora, não 3 linhas depois. Verificado
+  antes: nada no código nem nos testes dependia do `nil` (430 checks das suites
+  DataSet passaram com o erro ativo, antes de qualquer teste novo); `has_column`
+  não é afetado (lê `self._columns` direto, sem passar pelo `__index`). Chaves
+  com `_` seguem devolvendo `nil` (campos internos). No DataSet os candidatos
+  incluem as colunas reais, então typo de coluna sugere a coluna.
 - 12.13 **documentação prometida pelo 9.1 incompleta** — [Windows]. A limitação
   do `get()` (`tonumber`, perda > 2^53) e a faixa correta `get_raw` estão
   registradas só no API_INDEX; API_Reference e CONTRACT silenciosos. Completar,

@@ -419,4 +419,25 @@ do
 end
 
 
+do
+    -- 12.12: método desconhecido erra com sugestão (falha visível > nil silencioso)
+    local sx = S.from_table({1, 2, 3}, "float64")
+    local function msg(fn) local _, e = pcall(fn); return tostring(e) end
+
+    local m1 = msg(function() return sx:sumn() end)
+    check(m1:find("não existe", 1, true) ~= nil, "12.12 Series: método inexistente erra")
+    check(m1:find("'sum'", 1, true) ~= nil,      "12.12 Series: sugere 'sum' para 'sumn'")
+
+    local m2 = msg(function() return sx:xyzabc() end)
+    check(m2:find("não existe", 1, true) ~= nil, "12.12 Series: nome distante erra")
+    check(m2:find("quis dizer", 1, true) == nil, "12.12 Series: nome distante NÃO sugere")
+
+    -- campos internos seguem devolvendo nil (não podem erguer erro)
+    check(sx._inexistente == nil,                "12.12 Series: chave _interna devolve nil")
+    -- acessores e métodos reais intactos
+    check(sx:mean() == 2,                        "12.12 Series: método real intacto")
+    check(sx.at[1] == 1,                         "12.12 Series: acessor .at intacto")
+end
+
+
 print(string.format("OK — %d checks passaram (Series: acesso, edge cases, fillna)", n_ok))
