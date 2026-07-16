@@ -624,8 +624,15 @@ tiver.
 
 Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
 
-- 12.1 mensagens I/O: remover "smaug" duplicado (`smaug: smaug_read_csv:` →
-  padrão `smaug: <op> —`)
+- 12.1 **CONCLUÍDO (2026-07-14).** Além da duplicação registrada, a leitura
+  achou que o prefixo fixo do C **mentia**: `read_csv_mem("")` reportava
+  `smaug: smaug_read_csv: arquivo vazio` — função errada e "arquivo" quando a
+  entrada é buffer. Corrigido separando responsabilidade: o Anel 0 emite só a
+  **razão** (`"entrada vazia"`), o Anel 3 emite a **op** — mesma divisão que os
+  writers já usavam (`smaug: to_csv — falha ao escrever`). 15 `make_error`
+  limpos; `table_to_dataset(t, op)` recebe a op das 4 entradas
+  (read_csv/_mem, read_json/_mem). O contrato de mensagem estava sem teste;
+  agora tem.
 - 12.2 `read_parquet` fantasma (init.lua:50 comentado) — remover ou marcar pós-1.0
 - 12.3 `column_t` sem datetime / CSV não infere dt — decidir: fechar ou registrar
   como pós-1.0 (conecta Anel 0 ↔ Anel 3)
@@ -736,8 +743,36 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
   `if (!r)` (datetime:222) receberam `COV-EXCL-BR` com a justificativa canônica
   dos irmãos i64/f64/str. **Selo Fedora obtido (2026-07-09):** Valgrind 12/12
   clean, branch-alvo 94.49% (mudança só de comentário, sem alteração funcional).
- - 12.18 **guards `if(!s)` de `dt_get`/`dt_set` sem `COV-EXCL-BR`** — [Fedora]
-   (achado 2026-07-09, datetime:296/313). Mesma natureza do 12.17. Alinhar e reselar.
+ - 12.18 **CONCLUÍDO (2026-07-14) — invertido após revisão.** O item pedia
+   `COV-EXCL-BR` nos guards; a revisão mostrou que os 3 ramos são **alcançáveis e
+   testáveis**, e que o `smaug_core.c` fecha **100%** de branch-alvo justamente
+   por testá-los (o `f64_get` tem estrutura idêntica ao `dt_get`). Excluí-los
+   esconderia ramo vivo. Feito o oposto: 3 testes
+   (`dt_set_null(NULL)`, `dt_append_null(NULL)`, `dt_get(NULL,&st)` — este exercita
+   o `if (status)` DENTRO do `if (!s)`, que era o ramo real descoberto).
+   Branch-alvo 94.70% → **94.77%** com as mesmas 165 exclusões. Excluir daria o
+   mesmo 94.77% com 168 exclusões e zero proteção. Política registrada no
+   **CONTRATO 10**.
+ - 12.23 **6 guards ESSENCIAIS de API pública sem teste e fora da métrica** —
+   [achado 2026-07-14, auditoria empírica do 12.18]. Removendo cada guard e
+   chamando com `NULL`, estes **segfaultam** — são a única proteção, não defesa
+   redundante: `dt_clone`(datetime:201), `dt_coalesce`(:239),
+   `f64_coalesce`(ops_f64:185), `i64_coalesce`(ops_i64:179),
+   `str_coalesce_scalar`(str:199), `str_coalesce`(str:242). Todos são símbolos
+   públicos exportados (`T` na .so) e todos estão `COV-EXCL-BR` com a
+   justificativa "o frontend valida antes" — que contradiz o princípio "o engine
+   não confia no caller". **Medido:** com o guard removido, a suíte passa, o
+   Valgrind acusa 0 e o branch-alvo não se move. São segfaults esperando um
+   refactor. Fix: 6 linhas de teste + trocar a exclusão por cobertura real
+   (o `smaug_bool_coalesce_scalar` já é assim, ver 10.8). Custo baixo,
+   prioridade alta.
+ - 12.24 **7 guards redundantes com justificativa falsa** — [mesmo achado].
+   `dt/f64/i64_coalesce_scalar` e `dt/f64/i64/str_select` **não** segfaultam sem
+   o guard (o `clone(NULL)` barra antes). A exclusão é legítima, mas o texto
+   ("o frontend valida antes") é falso e foi copiado entre dtypes — deve dizer a
+   verdade: "redundante: o clone já barra NULL". Cosmético, mas o texto errado é
+   o que fez a justificativa migrar para os casos onde o guard É essencial
+   (12.23).
  - 12.19 **Fontes de verdade duplicadas de `SRCS`/`C_TESTS` (5 listas)** —
    [achado 2026-07-09, Fase 1 do 10.7]. Acrescentar um `.c` + um teste exige
    editar 5 listas: `Makefile:SRCS`, `build.sh:SRCS`, `build.sh:C_TESTS_PLAIN`,

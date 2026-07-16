@@ -5,6 +5,90 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-14 — 12.18: guards testados, não excluídos (CONTRATO 10)
+
+O item pedia `COV-EXCL-BR` nos guards de `dt_get`/`dt_set`, "alinhando com o
+12.17". A revisão (o Gui pediu três, cada uma mais funda) inverteu o item e
+expôs um problema estrutural.
+
+**1. Os ramos eram alcançáveis.** O `smaug_core.c` fecha **100%** de branch-alvo
+com guards idênticos: o `f64_get` cobre `get(NULL,&st)` **e** `get(NULL,NULL)`; o
+`dt_get` só cobria o segundo. O ramo descoberto nunca foi o `if (!s)` — era o
+`if (status)` **dentro** dele. Excluir seria esconder ramo vivo.
+
+**2. Não havia política.** Mesmo guard, mesma família `coalesce_scalar`, todas
+públicas: i64/f64/str/dt **excluem**, bool **testa**. O bool só é diferente
+porque no 10.8 eu quase excluí e corrigi no meio — foi acaso, não processo.
+
+**3. A justificativa contradiz o princípio.** O CONTRACT declara *"nunca assume
+que o caller validou"*; a exclusão diz *"o frontend nunca passa NULL"*. O guard
+existe porque não confiamos; a exclusão o dispensa porque confiamos. E são
+**símbolos públicos exportados** (`T` na .so) — o frontend Lua é *um* caller.
+
+**4. A auditoria empírica** (removi cada guard, compilei, chamei com NULL):
+**6 de 13 segfaultam** — são a única proteção, não defesa redundante. Estão
+todos excluídos e sem teste. Com o guard removido: **a suíte passa, o Valgrind
+acusa 0 erros, o branch-alvo não se move**. Os três guardiões do projeto passam
+sorrindo enquanto a API pública segfalta.
+
+**5. A raiz:** a justificativa foi **copiada entre dtypes sem verificar o código
+embaixo**. `f64_coalesce_scalar` clona primeiro (o `clone(NULL)` barra → guard
+redundante); `str_coalesce_scalar` mede o buffer tocando `self->size` direto
+(→ SIGSEGV). Mesmo nome, mesma justificativa, naturezas opostas.
+
+Entregue neste item:
+- **3 testes** em `test_datetime_c` (447→450): `dt_set_null(NULL)`,
+  `dt_append_null(NULL)` e `dt_get(NULL,&st)`. Branch-alvo **94.70% → 94.77%**
+  com as **mesmas 165 exclusões**. Excluir daria o **mesmo 94.77%** com 168
+  exclusões e zero proteção — o número é idêntico, o significado é oposto.
+- **CONTRATO 10** (`docs/CONTRACT.md`): fronteira pública alcançável → testa;
+  `COV-EXCL-BR` só para inalcançável verificado; **justificativa não se copia
+  entre dtypes**, com o exemplo f64-vs-str no texto.
+
+Registrados para execução própria (a pedido do Gui, fora deste item): **12.23**
+(os 6 essenciais — segfaults esperando um refactor, 6 linhas de teste,
+prioridade alta) e **12.24** (os 7 redundantes cuja justificativa é falsa e foi o
+veículo da propagação).
+
+Fedora `--all`: Valgrind 0, linha 98.76%, branch-alvo 94.77%.
+
+---
+## 2026-07-14 — 12.1: mensagens de I/O no padrão `smaug: <op> — <razão>`
+
+O registro pedia só tirar o `"smaug"` duplicado. Reproduzindo as 6 mensagens de
+I/O, apareceram três defeitos, não um:
+
+1. **Duplicação:** o C prefixava `smaug_read_csv:` em cada `make_error` e o Lua
+   somava `smaug: ` → `smaug: smaug_read_csv: ...`.
+2. **Fora do padrão:** os *writers* já usavam `smaug: to_csv — falha ao...`; só
+   os readers usavam `smaug_...:`. O padrão-alvo já existia no código.
+3. **A mensagem mentia** (o mais grave): `read_csv_mem("")` reportava
+   `smaug: smaug_read_csv: arquivo vazio` — nomeava a função **errada** (o
+   prefixo era fixo no C, que não sabe se veio de `read_csv` ou `read_csv_mem`)
+   e falava em "arquivo" quando a entrada é um buffer.
+
+Fix pela separação de responsabilidade, espelhando o que os writers já faziam
+(o C devolve `rc`, o Lua diz `smaug: to_csv — ...`):
+
+- **Anel 0** emite só a **razão**: `"entrada vazia"`, `"sem colunas"`,
+  `"não foi possível abrir '%s'"`. 15 `make_error` limpos (7 csv + 8 json). O
+  `"arquivo vazio"` virou `"entrada vazia"` — neutro entre path e buffer.
+- **Anel 3** emite a **op**: `table_to_dataset(t, op)` recebe `read_csv`,
+  `read_csv_mem`, `read_json` ou `read_json_mem` das 4 entradas e formata
+  `smaug: <op> — <razão>`. O `_table_to_dataset` (usado pelo json.lua) é alias
+  direto, repassa naturalmente.
+
+O consumidor do C puro não perde nada: ele sabe qual função chamou, e a razão é
+o que ele não teria como saber.
+
+Verificado que nenhum teste casava com o texto antigo — o contrato de mensagem
+estava **sem teste nenhum**. Agora tem: `test_csv` 124→130, `test_json` 39→43
+(ausência de duplicação, padrão `smaug: <op> —`, a op correta no `_mem`, "arquivo"
+ausente quando é buffer, e a simetria reader/writer).
+
+Fedora `--all`: Valgrind 0, coverage 98.76%/94.70%.
+
+---
 ## 2026-07-14 — 12.21: vocabulário de não-finitos (CONTRATO 9) — CSV, JSON, Ring 0
 
 O registro dizia "JSON writer emite `inf`, que é JSON inválido". A revisão pedida

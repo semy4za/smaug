@@ -79,9 +79,21 @@ static void test_lifecycle(void) {
     smaug_dt_get(s, 10, &st);
     CHECK(st == SMG_ERR_OOB, "get OOB → SMG_ERR_OOB");
 
-    /* NULL pointer */
+    /* NULL pointer — 12.18: guards de fronteira publica sao TESTADOS, nao
+       excluidos da metrica. O smaug_core.c (f64) fecha 100% de branch-alvo
+       exatamente por cobrir estes casos; o dt tinha os mesmos guards sem teste,
+       e o registro original pedia COV-EXCL-BR — o que esconderia um ramo
+       alcancavel em vez de exercita-lo. */
     CHECK(smaug_dt_set(NULL, 0, ep) == SMG_ERR_ARGUMENT, "set NULL ptr");
     CHECK(smaug_dt_is_null(NULL, 0) == true, "is_null NULL ptr = true");
+    CHECK(smaug_dt_set_null(NULL, 0) == SMG_ERR_ARGUMENT, "set_null NULL ptr");
+    CHECK(smaug_dt_append_null(NULL) == -1, "append_null NULL ptr -> -1");
+    /* get(NULL) com status NAO-nulo: exercita o `if (status)` DENTRO do
+       `if (!s)`. O caso status=NULL ja existe (test_get_null_status); sem este,
+       o ramo verdadeiro do if interno nunca era tomado. */
+    smaug_status_t stn = SMG_OK;
+    smaug_dt_get(NULL, 0, &stn);
+    CHECK(stn == SMG_ERR_ARGUMENT, "get NULL ptr com status -> SMG_ERR_ARGUMENT");
 
     smaug_dt_free(s);
 }

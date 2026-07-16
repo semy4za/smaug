@@ -278,6 +278,36 @@ Para avisar sem colapsar o Anel 0, o Anel 3 consulta
 `smaug_f64_count_nonfinite` antes de serializar — o C não tem canal de aviso, e
 o `warn` (`core/warn.lua`) é do Lua.
 
+### Contrato 10 — guard de fronteira pública se testa; `COV-EXCL-BR` é para o inalcançável
+
+Decorre do princípio acima. Se o engine **não confia no caller**, todo guard de
+fronteira pública é **alcançável por definição** — qualquer programa C, binding
+ou porte pode passar `NULL`. Logo:
+
+> **Fronteira pública + guard alcançável → TESTA** (custo: 1 linha).
+> **`COV-EXCL-BR` → só para o genuinamente inalcançável**, com justificativa
+> verificada: OOM sem injeção, overflow com `~SIZE_MAX`, invariante interno
+> provado, ramo morto por construção.
+
+**Justificativa não se copia entre dtypes.** Cada uma vale para o código que está
+embaixo dela — e o código diverge. Exemplo real (auditado 2026-07-14):
+
+```c
+/* f64_coalesce_scalar — o guard é REDUNDANTE */      /* str_coalesce_scalar — o guard é ESSENCIAL */
+if (!self) return NULL;                               if (!self) return NULL;
+r = smaug_f64_clone(self);   /* clone(NULL)→NULL */   for (i = 0; i < self->size; i++)
+if (!r) return NULL;         /* ESTE pega */               /* toca self direto → SIGSEGV */
+```
+
+Mesma função, mesmo nome, mesma justificativa herdada — naturezas opostas. Só a
+verificação caso-a-caso distingue.
+
+**Por que isto importa mais que a métrica:** um guard excluído e sem teste é um
+guard que ninguém protege. Medido: ao remover um guard essencial, a suíte inteira
+passa, o Valgrind acusa 0 erros e o branch-alvo não se move — enquanto a API
+pública passa a segfaultar. Testar e excluir produzem **o mesmo percentual**; só
+o teste produz proteção.
+
 ---
 
 ## Ring 0 — Backend C
