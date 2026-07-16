@@ -114,6 +114,7 @@ ffi.cdef([[
 
     /* --- Utilitarios --- */
     size_t              smaug_f64_count_nonnull(const smaug_series_f64_t *s);
+    size_t              smaug_f64_count_nonfinite(const smaug_series_f64_t *s);
     smaug_series_f64_t* smaug_f64_take  (const smaug_series_f64_t *s, const size_t *idx, size_t len);
     smaug_series_f64_t* smaug_f64_filter(const smaug_series_f64_t *s, const uint8_t *mask);
 

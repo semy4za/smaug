@@ -365,4 +365,39 @@ do
 end
 
 
+-- ================================================================
+-- 12.21: não-finitos são VALORES no CSV (round-trip preserva)
+-- ================================================================
+do
+    local df = smaug.DataSet({ {"id", {1,2,3,4,5}, "int64"},
+                               {"v", {NA, 0/0, 1/0, -1/0, 1.5}, "float64"} })
+    local back = smaug.read_csv_mem(df:to_csv_mem())
+    check(back:col("v"):is_null(1),               "12.21 CSV round-trip: NA continua NA")
+    check(not back:col("v"):is_null(2),           "12.21 CSV round-trip: NaN é VALOR, não NA")
+    check(back:col("v"):get(2) ~= back:col("v"):get(2), "12.21 CSV round-trip: NaN preservado")
+    check(back:col("v"):get(3) == math.huge,      "12.21 CSV round-trip: +inf preservado")
+    check(back:col("v"):get(4) == -math.huge,     "12.21 CSV round-trip: -inf preservado")
+    check(back:col("v"):get(5) == 1.5,            "12.21 CSV round-trip: finito preservado")
+
+    -- todas as grafias caem no mesmo destino (antes a CAIXA decidia:
+    -- "nan"/"NaN" viravam NA, "NAN" virava valor)
+    for _, tok in ipairs({"nan", "NaN", "NAN"}) do
+        local d = smaug.read_csv_mem("v,x\n" .. tok .. ",1\n")
+        check(not d:col("v"):is_null(1), "12.21 CSV: '" .. tok .. "' é valor (caixa não decide)")
+    end
+    for _, tok in ipairs({"inf", "Infinity", "INF"}) do
+        local d = smaug.read_csv_mem("v,x\n" .. tok .. ",1\n")
+        check(d:col("v"):get(1) == math.huge, "12.21 CSV: '" .. tok .. "' -> inf")
+    end
+    -- vocabulário de ausência intacto
+    for _, tok in ipairs({"NA", "null", "N/A", "NULL"}) do
+        local d = smaug.read_csv_mem("v,x\n" .. tok .. ",1\n")
+        check(d:col("v"):is_null(1), "12.21 CSV: '" .. tok .. "' segue sendo NA")
+    end
+    -- opt-in: quem precisa de "nan" como ausência passa na_values
+    local d = smaug.read_csv_mem("v,x\nnan,1\n", { na_values = {"nan"} })
+    check(d:col("v"):is_null(1), "12.21 CSV: na_values={'nan'} trata como NA (opt-in)")
+end
+
+
 print(string.format("OK — %d checks passaram (I/O CSV + dados reais)", n_ok))

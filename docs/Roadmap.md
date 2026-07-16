@@ -750,10 +750,19 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
    mas não os headers do 10.7; as 12 primitivas + 2 parsers ficam fora do radar
    C↔Lua. Adicionar `smaug_astype.h`/`smaug_convert.h` à lista do eixo. Não é
    bug de código; lacuna de cobertura do próprio checker.
- - 12.21 **JSON writer emite `nan`/`inf` (JSON inválido)** — [achado 2026-07-09,
-   Fase A do 10.9]. `to_json` trata `NaN→null` (json:588) mas não `inf` (vira
-   `"inf"`); e `nan`/`inf` não são JSON válido em nenhum caso. Corrigir: `NaN`
-   **e** `±inf` → `null` no writer JSON. Sem teste hoje; adicionar.
+ - 12.21 **CONCLUÍDO (2026-07-14).** O registro mirava o JSON; a revisão do Ring
+   0 (pedida pelo Gui) mostrou que o problema era o **vocabulário de não-finitos
+   como um todo**, sem regra: `smaug_convert.c` escrevia `"nan"` como valor
+   enquanto `smaug_csv.c:72` o listava como sentinela de ausência (contratos
+   contraditórios), e o destino do dado dependia da **caixa** (`nan`/`NaN` →
+   ausência; `NAN` escapava para o `strtod` → valor). Fechado com uma regra
+   única, registrada no **CONTRATO 9**: não-finito é valor, ausência é
+   `null_mask`; cada formato preserva se comportar, senão converte **e avisa**.
+   Entregue: `BUILTIN_NA` sem `"nan"`/`"NaN"` (round-trip CSV agora fiel);
+   `!isfinite` no writer JSON; `smaug_f64_count_nonfinite` (Anel 0) alimentando
+   o `warn` do Anel 3; e `na_values` **implementado** no frontend Lua — era
+   documentado desde sempre e nunca existiu (o C tinha os campos, o Lua não os
+   populava), o que tornaria a mudança uma remoção de capacidade sem alternativa.
  - 12.22 **CONCLUÍDO (2026-07-14).** Contador unificado nas 9 suites, mesmo fix
    do 12.7. Verificado antes: as cópias são idênticas dentro de cada arquivo,
    todas as declarações são top-level (nenhuma aninhada em `do...end`) e há um

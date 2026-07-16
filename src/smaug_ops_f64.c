@@ -545,6 +545,15 @@ size_t smaug_f64_count_nonnull(const smaug_series_f64_t *s) {
     return count;
 }
 
+size_t smaug_f64_count_nonfinite(const smaug_series_f64_t *s) {
+    if (!s) return 0;
+    size_t count = 0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i) && !isfinite(s->data[i])) count++;
+    }
+    return count;
+}
+
 /* take: copia elementos nas posições idx[0..len-1] (0-based).
    Retorna NULL se qualquer índice está fora dos limites. */
 smaug_series_f64_t *smaug_f64_take(const smaug_series_f64_t *s,

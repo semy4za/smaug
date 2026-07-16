@@ -78,6 +78,17 @@ static void test_create_from_array(void) {
 
     assert(smaug_f64_create_from_array(NULL, 4) == NULL);  /* NULL safe */
 
+    /* 12.21: count_nonfinite — quantos valores nao-nulos sao NaN/±inf.
+       Serve ao Anel 3 para avisar quando o formato nao os comporta (JSON). */
+    assert(smaug_f64_count_nonfinite(s) == 0);          /* todos finitos */
+    smaug_f64_set(s, 0, 0.0/0.0);                       /* NaN */
+    smaug_f64_set(s, 1, 1.0/0.0);                       /* +inf */
+    smaug_f64_set(s, 2, -1.0/0.0);                      /* -inf */
+    assert(smaug_f64_count_nonfinite(s) == 3);
+    smaug_f64_set_null(s, 0);                           /* NaN vira ausencia */
+    assert(smaug_f64_count_nonfinite(s) == 2);          /* nulo nao conta */
+    assert(smaug_f64_count_nonfinite(NULL) == 0);       /* NULL safe */
+
     smaug_f64_free(s);
 }
 

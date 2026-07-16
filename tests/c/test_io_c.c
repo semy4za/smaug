@@ -305,21 +305,59 @@ static void test_csv_newline_in_quoted_field(void) {
 
 static void test_csv_na_values(void) {
     /* NA padrão: célula vazia (campo real, não linha vazia), "NA", "null",
-       "N/A", "nan", "NaN", "NULL". Linhas completamente vazias são PULADAS
-       pelo parser (comportamento documentado). Para testar célula vazia,
-       usamos dois campos separados por vírgula. */
-    const char *csv = "v,x\n,1\nNA,2\nnull,3\nN/A,4\nnan,5\nNaN,6\nNULL,7\n1,8\n";
+       "N/A", "NULL". Linhas completamente vazias são PULADAS pelo parser
+       (comportamento documentado). Para testar célula vazia, usamos dois
+       campos separados por vírgula.
+
+       "nan"/"NaN" NÃO são NA (mudança deliberada, item 12.21): NaN é valor
+       IEEE 754, ausência vive no null_mask. Ver test_csv_nonfinite_values. */
+    const char *csv = "v,x\n,1\nNA,2\nnull,3\nN/A,4\nNULL,5\n1,6\n";
     smaug_table_t *t = smaug_read_csv_mem(csv, strlen(csv), NULL);
     CHECK(t && !t->error,      "NA padrão: sem erro");
-    CHECK(t->nrows == 8,       "NA padrão: 8 linhas");
+    CHECK(t->nrows == 6,       "NA padrão: 6 linhas");
     /* coluna v: todos NA exceto última */
-    for (size_t r = 0; r < 7; r++)
+    for (size_t r = 0; r < 5; r++)
         CHECK(col_is_null(t, 0, r), "NA padrão: linha NA");
-    CHECK(!col_is_null(t, 0, 7),    "NA padrão: linha 8 não é NA");
+    CHECK(!col_is_null(t, 0, 5),    "NA padrão: linha 6 não é NA");
     /* coluna x: nenhum NA */
-    for (size_t r = 0; r < 8; r++)
+    for (size_t r = 0; r < 6; r++)
         CHECK(!col_is_null(t, 1, r), "NA padrão: col x sem NA");
     smaug_table_free(t);
+}
+
+static void test_csv_nonfinite_values(void) {
+    /* 12.21: não-finitos são VALORES, não ausência. Todas as grafias que o
+       strtod aceita (case-insensitive) caem no mesmo destino — antes "nan"/
+       "NaN" viravam NA por estarem no BUILTIN_NA enquanto "NAN" escapava para
+       o strtod e virava valor: o destino do dado dependia da caixa. */
+    const char *csv = "v,x\nnan,1\nNaN,2\nNAN,3\ninf,4\nInfinity,5\n-inf,6\n";
+    smaug_table_t *t = smaug_read_csv_mem(csv, strlen(csv), NULL);
+    CHECK(t && !t->error,               "não-finito: sem erro");
+    CHECK(t->nrows == 6,                "não-finito: 6 linhas");
+    CHECK(t->columns[0].f64 != NULL,    "não-finito: coluna inferida float64");
+    for (size_t r = 0; r < 6; r++)
+        CHECK(!col_is_null(t, 0, r),    "não-finito: é valor, não NA");
+    smaug_status_t st;
+    CHECK(isnan(smaug_f64_get(t->columns[0].f64, 0, &st)), "não-finito: 'nan' -> NaN");
+    CHECK(isnan(smaug_f64_get(t->columns[0].f64, 1, &st)), "não-finito: 'NaN' -> NaN");
+    CHECK(isnan(smaug_f64_get(t->columns[0].f64, 2, &st)), "não-finito: 'NAN' -> NaN (caixa não decide)");
+    CHECK(isinf(smaug_f64_get(t->columns[0].f64, 3, &st)), "não-finito: 'inf' -> inf");
+    CHECK(isinf(smaug_f64_get(t->columns[0].f64, 4, &st)), "não-finito: 'Infinity' -> inf");
+    CHECK(smaug_f64_get(t->columns[0].f64, 5, &st) < 0,    "não-finito: '-inf' -> -inf");
+    smaug_table_free(t);
+
+    /* na_values explícito ainda permite tratar "nan" como ausência (compat com
+       CSV de terceiros onde "nan" significa missing). */
+    const char *na_vals[] = {"nan"};
+    smaug_csv_opts_t o = smaug_csv_default_opts();
+    o.na_values = na_vals;
+    o.na_count  = 1;
+    const char *csv2 = "v,x\nnan,1\n2.5,2\n";
+    smaug_table_t *t2 = smaug_read_csv_mem(csv2, strlen(csv2), &o);
+    CHECK(t2 && !t2->error,          "na_values: sem erro");
+    CHECK(col_is_null(t2, 0, 0),     "na_values={'nan'}: 'nan' vira NA (opt-in)");
+    CHECK(!col_is_null(t2, 0, 1),    "na_values={'nan'}: 2.5 segue valor");
+    smaug_table_free(t2);
 }
 
 /* ===================================================================
@@ -1404,6 +1442,7 @@ int main(void) {
     test_csv_quotes_unclosed();
     test_csv_newline_in_quoted_field();
     test_csv_na_values();
+    test_csv_nonfinite_values();
 
     /* CSV — inferência */
     test_csv_infer_bool_variants();

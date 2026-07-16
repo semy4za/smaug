@@ -239,6 +239,47 @@ composta, `NA` em **qualquer** coluna da chave dispara, nomeando-a. A coluna de
 
 ---
 
+### Contrato 9 — não-finito é valor; ausência é `null_mask`
+
+`NaN` e `±inf` são **valores** IEEE 754. Ausência é o `null_mask`, e só ele. O
+Smaug mantém essa distinção que o pandas não tem (lá `NaN` *é* o missing) — e
+que o R tem (`NA` vs `NaN`, literais distintos no CSV).
+
+Regra para todo I/O, presente e futuro:
+
+> **Cada formato preserva `NaN`/`±inf` se comportar. Se não comportar, converte
+> para ausência e AVISA — nunca em silêncio.**
+
+Estado por formato:
+
+| formato | `NaN` / `±inf` | por quê |
+|---|---|---|
+| **CSV** | preserva (`nan`/`inf`/`-inf`) | sem norma; escrevemos e lemos. `smaug_fmt_f64` normaliza a grafia (independe de libc) |
+| **JSON** | → `null` **+ warn** | RFC 8259 não tem `Infinity`/`NaN` na gramática de `number` |
+| **Parquet** *(futuro)* | preserva | IEEE 754 nativo + null separado |
+| **`.smg`** *(futuro)* | preserva | binário nosso |
+
+Vocabulário do CSV, deliberado:
+
+- **saída:** ausência → campo vazio; `NaN` → `nan`; `±inf` → `inf`/`-inf`.
+- **entrada (`BUILTIN_NA`):** `""`, `NA`, `null`, `N/A`, `NULL`. **`nan`/`NaN`
+  não estão aqui** — são valores, via `strtod` (que aceita todas as grafias,
+  case-insensitive: `nan`/`NaN`/`NAN`/`inf`/`Infinity`/`INF`).
+- **opt-in:** quem lê CSV de terceiros onde `nan` significa ausência passa
+  `na_values = {"nan"}`.
+
+Isto garante round-trip fiel no CSV (`NaN` → `nan` → `NaN`) e elimina dois
+defeitos históricos: o writer escrevia `nan` como valor enquanto o reader o lia
+como ausência (contratos contraditórios entre `smaug_convert.c` e
+`smaug_csv.c`), e o destino do dado dependia da **caixa** (`nan`/`NaN` viravam
+ausência; `NAN` escapava para o `strtod` e virava valor).
+
+Para avisar sem colapsar o Anel 0, o Anel 3 consulta
+`smaug_f64_count_nonfinite` antes de serializar — o C não tem canal de aviso, e
+o `warn` (`core/warn.lua`) é do Lua.
+
+---
+
 ## Ring 0 — Backend C
 
 ### Princípio: o engine não confia no caller

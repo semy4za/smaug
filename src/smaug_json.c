@@ -586,7 +586,13 @@ char *smaug_write_json_mem(const smaug_table_t *t,
                 smaug_status_t st;
                 double v = smaug_f64_get(col->f64, r, &st);
                 if (st != SMG_OK) { if (wbj_pushz(&b,"null")) goto oom; } /* idem i64 */ /* COV-EXCL-BR: ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541) */
-                else if (v != v) { if (wbj_pushz(&b,"null")) goto oom; }  /* COV-EXCL-BR: OOM de wbuf + NaN→null: ramo oom inalcançável sem injeção */
+                /* 12.21: JSON (RFC 8259) nao comporta nao-finitos. NaN e
+                   +-inf viram null. Antes so o NaN era interceptado e o inf caia
+                   no fmt, gerando "inf" — literal que nem o nosso proprio parser
+                   le (round-trip quebrado). O Anel 3 avisa o usuario da perda
+                   via smaug_f64_count_nonfinite; aqui a escrita e' silenciosa
+                   por contrato (o C nao tem canal de aviso). */
+                else if (!isfinite(v)) { if (wbj_pushz(&b,"null")) goto oom; }  /* COV-EXCL-BR: OOM de wbuf + nao-finito→null: ramo oom inalcançável sem injeção */
                 else { smaug_fmt_f64(tmp,sizeof(tmp),v); if (wbj_pushz(&b,tmp)) goto oom; } /* COV-EXCL-BR: ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541) */
             } else if (col->boolcol) {
                 smaug_status_t st;

@@ -61,6 +61,11 @@ smaug_series_f64_t* smaug_f64_sort   (const smaug_series_f64_t *s, bool ascendin
 
 /* Utilitários */
 size_t              smaug_f64_count_nonnull(const smaug_series_f64_t *s);
+/* count_nonfinite: quantos valores nao-nulos sao NaN ou +-inf. Serve ao Anel 3
+   para avisar quando um formato de intercambio nao comporta nao-finitos (ex.:
+   JSON/RFC 8259, que so tem null) — falha visivel em vez de perda silenciosa.
+   Nulos nao contam: ausencia nao e' valor nao-finito. */
+size_t              smaug_f64_count_nonfinite(const smaug_series_f64_t *s);
 smaug_series_f64_t* smaug_f64_take  (const smaug_series_f64_t *s, const size_t *idx, size_t len);
 smaug_series_f64_t* smaug_f64_filter(const smaug_series_f64_t *s, const uint8_t *mask);
 

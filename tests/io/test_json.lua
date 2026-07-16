@@ -89,4 +89,52 @@ local gb_back = smaug.read_json_mem(gb_json)
 check(gb_back:nrows() == 2,                 "integração csv→groupby→json: roundtrip")
 
 
+-- ================================================================
+-- 12.21: não-finitos no JSON — null + aviso (RFC 8259 não os comporta)
+-- ================================================================
+do
+    local function capture(fn)
+        local buf = {}
+        local real = io.stderr
+        io.stderr = { write = function(_, s) buf[#buf+1] = s end }
+        local ok, err = pcall(fn)
+        io.stderr = real
+        if not ok then error(err, 0) end
+        return table.concat(buf)
+    end
+
+    local df = smaug.DataSet({ {"id", {1,2,3,4,5}, "int64"},
+                               {"v", {NA, 0/0, 1/0, -1/0, 1.5}, "float64"} })
+    local js
+    local w = capture(function() js = df:to_json_mem() end)
+
+    -- writer: todos os não-finitos viram null (JSON válido)
+    check(js:find("inf", 1, true) == nil,  "12.21 to_json: sem literal 'inf'")
+    check(js:find("nan", 1, true) == nil,  "12.21 to_json: sem literal 'nan'")
+    check(js:find("null", 1, true) ~= nil, "12.21 to_json: não-finitos viraram null")
+
+    -- round-trip: o Smaug lê o que o Smaug escreve (antes falhava!)
+    local back = smaug.read_json_mem(js)
+    check(back:nrows() == 5,                  "12.21 read_json do próprio output: 5 linhas")
+    check(back:col("v"):is_null(2),           "12.21 round-trip: NaN virou null")
+    check(back:col("v"):is_null(3),           "12.21 round-trip: inf virou null")
+    check(back:col("v"):get(5) == 1.5,        "12.21 round-trip: finito preservado")
+
+    -- aviso: a perda é real, então é visível (não silenciosa)
+    check(w:find("não%-finito"), "12.21 to_json avisa sobre não-finitos")
+    check(w:find("3 valor", 1, true) ~= nil, "12.21 aviso conta os 3 (NaN, inf, -inf; NA não conta)")
+    check(w:find("null", 1, true) ~= nil,    "12.21 aviso diz que viraram null")
+
+    -- sem não-finitos: silêncio
+    local df2 = smaug.DataSet({ {"v", {1.5, 2.5}, "float64"} })
+    local w2 = capture(function() df2:to_json_mem() end)
+    check(w2 == "", "12.21 to_json sem não-finitos não avisa")
+
+    -- NA sozinho não dispara aviso (ausência não é não-finito)
+    local df3 = smaug.DataSet({ {"v", {NA, 1.5}, "float64"} })
+    local w3 = capture(function() df3:to_json_mem() end)
+    check(w3 == "", "12.21 NA puro não dispara aviso")
+end
+
+
 print(string.format("OK — %d checks passaram (I/O JSON + unicode)", n_ok))

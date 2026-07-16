@@ -5,6 +5,65 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-14 — 12.21: vocabulário de não-finitos (CONTRATO 9) — CSV, JSON, Ring 0
+
+O registro dizia "JSON writer emite `inf`, que é JSON inválido". A revisão pedida
+pelo Gui — primeiro "a assimetria CSV/JSON faz sentido?", depois "leva pro Ring
+0" — mostrou que o item era a ponta de um problema sem dono: **não havia regra
+para não-finitos**, havia sedimentos.
+
+O que a leitura do Ring 0 revelou (tudo medido):
+
+1. **Contratos contraditórios.** `smaug_convert.h` promete formatar `NaN` como
+   `"nan"` (fonte única, item 10.9). `smaug_csv.c:72` listava `"nan"` como
+   sentinela de ausência. O writer escrevia valor, o reader lia ausência — o
+   mesmo token, dois significados, dois arquivos que não se conhecem.
+2. **A caixa decidia o destino do dado.** `BUILTIN_NA` é case-sensitive e o
+   `strtod` não: `nan`/`NaN` viravam ausência (estavam na lista), `NAN` escapava
+   para o `strtod` e virava **valor**. Três grafias, dois destinos.
+3. **Round-trip quebrado no próprio produto.** `read_json` do Smaug não lia o
+   `to_json` do Smaug (`{"v":inf}` → "erro ao parsear objeto").
+4. **`na_values` era promessa vazia.** Documentado no `csv.lua` desde sempre; o
+   struct C tinha os campos; o frontend nunca os populava.
+
+**Correção de rumo minha, registrada:** eu havia proposto "não-finitos viram NA
+em todos os formatos" como regra de consistência. Errado — isso joga fora a
+distinção que o `null_mask` existe para manter, e alinha o Smaug com o pandas
+justamente onde o Smaug é melhor (lá `NaN` *é* o missing; aqui não). O R, que
+também distingue, escreve `NA` e `NaN` como literais separados: ler `"NaN"` como
+ausência destrói uma distinção que o R preservou.
+
+**CONTRATO 9** (novo, em `docs/CONTRACT.md`): *não-finito é valor; ausência é
+`null_mask`. Cada formato preserva se comportar; se não comportar, converte e
+**avisa** — nunca em silêncio.* A tabela por formato (CSV/JSON/Parquet/`.smg`)
+está lá para os I/O futuros não reinventarem vocabulário — era a preocupação do
+Gui com compatibilidade, e é o que transforma o fix num precedente.
+
+Entregue:
+- **CSV** (`smaug_csv.c`): `BUILTIN_NA` = `{"", "NA", "null", "N/A", "NULL"}` —
+  sem `"nan"`/`"NaN"`. Round-trip agora é fiel (`NA`→NA, `NaN`→NaN, `inf`→inf) e
+  todas as grafias caem no mesmo destino via `strtod`. **Mudança de contrato
+  público**, testada nos dois sentidos.
+- **JSON** (`smaug_json.c:589`): `v != v` → `!isfinite(v)`. NaN **e** ±inf →
+  `null`. O Smaug voltou a ler o próprio output.
+- **Anel 0**: `smaug_f64_count_nonfinite` (espelha `count_nonnull`) — o C não tem
+  canal de aviso, então o Anel 3 consulta antes de serializar.
+- **Anel 3** (`json.lua`): `warn` com a contagem exata ("3 valor(es) não-finito(s)
+  viraram null"). NA não conta — ausência não é não-finito.
+- **`na_values` implementado** no `csv.lua` (`apply_opts`, com anchor de GC para
+  o array de `const char*` e as strings Lua). Sem isso, tirar `"nan"` do
+  `BUILTIN_NA` seria remover capacidade sem oferecer alternativa.
+
+Testes: `test_io_c` 298→312 (`test_csv_nonfinite_values`: as 6 grafias +
+`na_values` opt-in; `test_csv_na_values` atualizado — fixava o contrato antigo),
+`test_alloc` 243→247 (`count_nonfinite`), `test_csv` 107→124 (round-trip,
+grafias, vocabulário de ausência, opt-in), `test_json` 27→39 (null, round-trip,
+aviso, e os dois casos que **não** avisam: sem não-finitos e NA puro).
+
+Ring 0 + contrato público. Fedora `--all`: Valgrind 0, coverage 98.73%/94.70%.
+**Windows obrigatório** (símbolo C novo + mudança de parser).
+
+---
 ## 2026-07-14 — 12.22: contador unificado nas 9 suites restantes
 
 Generalização do 12.7 (que corrigiu só `test_constructors`). Achado durante o

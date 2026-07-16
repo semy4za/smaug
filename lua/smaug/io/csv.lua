@@ -227,6 +227,46 @@ end
 -- API pública
 -- ===================================================================
 
+-- apply_opts: traduz opts Lua -> smaug_csv_opts_t.
+-- Devolve (copts, anchor). O `anchor` PRECISA continuar vivo até a chamada C
+-- terminar: copts.na_values aponta para o array de const char* e para as
+-- strings Lua. Sem segurá-lo, o GC pode coletá-los durante a leitura.
+--
+-- na_values era documentado desde sempre ("opts: { sep, header, na_values }")
+-- mas nunca implementado — o C tinha os campos, o frontend não os populava.
+-- Implementado no 12.21, quando "nan"/"NaN" saíram do BUILTIN_NA: quem lê CSV
+-- de terceiros onde "nan" significa ausência precisa deste opt-in.
+local function apply_opts(opts)
+    local copts = C.smaug_csv_default_opts()
+    if not opts then return copts, nil end
+    if opts.sep     then copts.sep     = string.byte(opts.sep) end
+    if opts.quote   then copts.quote   = string.byte(opts.quote) end
+    if opts.decimal then copts.decimal = string.byte(opts.decimal) end
+    if opts.header ~= nil then copts.header = opts.header and 1 or 0 end
+    local anchor
+    if opts.na_values ~= nil then
+        if type(opts.na_values) ~= "table" then
+            error("smaug: read_csv — na_values espera tabela de strings", 3)
+        end
+        local n = #opts.na_values
+        local arr = ffi.new("const char*[?]", n > 0 and n or 1)
+        local keep = {}
+        for i = 1, n do
+            local v = opts.na_values[i]
+            if type(v) ~= "string" then
+                error("smaug: read_csv — na_values[" .. i .. "] deve ser string; recebido "
+                      .. type(v), 3)
+            end
+            keep[i]  = v
+            arr[i-1] = keep[i]
+        end
+        copts.na_values = arr
+        copts.na_count  = n
+        anchor = { arr, keep }
+    end
+    return copts, anchor
+end
+
 local M = {}
 
 -- opts: { sep=",", header=true, na_values={...} }
@@ -234,16 +274,11 @@ function M.read(path, opts)
     if type(path) ~= "string" then
         error("smaug: read_csv espera string como path", 2)
     end
-    local copts = C.smaug_csv_default_opts()
-    if opts then
-        if opts.sep    then copts.sep    = string.byte(opts.sep) end
-        if opts.quote  then copts.quote  = string.byte(opts.quote) end
-        if opts.decimal then copts.decimal = string.byte(opts.decimal) end
-        if opts.header ~= nil then copts.header = opts.header and 1 or 0 end
-    end
+    local copts, anchor = apply_opts(opts)
     local t = C.smaug_read_csv(path, copts)
     local ds = table_to_dataset(t)
     warn_if_suspect_sep(ds, copts)
+    local _ = anchor   -- mantém na_values vivo até aqui
     return ds
 end
 
@@ -251,16 +286,11 @@ function M.read_mem(buf, opts)
     if type(buf) ~= "string" then
         error("smaug: read_csv_mem espera string", 2)
     end
-    local copts = C.smaug_csv_default_opts()
-    if opts then
-        if opts.sep    then copts.sep    = string.byte(opts.sep) end
-        if opts.quote  then copts.quote  = string.byte(opts.quote) end
-        if opts.decimal then copts.decimal = string.byte(opts.decimal) end
-        if opts.header ~= nil then copts.header = opts.header and 1 or 0 end
-    end
+    local copts, anchor = apply_opts(opts)
     local t = C.smaug_read_csv_mem(buf, #buf, copts)
     local ds = table_to_dataset(t)
     warn_if_suspect_sep(ds, copts)
+    local _ = anchor   -- mantém na_values vivo até aqui
     return ds
 end
 

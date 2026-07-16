@@ -1,8 +1,7 @@
 # Smaug — Relatório de Paridade
 
-> Arquivo gerado por `bash scripts/parity/parity.sh` ou `powershell scripts/parity/parity.ps1`.
-> **Não editar à mão.** Decisões conscientes de não-paridade ficam em
-> `scripts/parity/exceptions.txt`.
+> Arquivo gerado por `bash scripts/parity/parity.sh`. **Não editar à mão.**
+> Decisões conscientes de não-paridade ficam em `scripts/parity/exceptions.txt`.
 
 Convenção de status:
 
@@ -11,7 +10,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-07-15 21:37:59 UTC
+Gerado em: 2026-07-16 02:32:43 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -267,7 +266,7 @@ Cada assimetria é classificada: 🟩 ambos · 🟦 par de nome · ⬜ intencion
 Cada função pública do backend C deveria ter caminho no frontend Lua (direto via FFI ou exposto via método Series). 🟨 = função C que não aparece em `lua/smaug/core/series.lua` (pode ser órfã ou exposta indiretamente via outro nome).
 
 
-### f64 — 52 funções C
+### f64 — 53 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -282,6 +281,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `clone` | 🟩 |  |
 | `coalesce` | 🟩 |  |
 | `coalesce_scalar` | 🟩 |  |
+| `count_nonfinite` | 🟨 |  |
 | `count_nonnull` | 🟩 |  |
 | `create` | 🟩 |  |
 | `create_from_array` | 🟨 |  |
@@ -553,7 +553,7 @@ Heurística conservadora: verifica menção explícita do dtype no corpo da fun�
 
 | dtype | CSV C | CSV Lua | JSON C | JSON Lua |
 | :--- | :-: | :-: | :-: | :-: |
-| `float64` | 🟩 | 🟩 | 🟩 | 🟨 |
+| `float64` | 🟩 | 🟩 | 🟩 | 🟩 |
 | `int64` | 🟩 | 🟩 | 🟩 | 🟨 |
 | `bool` | 🟩 | 🟩 | 🟩 | 🟨 |
 | `string` | 🟩 | 🟩 | 🟩 | 🟩 |
@@ -736,19 +736,19 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `dataset/test_relational` | 169 | 10 | 50 | 4 | 34 | — | — |
 | `dataset/test_stat` | 91 | 10 | 16 | 1 | 13 | — | — |
 | `dataset/test_io_support` | 53 | 4 | 15 | 1 | 7 | — | — |
-| `io/test_csv` | 108 | 2 | 3 | 2 | 9 | — | — |
-| `io/test_json` | 28 | 1 | 1 | 1 | 2 | — | — |
+| `io/test_csv` | 118 | 3 | 4 | 2 | 9 | — | — |
+| `io/test_json` | 40 | 4 | 2 | 1 | 2 | — | — |
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 79 | 19 | 2 | 2 | 4 | 1 | 1 |
 
-**Total de checks:** 2588
+**Total de checks:** 2610
 
 ### Menções totais por dtype (toda a suite)
 
 | dtype | menções |
 | :--- | :-: |
-| float64 | 194 |
-| int64 | 324 |
+| float64 | 198 |
+| int64 | 326 |
 | bool | 66 |
 | string | 221 |
 | datetime | 87 |
@@ -795,7 +795,7 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 997
+- 🟩 paridade: 998
 - ⬜ exceção registrada: 215
 - 🟨 suspeita (revisar): 270
 - 🟥 inconsistência clara: 13

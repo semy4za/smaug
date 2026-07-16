@@ -68,9 +68,19 @@ smaug_csv_write_opts_t smaug_csv_write_default_opts(void) {
     return o;
 }
 
-/* Valores NA padrão */
-static const char *BUILTIN_NA[] = {"", "NA", "null", "N/A", "nan", "NaN", "NULL"};
-#define BUILTIN_NA_COUNT 7
+/* Valores NA padrão — vocabulário de AUSÊNCIA.
+   "nan"/"NaN" NÃO estão aqui de propósito: NaN é um VALOR (IEEE 754), não
+   ausência. O Smaug separa os dois — ausência vive no null_mask. Tratá-los
+   como sentinela desfazia, na leitura, a distinção que o core inteiro sustenta,
+   e criava colisão com o smaug_fmt_f64, que escreve "nan" como valor (o writer
+   e o reader discordavam do significado do mesmo token). Também gerava um buraco
+   por caixa: "nan"/"NaN" viravam ausência, mas "NAN" escapava para o strtod e
+   virava valor. Agora todas as grafias de não-finito (nan/NaN/NAN/inf/Infinity/
+   INF, case-insensitive via strtod) são valores, uniformemente.
+   Quem lê CSV de terceiros onde "nan" significa ausência passa
+   na_values={"nan"} explicitamente. */
+static const char *BUILTIN_NA[] = {"", "NA", "null", "N/A", "NULL"};
+#define BUILTIN_NA_COUNT 5
 
 static int is_na(const char *s, const char **na_values, size_t na_count) {
     const char **nav = na_values ? na_values : BUILTIN_NA;
