@@ -400,4 +400,28 @@ do
 end
 
 
+-- ================================================================
+-- 12.1: mensagens de erro seguem "smaug: <op> — <razão>"
+-- ================================================================
+do
+    local function msg(fn) local _, e = pcall(fn); return tostring(e) end
+
+    local m1 = msg(function() smaug.read_csv("/tmp/_nao_existe_smaug_12_1.csv") end)
+    check(m1:find("smaug: smaug_", 1, true) == nil, "12.1 read_csv: sem 'smaug' duplicado")
+    check(m1:find("smaug: read_csv —", 1, true) ~= nil, "12.1 read_csv: padrão 'smaug: <op> —'")
+
+    -- a mensagem nomeia a função REALMENTE chamada (antes dizia read_csv no _mem)
+    local m2 = msg(function() smaug.read_csv_mem("") end)
+    check(m2:find("smaug: read_csv_mem —", 1, true) ~= nil,
+          "12.1 read_csv_mem: nomeia a própria função, não read_csv")
+    check(m2:find("arquivo", 1, true) == nil,
+          "12.1 read_csv_mem: não fala em 'arquivo' (é buffer)")
+    check(m2:find("entrada vazia", 1, true) ~= nil, "12.1 read_csv_mem: razão vem do Anel 0")
+
+    -- writers já seguiam o padrão: simetria preservada
+    local m3 = msg(function() smaug.DataSet({{"a",{1},"int64"}}):to_csv("/nao/existe/x.csv") end)
+    check(m3:find("smaug: to_csv —", 1, true) ~= nil, "12.1 to_csv: mesmo padrão do reader")
+end
+
+
 print(string.format("OK — %d checks passaram (I/O CSV + dados reais)", n_ok))

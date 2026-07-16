@@ -191,10 +191,10 @@ smaug_table_t *smaug_read_csv_mem(const char *buf, size_t len,
     /* H.5.c: separador de campo e decimal iguais tornam o parsing ambíguo
        ("3,14" com sep=',' decimal=',' seria dois campos). Erro que orienta. */
     if (sep == decimal)
-        return make_error("smaug_read_csv: separador de campo e decimal não podem "
+        return make_error("separador de campo e decimal não podem "
                           "ser o mesmo caractere (ex.: sep=';' com decimal=',')");
 
-    if (len == 0) return make_error("smaug_read_csv: arquivo vazio");
+    if (len == 0) return make_error("entrada vazia");   /* neutro: serve path e buffer (12.1) */
 
     /* --- Passo 1: tokenizar tudo em um vetor plano de strings --- */
     /* rows_tok[r] = array de campos da linha r (inclui header se houver) */
@@ -243,7 +243,7 @@ smaug_table_t *smaug_read_csv_mem(const char *buf, size_t len,
 
     if (n_rows == 0) {
         free(rows); free(row_sizes);
-        return make_error("smaug_read_csv: sem linhas de dados");
+        return make_error("sem linhas de dados");
     }
 
     size_t header_row = opts->header ? 1 : 0;
@@ -394,26 +394,26 @@ done:
 
 cleanup_empty:
     free(rows); free(row_sizes);
-    return make_error("smaug_read_csv: sem colunas");
+    return make_error("sem colunas");
 oom_cleanup:
     for (size_t r = 0; r < n_rows; r++) {
         for (size_t c = 0; c < row_sizes[r]; c++) free(rows[r][c]);
         free(rows[r]);
     }
     free(rows); free(row_sizes);
-    return make_error("smaug_read_csv: OOM");
+    return make_error("OOM");
 oom:
     for (size_t r = 0; r < n_rows; r++) {
         if (rows[r]) { for(size_t c=0;c<row_sizes[r];c++) free(rows[r][c]); free(rows[r]); }
     }
     free(rows); free(row_sizes);
-    return make_error("smaug_read_csv: OOM");
+    return make_error("OOM");
 }
 
 smaug_table_t *smaug_read_csv(const char *path, const smaug_csv_opts_t *opts) {
     size_t len; char *buf = read_file(path, &len);
     if (!buf) {
-        char msg[256]; snprintf(msg,sizeof(msg),"smaug_read_csv: não foi possível abrir '%s'",path);
+        char msg[256]; snprintf(msg,sizeof(msg),"não foi possível abrir '%s'",path);
         return make_error(msg);
     }
     smaug_table_t *t = smaug_read_csv_mem(buf, len, opts);

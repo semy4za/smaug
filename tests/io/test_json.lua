@@ -137,4 +137,23 @@ do
 end
 
 
+-- ================================================================
+-- 12.1: mensagens de erro seguem "smaug: <op> — <razão>"
+-- ================================================================
+do
+    local function msg(fn) local _, e = pcall(fn); return tostring(e) end
+
+    local m1 = msg(function() smaug.read_json("/tmp/_nao_existe_smaug_12_1.json") end)
+    check(m1:find("smaug: smaug_", 1, true) == nil, "12.1 read_json: sem 'smaug' duplicado")
+    check(m1:find("smaug: read_json —", 1, true) ~= nil, "12.1 read_json: padrão 'smaug: <op> —'")
+
+    local m2 = msg(function() smaug.read_json_mem("xyz") end)
+    check(m2:find("smaug: read_json_mem —", 1, true) ~= nil,
+          "12.1 read_json_mem: nomeia a própria função")
+
+    local m3 = msg(function() smaug.DataSet({{"a",{1},"int64"}}):to_json("/nao/existe/x.json") end)
+    check(m3:find("smaug: to_json —", 1, true) ~= nil, "12.1 to_json: mesmo padrão do reader")
+end
+
+
 print(string.format("OK — %d checks passaram (I/O JSON + unicode)", n_ok))

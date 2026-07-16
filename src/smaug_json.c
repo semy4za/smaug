@@ -316,12 +316,12 @@ smaug_table_t *smaug_read_json_mem(const char *buf, size_t len) {
 
     t = next_token(&l);
     if (t != TOK_LBRACKET)
-        return make_error("smaug_read_json: esperado array '[' no topo");
+        return make_error("esperado array '[' no topo");
 
     /* ler todos os records */
     size_t rec_cap = 64;
     json_record_t *recs = malloc(rec_cap * sizeof(json_record_t));
-    if (!recs) return make_error("smaug_read_json: OOM");
+    if (!recs) return make_error("OOM");
     size_t n_recs = 0;
 
     t = next_token(&l);
@@ -329,7 +329,7 @@ smaug_table_t *smaug_read_json_mem(const char *buf, size_t len) {
         if (t != TOK_LBRACE) {
             for (size_t i = 0; i < n_recs; i++) free_record(&recs[i]);
             free(recs); free(l.str_val);
-            return make_error("smaug_read_json: esperado '{' em cada elemento");
+            return make_error("esperado '{' em cada elemento");
         }
         if (n_recs >= rec_cap) {
             rec_cap *= 2;
@@ -337,7 +337,7 @@ smaug_table_t *smaug_read_json_mem(const char *buf, size_t len) {
             if (!tmp) {
                 for (size_t i = 0; i < n_recs; i++) free_record(&recs[i]);
                 free(recs); free(l.str_val);
-                return make_error("smaug_read_json: OOM");
+                return make_error("OOM");
             }
             recs = tmp;
         }
@@ -345,7 +345,7 @@ smaug_table_t *smaug_read_json_mem(const char *buf, size_t len) {
         if (!parse_record(&l, &recs[n_recs])) {
             for (size_t i = 0; i <= n_recs; i++) free_record(&recs[i]);
             free(recs); free(l.str_val);
-            return make_error("smaug_read_json: erro ao parsear objeto");
+            return make_error("erro ao parsear objeto");
         }
         n_recs++;
         t = next_token(&l);
@@ -356,7 +356,7 @@ smaug_table_t *smaug_read_json_mem(const char *buf, size_t len) {
     if (n_recs == 0) {
         free(recs);
         smaug_table_t *empty = calloc(1, sizeof(smaug_table_t));
-        return empty ? empty : make_error("smaug_read_json: OOM");
+        return empty ? empty : make_error("OOM");
     }
 
     /* descobrir colunas (ordem do primeiro record) */
@@ -489,7 +489,7 @@ oom_recs:
     free(dtypes);
     for (size_t r = 0; r < n_recs; r++) free_record(&recs[r]);
     free(recs);
-    return make_error("smaug_read_json: OOM");
+    return make_error("OOM");
 }
 
 static char *read_file_json(const char *path, size_t *out_len) {
@@ -507,7 +507,7 @@ static char *read_file_json(const char *path, size_t *out_len) {
 smaug_table_t *smaug_read_json(const char *path) {
     size_t len; char *buf = read_file_json(path, &len);
     if (!buf) {
-        char msg[256]; snprintf(msg,sizeof(msg),"smaug_read_json: não foi possível abrir '%s'",path);
+        char msg[256]; snprintf(msg,sizeof(msg),"não foi possível abrir '%s'",path);
         return make_error(msg);
     }
     smaug_table_t *t = smaug_read_json_mem(buf, len);

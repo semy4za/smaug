@@ -66,14 +66,21 @@ end
 -- smaug_table_t → DataSet
 -- ===================================================================
 
-local function table_to_dataset(t)
+-- table_to_dataset(t, op): `op` é o nome da função pública que o usuário
+-- chamou (read_csv, read_csv_mem, read_json, read_json_mem). O Anel 0 devolve
+-- só a RAZÃO do erro ("entrada vazia"); quem sabe a operação é o Anel 3 (12.1).
+-- Antes o C prefixava "smaug_read_csv:" e o Lua somava "smaug: ", produzindo
+-- "smaug: smaug_read_csv: ..." — e o prefixo fixo mentia no _mem (dizia
+-- read_csv quando a chamada era read_csv_mem, e "arquivo" quando era buffer).
+local function table_to_dataset(t, op)
+    op = op or "read_csv"
     if t == nil then
-        error("smaug: read_csv/json retornou NULL (OOM)", 3)
+        error("smaug: " .. op .. " — retornou NULL (OOM)", 3)
     end
     if t.error ~= nil then
         local msg = ffi.string(t.error)
         C.smaug_table_free(t)
-        error("smaug: " .. msg, 3)
+        error("smaug: " .. op .. " — " .. msg, 3)
     end
 
     local ds = DataSet.new("DataFrame")
@@ -276,7 +283,7 @@ function M.read(path, opts)
     end
     local copts, anchor = apply_opts(opts)
     local t = C.smaug_read_csv(path, copts)
-    local ds = table_to_dataset(t)
+    local ds = table_to_dataset(t, "read_csv")
     warn_if_suspect_sep(ds, copts)
     local _ = anchor   -- mantém na_values vivo até aqui
     return ds
@@ -288,7 +295,7 @@ function M.read_mem(buf, opts)
     end
     local copts, anchor = apply_opts(opts)
     local t = C.smaug_read_csv_mem(buf, #buf, copts)
-    local ds = table_to_dataset(t)
+    local ds = table_to_dataset(t, "read_csv_mem")
     warn_if_suspect_sep(ds, copts)
     local _ = anchor   -- mantém na_values vivo até aqui
     return ds

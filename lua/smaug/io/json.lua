@@ -23,7 +23,7 @@ function M.read(path)
     local t = C.smaug_read_json(path)
     -- delega ao csv que sabe converter smaug_table_t → DataSet
     -- (table_to_dataset é interno ao csv.lua; reexpomos via wrapper)
-    return csv._table_to_dataset(t)
+    return csv._table_to_dataset(t, "read_json")
 end
 
 function M.read_mem(buf)
@@ -31,7 +31,7 @@ function M.read_mem(buf)
         error("smaug: read_json_mem espera string", 2)
     end
     local t = C.smaug_read_json_mem(buf, #buf)
-    return csv._table_to_dataset(t)
+    return csv._table_to_dataset(t, "read_json_mem")
 end
 
 -- 12.21: JSON (RFC 8259) nao comporta NaN/±inf — o writer C os converte para
