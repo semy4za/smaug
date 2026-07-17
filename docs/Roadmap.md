@@ -633,7 +633,9 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
   limpos; `table_to_dataset(t, op)` recebe a op das 4 entradas
   (read_csv/_mem, read_json/_mem). O contrato de mensagem estava sem teste;
   agora tem.
-- 12.2 `read_parquet` fantasma (init.lua:50 comentado) — remover ou marcar pós-1.0
+- 12.2 **CONCLUÍDO (2026-07-14).** Linha comentada removida do `init.lua`. O
+  Parquet já está registrado no `ARCHITECTURE.md` (marco 1.5, após `.smg` e
+  Excel); o comentário era redundante e sugeria algo meio-feito que não existia.
 - 12.3 `column_t` sem datetime / CSV não infere dt — decidir: fechar ou registrar
   como pós-1.0 (conecta Anel 0 ↔ Anel 3)
   - Nota (E10, 2026-06-30): vírgula decimal BR não é bug — o CSV **suporta**
@@ -663,7 +665,17 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
   injetando um global). Alternativas descartadas com medição: `qsort_r` (3
   assinaturas por plataforma), `struct{ptr,len,idx}`+qsort (1.45x mais lenta,
   4x memória).
-- 12.6 I4 — `get_value` passa `nil` como status (assimetria; sem bug)
+- 12.6 **CONCLUÍDO (2026-07-14) — o registro subestimava.** Dizia "assimetria;
+  sem bug". Eram **3 padrões**, não 2: f64/i64 descartavam o status; str, dt e
+  bool **alocavam out-param a cada get()** (`ffi.new` por chamada). Medido: o
+  `get()` variava **50x** entre dtypes (f64 0.0018s vs string 0.0950s por 300k
+  acessos) — ninguém sabia, e o item só mencionava o dt. **A raiz:** o Anel 1
+  descartava o status e depois pagava uma segunda travessia FFI (`is_null`) para
+  obter o que o getter já responde (`SMG_NULL_VALUE`). Corrigido: out-param
+  reusado (upvalue) + o status detecta null → **1 travessia**. Ganho medido:
+  string **12x**, bool **10.3x**, datetime **5.4x**, f64 1.4x, i64 1.1x — e os 5
+  dtypes agora na mesma faixa. `get_raw` mantém o `is_null` explícito (devolve
+  cdata cru, não passa pelo get_value).
 - 12.7 **CONCLUÍDO (2026-07-14).** `test_constructors.lua` redeclarava
   `local n_ok`/`check` 4× (suites concatenadas) e só imprimia no fim → headline
   subcontava (98 vs 343 reais). Unificado num contador único (removidas as 3

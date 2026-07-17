@@ -5,6 +5,65 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-14 — 12.6 + 12.2: uma travessia FFI por `get()`
+
+**12.2:** removida a linha comentada `-- smaug.read_parquet = ...` do
+`init.lua`. O Parquet já está registrado no `ARCHITECTURE.md` (marco 1.5, depois
+de `.smg` e Excel); o comentário era redundante e sugeria algo meio-feito.
+
+**12.6** — o registro dizia *"`get_value` passa nil como status (assimetria; sem
+bug)"*. A revisão (o Gui pediu "a solução ideal, não o que já existe") mostrou
+que o diagnóstico do item — e o meu primeiro — estavam errados.
+
+**Não eram 2 padrões, eram 3:**
+- f64/i64: `get(c, i, nil)` — descartam o status;
+- str: `ffi.new("size_t[1]")` **por chamada** (o len);
+- dt/bool: `ffi.new("smaug_status_t[1]")` **por chamada** (o status).
+
+**Medido: o `get()` variava 50x entre dtypes** (300k acessos: f64 0.0018s vs
+string 0.0950s). O item só falava do dt; string e bool eram os piores, e ninguém
+sabia.
+
+**Meu primeiro diagnóstico estava errado.** Propus "uniformizar por baixo" —
+descartar o status no dt, como f64/i64. Isso é jogar informação fora para ganhar
+velocidade. O Gui não aceitou o remendo, e a análise correta é a inversa:
+
+> A alocação nunca foi o problema — alocar **por chamada** era. E o status não é
+> custo: é a resposta que já estávamos pagando uma segunda travessia FFI
+> (`is_null`) para obter.
+
+O `methods.get` fazia duas travessias: `is_null(...)` perguntava "é null?" e
+`get_value(..., nil)` **descartava** a mesma resposta. O CONTRACT chama isso de
+"Shape 1: valor + status anulável" — o Anel 0 desenhou certo; o Anel 1 é que não
+usava.
+
+**Design:** out-param reusado (upvalue no `_types.lua`) + o status traduz null →
+`nil`. Uma travessia. O `is_null` sai do `methods.get`; o `check_index` fica (a
+mensagem dele, com `Err.describe`, é melhor que um nil silencioso). O `get_raw`
+mantém o `is_null` explícito — devolve cdata cru, não passa pelo `get_value`.
+
+Ganho medido (300k `s:get(i)` pela API pública):
+
+| dtype | antes | depois | ganho |
+|---|---|---|---|
+| string | 0.0950s | 0.0079s | **12x** |
+| bool | 0.0866s | 0.0084s | **10.3x** |
+| datetime | 0.0451s | 0.0083s | **5.4x** |
+| float64 | 0.0018s | 0.0013s | 1.4x |
+| int64 | 0.0078s | 0.0071s | 1.1x |
+
+Os 5 dtypes agora na mesma faixa (0.0013–0.0084s); antes havia 50x de spread.
+
+**Thread-safety (relação com o CONTRATO 11):** os buffers são upvalues **Lua**,
+não globais **C**. Lua não é thread-safe por natureza — cada thread tem seu
+state, logo seu buffer; e são escritos e lidos na mesma expressão, sem yield
+entre os dois. Não é o caso do 12.5, onde o global vivia no C e a janela era o
+`qsort` inteiro (segfault provado).
+
+Lua puro. Fedora `--all`: Valgrind 0, parity 14/14, suites de acesso intactas
+(`test_access` 127, `test_dt` 271, `test_str` 272, `constructors` 343).
+
+---
 ## 2026-07-14 — 12.5: o Anel 0 é thread-safe (CONTRATO 11)
 
 O registro dizia *"`g_sort_series` global em `ops_str` (single-thread: **sem

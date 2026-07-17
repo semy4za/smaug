@@ -46,9 +46,6 @@ DataSet.methods.to_csv_mem  = function(self, opts)       return io_csv.write_mem
 DataSet.methods.to_json      = function(self, path, opts) return io_json.write(self, path, opts) end
 DataSet.methods.to_json_mem  = function(self, opts)       return io_json.write_mem(self, opts)   end
 
--- Futuro (Anel 3, pós-v1.0):
--- smaug.read_parquet = require("smaug.io.parquet").read
-
 -- Açúcar para Series (uso avançado / interoperabilidade).
 -- A forma OFICIAL de construir é smaug.Series({...}) (chamável, dtype opcional
 -- como 2º arg). Os atalhos abaixo ficam disponíveis, mas não são a via ensinada.

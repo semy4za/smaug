@@ -18,9 +18,13 @@ return function(I)
     -- =====================================================================
     -- Acesso (1-based; nil <-> null)
     -- =====================================================================
+    -- get: UMA travessia FFI. O getter do Anel 0 já comunica null pelo status
+    -- (SMG_NULL_VALUE); o get_value traduz para nil (ver 12.6 em _types.lua).
+    -- A chamada `is_null` separada existia porque o status era descartado —
+    -- pagávamos duas travessias para obter o que uma já dá. `check_index` fica:
+    -- a mensagem dele (com Err.describe) é melhor que um nil silencioso.
     function methods.get(self, i)
         check_index(self, i)
-        if self._d.is_null(self._c, i - 1) then return nil end
         return self._d.get_value(self._c, i - 1)
     end
 
@@ -37,6 +41,8 @@ return function(I)
                   .. self._dtype .. "'", 2)
         end
         check_index(self, i)
+        -- get_raw devolve cdata cru, então não pode usar o get_value (que
+        -- traduz status→nil). Aqui a checagem de null continua explícita.
         if self._d.is_null(self._c, i - 1) then return nil end
         return self._d.get(self._c, i - 1, nil)
     end
