@@ -156,4 +156,24 @@ do
 end
 
 
+-- ================================================================
+-- 12.3: datetime no to_json — string ISO (JSON não tem tipo "date")
+-- ================================================================
+do
+    local ds = smaug.DataSet({ {"id", {1, 2}, "int64"},
+                               {"t", {1710460800000, 1710547200000}, "datetime"} })
+    local js
+    local ok = pcall(function() js = ds:to_json_mem() end)
+    check(ok, "12.3 to_json com datetime não crasha")
+    check(js:find('"2024%-03%-15T00:00:00%.000Z"') ~= nil,
+          "12.3 to_json escreve datetime como string ISO 8601")
+
+    -- o Smaug lê o próprio output (era o critério do 12.21)
+    local back = smaug.read_json_mem(js)
+    check(back:nrows() == 2, "12.3 read_json do próprio output")
+    local rt = back:col("t"):astype("datetime")
+    check(rt:get(1) == ds:col("t"):get(1), "12.3 round-trip de valor via astype")
+end
+
+
 print(string.format("OK — %d checks passaram (I/O JSON + unicode)", n_ok))

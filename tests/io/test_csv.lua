@@ -424,4 +424,40 @@ do
 end
 
 
+-- ================================================================
+-- 12.3: datetime no to_csv (o column_t do Anel 0 não tem dt)
+-- ================================================================
+do
+    local ds = smaug.DataSet({ {"id", {1, 2}, "int64"},
+                               {"t", {1710460800000, 1710547200000}, "datetime"} })
+    -- antes: crash ("attempt to get length of local 'v' (a number value)") —
+    -- o mapa de dtype dizia "string" mas entregava a coluna datetime crua
+    local csv
+    local ok = pcall(function() csv = ds:to_csv_mem() end)
+    check(ok, "12.3 to_csv com datetime não crasha")
+    check(csv:find("2024%-03%-15T00:00:00%.000Z") ~= nil,
+          "12.3 to_csv escreve datetime como ISO 8601")
+
+    -- round-trip de VALOR: o CSV não tem tipos, então volta como string;
+    -- astype("datetime") recupera o epoch_ms exato (ver 12.25 sobre inferir ISO)
+    local back = smaug.read_csv_mem(csv)
+    check(back:col("t")._dtype == "string", "12.3 read_csv devolve string (não infere ISO — ver 12.25)")
+    local rt = back:col("t"):astype("datetime")
+    check(rt:get(1) == ds:col("t"):get(1), "12.3 round-trip de valor: astype recupera o epoch exato")
+    check(rt:get(2) == ds:col("t"):get(2), "12.3 round-trip de valor: 2a linha")
+
+    -- NA em datetime sobrevive à escrita
+    local dn = smaug.DataSet({ {"id", {1, 2}, "int64"},
+                               {"t", {1710460800000, NA}, "datetime"} })
+    local cn = dn:to_csv_mem()
+    check(cn ~= nil, "12.3 to_csv com datetime + NA não crasha")
+    local bn = smaug.read_csv_mem(cn)
+    check(bn:col("t"):is_null(2), "12.3 NA em datetime sobrevive ao round-trip")
+
+    -- categorical (também fora do column_t) segue funcionando — controle
+    local dc = smaug.DataSet({ {"c", {"a", "b"}, "categorical"} })
+    check(pcall(function() return dc:to_csv_mem() end), "12.3 categorical no to_csv (controle)")
+end
+
+
 print(string.format("OK — %d checks passaram (I/O CSV + dados reais)", n_ok))

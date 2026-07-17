@@ -64,6 +64,51 @@ Lua puro. Fedora `--all`: Valgrind 0, parity 14/14, suites de acesso intactas
 (`test_access` 127, `test_dt` 271, `test_str` 272, `constructors` 343).
 
 ---
+## 2026-07-14 — 12.3: datetime no to_csv/to_json (era crash, não "decidir")
+
+O item pedia *"decidir: fechar ou registrar pós-1.0"*. Reproduzido: **crash**.
+`to_csv_mem` e `to_json_mem` morriam com coluna datetime —
+`attempt to get length of local 'v' (a number value)`. Não havia o que decidir:
+API pública quebrada.
+
+**A causa não era "column_t sem datetime".** Era incoerência do Anel 3: o mapa de
+dtype no `dataset_to_table` já traduzia datetime → `"string"`, mas entregava a
+**coluna datetime crua**. O C recebia a promessa de string e o laço fazia `#v`
+num `epoch_ms`.
+
+**Fix:** converter via `astype("string")` antes de montar a table — que já produz
+ISO 8601 (mesmo formato do `smaug_dt_format`). **Uma correção, dois formatos**: o
+`json.lua` reusa o `dataset_to_table`. Sem mudança de ABI.
+
+Round-trip de **valor** preservado (testado): `astype("datetime")` devolve o
+epoch_ms exato. O **tipo** não sobrevive — e isso é do formato: CSV não tem
+tipos, JSON não tem *date*. Registrado no **CONTRATO 9**, que é a tabela por
+formato. Não avisa: seria ruído em toda escrita de data, e o dado está intacto.
+
+Testes: `test_csv` 130→**138**, `test_json` 43→**47** (o crash, o ISO no output,
+round-trip de valor, NA em datetime sobrevivendo, e categorical como controle —
+ele também está fora do `column_t` e já funcionava, porque o `get` dele devolve
+string).
+
+**Dois achados colaterais, medidos e registrados** (não tocados aqui):
+
+- **12.25** — o `read_csv` **já infere 3 dtypes** (`try_bool`→`try_i64`→`try_f64`).
+  O caso que ele recusa (`2024-03-15`) é o **único não-ambíguo** — ISO 8601 é
+  não-ambíguo por design, enquanto `03/04/2024` (mar ou abr?) corretamente não é
+  inferido. Ou seja: o critério atual não é "evitar ambiguidade". Consequência: o
+  Smaug escreve ISO e não lê de volta — o mesmo critério que classificou o JSON
+  como bug no 12.21, aqui em tipo (não em valor). Muda contrato público do
+  reader: precisa de design próprio.
+- **12.26 — prioridade alta:** zeros à esquerda **destruídos** na inferência, em
+  dados BR (o alvo do projeto). CEP `01310100` → `1310100`; **CNPJ
+  `00000000000191` → `191`**; telefone `011999998888` → `11999998888`. E o
+  round-trip do próprio Smaug quebra: escrever a string `"01310100"` e ler de
+  volta devolve `1310100` (int64). Sem aviso. É pior que o 12.25: ali se perde o
+  tipo (recuperável); aqui se perde o **dado**.
+
+Fedora `--all`: Valgrind 0, linha 98.81%, parity 14/14.
+
+---
 ## 2026-07-14 — 12.24: os `select` eram essenciais — o item estava errado
 
 O Gui pediu review antes do código. O review derrubou o item — e o erro era meu.

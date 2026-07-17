@@ -268,6 +268,15 @@ Vocabulário do CSV, deliberado:
 - **opt-in:** quem lê CSV de terceiros onde `nan` significa ausência passa
   `na_values = {"nan"}`.
 
+**Datetime nos formatos de texto (12.3):** `smaug_column_t` (Anel 0) carrega
+f64/i64/bool/str — não tem `dt`. O Anel 3 converte datetime para **ISO 8601** na
+escrita (`astype("string")`, o mesmo formato do `smaug_dt_format`). CSV não tem
+tipos e JSON não tem tipo *date*: texto ISO é o que ambos comportam, então isto
+**preserva o valor** — round-trip testado, `astype("datetime")` devolve o
+epoch_ms exato. O que não sobrevive é o **tipo**, e isso é do formato, não nosso:
+por isso não avisa (seria ruído em toda escrita de data). Se o reader deve
+inferir ISO de volta é outra questão — ver 12.25.
+
 Isto garante round-trip fiel no CSV (`NaN` → `nan` → `NaN`) e elimina dois
 defeitos históricos: o writer escrevia `nan` como valor enquanto o reader o lia
 como ausência (contratos contraditórios entre `smaug_convert.c` e

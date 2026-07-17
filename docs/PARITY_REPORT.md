@@ -10,7 +10,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-07-17 01:16:35 UTC
+Gerado em: 2026-07-17 02:20:12 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -557,7 +557,7 @@ Heurística conservadora: verifica menção explícita do dtype no corpo da fun�
 | `int64` | 🟩 | 🟩 | 🟩 | 🟨 |
 | `bool` | 🟩 | 🟩 | 🟩 | 🟨 |
 | `string` | 🟩 | 🟩 | 🟩 | 🟩 |
-| `datetime` | 🟨 | 🟨 | 🟨 | 🟨 |
+| `datetime` | 🟨 | 🟩 | 🟨 | 🟨 |
 | `categorical` | 🟨 | 🟨 | 🟨 | 🟨 |
 
 ## Eixo 6 — Tipos de retorno consistentes
@@ -736,23 +736,23 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `dataset/test_relational` | 169 | 10 | 50 | 4 | 34 | — | — |
 | `dataset/test_stat` | 91 | 10 | 16 | 1 | 13 | — | — |
 | `dataset/test_io_support` | 53 | 4 | 15 | 1 | 7 | — | — |
-| `io/test_csv` | 124 | 3 | 5 | 2 | 9 | — | — |
-| `io/test_json` | 44 | 4 | 3 | 1 | 2 | — | — |
+| `io/test_csv` | 132 | 3 | 7 | 2 | 11 | 4 | 1 |
+| `io/test_json` | 48 | 4 | 4 | 1 | 2 | 2 | — |
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 79 | 19 | 2 | 2 | 4 | 1 | 1 |
 
-**Total de checks:** 2620
+**Total de checks:** 2632
 
 ### Menções totais por dtype (toda a suite)
 
 | dtype | menções |
 | :--- | :-: |
 | float64 | 198 |
-| int64 | 328 |
+| int64 | 331 |
 | bool | 66 |
-| string | 221 |
-| datetime | 87 |
-| categorical | 61 |
+| string | 223 |
+| datetime | 93 |
+| categorical | 62 |
 
 ## Eixo 12 — Sincronização docs ↔ código
 
@@ -815,9 +815,9 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 1011
+- 🟩 paridade: 1012
 - ⬜ exceção registrada: 215
-- 🟨 suspeita (revisar): 270
+- 🟨 suspeita (revisar): 269
 - 🟥 inconsistência clara: 14
 
 

@@ -636,8 +636,22 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
 - 12.2 **CONCLUÍDO (2026-07-14).** Linha comentada removida do `init.lua`. O
   Parquet já está registrado no `ARCHITECTURE.md` (marco 1.5, após `.smg` e
   Excel); o comentário era redundante e sugeria algo meio-feito que não existia.
-- 12.3 `column_t` sem datetime / CSV não infere dt — decidir: fechar ou registrar
-  como pós-1.0 (conecta Anel 0 ↔ Anel 3)
+- 12.3 **CONCLUÍDO (2026-07-14) — era crash, não "decidir".** O registro pedia
+  para "decidir: fechar ou registrar pós-1.0". Reproduzido: `to_csv_mem` e
+  `to_json_mem` **crashavam** com coluna datetime
+  (`attempt to get length of local 'v' (a number value)`). Causa: o
+  `smaug_column_t` não tem `dt`, e o mapa de dtype no `dataset_to_table` já
+  traduzia datetime → `"string"` mas **entregava a coluna datetime crua** — o C
+  recebia a promessa de string e o laço fazia `#v` num epoch_ms. Não era "falta
+  de suporte", era incoerência do Anel 3. Fix: converter via `astype("string")`
+  (produz ISO 8601) antes de montar a table — **uma correção, dois formatos**
+  (o `json.lua` reusa a função). Sem mudança de ABI. Round-trip de **valor**
+  preservado (`astype("datetime")` devolve o epoch exato); o **tipo** não
+  sobrevive, e isso é do formato (CSV não tem tipos; JSON não tem *date*) —
+  registrado no CONTRATO 9. `test_csv` 130→138, `test_json` 43→47.
+  Achados colaterais registrados: **12.25** (o reader não infere ISO — e o
+  critério de inferência não tem critério) e **12.26** (zeros à esquerda
+  destruídos: CEP/CNPJ/telefone).
   - Nota (E10, 2026-06-30): vírgula decimal BR não é bug — o CSV **suporta**
     `decimal=','` (o C troca por `.` em `try_f64`); ler `34,12` como string foi
     default `.`. Mesma natureza do E9 (12.10): default não-BR, não defeito.
@@ -792,6 +806,38 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
    cobrir, o bruto só sobe quando se cobre — é a métrica honesta.
    **Verificado:** deletar um guard agora QUEBRA a suíte (SIGSEGV no teste);
    antes dava "TUDO PASSOU" com a métrica intacta.
+ - 12.25 **`read_csv` não infere ISO 8601 — e o critério de inferência não tem
+   critério** — [achado 2026-07-14, durante o 12.3]. Medido: o CSV **já infere**
+   3 dtypes (`try_bool` → `try_i64` → `try_f64` → `DT_STR`, csv:296-299). O que
+   ele recusa (`2024-03-15`) é o **único não-ambíguo** dos casos — ISO 8601 é
+   não-ambíguo por design; `03/04/2024` (mar ou abr?) é que não deveria ser
+   inferido, e corretamente não é. Consequência: **o Smaug escreve ISO e não lê
+   de volta** — `to_csv` de datetime produz `2024-03-15T00:00:00.000Z`, e o
+   `read_csv` devolve string. Mesmo critério que classificou o JSON como bug no
+   12.21 ("o Smaug não lê o que o Smaug escreve"), aqui em tipo, não em valor
+   (o `astype("datetime")` recupera — round-trip de valor testado, preserva).
+   `smaug_dt_parse` já existe no Anel 0. Decidir: inferir só ISO (fecha o
+   round-trip, risco baixo) ou `parse_dates` opt-in (estilo pandas / `na_values`
+   do 12.21). **Muda contrato público do reader** — precisa de design próprio.
+ - 12.26 **zeros à esquerda destruídos na inferência — CEP, CNPJ, telefone** —
+   [achado 2026-07-14, durante o 12.3]. **Prioridade alta: perda silenciosa de
+   dado, em dados BR (o alvo do projeto).** Medido:
+
+   | coluna | CSV | vira |
+   |---|---|---|
+   | CEP | `01310100` | `1310100` |
+   | CNPJ | `00000000000191` | `191` |
+   | telefone | `011999998888` | `11999998888` |
+
+   O `try_i64` aceita zeros à esquerda e o dtype vira int64 — o identificador
+   deixa de ser identificador. E o round-trip do próprio Smaug quebra: escrever
+   a string `"01310100"` e ler de volta devolve `1310100` (int64). Não há aviso.
+   É mais grave que o 12.25: ali se perde o *tipo* (recuperável via astype); aqui
+   se perde o *dado*. Conecta com 12.8 (fixtures BR: IBGE/dados.gov.br têm CEP e
+   código de município). Decidir: `try_i64` recusar zeros à esquerda (`"007"` vira
+   string, `"7"` continua int) — coerente com "falha visível > acerto adivinhado",
+   já que hoje adivinha errado; ou `dtype=` explícito por coluna. Verificar antes
+   se algum teste/fixture depende do comportamento atual.
  - 12.24 **CONCLUÍDO (2026-07-14) — o item estava errado, e o erro era meu.**
    A reauditoria (pedida como review pré-código) mostrou que **4 dos 7 são
    ESSENCIAIS**, não redundantes: `dt/f64/i64/str_select` **segfaultam** sem o

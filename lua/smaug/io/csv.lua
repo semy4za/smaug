@@ -157,6 +157,21 @@ local function dataset_to_table(ds)
         local dtype = col._dtype
         local idx   = ci - 1
 
+        -- 12.3: `smaug_column_t` carrega f64/i64/bool/str — não tem dt. O mapa
+        -- de dtype abaixo já traduzia datetime para "string", mas entregava a
+        -- coluna datetime crua: o C recebia a promessa de string e o laço da
+        -- string fazia `#v` num número (epoch_ms) → crash em to_csv/to_json.
+        -- Convertemos aqui, no Anel 3: astype("string") de datetime produz ISO
+        -- 8601 (o mesmo formato do smaug_dt_format), e o round-trip de VALOR é
+        -- preservado — quem lê faz astype("datetime") de volta (ver 12.25, que
+        -- decide se o reader deve inferir ISO sozinho).
+        -- CSV não tem tipos e JSON não tem tipo "date": texto ISO é o que ambos
+        -- comportam, então isto preserva o dado, não o degrada (CONTRATO 9).
+        if dtype == "datetime" then
+            col   = col:astype("string")
+            dtype = "string"
+        end
+
         -- nome: precisamos manter a string viva durante a escrita
         -- alocamos com strdup para ser gerenciado pelo C
         local name_c = ffi.C.malloc(#cname + 1)  -- heap do luajit → free com ffi.C.free (ver free_table_lua)
