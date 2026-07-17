@@ -5,6 +5,71 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-14 — 12.5: o Anel 0 é thread-safe (CONTRATO 11)
+
+O registro dizia *"`g_sort_series` global em `ops_str` (single-thread: **sem
+bug**)"*. O Gui pediu revisão crítica — "estamos construindo um motor". O
+registro estava errado.
+
+**Medido, não argumentado:**
+
+| teste | resultado |
+|---|---|
+| 80 sorts **sequenciais** | 0 erros — o código está correto |
+| **2 threads**, séries **diferentes**, 20k linhas | **SEGFAULT, 6/6 execuções** |
+| `f64_sort` em 2 threads, 400 sorts | OK |
+
+O mecanismo: a thread 1 termina e executa `g_sort_series = NULL` enquanto a
+thread 2 ainda está **dentro** do `qsort`; o comparador lê `s->offsets[ia]` com
+`s == NULL`. **Séries diferentes, nenhum dado compartilhado** — é o que qualquer
+um faria ao paralelizar o sort de colunas distintas.
+
+**Dois achados que mudaram o peso do item:**
+
+1. `g_sort_series`/`g_sort_ascending` eram os **únicos globais mutáveis do Anel
+   0 inteiro**. Todo o resto já era reentrante — provado. O Smaug era uma
+   biblioteca thread-safe **com exatamente uma função que segfalta**: pior que
+   ser declaradamente single-thread, porque é armadilha sem aviso.
+2. A justificativa — *"o projeto não usa threads"* — é a **mesma classe de erro
+   do CONTRATO 10** (*"o frontend valida antes"*): confiar no caller. O
+   **projeto** não usa threads; o Smaug é **biblioteca**, e quem a usa decide.
+
+**Decisão do Gui: o Smaug é thread-safe.** Isso transforma o item de "limitação
+a registrar" em "bug a corrigir".
+
+**CONTRATO 11** (`docs/CONTRACT.md`): nenhum estado global mutável no Anel 0;
+`static const` permitido (imutável). Delimita o que **não** é prometido: mutação
+concorrente da *mesma* série é responsabilidade do caller — a promessa é sobre o
+engine, não sobre os dados do usuário.
+
+**Implementação:** quicksort com contexto por parâmetro, substituindo
+`qsort`+global nos dois usos (`argsort` e `rank`). Mediana de 3 (evita O(n²) em
+dados ordenados), insertion sort abaixo de 16, recursão só na metade menor
+(pilha O(log n) — medida: profundidade 22 para 100k, log₂≈17). `descending` =
+ascending revertido em O(n), mais barato que carregar o flag na comparação.
+
+Alternativas descartadas **com medição**, não por preferência:
+- `qsort_r`/`qsort_s`: assinaturas divergem entre glibc, BSD e UCRT → `#ifdef` e
+  comportamento por plataforma.
+- `struct {ptr,len,idx}` + `qsort`: **1.45x mais lenta, 4x mais memória** (o
+  qsort move 24B por swap em vez de 8B).
+- Sort próprio: **empata em performance** (1.04x mais rápido no aleatório;
+  0.66–0.95x nos patológicos: ordenado, reverso, todos-iguais, poucos-distintos)
+  e produz **ordem idêntica** ao `qsort` nos 5 padrões. Bônus: garante o mesmo
+  algoritmo em toda plataforma — o `qsort` da libc não especifica o seu.
+
+**Guardião: eixo de paridade 14** (`14_thread_safety`). Auditoria estática, não
+teste com threads — um teste de corrida exigiria `-lpthread` (e winpthreads no
+Windows) e races são não-determinísticos: passariam por sorte. A ausência de
+estado global é o que de fato garante o invariante, e é verificável no fonte.
+**Detector validado**: injetei um global mutável e um `const` — pegou o mutável
+(🟥, com arquivo:linha), ignorou o `const`.
+
+Verificação final: o mesmo teste que segfaultava 6/6 roda **480 sorts em 2
+threads sem um erro**. Fedora `--all`: Valgrind 0, `test_string` 118, parity
+14/14.
+
+---
 ## 2026-07-14 — 12.18: guards testados, não excluídos (CONTRATO 10)
 
 O item pedia `COV-EXCL-BR` nos guards de `dt_get`/`dt_set`, "alinhando com o

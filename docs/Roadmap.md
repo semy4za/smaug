@@ -646,7 +646,23 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
   silenciosamente, corrompendo o categorical. Adicionado guard falha-visível
   (erro em nível duplicado após normalização). O path de dados já dedupe via
   `level_map`; o furo era exclusivo do `from_codes`. Lua puro.
-- 12.5 I3 — `g_sort_series` global em `ops_str` (single-thread: sem bug)
+- 12.5 **CONCLUÍDO (2026-07-14) — o registro estava errado.** Dizia
+  "single-thread: sem bug". **Medido:** duas threads ordenando séries
+  **diferentes** segfaultavam em **6/6 execuções** — a primeira a terminar
+  zerava `g_sort_series` enquanto a outra ainda estava dentro do `qsort`.
+  Não é ausência de bug; é **segfault garantido em qualquer uso multithread da
+  API pública** (`smaug_str_argsort`/`sort`/`rank` são exportados). A
+  justificativa — "o projeto não usa threads" — é a mesma classe de erro do
+  CONTRATO 10: **confiar no caller**; o Smaug é biblioteca, quem usa decide.
+  Agravante: eram os **únicos** globais mutáveis do Anel 0 — todo o resto já era
+  reentrante (`f64_sort` em 2 threads: 400 sorts sem arranhão), o que fazia do
+  caso uma armadilha sem aviso. **Decisão do Gui: o Smaug é thread-safe**
+  (CONTRATO 11). Substituído por quicksort com contexto por parâmetro; mesmo
+  teste que segfaultava agora roda 480 sorts em 2 threads limpo. Guardado pelo
+  eixo de paridade **14** (audita estado global mutável; detector validado
+  injetando um global). Alternativas descartadas com medição: `qsort_r` (3
+  assinaturas por plataforma), `struct{ptr,len,idx}`+qsort (1.45x mais lenta,
+  4x memória).
 - 12.6 I4 — `get_value` passa `nil` como status (assimetria; sem bug)
 - 12.7 **CONCLUÍDO (2026-07-14).** `test_constructors.lua` redeclarava
   `local n_ok`/`check` 4× (suites concatenadas) e só imprimia no fim → headline

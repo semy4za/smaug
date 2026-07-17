@@ -42,6 +42,7 @@ EIXOS=(
     11_test_coverage
     12_docs_sync
     13_tostring
+    14_thread_safety
 )
 
 FAILED=()

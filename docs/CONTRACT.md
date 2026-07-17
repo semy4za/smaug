@@ -308,6 +308,40 @@ passa, o Valgrind acusa 0 erros e o branch-alvo não se move — enquanto a API
 pública passa a segfaultar. Testar e excluir produzem **o mesmo percentual**; só
 o teste produz proteção.
 
+### Contrato 11 — o Anel 0 é thread-safe (reentrante)
+
+**O Smaug é thread-safe.** Toda função do backend C recebe o que precisa por
+parâmetro; não há estado compartilhado entre chamadas. Duas threads operando em
+séries **diferentes** nunca colidem — e o Smaug é uma biblioteca: quem a usa
+decide sobre threads, não nós.
+
+> **Nenhum estado global mutável no Anel 0.** `static const` (tabelas de lookup,
+> literais) é permitido — é imutável. Auditado a cada build pelo **eixo 14** de
+> paridade.
+
+O que este contrato **não** promete: mutação concorrente da **mesma** série. Duas
+threads chamando `set` no mesmo objeto competem pelo mesmo buffer — sincronizar o
+acesso a um objeto compartilhado é responsabilidade do caller, como em qualquer
+biblioteca. A promessa é sobre o *engine*, não sobre os *dados do usuário*.
+
+**Precedente (2026-07-14):** `smaug_ops_str.c` mantinha `g_sort_series` e
+`g_sort_ascending` como contexto do comparador do `qsort` — os únicos globais
+mutáveis do Anel 0. O comentário dizia *"single-thread: o projeto não usa
+threads"*, o que é a mesma classe de erro do CONTRATO 10 (*"o frontend valida
+antes"*): **confiar no caller**. Medido: duas threads ordenando séries
+**diferentes** segfaultavam em 6/6 execuções — a primeira a terminar zerava o
+global enquanto a outra ainda estava dentro do `qsort`, e o comparador
+desreferenciava `NULL`. Todo o resto do Anel 0 já era reentrante, o que tornava
+o caso pior que ser declaradamente single-thread: uma armadilha sem aviso.
+
+Substituído por quicksort com contexto por parâmetro. Alternativas descartadas,
+com medição: `qsort_r`/`qsort_s` têm assinaturas divergentes entre glibc, BSD e
+UCRT (traria `#ifdef` e comportamento por plataforma); `struct {ptr,len,idx}` +
+`qsort` é 1.45x mais lenta e usa 4x mais memória. O sort próprio empata em
+performance (1.04x mais rápido no aleatório; 0.66–0.95x nos padrões
+patológicos), é in-place, e garante o **mesmo algoritmo em toda plataforma** —
+o `qsort` da libc não especifica o seu.
+
 ---
 
 ## Ring 0 — Backend C

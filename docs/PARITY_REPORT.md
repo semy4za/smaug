@@ -1,8 +1,7 @@
 # Smaug — Relatório de Paridade
 
-> Arquivo gerado por `bash scripts/parity/parity.sh` ou `powershell scripts/parity/parity.ps1`.
-> **Não editar à mão.** Decisões conscientes de não-paridade ficam em
-> `scripts/parity/exceptions.txt`.
+> Arquivo gerado por `bash scripts/parity/parity.sh`. **Não editar à mão.**
+> Decisões conscientes de não-paridade ficam em `scripts/parity/exceptions.txt`.
 
 Convenção de status:
 
@@ -11,7 +10,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-07-16 14:43:52 UTC
+Gerado em: 2026-07-17 00:15:11 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -789,6 +788,26 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 | `GroupBy` | 🟩 |
 | `Rolling (DataSet)` | 🟩 |
 
+## Eixo 14 — Thread-safety — estado global mutável no Anel 0
+
+🟩 = nenhum estado global mutável (função reentrante). 🟥 = global encontrado. Invariante do CONTRATO 11: o Anel 0 é thread-safe — toda função recebe contexto por parâmetro. `static const` não conta (imutável); protótipos e definições de função não contam. Total de globais mutáveis: **0**.
+
+
+| fonte C | sem global mutável | achados |
+| :--- | :-: | :-: |
+| `smaug_astype.c` | 🟩 | — |
+| `smaug_convert.c` | 🟩 | — |
+| `smaug_core.c` | 🟩 | — |
+| `smaug_csv.c` | 🟩 | — |
+| `smaug_datetime.c` | 🟩 | — |
+| `smaug_json.c` | 🟩 | — |
+| `smaug_ops_bool.c` | 🟩 | — |
+| `smaug_ops_f64.c` | 🟩 | — |
+| `smaug_ops_i64.c` | 🟩 | — |
+| `smaug_ops_str.c` | 🟩 | — |
+| `smaug_ops_window.c` | 🟩 | — |
+| `smaug_str.c` | 🟩 | — |
+
 ---
 
 ## Resumo executivo
@@ -796,10 +815,10 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 998
+- 🟩 paridade: 1011
 - ⬜ exceção registrada: 215
 - 🟨 suspeita (revisar): 270
-- 🟥 inconsistência clara: 13
+- 🟥 inconsistência clara: 14
 
 
 ## Como usar este relatório
