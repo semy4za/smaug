@@ -196,8 +196,8 @@ smaug_series_str_t *smaug_str_create_from_array(const char *const *array, size_t
    responsabilidade do frontend (wrap), não do meta.name aqui. */
 smaug_series_str_t *smaug_str_coalesce_scalar(const smaug_series_str_t *self,
                                               const char *value, size_t value_len) {
-    if (!self) return NULL;  /* COV-EXCL-BR: o engine nao confia no caller; frontend nunca passa NULL (fillna valida antes) */
-    if (!value && value_len > 0) return NULL;   /* COV-EXCL-BR: ponteiro-nulo-com-len; frontend passa value com #value coerente */
+    if (!self) return NULL;  /* guard essencial: mede o buffer tocando self->size direto (nao clona antes, ao contrario de f64/i64/dt). Coberto por teste (12.23) */
+    if (!value && value_len > 0) return NULL;   /* guard de fronteira publica: coberto por teste (12.23) */
 
     /* Passo 1: mede o buffer final (não-nulo: comprimento real; nulo: value). */
     size_t total = 0;
@@ -239,7 +239,7 @@ smaug_series_str_t *smaug_str_coalesce_scalar(const smaug_series_str_t *self,
    O(n) offset-based, preserva \0 embutido; a máscara é setada por caso. */
 smaug_series_str_t *smaug_str_coalesce(const smaug_series_str_t *self,
                                        const smaug_series_str_t *other) {
-    if (!self || !other || self->size != other->size) return NULL;  /* COV-EXCL-BR: combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente */
+    if (!self || !other || self->size != other->size) return NULL;  /* guard essencial: sem ele, other->offsets crasha. Coberto por teste (12.23) */
 
     /* Passo 1: mede o buffer final. Ambos nulos contribui 0. */
     size_t total = 0;

@@ -930,8 +930,34 @@ static void test_week_pre1970(void) {
 
 
 
+/* 12.23: guards ESSENCIAIS de fronteira publica (ver CONTRATO 10).
+   Auditado: sem o guard, estes SEGFAULTAM — dt_clone(NULL) desreferencia s->size
+   direto, e dt_coalesce toca other->null_mask no laco. Nao sao redundantes. */
+static void test_guards_publicos(void) {
+    CHECK(smaug_dt_clone(NULL) == NULL, "dt_clone(NULL) -> NULL");
+
+    smaug_series_dt_t *a = smaug_dt_create(3);
+    smaug_dt_set(a, 0, 1000); smaug_dt_set_null(a, 1); smaug_dt_set(a, 2, 3000);
+    smaug_series_dt_t *b = smaug_dt_create(2);
+    smaug_dt_set(b, 0, 9); smaug_dt_set(b, 1, 9);
+
+    CHECK(smaug_dt_coalesce(NULL, a) == NULL, "dt_coalesce(NULL, other) -> NULL");
+    CHECK(smaug_dt_coalesce(a, NULL) == NULL, "dt_coalesce(self, NULL) -> NULL");
+    CHECK(smaug_dt_coalesce(a, b)    == NULL, "dt_coalesce size divergente -> NULL");
+    smaug_series_dt_t *r = smaug_dt_coalesce(a, a);
+    CHECK(r != NULL,                          "dt_coalesce valido -> serie (controle)");
+    smaug_dt_free(r); smaug_dt_free(b); smaug_dt_free(a);
+
+    smaug_series_dt_t *c = smaug_dt_create(2);
+    smaug_dt_set(c, 0, 5000);
+    smaug_series_dt_t *cl = smaug_dt_clone(c);
+    CHECK(cl != NULL && cl->size == 2, "dt_clone valido -> copia (controle)");
+    smaug_dt_free(cl); smaug_dt_free(c);
+}
+
 int main(void) {
     test_lifecycle();
+    test_guards_publicos();
     test_get_null_status();
     test_is_null_oob();
     test_append_grow();

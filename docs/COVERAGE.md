@@ -3,26 +3,26 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `95d2876`  |  Data: 2026-07-16 15:13:56 -0300
+- Commit medido: `bc6b4ad`  |  Data: 2026-07-16 21:40:14 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `4005/4395 = 91.13%` -- 164 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- **Branch-bruto** (todos os ramos): `4021/4395 = 91.49%` -- 148 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 | Arquivo | Linhas | Branch-alvo (taken) |
 | :--- | :--- | :--- |
 | `smaug_core.c` | `402/402 = 100.00%` `[██████████]` | `290/290 = 100.00%` `[██████████]` |
-| `smaug_ops_f64.c` | `493/494 = 99.80%` `[██████████]` | `503/504 = 99.80%` `[██████████]` |
-| `smaug_ops_i64.c` | `475/479 = 99.16%` `[█████████░]` | `488/498 = 97.99%` `[█████████░]` |
+| `smaug_ops_f64.c` | `494/495 = 99.80%` `[██████████]` | `506/507 = 99.80%` `[██████████]` |
+| `smaug_ops_i64.c` | `476/480 = 99.17%` `[█████████░]` | `491/501 = 98.00%` `[█████████░]` |
 | `smaug_ops_bool.c` | `314/320 = 98.12%` `[█████████░]` | `380/407 = 93.37%` `[█████████░]` |
-| `smaug_str.c` | `293/294 = 99.66%` `[██████████]` | `242/242 = 100.00%` `[██████████]` |
+| `smaug_str.c` | `296/297 = 99.66%` `[██████████]` | `249/249 = 100.00%` `[██████████]` |
 | `smaug_ops_str.c` | `270/277 = 97.47%` `[█████████░]` | `300/324 = 92.59%` `[█████████░]` |
 | `smaug_csv.c` | `293/301 = 97.34%` `[█████████░]` | `330/368 = 89.67%` `[█████████░]` |
 | `smaug_json.c` | `348/360 = 96.67%` `[█████████░]` | `415/461 = 90.02%` `[█████████░]` |
-| `smaug_datetime.c` | `538/545 = 98.72%` `[█████████░]` | `567/612 = 92.65%` `[█████████░]` |
+| `smaug_datetime.c` | `539/546 = 98.72%` `[█████████░]` | `570/615 = 92.68%` `[█████████░]` |
 | `smaug_ops_window.c` | `329/334 = 98.50%` `[█████████░]` | `344/379 = 90.77%` `[█████████░]` |
 | `smaug_convert.c` | `37/37 = 100.00%` `[██████████]` | `37/37 = 100.00%` `[██████████]` |
 | `smaug_astype.c` | `118/118 = 100.00%` `[██████████]` | `109/109 = 100.00%` `[██████████]` |
-| **TOTAL** | `3910/3961 = 98.71%` `[█████████░]` | `4005/4231 = 94.66%` `[█████████░]` |
+| **TOTAL** | `3916/3967 = 98.71%` `[█████████░]` | `4021/4247 = 94.68%` `[█████████░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
@@ -235,9 +235,6 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_core.c:457` — realloc de shrink falhando; defensivo, mantem buffer maior (seguro)
 - `smaug_ops_f64.c:164` — o engine nao confia no caller; frontend nunca passa NULL (fillna valida antes)
 - `smaug_ops_f64.c:167` — falha de alloc do clone; OOM sem injecao
-- `smaug_ops_f64.c:185` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
-- `smaug_ops_f64.c:185` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
-- `smaug_ops_f64.c:185` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
 - `smaug_ops_f64.c:188` — falha de alloc do clone; OOM sem injecao
 - `smaug_ops_f64.c:205` — frontend valida Series/tamanhos antes de delegar
 - `smaug_ops_f64.c:205` — frontend valida Series/tamanhos antes de delegar
@@ -247,9 +244,6 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_ops_f64.c:209` — OOM sem injecao
 - `smaug_ops_i64.c:158` — o engine nao confia no caller; frontend nunca passa NULL (fillna valida antes)
 - `smaug_ops_i64.c:161` — falha de alloc do clone; OOM sem injecao
-- `smaug_ops_i64.c:179` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
-- `smaug_ops_i64.c:179` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
-- `smaug_ops_i64.c:179` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
 - `smaug_ops_i64.c:182` — falha de alloc do clone; OOM sem injecao
 - `smaug_ops_i64.c:200` — frontend valida Series/tamanhos antes de delegar
 - `smaug_ops_i64.c:200` — frontend valida Series/tamanhos antes de delegar
@@ -263,14 +257,7 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_ops_bool.c:267` — falha de alloc do clone; OOM sem injecao
 - `smaug_str.c:104` — offsets_owned=false nao existe na API atual; o campo separa a posse do offsets da do buffer (modelo A1, smaug_types.h) — sem ele o free inferiria posse por acoplamento external_alloc+is_view
 - `smaug_str.c:164` — total ~ SIZE_MAX; inalcancavel
-- `smaug_str.c:199` — o engine nao confia no caller; frontend nunca passa NULL (fillna valida antes)
-- `smaug_str.c:200` — ponteiro-nulo-com-len; frontend passa value com #value coerente
-- `smaug_str.c:200` — ponteiro-nulo-com-len; frontend passa value com #value coerente
-- `smaug_str.c:200` — ponteiro-nulo-com-len; frontend passa value com #value coerente
 - `smaug_str.c:214` — falha de alloc; OOM sem injecao
-- `smaug_str.c:242` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
-- `smaug_str.c:242` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
-- `smaug_str.c:242` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
 - `smaug_str.c:256` — falha de alloc; OOM sem injecao
 - `smaug_str.c:288` — frontend valida Series/tamanhos antes de delegar
 - `smaug_str.c:288` — frontend valida Series/tamanhos antes de delegar
@@ -360,9 +347,6 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_datetime.c:204` — size==0 — clone de série vazia tem size=0, memcpy não executado
 - `smaug_datetime.c:219` — o engine nao confia no caller; frontend nunca passa NULL (fillna valida antes)
 - `smaug_datetime.c:222` — falha de alloc do clone; OOM sem injecao
-- `smaug_datetime.c:239` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
-- `smaug_datetime.c:239` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
-- `smaug_datetime.c:239` — combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente
 - `smaug_datetime.c:242` — falha de alloc do clone; OOM sem injecao
 - `smaug_datetime.c:259` — frontend valida Series/tamanhos antes de delegar
 - `smaug_datetime.c:259` — frontend valida Series/tamanhos antes de delegar

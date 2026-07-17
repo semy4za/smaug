@@ -64,6 +64,49 @@ Lua puro. Fedora `--all`: Valgrind 0, parity 14/14, suites de acesso intactas
 (`test_access` 127, `test_dt` 271, `test_str` 272, `constructors` 343).
 
 ---
+## 2026-07-14 — 12.23: os 6 guards essenciais viram teste
+
+Execução do que a auditoria empírica do 12.18 achou: seis guards de fronteira
+**pública** que, removidos, causam **SIGSEGV** — não são defesa redundante como
+os do `coalesce_scalar` (onde o `clone(NULL)` barra antes). Estavam todos
+`COV-EXCL-BR` com *"o frontend valida antes"*, contra o CONTRATO 10.
+
+Auditoria **refeita neste tree** antes de agir (as linhas mudaram com o 12.5):
+os 6 reconfirmados, um a um, removendo o guard e chamando com `NULL`.
+
+| guard | suíte | checks |
+|---|---|---|
+| `dt_clone`, `dt_coalesce` | `test_datetime_c` | 450 → **456** |
+| `f64_coalesce`, `i64_coalesce` | `test_ops_edge` | 272 → **280** |
+| `str_coalesce_scalar`, `str_coalesce` | `test_string` | 118 → **126** |
+
+Cobertos **todos os ramos**, não só o `NULL`: os três do `||` (`!self`,
+`!other`, `size` divergente) e o `!value && len>0` do `str_coalesce_scalar` —
+mais um controle positivo em cada, para provar que o guard não passou a rejeitar
+entrada válida.
+
+**16 exclusões removidas** (164→148): cada `||` de três condições conta 3 ramos.
+
+O número que importa:
+
+| | antes | depois |
+|---|---|---|
+| branch-alvo | 94.66% | 94.66% — **igual** |
+| **branch bruto** | 91.13% | **91.47%** |
+
+O **alvo não distingue esconder de cobrir** — foi o ponto do 12.18, e aqui se
+confirma do outro lado: 16 ramos saíram da exclusão e entraram cobertos, e o
+alvo não se moveu. O **bruto só sobe quando se cobre de verdade**. É a métrica
+honesta.
+
+**Verificação final:** deletei um guard essencial e rodei a suíte. Antes do
+12.23: *"TUDO PASSOU"*, Valgrind 0, branch-alvo inalterado — ninguém percebia.
+Agora: **SIGSEGV no teste**. Os guards estão protegidos.
+
+Fedora `--all`: Valgrind 0, linha 98.71%, parity 14/14. Sobra o **12.24** (os 7
+redundantes cuja justificativa é falsa) — registrado, não tocado.
+
+---
 ## 2026-07-14 — 12.5: o Anel 0 é thread-safe (CONTRATO 11)
 
 O registro dizia *"`g_sort_series` global em `ops_str` (single-thread: **sem

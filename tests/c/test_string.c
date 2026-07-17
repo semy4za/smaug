@@ -396,6 +396,45 @@ int main(void) {
         smaug_str_free(gs);
     }
 
+    /* ==================================================================
+       12.23: guards ESSENCIAIS de fronteira publica (CONTRATO 10).
+       Auditado empiricamente: sem estes guards, ambos SEGFAULTAM — o
+       coalesce_scalar mede o buffer tocando self->size direto (nao clona
+       antes, ao contrario dos irmaos f64/i64/dt, onde o clone(NULL) barra),
+       e o coalesce toca other->offsets no laco. Estavam COV-EXCL-BR com
+       "o frontend valida antes": sao simbolos publicos exportados.
+       ================================================================== */
+    {
+        const char *arr[] = {"a", NULL, "c"};
+        smaug_series_str_t *s  = smaug_str_create_from_array(arr, 3);
+        const char *arr2[] = {"x", "y"};
+        smaug_series_str_t *s2 = smaug_str_create_from_array(arr2, 2);
+
+        /* coalesce_scalar: os dois ramos do guard */
+        OK(smaug_str_coalesce_scalar(NULL, "x", 1) == NULL,
+           "str_coalesce_scalar(serie NULL) -> NULL");
+        OK(smaug_str_coalesce_scalar(s, NULL, 5) == NULL,
+           "str_coalesce_scalar(value NULL, len>0) -> NULL");
+        smaug_series_str_t *r1 = smaug_str_coalesce_scalar(s, "Z", 1);
+        OK(r1 != NULL && STR_EQ(r1, 1, "Z"),
+           "str_coalesce_scalar valido preenche o NULL (controle)");
+        smaug_str_free(r1);
+        /* value NULL com len==0 e valido (string vazia), como no str_set */
+        smaug_series_str_t *r2 = smaug_str_coalesce_scalar(s, NULL, 0);
+        OK(r2 != NULL, "str_coalesce_scalar(value NULL, len==0) -> ok (vazia)");
+        smaug_str_free(r2);
+
+        /* coalesce: os tres ramos do || */
+        OK(smaug_str_coalesce(NULL, s) == NULL, "str_coalesce(NULL, other) -> NULL");
+        OK(smaug_str_coalesce(s, NULL) == NULL, "str_coalesce(self, NULL) -> NULL");
+        OK(smaug_str_coalesce(s, s2)   == NULL, "str_coalesce size divergente -> NULL");
+        smaug_series_str_t *r3 = smaug_str_coalesce(s, s);
+        OK(r3 != NULL, "str_coalesce valido -> serie (controle)");
+        smaug_str_free(r3);
+
+        smaug_str_free(s2); smaug_str_free(s);
+    }
+
     printf("PASS: string lifecycle (%d checks)\n", n_checks);
 
     return 0;

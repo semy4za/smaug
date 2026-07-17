@@ -182,7 +182,7 @@ smaug_series_f64_t *smaug_f64_coalesce_scalar(const smaug_series_f64_t *self,
    preenche os buracos de self a partir de other. */
 smaug_series_f64_t *smaug_f64_coalesce(const smaug_series_f64_t *self,
                                        const smaug_series_f64_t *other) {
-    if (!self || !other || self->size != other->size) return NULL;  /* COV-EXCL-BR: combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente */
+    if (!self || !other || self->size != other->size) return NULL;  /* guard essencial: sem ele, other->null_mask crasha. Coberto por coalesce_guards_publicos (12.23) */
 
     smaug_series_f64_t *r = smaug_f64_clone(self);
     if (!r) return NULL;  /* COV-EXCL-BR: falha de alloc do clone; OOM sem injecao */

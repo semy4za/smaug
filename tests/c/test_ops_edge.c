@@ -961,6 +961,41 @@ static void ops_str_reachable_edges(void) {
     smaug_str_free(sd);
 }
 
+/* 12.23: guards ESSENCIAIS de fronteira publica.
+   Auditados empiricamente (removendo o guard e chamando com NULL): estes
+   SEGFAULTAM sem a protecao — nao sao defesa redundante como o
+   coalesce_scalar (onde o clone(NULL) barra antes). Estavam COV-EXCL-BR com
+   "o frontend valida antes", o que contradiz o CONTRATO 10: sao simbolos
+   publicos exportados, alcancaveis por qualquer caller C. Cobrir os dois
+   ramos do `||`: ponteiro NULL e size divergente. */
+static void coalesce_guards_publicos(void) {
+    double a[3] = {1, 2, 3};
+    smaug_series_f64_t *f = smaug_f64_create_from_array(a, 3);
+    smaug_f64_set_null(f, 1);
+    double b[2] = {9, 9};
+    smaug_series_f64_t *f2 = smaug_f64_create_from_array(b, 2);
+
+    OK(smaug_f64_coalesce(NULL, f) == NULL,  "f64_coalesce(NULL, other) -> NULL");
+    OK(smaug_f64_coalesce(f, NULL) == NULL,  "f64_coalesce(self, NULL) -> NULL");
+    OK(smaug_f64_coalesce(f, f2)   == NULL,  "f64_coalesce size divergente -> NULL");
+    smaug_series_f64_t *fr = smaug_f64_coalesce(f, f);
+    OK(fr != NULL,                           "f64_coalesce valido -> serie (controle)");
+    smaug_f64_free(fr); smaug_f64_free(f2); smaug_f64_free(f);
+
+    int64_t ia[3] = {1, 2, 3};
+    smaug_series_i64_t *i = smaug_i64_create_from_array(ia, 3);
+    smaug_i64_set_null(i, 1);
+    int64_t ib[2] = {9, 9};
+    smaug_series_i64_t *i2 = smaug_i64_create_from_array(ib, 2);
+
+    OK(smaug_i64_coalesce(NULL, i) == NULL,  "i64_coalesce(NULL, other) -> NULL");
+    OK(smaug_i64_coalesce(i, NULL) == NULL,  "i64_coalesce(self, NULL) -> NULL");
+    OK(smaug_i64_coalesce(i, i2)   == NULL,  "i64_coalesce size divergente -> NULL");
+    smaug_series_i64_t *ir = smaug_i64_coalesce(i, i);
+    OK(ir != NULL,                           "i64_coalesce valido -> serie (controle)");
+    smaug_i64_free(ir); smaug_i64_free(i2); smaug_i64_free(i);
+}
+
 int main(void) {
     f64_arith_null_prop();
     i64_arith_null_prop();
@@ -997,6 +1032,8 @@ int main(void) {
 
     mutation_status_contract();
     get_status_contract();
+
+    coalesce_guards_publicos();
 
     view_overflow_boundary();
     nan_in_compare();

@@ -198,7 +198,7 @@ void smaug_dt_free(smaug_series_dt_t *s) {
 }
 
 smaug_series_dt_t *smaug_dt_clone(const smaug_series_dt_t *s) {
-    if (!s) return NULL;  /* COV-EXCL-BR: s==NULL — defensivo, caller já verifica */
+    if (!s) return NULL;  /* guard essencial: sem ele, s->size crasha. Coberto por test_guards_publicos (12.23) */
     smaug_series_dt_t *c = smaug_dt_create_with_capacity(s->size, s->capacity);
     if (!c) return NULL;  /* COV-EXCL-BR: OOM em create — coberto por test_allocfail */
     if (s->size > 0) {  /* COV-EXCL-BR: size==0 — clone de série vazia tem size=0, memcpy não executado */
@@ -236,7 +236,7 @@ smaug_series_dt_t *smaug_dt_coalesce_scalar(const smaug_series_dt_t *self,
    buracos de self a partir de other — epoch_ms int64 exato. */
 smaug_series_dt_t *smaug_dt_coalesce(const smaug_series_dt_t *self,
                                      const smaug_series_dt_t *other) {
-    if (!self || !other || self->size != other->size) return NULL;  /* COV-EXCL-BR: combine_first valida Series/dtype/tamanho antes de delegar — nunca NULL nem size diferente */
+    if (!self || !other || self->size != other->size) return NULL;  /* guard essencial: sem ele, other->null_mask crasha. Coberto por test_guards_publicos (12.23) */
 
     smaug_series_dt_t *r = smaug_dt_clone(self);
     if (!r) return NULL;  /* COV-EXCL-BR: falha de alloc do clone; OOM sem injecao */

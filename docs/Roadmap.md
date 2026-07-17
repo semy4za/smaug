@@ -781,19 +781,17 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
    Branch-alvo 94.70% → **94.77%** com as mesmas 165 exclusões. Excluir daria o
    mesmo 94.77% com 168 exclusões e zero proteção. Política registrada no
    **CONTRATO 10**.
- - 12.23 **6 guards ESSENCIAIS de API pública sem teste e fora da métrica** —
-   [achado 2026-07-14, auditoria empírica do 12.18]. Removendo cada guard e
-   chamando com `NULL`, estes **segfaultam** — são a única proteção, não defesa
-   redundante: `dt_clone`(datetime:201), `dt_coalesce`(:239),
-   `f64_coalesce`(ops_f64:185), `i64_coalesce`(ops_i64:179),
-   `str_coalesce_scalar`(str:199), `str_coalesce`(str:242). Todos são símbolos
-   públicos exportados (`T` na .so) e todos estão `COV-EXCL-BR` com a
-   justificativa "o frontend valida antes" — que contradiz o princípio "o engine
-   não confia no caller". **Medido:** com o guard removido, a suíte passa, o
-   Valgrind acusa 0 e o branch-alvo não se move. São segfaults esperando um
-   refactor. Fix: 6 linhas de teste + trocar a exclusão por cobertura real
-   (o `smaug_bool_coalesce_scalar` já é assim, ver 10.8). Custo baixo,
-   prioridade alta.
+ - 12.23 **CONCLUÍDO (2026-07-14).** Os 6 guards essenciais (auditados: sem eles,
+   SIGSEGV) agora têm teste e saíram da exclusão. `dt_clone`, `dt_coalesce`
+   (test_datetime_c 450→456), `f64_coalesce`, `i64_coalesce` (test_ops_edge
+   272→280), `str_coalesce_scalar`, `str_coalesce` (test_string 118→126).
+   Cobertos **todos os ramos**, não só o NULL: os três do `||` (self, other,
+   size divergente) e o `!value && len>0` do str. **16 exclusões removidas**
+   (164→148) — cada `||` conta 3 ramos. Branch-alvo inalterado (94.66%), mas o
+   **bruto subiu de 91.13% para 91.47%**: o alvo não distingue esconder de
+   cobrir, o bruto só sobe quando se cobre — é a métrica honesta.
+   **Verificado:** deletar um guard agora QUEBRA a suíte (SIGSEGV no teste);
+   antes dava "TUDO PASSOU" com a métrica intacta.
  - 12.24 **7 guards redundantes com justificativa falsa** — [mesmo achado].
    `dt/f64/i64_coalesce_scalar` e `dt/f64/i64/str_select` **não** segfaultam sem
    o guard (o `clone(NULL)` barra antes). A exclusão é legítima, mas o texto
