@@ -996,6 +996,52 @@ static void coalesce_guards_publicos(void) {
     smaug_i64_free(ir); smaug_i64_free(i2); smaug_i64_free(i);
 }
 
+/* 12.24: os guards de `select` sao ESSENCIAIS, nao redundantes.
+   A auditoria do 12.18 os classificou errado — o script removia so a primeira
+   linha do guard (`if (...)`), deixando o `return NULL;` orfao, que passava a
+   executar SEMPRE: a funcao virava `return NULL` incondicional e nunca crashava.
+   Artefato do harness, nao do codigo. Removendo o guard INTEIRO: SIGSEGV nos 4.
+   O corpo toca os tres ponteiros direto — create(a->size), cond->null_mask no
+   laco, e `b` quando cond[i] e' false. Cobrimos os 5 ramos do `||`. */
+static void select_guards_publicos(void) {
+    double a[3] = {1, 2, 3};
+    smaug_series_f64_t *f  = smaug_f64_create_from_array(a, 3);
+    smaug_series_f64_t *f2 = smaug_f64_create_from_array(a, 3);
+    double s2[2] = {9, 9};
+    smaug_series_f64_t *fd = smaug_f64_create_from_array(s2, 2);   /* size divergente */
+    /* cond com um FALSE no meio: o laco PRECISA tocar `b` */
+    smaug_series_bool_t *cb = smaug_bool_create(3);
+    smaug_bool_set(cb, 0, 1); smaug_bool_set(cb, 1, 0); smaug_bool_set(cb, 2, 1);
+    smaug_series_bool_t *cbd = smaug_bool_create(2);               /* size divergente */
+
+    OK(smaug_f64_select(NULL, f, f2) == NULL, "f64_select(cond NULL) -> NULL");
+    OK(smaug_f64_select(cb, NULL, f2) == NULL, "f64_select(a NULL) -> NULL");
+    OK(smaug_f64_select(cb, f, NULL) == NULL, "f64_select(b NULL) -> NULL");
+    OK(smaug_f64_select(cbd, f, f2) == NULL,  "f64_select(cond->size != a->size) -> NULL");
+    OK(smaug_f64_select(cb, f, fd) == NULL,   "f64_select(a->size != b->size) -> NULL");
+    smaug_series_f64_t *fr = smaug_f64_select(cb, f, f2);
+    OK(fr != NULL && fr->size == 3,           "f64_select valido -> serie (controle)");
+    smaug_f64_free(fr);
+    smaug_f64_free(fd); smaug_f64_free(f2); smaug_f64_free(f);
+
+    int64_t ia[3] = {1, 2, 3};
+    smaug_series_i64_t *i  = smaug_i64_create_from_array(ia, 3);
+    smaug_series_i64_t *i2 = smaug_i64_create_from_array(ia, 3);
+    int64_t id[2] = {9, 9};
+    smaug_series_i64_t *idv = smaug_i64_create_from_array(id, 2);
+
+    OK(smaug_i64_select(NULL, i, i2) == NULL, "i64_select(cond NULL) -> NULL");
+    OK(smaug_i64_select(cb, NULL, i2) == NULL, "i64_select(a NULL) -> NULL");
+    OK(smaug_i64_select(cb, i, NULL) == NULL, "i64_select(b NULL) -> NULL");
+    OK(smaug_i64_select(cbd, i, i2) == NULL,  "i64_select(cond->size != a->size) -> NULL");
+    OK(smaug_i64_select(cb, i, idv) == NULL,  "i64_select(a->size != b->size) -> NULL");
+    smaug_series_i64_t *ir2 = smaug_i64_select(cb, i, i2);
+    OK(ir2 != NULL && ir2->size == 3,         "i64_select valido -> serie (controle)");
+    smaug_i64_free(ir2);
+    smaug_i64_free(idv); smaug_i64_free(i2); smaug_i64_free(i);
+    smaug_bool_free(cbd); smaug_bool_free(cb);
+}
+
 int main(void) {
     f64_arith_null_prop();
     i64_arith_null_prop();
@@ -1034,6 +1080,7 @@ int main(void) {
     get_status_contract();
 
     coalesce_guards_publicos();
+    select_guards_publicos();
 
     view_overflow_boundary();
     nan_in_compare();

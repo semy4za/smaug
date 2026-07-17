@@ -290,7 +290,15 @@ ou porte pode passar `NULL`. Logo:
 > provado, ramo morto por construção.
 
 **Justificativa não se copia entre dtypes.** Cada uma vale para o código que está
-embaixo dela — e o código diverge. Exemplo real (auditado 2026-07-14):
+embaixo dela — e o código diverge.
+
+**E auditoria não se aceita sem verificar o harness.** A primeira auditoria destes
+guards (2026-07-14) classificou os quatro `select` como redundantes. Era falso: o
+script removia apenas a **primeira** linha do guard, deixando o `return NULL;`
+órfão — a função virava `return NULL` incondicional e nunca crashava. Artefato do
+método, não do código. Refeita removendo o guard **inteiro**: os quatro
+segfaultam. Um falso negativo em auditoria de segurança é pior que não auditar:
+produz confiança sem base. Exemplo real (auditado 2026-07-14):
 
 ```c
 /* f64_coalesce_scalar — o guard é REDUNDANTE */      /* str_coalesce_scalar — o guard é ESSENCIAL */

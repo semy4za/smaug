@@ -953,6 +953,30 @@ static void test_guards_publicos(void) {
     smaug_series_dt_t *cl = smaug_dt_clone(c);
     CHECK(cl != NULL && cl->size == 2, "dt_clone valido -> copia (controle)");
     smaug_dt_free(cl); smaug_dt_free(c);
+
+    /* 12.24: dt_select — guard ESSENCIAL (a auditoria do 12.18 errou: o script
+       removia so a linha do `if`, deixando o `return NULL;` orfao executar
+       sempre; a funcao virava `return NULL` incondicional e nao crashava).
+       O corpo toca cond->null_mask e `b` no laco. 5 ramos do `||`. */
+    smaug_series_dt_t *x  = smaug_dt_create(3);
+    smaug_dt_set(x, 0, 1); smaug_dt_set(x, 1, 2); smaug_dt_set(x, 2, 3);
+    smaug_series_dt_t *y  = smaug_dt_create(3);
+    smaug_dt_set(y, 0, 7); smaug_dt_set(y, 1, 8); smaug_dt_set(y, 2, 9);
+    smaug_series_dt_t *yd = smaug_dt_create(2);
+    smaug_series_bool_t *cb = smaug_bool_create(3);
+    smaug_bool_set(cb, 0, 1); smaug_bool_set(cb, 1, 0); smaug_bool_set(cb, 2, 1);
+    smaug_series_bool_t *cbd = smaug_bool_create(2);
+
+    CHECK(smaug_dt_select(NULL, x, y) == NULL, "dt_select(cond NULL) -> NULL");
+    CHECK(smaug_dt_select(cb, NULL, y) == NULL, "dt_select(a NULL) -> NULL");
+    CHECK(smaug_dt_select(cb, x, NULL) == NULL, "dt_select(b NULL) -> NULL");
+    CHECK(smaug_dt_select(cbd, x, y) == NULL,   "dt_select(cond->size != a->size) -> NULL");
+    CHECK(smaug_dt_select(cb, x, yd) == NULL,   "dt_select(a->size != b->size) -> NULL");
+    smaug_series_dt_t *sr = smaug_dt_select(cb, x, y);
+    CHECK(sr != NULL && sr->size == 3,          "dt_select valido -> serie (controle)");
+    smaug_dt_free(sr);
+    smaug_bool_free(cbd); smaug_bool_free(cb);
+    smaug_dt_free(yd); smaug_dt_free(y); smaug_dt_free(x);
 }
 
 int main(void) {

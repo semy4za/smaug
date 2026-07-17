@@ -64,6 +64,60 @@ Lua puro. Fedora `--all`: Valgrind 0, parity 14/14, suites de acesso intactas
 (`test_access` 127, `test_dt` 271, `test_str` 272, `constructors` 343).
 
 ---
+## 2026-07-14 — 12.24: os `select` eram essenciais — o item estava errado
+
+O Gui pediu review antes do código. O review derrubou o item — e o erro era meu.
+
+O 12.24 estava registrado como cosmético: *"7 guards redundantes; trocar o texto
+da justificativa"*. **Reauditando neste tree, 4 dos 7 SEGFAULTAM sem o guard:**
+`dt_select`, `f64_select`, `i64_select`, `str_select`.
+
+**Por que a auditoria do 12.18 errou:** o guard do `select` ocupa duas linhas —
+`if (...)` numa, `return NULL;` na outra. Meu script removia **uma**. O
+`return NULL;` ficava órfão e passava a executar **sempre**: a função virava
+`return NULL` incondicional, nunca crashava, e era classificada como redundante.
+**Artefato do harness, não do código.**
+
+Consequência: **não eram 6 guards essenciais, eram 10.** O 12.23 tratou 6; os 4
+`select` escaparam pelo meu erro de medição. E se este item tivesse sido
+executado como registrado, eu teria "corrigido o texto" de 4 guards essenciais —
+trocando uma justificativa falsa por outra, e deixando 4 segfaults destrancados.
+
+O corpo do `select` toca os três ponteiros direto: `create(a->size)`,
+`cond->null_mask[i]` no laço, e `b` quando `cond[i]` é false. Cinco ramos, nenhum
+decorativo.
+
+Entregue:
+- **Os 4 `select` viraram teste**, cobrindo os **5 ramos** do `||` (`!cond`,
+  `!a`, `!b`, `cond->size != a->size`, `a->size != b->size`) + controle positivo.
+  `test_ops_edge` 280→**292**, `test_datetime_c` 456→**462**, `test_string`
+  126→**132**. **20 exclusões removidas** (148→128) — 4 guards × 5 ramos.
+- **Os 3 `coalesce_scalar` são mesmo redundantes** (confirmado: o `clone(NULL)`
+  devolve NULL e o `if (!r)` barra). Mantêm o `COV-EXCL-BR`, agora com
+  justificativa **verdadeira**: *"redundante — o clone barra; auditado, remover
+  não crasha. Defesa em profundidade, não a única proteção."*
+- A frase **"o frontend valida antes" sumiu do Anel 0** — era o veículo que
+  propagou a exclusão indevida entre dtypes.
+
+| | 12.23 | **12.24** |
+|---|---|---|
+| exclusões | 148 | **128** |
+| branch bruto | 91.49% | **91.93%** |
+| linha | 98.71% | **98.81%** |
+| branch-alvo | 94.66% | 94.68% |
+
+Desde o 12.18: **164 → 128 exclusões**, bruto **91.13% → 91.93%**. O alvo mal se
+moveu — ele não distingue esconder de cobrir. O bruto é a métrica honesta.
+
+**CONTRATO 10** ganhou a lição: *"auditoria não se aceita sem verificar o
+harness"*. Um falso negativo em auditoria de segurança é pior que não auditar —
+produz confiança sem base.
+
+**Verificado:** deletar o guard do `f64_select` agora dá SIGSEGV no teste.
+
+Fedora `--all`: Valgrind 0, parity 14/14.
+
+---
 ## 2026-07-14 — 12.23: os 6 guards essenciais viram teste
 
 Execução do que a auditoria empírica do 12.18 achou: seis guards de fronteira

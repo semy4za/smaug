@@ -8,6 +8,7 @@
  */
 
 #include "../include/smaug_string.h"
+#include "../include/smaug_core.h"   /* 12.24: str_select recebe smaug_series_bool_t */
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -433,6 +434,34 @@ int main(void) {
         smaug_str_free(r3);
 
         smaug_str_free(s2); smaug_str_free(s);
+    }
+
+    /* 12.24: str_select — guard ESSENCIAL. A auditoria do 12.18 o marcou como
+       redundante por erro do harness (removia so a linha do `if`, o
+       `return NULL;` orfao executava sempre). O corpo toca cond->null_mask e
+       `b` no laco. 5 ramos do `||`. */
+    {
+        const char *av[] = {"a", "b", "c"};
+        const char *bv[] = {"x", "y", "z"};
+        smaug_series_str_t *sa = smaug_str_create_from_array(av, 3);
+        smaug_series_str_t *sb = smaug_str_create_from_array(bv, 3);
+        const char *dv[] = {"p", "q"};
+        smaug_series_str_t *sd = smaug_str_create_from_array(dv, 2);
+        smaug_series_bool_t *cb = smaug_bool_create(3);
+        smaug_bool_set(cb, 0, 1); smaug_bool_set(cb, 1, 0); smaug_bool_set(cb, 2, 1);
+        smaug_series_bool_t *cbd = smaug_bool_create(2);
+
+        OK(smaug_str_select(NULL, sa, sb) == NULL, "str_select(cond NULL) -> NULL");
+        OK(smaug_str_select(cb, NULL, sb) == NULL, "str_select(a NULL) -> NULL");
+        OK(smaug_str_select(cb, sa, NULL) == NULL, "str_select(b NULL) -> NULL");
+        OK(smaug_str_select(cbd, sa, sb) == NULL,  "str_select(cond->size != a->size) -> NULL");
+        OK(smaug_str_select(cb, sa, sd) == NULL,   "str_select(a->size != b->size) -> NULL");
+        smaug_series_str_t *sr = smaug_str_select(cb, sa, sb);
+        OK(sr != NULL && STR_EQ(sr, 0, "a") && STR_EQ(sr, 1, "y") && STR_EQ(sr, 2, "c"),
+           "str_select valido: cond escolhe a/b por posicao (controle)");
+        smaug_str_free(sr);
+        smaug_bool_free(cbd); smaug_bool_free(cb);
+        smaug_str_free(sd); smaug_str_free(sb); smaug_str_free(sa);
     }
 
     printf("PASS: string lifecycle (%d checks)\n", n_checks);

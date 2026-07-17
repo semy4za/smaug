@@ -3,26 +3,26 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `bc6b4ad`  |  Data: 2026-07-16 21:40:14 -0300
+- Commit medido: `310e67c`  |  Data: 2026-07-16 22:08:04 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `4021/4395 = 91.49%` -- 148 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- **Branch-bruto** (todos os ramos): `4041/4395 = 91.95%` -- 128 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 | Arquivo | Linhas | Branch-alvo (taken) |
 | :--- | :--- | :--- |
 | `smaug_core.c` | `402/402 = 100.00%` `[██████████]` | `290/290 = 100.00%` `[██████████]` |
-| `smaug_ops_f64.c` | `494/495 = 99.80%` `[██████████]` | `506/507 = 99.80%` `[██████████]` |
-| `smaug_ops_i64.c` | `476/480 = 99.17%` `[█████████░]` | `491/501 = 98.00%` `[█████████░]` |
+| `smaug_ops_f64.c` | `495/495 = 100.00%` `[██████████]` | `511/512 = 99.80%` `[██████████]` |
+| `smaug_ops_i64.c` | `477/480 = 99.38%` `[█████████░]` | `496/506 = 98.02%` `[█████████░]` |
 | `smaug_ops_bool.c` | `314/320 = 98.12%` `[█████████░]` | `380/407 = 93.37%` `[█████████░]` |
-| `smaug_str.c` | `296/297 = 99.66%` `[██████████]` | `249/249 = 100.00%` `[██████████]` |
+| `smaug_str.c` | `297/297 = 100.00%` `[██████████]` | `254/254 = 100.00%` `[██████████]` |
 | `smaug_ops_str.c` | `270/277 = 97.47%` `[█████████░]` | `300/324 = 92.59%` `[█████████░]` |
 | `smaug_csv.c` | `293/301 = 97.34%` `[█████████░]` | `330/368 = 89.67%` `[█████████░]` |
 | `smaug_json.c` | `348/360 = 96.67%` `[█████████░]` | `415/461 = 90.02%` `[█████████░]` |
-| `smaug_datetime.c` | `539/546 = 98.72%` `[█████████░]` | `570/615 = 92.68%` `[█████████░]` |
+| `smaug_datetime.c` | `540/546 = 98.90%` `[█████████░]` | `575/620 = 92.74%` `[█████████░]` |
 | `smaug_ops_window.c` | `329/334 = 98.50%` `[█████████░]` | `344/379 = 90.77%` `[█████████░]` |
 | `smaug_convert.c` | `37/37 = 100.00%` `[██████████]` | `37/37 = 100.00%` `[██████████]` |
 | `smaug_astype.c` | `118/118 = 100.00%` `[██████████]` | `109/109 = 100.00%` `[██████████]` |
-| **TOTAL** | `3916/3967 = 98.71%` `[█████████░]` | `4021/4247 = 94.68%` `[█████████░]` |
+| **TOTAL** | `3920/3967 = 98.82%` `[█████████░]` | `4041/4267 = 94.70%` `[█████████░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
@@ -233,23 +233,13 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_core.c:62` — realloc de shrink falhando; defensivo, mantem buffer maior (seguro)
 - `smaug_core.c:447` — overflow ao dobrar capacity; so com capacity ~ SIZE_MAX
 - `smaug_core.c:457` — realloc de shrink falhando; defensivo, mantem buffer maior (seguro)
-- `smaug_ops_f64.c:164` — o engine nao confia no caller; frontend nunca passa NULL (fillna valida antes)
+- `smaug_ops_f64.c:164` — redundante — o clone(NULL) logo abaixo devolve NULL e o `if (!r)` barra; auditado 2026-07-14 (remover este guard NAO crasha). Defesa em profundidade, nao a unica protecao.
 - `smaug_ops_f64.c:167` — falha de alloc do clone; OOM sem injecao
 - `smaug_ops_f64.c:188` — falha de alloc do clone; OOM sem injecao
-- `smaug_ops_f64.c:205` — frontend valida Series/tamanhos antes de delegar
-- `smaug_ops_f64.c:205` — frontend valida Series/tamanhos antes de delegar
-- `smaug_ops_f64.c:205` — frontend valida Series/tamanhos antes de delegar
-- `smaug_ops_f64.c:205` — frontend valida Series/tamanhos antes de delegar
-- `smaug_ops_f64.c:205` — frontend valida Series/tamanhos antes de delegar
 - `smaug_ops_f64.c:209` — OOM sem injecao
-- `smaug_ops_i64.c:158` — o engine nao confia no caller; frontend nunca passa NULL (fillna valida antes)
+- `smaug_ops_i64.c:158` — redundante — o clone(NULL) logo abaixo devolve NULL e o `if (!r)` barra; auditado 2026-07-14 (remover este guard NAO crasha). Defesa em profundidade, nao a unica protecao.
 - `smaug_ops_i64.c:161` — falha de alloc do clone; OOM sem injecao
 - `smaug_ops_i64.c:182` — falha de alloc do clone; OOM sem injecao
-- `smaug_ops_i64.c:200` — frontend valida Series/tamanhos antes de delegar
-- `smaug_ops_i64.c:200` — frontend valida Series/tamanhos antes de delegar
-- `smaug_ops_i64.c:200` — frontend valida Series/tamanhos antes de delegar
-- `smaug_ops_i64.c:200` — frontend valida Series/tamanhos antes de delegar
-- `smaug_ops_i64.c:200` — frontend valida Series/tamanhos antes de delegar
 - `smaug_ops_i64.c:204` — OOM sem injecao
 - `smaug_ops_bool.c:48` — at&&bt sempre true aqui (linhas 45/47 ja garantiram ambos validos-nao-false)
 - `smaug_ops_bool.c:48` — at&&bt sempre true aqui (linhas 45/47 ja garantiram ambos validos-nao-false)
@@ -259,11 +249,6 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_str.c:164` — total ~ SIZE_MAX; inalcancavel
 - `smaug_str.c:214` — falha de alloc; OOM sem injecao
 - `smaug_str.c:256` — falha de alloc; OOM sem injecao
-- `smaug_str.c:288` — frontend valida Series/tamanhos antes de delegar
-- `smaug_str.c:288` — frontend valida Series/tamanhos antes de delegar
-- `smaug_str.c:288` — frontend valida Series/tamanhos antes de delegar
-- `smaug_str.c:288` — frontend valida Series/tamanhos antes de delegar
-- `smaug_str.c:288` — frontend valida Series/tamanhos antes de delegar
 - `smaug_str.c:303` — OOM sem injecao
 - `smaug_str.c:358` — overflow na soma buffer_len+extra; so com buffer_len ~ SIZE_MAX
 - `smaug_str.c:360` — buffer_capacity==0 inalcancavel via API publica (create garante bufcap>=INIT)
@@ -345,14 +330,9 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_datetime.c:130` — view size==0 — caso degenerado de view vazia
 - `smaug_datetime.c:151` — size > capacity — invariante; create() nunca viola
 - `smaug_datetime.c:204` — size==0 — clone de série vazia tem size=0, memcpy não executado
-- `smaug_datetime.c:219` — o engine nao confia no caller; frontend nunca passa NULL (fillna valida antes)
+- `smaug_datetime.c:219` — redundante — o clone(NULL) logo abaixo devolve NULL e o `if (!r)` barra; auditado 2026-07-14 (remover este guard NAO crasha). Defesa em profundidade, nao a unica protecao.
 - `smaug_datetime.c:222` — falha de alloc do clone; OOM sem injecao
 - `smaug_datetime.c:242` — falha de alloc do clone; OOM sem injecao
-- `smaug_datetime.c:259` — frontend valida Series/tamanhos antes de delegar
-- `smaug_datetime.c:259` — frontend valida Series/tamanhos antes de delegar
-- `smaug_datetime.c:259` — frontend valida Series/tamanhos antes de delegar
-- `smaug_datetime.c:259` — frontend valida Series/tamanhos antes de delegar
-- `smaug_datetime.c:259` — frontend valida Series/tamanhos antes de delegar
 - `smaug_datetime.c:263` — OOM sem injecao
 - `smaug_datetime.c:277` — args inválidos — start > size ou len > size-start
 - `smaug_ops_window.c:410` — loop-body inalcançável — a if em 258-260 já trata o único item stale possível; by invariante de 266, no máximo um item envelhece por passo de null

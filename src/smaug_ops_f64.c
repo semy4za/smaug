@@ -161,7 +161,7 @@ smaug_series_f64_t *smaug_f64_div_scalar(const smaug_series_f64_t *a, double sca
    smaug_f64_clone (cópia via memcpy); o loop só preenche os buracos. */
 smaug_series_f64_t *smaug_f64_coalesce_scalar(const smaug_series_f64_t *self,
                                               double value) {
-    if (!self) return NULL;  /* COV-EXCL-BR: o engine nao confia no caller; frontend nunca passa NULL (fillna valida antes) */
+    if (!self) return NULL;  /* COV-EXCL-BR: redundante — o clone(NULL) logo abaixo devolve NULL e o `if (!r)` barra; auditado 2026-07-14 (remover este guard NAO crasha). Defesa em profundidade, nao a unica protecao. */
 
     smaug_series_f64_t *r = smaug_f64_clone(self);
     if (!r) return NULL;  /* COV-EXCL-BR: falha de alloc do clone; OOM sem injecao */
@@ -202,7 +202,7 @@ smaug_series_f64_t *smaug_f64_coalesce(const smaug_series_f64_t *self,
 smaug_series_f64_t *smaug_f64_select(const smaug_series_bool_t *cond,
                                      const smaug_series_f64_t *a,
                                      const smaug_series_f64_t *b) {
-    if (!cond || !a || !b || cond->size != a->size || a->size != b->size)  /* COV-EXCL-BR: frontend valida Series/tamanhos antes de delegar */
+    if (!cond || !a || !b || cond->size != a->size || a->size != b->size)  /* guard essencial: o corpo toca create(a->size), cond->null_mask e `b` direto. Coberto por select_guards_publicos (12.24) */
         return NULL;
 
     smaug_series_f64_t *r = smaug_f64_create(a->size);

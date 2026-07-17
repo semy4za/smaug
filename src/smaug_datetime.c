@@ -216,7 +216,7 @@ smaug_series_dt_t *smaug_dt_clone(const smaug_series_dt_t *s) {
    buracos. Sem double no caminho — epoch_ms int64 exato. */
 smaug_series_dt_t *smaug_dt_coalesce_scalar(const smaug_series_dt_t *self,
                                             int64_t value) {
-    if (!self) return NULL;  /* COV-EXCL-BR: o engine nao confia no caller; frontend nunca passa NULL (fillna valida antes) */
+    if (!self) return NULL;  /* COV-EXCL-BR: redundante — o clone(NULL) logo abaixo devolve NULL e o `if (!r)` barra; auditado 2026-07-14 (remover este guard NAO crasha). Defesa em profundidade, nao a unica protecao. */
 
     smaug_series_dt_t *r = smaug_dt_clone(self);
     if (!r) return NULL;  /* COV-EXCL-BR: falha de alloc do clone; OOM sem injecao */
@@ -256,7 +256,7 @@ smaug_series_dt_t *smaug_dt_coalesce(const smaug_series_dt_t *self,
 smaug_series_dt_t *smaug_dt_select(const smaug_series_bool_t *cond,
                                    const smaug_series_dt_t *a,
                                    const smaug_series_dt_t *b) {
-    if (!cond || !a || !b || cond->size != a->size || a->size != b->size)  /* COV-EXCL-BR: frontend valida Series/tamanhos antes de delegar */
+    if (!cond || !a || !b || cond->size != a->size || a->size != b->size)  /* guard essencial: o corpo toca create(a->size), cond->null_mask e `b` direto. Coberto por select_guards_publicos (12.24) */
         return NULL;
 
     smaug_series_dt_t *r = smaug_dt_create(a->size);

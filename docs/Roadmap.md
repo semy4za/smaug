@@ -792,13 +792,20 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
    cobrir, o bruto só sobe quando se cobre — é a métrica honesta.
    **Verificado:** deletar um guard agora QUEBRA a suíte (SIGSEGV no teste);
    antes dava "TUDO PASSOU" com a métrica intacta.
- - 12.24 **7 guards redundantes com justificativa falsa** — [mesmo achado].
-   `dt/f64/i64_coalesce_scalar` e `dt/f64/i64/str_select` **não** segfaultam sem
-   o guard (o `clone(NULL)` barra antes). A exclusão é legítima, mas o texto
-   ("o frontend valida antes") é falso e foi copiado entre dtypes — deve dizer a
-   verdade: "redundante: o clone já barra NULL". Cosmético, mas o texto errado é
-   o que fez a justificativa migrar para os casos onde o guard É essencial
-   (12.23).
+ - 12.24 **CONCLUÍDO (2026-07-14) — o item estava errado, e o erro era meu.**
+   A reauditoria (pedida como review pré-código) mostrou que **4 dos 7 são
+   ESSENCIAIS**, não redundantes: `dt/f64/i64/str_select` **segfaultam** sem o
+   guard. A auditoria original os classificou mal porque o script removia só a
+   primeira linha do guard (`if (...)`), deixando o `return NULL;` órfão executar
+   sempre — a função virava `return NULL` incondicional e não crashava. Artefato
+   do harness. **Não eram 6 guards essenciais, eram 10**; os 4 escaparam do 12.23
+   por erro de medição. Feito: os 4 `select` viraram teste cobrindo os **5 ramos**
+   do `||` (`!cond`/`!a`/`!b`/2× size) + controle positivo — `test_ops_edge`
+   280→292, `test_datetime_c` 456→462, `test_string` 126→132; **20 exclusões
+   removidas** (148→128). Os 3 `coalesce_scalar` **são** redundantes (confirmado:
+   o `clone(NULL)` barra) e mantêm a exclusão, agora com justificativa
+   verdadeira. A frase "o frontend valida antes" **sumiu do Anel 0**.
+   Bruto 91.49% → **91.93%**; linha 98.71% → **98.81%**.
  - 12.19 **Fontes de verdade duplicadas de `SRCS`/`C_TESTS` (5 listas)** —
    [achado 2026-07-09, Fase 1 do 10.7]. Acrescentar um `.c` + um teste exige
    editar 5 listas: `Makefile:SRCS`, `build.sh:SRCS`, `build.sh:C_TESTS_PLAIN`,

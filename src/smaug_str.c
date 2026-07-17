@@ -285,7 +285,7 @@ smaug_series_str_t *smaug_str_coalesce(const smaug_series_str_t *self,
 smaug_series_str_t *smaug_str_select(const smaug_series_bool_t *cond,
                                      const smaug_series_str_t *a,
                                      const smaug_series_str_t *b) {
-    if (!cond || !a || !b || cond->size != a->size || a->size != b->size)  /* COV-EXCL-BR: frontend valida Series/tamanhos antes de delegar */
+    if (!cond || !a || !b || cond->size != a->size || a->size != b->size)  /* guard essencial: o corpo toca create(a->size), cond->null_mask e `b` direto. Coberto por select_guards_publicos (12.24) */
         return NULL;
 
     /* Passo 1: mede o buffer final a partir do operando escolhido por posição. */
