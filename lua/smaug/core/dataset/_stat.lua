@@ -5,7 +5,8 @@
 -- Contribui: methods.corr, cov, equals, compare,
 --            methods.duplicated, drop_duplicates, methods.rolling
 
-local Err = require("smaug.core.errors")
+local Err  = require("smaug.core.errors")
+local keys = require("smaug.core.keys")
 
 return function(I)
     local Series  = I.Series
@@ -257,11 +258,13 @@ return function(I)
     -- F.6 — Duplicatas
     -- =====================================================================
 
+    -- Chave de linha via keys.encode por coluna (fonte única, int64 > 2^53
+    -- exato). Antes concatenava type(v)..tostring(get()) inline — terceira
+    -- cópia da canonicalização, com o mesmo furo de precisão do L2.
     local function row_dup_key(self, i, subset)
         local parts = {}
         for j, name in ipairs(subset) do
-            local v = self._columns[name]:get(i)
-            parts[j] = (v == nil) and "\0NULL\0" or (type(v)..":"..tostring(v))
+            parts[j] = keys.encode(self._columns[name], i)
         end
         return table.concat(parts, "\1")
     end

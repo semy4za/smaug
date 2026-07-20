@@ -10,7 +10,8 @@
 --            methods.pivot_table, methods.stack, methods.unstack,
 --            methods.explode
 
-local Err = require("smaug.core.errors")
+local Err  = require("smaug.core.errors")
+local keys = require("smaug.core.keys")
 
 return function(I)
     local Series        = I.Series
@@ -87,15 +88,14 @@ return function(I)
     -- =====================================================================
     -- Join helpers
     -- =====================================================================
-    local function key_to_str(v)
-        if v == nil then return "\0NULL\0" end
-        return type(v) .. ":" .. tostring(v)
-    end
-
+    -- join_key: chave de igualdade de N colunas para a posição `row`.
+    -- Delega a keys.encode (fonte única): int64 preserva via get_raw, os demais
+    -- via get, sempre com prefixo de tipo. Antes usava um key_to_str local sobre
+    -- col:get(row) — que degradava int64 > 2^53 e fundia linhas no join (L2).
     local function join_key(col_list, row)
-        if #col_list == 1 then return key_to_str(col_list[1]:get(row)) end
+        if #col_list == 1 then return keys.encode(col_list[1], row) end
         local parts = {}
-        for _, c in ipairs(col_list) do parts[#parts+1] = key_to_str(c:get(row)) end
+        for _, c in ipairs(col_list) do parts[#parts+1] = keys.encode(c, row) end
         return table.concat(parts, "\1")
     end
 
@@ -256,13 +256,16 @@ return function(I)
                     end
                 end
                 local right_key_src = other:_raw_column(right_key_names[right_key_idx] or right_key_names[1])
+                -- Reconstrói a coluna de chave no resultado. keys.value preserva
+                -- o valor exato (int64 > 2^53 via get_raw); usar get aqui
+                -- degradaria o int64 grande no próprio resultado do join.
                 local vals = {}
                 for _, p in ipairs(pairs_idx) do
                     if p[1] ~= 0 then
-                        local v = src:get(p[1])
+                        local v = keys.value(src, p[1])
                         vals[#vals+1] = (v == nil) and NA or v
                     else
-                        local v = right_key_src:get(p[2])
+                        local v = keys.value(right_key_src, p[2])
                         vals[#vals+1] = (v == nil) and NA or v
                     end
                 end
@@ -288,25 +291,24 @@ return function(I)
             table.concat(self._key_names or {}, ", "), self._ds._name or "DataSet")
     end
 
-    local function key_eq(a, b)
-        if type(a) ~= type(b) then return false end
-        return a == b
+    -- Agrupamento: separa COMPARAÇÃO de VALOR (fonte única = keys).
+    -- group_encode → string canônica de igualdade (int64 preserva via get_raw);
+    -- é o que decide se duas linhas caem no mesmo grupo. Antes, get_key/keys_eq
+    -- comparavam valores via get(), degradando int64 > 2^53 e fundindo grupos (L2).
+    -- group_value → o valor exato, guardado como chave do grupo para reconstruir
+    -- a coluna no resultado (usar get aqui degradaria o int64 grande no resultado).
+    local function group_encode(key_cols, row)
+        if #key_cols == 1 then return keys.encode(key_cols[1], row) end
+        local parts = {}
+        for _, c in ipairs(key_cols) do parts[#parts+1] = keys.encode(c, row) end
+        return table.concat(parts, "\1")
     end
 
-    local function get_key(key_cols, row)
-        if #key_cols == 1 then return key_cols[1]:get(row) end
+    local function group_value(key_cols, row)
+        if #key_cols == 1 then return keys.value(key_cols[1], row) end
         local k = {}
-        for _, c in ipairs(key_cols) do k[#k+1] = c:get(row) end
+        for _, c in ipairs(key_cols) do k[#k+1] = keys.value(c, row) end
         return k
-    end
-
-    local function keys_eq(a, b)
-        if type(a) ~= "table" then return key_eq(a, b) end
-        if #a ~= #b then return false end
-        for i = 1, #a do
-            if not key_eq(a[i], b[i]) then return false end
-        end
-        return true
     end
 
     local SORT_COL_KIND = {
@@ -366,15 +368,17 @@ return function(I)
         local groups = {}
         local n = ds:nrows()
         if n == 0 then return groups end
-        local cur_key = get_key(key_cols, perm[1])
+        local cur_enc = group_encode(key_cols, perm[1])
+        local cur_key = group_value(key_cols, perm[1])
         local cur_idx = { perm[1] }
         for i = 2, n do
-            local k = get_key(key_cols, perm[i])
-            if keys_eq(k, cur_key) then
+            local enc = group_encode(key_cols, perm[i])
+            if enc == cur_enc then
                 cur_idx[#cur_idx+1] = perm[i]
             else
                 groups[#groups+1] = { key = cur_key, idx = cur_idx }
-                cur_key = k
+                cur_enc = enc
+                cur_key = group_value(key_cols, perm[i])
                 cur_idx = { perm[i] }
             end
         end

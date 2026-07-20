@@ -127,7 +127,8 @@ C_TESTS_PLAIN=(test_alloc test_ops test_ops_edge test_bool \
                test_ops_window test_astype)
 C_TESTS_WRAP=(test_allocfail)
 C_TESTS_STRESS=(test_stress)
-LUA_TESTS=(series/test_constructors series/test_access series/test_reduce \
+LUA_TESTS=(core/test_keys \
+           series/test_constructors series/test_access series/test_reduce \
            series/test_stat series/test_window series/test_predicates \
            series/test_selection series/test_str series/test_dt series/test_categorical \
            dataset/test_core dataset/test_relational dataset/test_stat dataset/test_io_support \

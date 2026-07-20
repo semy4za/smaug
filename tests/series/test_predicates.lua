@@ -535,5 +535,38 @@ do
     check(rd:is_null(3),     "10.6B: combine_first dt ambos-nulos → nulo")
 end
 
+-- ===================================================================
+-- L2: int64 > 2^53 em operações de cardinalidade/igualdade (core/keys).
+-- A chave passava por get()→double, colapsando valores distintos acima
+-- de 2^53. Cobre unique/nunique/value_counts/mode (de _stat) e isin/
+-- duplicated (aqui) — todos migrados para keys.encode/value.
+-- ===================================================================
+do
+    local ffi = require("ffi")
+    local A = ffi.new("int64_t", 9007199254740992LL)  -- 2^53
+    local B = ffi.new("int64_t", 9007199254740993LL)  -- 2^53 + 1
+    local Cc = ffi.new("int64_t", 9007199254740994LL) -- 2^53 + 2
+    local s = Series.from_table({A, B, A}, "int64")   -- 2 distintos, A repetido
+
+    check(s:nunique() == 2,        "L2 nunique int64>2^53 = 2")
+    check(s:unique():len() == 2,   "L2 unique int64>2^53 → 2 elementos")
+    check(s:value_counts():nrows() == 2, "L2 value_counts int64>2^53 → 2 linhas")
+    check(s:mode() == A,           "L2 mode int64>2^53 = valor exato mais frequente")
+
+    local d = s:duplicated()
+    check(d:get(1) == false and d:get(2) == false and d:get(3) == true,
+          "L2 duplicated int64>2^53 exato (A,B,A → f,f,t)")
+
+    local si = Series.from_table({A, B, Cc}, "int64")
+    local m  = si:isin({B})        -- só B presente no conjunto
+    check(m:get(1) == false and m:get(2) == true and m:get(3) == false,
+          "L2 isin int64>2^53 distingue exato")
+    -- isin com número cru na lista (usuário passa 5, não 5LL) segue funcionando
+    local sp = Series.from_table({1, 5, 9}, "int64")
+    local mp = sp:isin({5})
+    check(mp:get(1) == false and mp:get(2) == true and mp:get(3) == false,
+          "L2 isin: número cru na lista bate com int64 da série")
+end
+
 
 print(string.format("OK — %d checks passaram (Series: predicados, duplicatas, searchsorted, rep_each)", n_ok))

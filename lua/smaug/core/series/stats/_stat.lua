@@ -7,6 +7,8 @@
 -- Contribui: methods.unique, nunique, value_counts, prod, median, quantile,
 --            mode, describe
 
+local keys = require("smaug.core.keys")
+
 return function(I)
     local methods = I.methods
     local Series  = I.Series
@@ -113,10 +115,10 @@ return function(I)
         local seen = {}
         local vals = {}
         for i = 1, n do
-            local v   = self:get(i)
-            local key = (v == nil) and "\0NULL\0" or (type(v)..":"..tostring(v))
+            local key = keys.encode(self, i)          -- igualdade exata (int64 > 2^53)
             if not seen[key] then
                 seen[key]     = true
+                local v       = keys.value(self, i)   -- valor preservado no resultado
                 vals[#vals+1] = (v == nil) and NA or v
             end
         end
@@ -129,9 +131,8 @@ return function(I)
         local n    = self:len()
         local c    = 0
         for i = 1, n do
-            local v = self:get(i)
-            if v ~= nil then
-                local key = type(v)..":"..tostring(v)
+            if not self:is_null(i) then
+                local key = keys.encode(self, i)
                 if not seen[key] then seen[key] = true; c = c + 1 end
             end
         end
@@ -145,12 +146,11 @@ return function(I)
         local cnt   = {}
         local order = {}
         for i = 1, n do
-            local v = self:get(i)
-            if v ~= nil then
-                local key = type(v)..":"..tostring(v)
+            if not self:is_null(i) then
+                local key = keys.encode(self, i)
                 if not cnt[key] then
-                    cnt[key]         = 0
-                    order[#order+1] = {key=key, val=v}
+                    cnt[key]        = 0
+                    order[#order+1] = {key=key, val=keys.value(self, i)}
                 end
                 cnt[key] = cnt[key] + 1
             end
@@ -239,18 +239,19 @@ return function(I)
         local freq  = {}
         local order = {}
         for i = 1, self:len() do
-            local v = self:get(i)
-            if v ~= nil then
-                local k = tostring(v)
-                if not freq[k] then freq[k] = 0; order[#order+1] = v end
+            if not self:is_null(i) then
+                local k = keys.encode(self, i)   -- prefixo por dtype (antes: tostring cru)
+                if not freq[k] then
+                    freq[k] = 0
+                    order[#order+1] = {key = k, val = keys.value(self, i)}
+                end
                 freq[k] = freq[k] + 1
             end
         end
         if #order == 0 then return nil end
-        local best, best_f = order[1], 0
-        for _, v in ipairs(order) do
-            local f = freq[tostring(v)]
-            if f > best_f then best = v; best_f = f end
+        local best, best_f = order[1].val, 0
+        for _, item in ipairs(order) do
+            if freq[item.key] > best_f then best = item.val; best_f = freq[item.key] end
         end
         return best
     end

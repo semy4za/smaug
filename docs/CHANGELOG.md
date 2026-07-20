@@ -5,6 +5,55 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-19 — 10.5 Passo A: `core/keys.lua`, chave de igualdade com int64 exato (L2)
+
+Achado (L2): o padrão `type(v)..":"..tostring(v)` sobre `series:get(i)`, repetido
+em 6+ call-sites (unique/nunique/value_counts/mode/isin/duplicated + join/groupby
++ row_dup_key), propaga a mesma perda do 9.1 — `get()` reintroduz o double na
+saída. Dois int64 distintos > 2^53 colapsavam na MESMA chave: **join casava
+linhas erradas, groupby/unique/value_counts fundiam, isin/duplicated erravam** —
+em silêncio, sem teste que guardasse. Provado com 9007199254740992 vs ...993.
+Pior que os 10.6/10.7: lá o valor errado é visível; aqui as linhas se fundem
+DENTRO de uma agregação, e a chave ainda era guardada como VALOR no resultado
+(groupby/value_counts/join), degradando o int64 no próprio resultado.
+
+**A pergunta que definiu o desenho (não-óbvio): "onde isso pertence?"** A
+arquitetura respondeu, não a conveniência. P3 (responsabilidade única) +
+precedente: "canonicalizar valor de coluna para comparar" já vive no Anel 0 para
+ordenação (`smaug_multi_argsort`), e `smaug_hash_table_t` já está reservado lá
+"para GroupBy futuro". A chave de igualdade pertence ao mesmo anel. Logo isto é um
+**Passo A** (correção na camada acessível), como no 10.6 — não o destino.
+
+Diferença vs Passo A do 10.6: lá a guarda **recusa** int64 > 2^53 (falha visível);
+aqui **preserva** via `get_raw`. Escolha deliberada — preservar alinha com o
+*destino* do 10.6 (Passo B preserva exato), e a chave de igualdade não tem por que
+recusar o que o buffer já guarda certo.
+
+**Desenho de `core/keys.lua`** (`encode`/`value`/`encode_value`): o prefixo da
+chave é o **dtype da coluna**, não o `type()` do valor Lua. Descoberto na
+verificação do isin: o mesmo int64 chega como `number` via get() e `cdata` via
+get_raw() — prefixar por type() faria a lista crua do isin (number) divergir da
+série (cdata) e quebrar o casamento. Prefixar por dtype (fixo, conhecido) faz
+`int64:100` bater dos dois lados. Uma canônica só; `encode` delega a
+`encode_value`.
+
+Coesão/limpeza no mesmo passo: eliminados `dup_key` (código morto, exposto em
+`I.dup_key` sem consumidor), a 3ª cópia da canonicalização em `row_dup_key`
+(DataSet), e o `mode` que usava `tostring` sem prefixo de tipo (colisão latente
+1 vs "1") e o chamava 2×.
+
+Passo B (registrado no Roadmap 10.5): descer a canonicalização/hash ao Anel 0
+(usando o `smaug_hash_table_t` reservado) fecha o P3 — conceito num anel só, junto
+do `multi_argsort`. O `keys.lua` já é o ponto de plugue: substitui o corpo de
+`encode`/`value` sem tocar call-sites.
+
+Lua puro (nenhum C tocado). Guards permanentes: `test_keys` (18), `test_relational`
+(+5), `test_predicates` (+7). Fedora `--all` verde: Valgrind-clean, parity 14/14,
+cobertura de linha 98.82%. Colaterais registrados (12.27/12.28/12.29): OOM parcial
+no dataset_to_table (L1), sincronia cdef↔header sem verificação (A-FFI), eixo 14
+com lista hardcoded (A3).
+
+---
 ## 2026-07-14 — 12.6 + 12.2: uma travessia FFI por `get()`
 
 **12.2:** removida a linha comentada `-- smaug.read_parquet = ...` do

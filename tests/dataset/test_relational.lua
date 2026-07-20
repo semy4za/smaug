@@ -634,5 +634,37 @@ local vR = smaug.DataSet({{"k", {"x", "y"}, "string"}, {"w", {9, 8}, "int64"}})
 local okv = pcall(function() return vL:join(vR, "k") end)
 check(okv, "C8: NA em coluna de valores (não-chave) não dispara")
 
+-- ===================================================================
+-- L2: int64 > 2^53 em chave de join/groupby (correção via core/keys).
+-- A chave passava por get()→double: dois int64 distintos acima de 2^53
+-- colapsavam (join casava errado, groupby fundia grupos) e o valor da
+-- chave saía degradado no resultado. keys.encode/value corrigem ambos.
+-- ===================================================================
+do
+    local ffi = require("ffi")
+    local A = ffi.new("int64_t", 9007199254740992LL)  -- 2^53
+    local B = ffi.new("int64_t", 9007199254740993LL)  -- 2^53 + 1
+
+    -- groupby: a,b,a → 2 grupos (não funde)
+    local g = smaug.DataSet({{"id", {A, B, A}, "int64"}, {"v", {1, 10, 100}, "int64"}})
+                   :groupby("id"):sum("v")
+    check(g:nrows() == 2, "L2 groupby int64>2^53 não funde grupos")
+    local seen_a, seen_b = false, false
+    for i = 1, g:nrows() do
+        local k = g:column("id"):get_raw(i)
+        if k == A then seen_a = true elseif k == B then seen_b = true end
+    end
+    check(seen_a and seen_b, "L2 groupby preserva valor exato da chave no resultado")
+
+    -- join: ids distintos não casam; iguais casam e preservam valor
+    local L = smaug.DataSet({{"id", {A}, "int64"}, {"lval", {100}, "int64"}})
+    local Rdiff = smaug.DataSet({{"id", {B}, "int64"}, {"rval", {200}, "int64"}})
+    check(L:join(Rdiff, "id", "inner"):nrows() == 0, "L2 join ids distintos → 0 linhas")
+    local Rsame = smaug.DataSet({{"id", {A}, "int64"}, {"rval", {200}, "int64"}})
+    local j = L:join(Rsame, "id", "inner")
+    check(j:nrows() == 1, "L2 join ids iguais → 1 linha")
+    check(j:column("id"):get_raw(1) == A, "L2 join preserva valor exato da chave")
+end
+
 
 print(string.format("OK — %d checks passaram (DataSet: groupby, concat, join)", n_ok))

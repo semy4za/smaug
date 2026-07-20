@@ -411,11 +411,12 @@ espontânea; são decisões de contrato com aresta, que precisam estar resolvida
 Mesma tese do item 7 (completude do motor), agora para **transformações
 element-wise**. A exploração de 2026-06-30 mapeou operações que fazem o loop em
 Lua cruzando FFI por elemento, quando o padrão correto (delegar ao descritor → C)
-já existe e é seguido em toda a aritmética (o `binop` é exemplar). Em 10.1–10.5
+já existe e é seguido em toda a aritmética (o `binop` é exemplar). Em 10.1–10.4
 não são bugs — são assimetrias de vetorização (performance): 1 travessia FFI por
-linha vs 1 total. Em 10.6–10.7 a assimetria vem com defeito de correção: o loop
-Lua round-tripa por `get()`/`tonumber()`, corrompendo int64 acima de 2^53 no que
-escreve (mesma natureza da Sub-A do 9.1, reintroduzida na reconstrução).
+linha vs 1 total. Em 10.5–10.7 a assimetria vem com **defeito de correção**: o
+loop Lua round-tripa por `get()`/`tonumber()`, corrompendo int64 acima de 2^53 no
+que escreve ou na chave que compara (mesma natureza da Sub-A do 9.1, reintroduzida
+na reconstrução e na canonicalização de chave).
 
 > **Meta-decisão:** levar ao Anel 0 o que o projeto já sabe fazer (o `binop`
 > prova o padrão). Onde a primitiva escalar já existe mas falta a vetorizada,
@@ -435,14 +436,42 @@ escreve (mesma natureza da Sub-A do 9.1, reintroduzida na reconstrução).
   `C.smaug_dt_year(v)` **por elemento** num loop Lua — a lógica escalar está no C,
   falta a versão de série (`smaug_dt_year_series(s) → série`). Mesmo padrão em
   `.str` (upper/lower/len/...). Criar as primitivas de série; a Lua delega.
-- 10.5 **primitiva `hash_series` no Anel 0** (E7) — **precisa de levantamento
-  próprio antes de executar**. Padrão `tostring`-como-hash repetido em 6
-  call-sites: `unique`/`nunique`/`value_counts`/`mode`/`isin` (Series) +
-  `key_to_str` (relacional). Padrão repetido = primitiva ausente. É a de **maior
-  alavancagem** (resolve 6 lugares), mas também a mais pesada (hash de valores
-  arbitrários incl. string/datetime em C é trabalho real). Levantar escopo e
-  decisões antes de cravar. Vínculo: item 12.4 (categorical hash — a ponta já
-  registrada).
+- 10.5 **chave de igualdade/cardinalidade → int64 exato (L2)** (E7). Não é
+  performance — é **defeito de correção**, mesma família do 10.6/10.7. O padrão
+  `type(v)..":"..tostring(v)` sobre `series:get(i)` estava repetido em 6+
+  call-sites: `unique`/`nunique`/`value_counts`/`mode`/`isin`/`duplicated`
+  (Series), `join`/`groupby` (relacional) e `row_dup_key` (DataSet). O furo é a
+  propagação da mesma perda do 9.1: `get()` reintroduz o double na saída (o valor
+  está exato no buffer C, mas `tonumber` degrada acima de 2^53). **Provado (L2,
+  2026-07-19):** dois int64 distintos > 2^53 (ex.: 9007199254740992 e ...993 —
+  IDs, contadores) colapsavam na MESMA chave → join casava linhas erradas,
+  groupby/unique/value_counts fundiam grupos/valores, isin/duplicated erravam —
+  em silêncio, sem teste que guardasse. E a chave era guardada como VALOR no
+  resultado (groupby/value_counts/join), degradando o int64 no próprio resultado.
+  - **Enquadramento arquitetural (P3 — responsabilidade única).** "Canonicalizar
+    valor de coluna para comparar" já vive no Anel 0 para *ordenação*
+    (`smaug_multi_argsort`), e o `smaug_hash_table_t` já está reservado lá "para
+    GroupBy futuro". A chave de *igualdade* pertence ao mesmo anel — deixá-la no
+    Lua duplicaria o conceito entre camadas (o que P3 proíbe). Logo, como no 10.6:
+    Passo A corrige na camada acessível; Passo B desce ao Anel 0 (destino).
+  - **Passo A — fonte única em Lua CONCLUÍDO (selo Fedora 2026-07-19):**
+    `core/keys.lua` (`encode`/`value`/`encode_value`) — uma canonicalização só,
+    prefixo pelo **dtype da coluna** (não `type()` do valor: assim o int64 100 da
+    série via `get_raw` e o 100 cru da lista do `isin` batem). int64 lê via
+    `get_raw` (preserva); demais via `get`. Migrados os 6+ call-sites; eliminados
+    `dup_key` (morto, exposto sem uso), a 3ª cópia em `row_dup_key`, e o `mode`
+    sem prefixo de tipo. Diferente do Passo A do 10.6 (guarda que **recusa**),
+    aqui **preserva** — alinhado ao *destino* do 10.6 (Passo B preserva exato).
+    Guards permanentes (`test_keys` 18, +5 relacional, +7 predicates).
+    Valgrind-clean, parity 14/14, cobertura de linha 98.82%.
+  - **Passo B — descer ao Anel 0 (destino, não otimização opcional):** a
+    canonicalização/hash de igualdade vira primitiva do Núcleo (usando o
+    `smaug_hash_table_t` reservado), e `keys.encode` passa a delegar a ela —
+    fechando o P3 (conceito num anel só, junto do `multi_argsort`). O `keys.lua`
+    já é o ponto de plugue: o Passo B substitui o corpo de `encode`/`value` sem
+    tocar nenhum call-site. Precisa de levantamento próprio (hash de valores
+    arbitrários incl. string/datetime em C é trabalho real). Vínculo: 12.4
+    (categorical hash — a ponta já registrada).
 - 10.6 **Família seleção/preenchimento por máscara → Anel 0** (achado 2026-07-02,
   ampliado 2026-07-06). Toda a família que escolhe/preenche valor por posição
   segundo uma máscara vive no Anel 1 via loop `get→set`+`from_table`: `fillna`
@@ -887,7 +916,32 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
    declaração estava no preâmbulo, não no meio: quase todos os checks já
    contavam) — a remoção só tirou a redundância. Nenhum check novo: a validação
    sempre foi real, só o relato subcontava.
-
+ - 12.27 **OOM parcial em `dataset_to_table` vaza (to_csv/to_json)** — [Windows]
+   (achado 2026-07-19, L1). `dataset_to_table` (`io/csv.lua`) aloca colunas C num
+   laço; se um `smaug_*_create` falhar no meio (linhas ~187/197/207/217 dão
+   `error("OOM")`), as colunas já alocadas não são liberadas — o `error` sobe
+   direto, pulando `free_table_lua`. Afeta `to_csv` e `to_json` (o json reusa o
+   mesmo `_dataset_to_table`). Assimétrico com o rigor do C (que protege OOM
+   parcial, ex.: `str_slots_reserve_one`). Raro (só sob OOM), mas real. Correção:
+   envolver a construção num `pcall` que libera o parcial antes de repropagar, ou
+   construir tudo e só então publicar. Uma correção no ponto compartilhado cobre
+   os dois I/O.
+ - 12.28 **Sincronia cdef↔header (ABI) sem verificação automática** — [achado
+   2026-07-19, A-FFI]. O `cdef` do `ffi_loader.lua` replica manualmente o layout
+   das structs dos headers. Está correto hoje (verificado campo a campo:
+   `smaug_series_str_t`, `smaug_metadata_t`), mas é mantido por disciplina — um
+   esquecimento não quebra o build de forma óbvia, vira leitura de memória
+   deslocada (passa em teste pequeno, corrompe depois). Mesma classe do 12.20/A3:
+   coerência presumida, não verificada. Fix barato (confirmado: `ffi.offsetof`
+   funciona): um teste cruza `ffi.sizeof`/`offsetof` de cada struct com valores
+   que o C imprime via `sizeof`/`offsetof`. Fecha o buraco antes do 1.0.
+ - 12.29 **Eixo 14 (thread-safety) com lista de `.c` hardcoded** — [achado
+   2026-07-19, A3]. `14_thread_safety.lua` itera uma lista fixa de `src/*.c`
+   (hoje 12/12 ✓) mas não detecta um `.c` NOVO não-listado — falha em silêncio.
+   Oportuno: o item 10 (Passo B do 10.5, prod, etc.) cria arquivos C. Respeitando
+   a restrição de não usar shell (Windows), cruzar com `MANIFEST.txt` (já gerado,
+   lista tudo) fecharia a completude. Mesma natureza do 12.19 (fontes de verdade
+   duplicadas).
 ## 13. Reescrita de exemplos + docstrings  [Windows]
 
 Doc reflete a API depois que ela para de mudar (itens 1–12).

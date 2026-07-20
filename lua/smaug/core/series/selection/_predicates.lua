@@ -4,8 +4,10 @@
 -- is_monotonic_*, equals, compare, idxmin/max, first/last_valid_index,
 -- duplicated, drop_duplicates, combine_first, searchsorted, rep_each.
 -- Recebe I com: I.methods, I.Series, I.NA
--- Produz em I: I.is_monotonic, I.dup_key
+-- Produz em I: I.is_monotonic
 -- Contribui: todos os methods acima
+
+local keys = require("smaug.core.keys")
 
 return function(I)
     local methods = I.methods
@@ -51,16 +53,21 @@ return function(I)
         if type(values) ~= "table" then
             error("smaug: isin() espera uma tabela de valores", 2)
         end
+        -- Chave canônica em ambos os lados (fonte única keys), com o dtype da
+        -- série como referência: assim o int64 100 da série (cdata via get_raw)
+        -- e o 100 da lista (number) batem. Antes, tostring cru nos dois lados
+        -- funcionava só para valores pequenos e sem prefixo de tipo.
         local set = {}
-        for _, val in ipairs(values) do set[tostring(val)] = true end
+        for _, val in ipairs(values) do
+            set[keys.encode_value(val, self._dtype)] = true
+        end
         local n    = self:len()
         local vals = {}
         for i = 1, n do
-            local v = self:get(i)
-            if v == nil then
+            if self:is_null(i) then
                 vals[i] = NA
             else
-                vals[i] = set[tostring(v)] == true
+                vals[i] = set[keys.encode(self, i)] == true
             end
         end
         return Series.from_table(vals, "bool", self._name)
@@ -191,15 +198,9 @@ return function(I)
     -- F.6 — Duplicatas e operações binárias
     -- =====================================================================
 
-    -- Chave de igualdade consistente com unique/nunique. Null tem chave própria.
-    local function dup_key(v)
-        if v == nil then return "\0NULL\0" end
-        return type(v) .. ":" .. tostring(v)
-    end
-    I.dup_key = dup_key
-
     -- duplicated([keep]): Series<bool> marcando posições duplicadas.
-    -- keep="first" (default), "last", "none".
+    -- keep="first" (default), "last", "none". Chave de igualdade via keys.encode
+    -- (fonte única, consistente com unique/nunique; int64 > 2^53 exato).
     function methods.duplicated(self, keep)
         keep = keep or "first"
         if keep ~= "first" and keep ~= "last" and keep ~= "none" then
@@ -211,23 +212,23 @@ return function(I)
         if keep == "first" then
             local seen = {}
             for i = 1, n do
-                local k = dup_key(self:get(i))
+                local k = keys.encode(self, i)
                 if seen[k] then vals[i] = true else seen[k] = true; vals[i] = false end
             end
         elseif keep == "last" then
             local seen = {}
             for i = n, 1, -1 do
-                local k = dup_key(self:get(i))
+                local k = keys.encode(self, i)
                 if seen[k] then vals[i] = true else seen[k] = true; vals[i] = false end
             end
         else  -- none
             local count = {}
             for i = 1, n do
-                local k = dup_key(self:get(i))
+                local k = keys.encode(self, i)
                 count[k] = (count[k] or 0) + 1
             end
             for i = 1, n do
-                vals[i] = count[dup_key(self:get(i))] > 1
+                vals[i] = count[keys.encode(self, i)] > 1
             end
         end
         return Series.from_table(vals, "bool", self._name)

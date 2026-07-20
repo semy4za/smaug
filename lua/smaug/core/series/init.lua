@@ -26,7 +26,7 @@
 --                               cummin, cummax, argmin, argmax
 --   11. window/_rolling.lua   → I.SeriesRolling, I.SeriesExpanding
 --                             → methods.rolling, expanding
---   12. selection/_predicates.lua→ I.is_monotonic, I.dup_key
+--   12. selection/_predicates.lua→ I.is_monotonic
 --                               → methods.between, isin, is_unique, is_monotonic_*,
 --                                 equals, compare, idxmin, idxmax, first/last_valid_index,
 --                                 duplicated, drop_duplicates, combine_first,
