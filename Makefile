@@ -2,8 +2,9 @@ CC      = gcc
 CFLAGS  = -std=c11 -fPIC -Wall -Wextra -O2 -I./include
 LDFLAGS = -shared
 
-# Backend C completo (f64 + i64 + bool + string)
-SRCS = src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c src/smaug_ops_bool.c src/smaug_str.c src/smaug_ops_str.c src/smaug_csv.c src/smaug_json.c src/smaug_datetime.c src/smaug_ops_window.c src/smaug_convert.c src/smaug_astype.c
+# Backend C completo: descobre todos os src/*.c automaticamente (12.19) — assim
+# um .c novo entra sem editar lista. Espelha o glob de build.sh e build_win.ps1.
+SRCS = $(wildcard src/*.c)
 
 TARGET = build/libsmaug.so
 

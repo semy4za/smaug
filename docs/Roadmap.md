@@ -881,13 +881,23 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
    o `clone(NULL)` barra) e mantêm a exclusão, agora com justificativa
    verdadeira. A frase "o frontend valida antes" **sumiu do Anel 0**.
    Bruto 91.49% → **91.93%**; linha 98.71% → **98.81%**.
- - 12.19 **Fontes de verdade duplicadas de `SRCS`/`C_TESTS` (5 listas)** —
-   [achado 2026-07-09, Fase 1 do 10.7]. Acrescentar um `.c` + um teste exige
-   editar 5 listas: `Makefile:SRCS`, `build.sh:SRCS`, `build.sh:C_TESTS_PLAIN`,
-   `make_coverage.sh:SRCS`, `make_coverage.sh:C_TESTS`. Divergência silenciosa e
-   perigosa: esquecer a de coverage deixa o build **verde** enquanto o arquivo
-   novo reporta 0% e **não entra no selo**. Unificar numa fonte única lida pelos
-   3 scripts. Não bloqueia o 10.7; dívida de manutenibilidade.
+ - 12.19 **PARCIAL (2026-07-20) — metade SRCS concluída; C_TESTS registrado.**
+   [achado 2026-07-09, Fase 1 do 10.7]. Eram 5 listas duplicadas; o levantamento
+   mostrou que têm **duas naturezas**:
+   - **SRCS (fontes C) — RESOLVIDO.** As 3 cópias viram descoberta automática:
+     `build.sh` já era glob (12.29); agora `Makefile` usa `$(wildcard src/*.c)` e
+     `make_coverage.sh` deriva por glob + basename (`src/X.c → X`). Mata o risco
+     central do achado — esquecer a de coverage deixava o build **verde** com o
+     `.c` novo reportando 0% e fora do selo. Provado: um `.c` novo é pego pelos
+     três sem editar lista. (Restava só `build.sh:SRCS` no 12.29; agora as 3.)
+   - **C_TESTS (test binaries) — REGISTRADO, não derivável por glob puro.** As 2
+     cópias (`build.sh:C_TESTS_PLAIN`, `make_coverage.sh:C_TESTS`) têm
+     categorização **semântica**: `test_allocfail` exige `-Wl,--wrap`, `test_stress`
+     é categoria à parte. Um glob de `tests/c/*.c` pegaria os 13 mas quebraria a
+     compilação especial. Unificar exigiria um manifesto que preserve categorias
+     (mais invasivo). Menos perigoso que a de coverage: esquecer um teste aqui
+     apenas não o roda (visível no contador de checks), não mente sobre cobertura.
+     Candidato a fazer junto do item 10, quando `.c`/testes novos entrarem.
  - 12.20 **`03_c_lua_mirror` não audita `astype.h`/`convert.h`** — [achado
    2026-07-09]. O eixo lê `smaug.h`+`_string/_datetime/_numeric/_bool/_core.h`,
    mas não os headers do 10.7; as 12 primitivas + 2 parsers ficam fora do radar

@@ -24,7 +24,14 @@ set -euo pipefail
 
 command -v luajit >/dev/null 2>&1 || { echo "ERRO: luajit nao encontrado (necessario para agregar os testes Lua)."; exit 1; }
 
-SRCS="smaug_core smaug_ops_f64 smaug_ops_i64 smaug_ops_bool smaug_str smaug_ops_str smaug_csv smaug_json smaug_datetime smaug_ops_window smaug_convert smaug_astype"
+# Backend C: descobre todos os src/*.c automaticamente (12.19). Antes era uma
+# lista hardcoded — a mais perigosa das cópias de SRCS: esquecer um .c novo aqui
+# deixava o build verde enquanto o arquivo reportava 0% e não entrava no selo.
+# Agora acompanha o glob de build.sh/Makefile/build_win.ps1. Formato "smaug_X"
+# (sem src/ nem .c) porque o resto do script referencia os objetos por esse nome.
+SRCS=""
+for _f in src/*.c; do _b="${_f##*/}"; SRCS="$SRCS ${_b%.c}"; done
+SRCS="${SRCS# }"
 # Tudo que exercita o backend. Se test_stress deixar a medicao lenta demais,
 # pode remove-lo daqui -- ele cobre majoritariamente ramos que ops ja pega.
 C_TESTS="test_alloc test_ops test_ops_edge test_bool test_bool_lifecycle test_string test_cow test_io_c test_datetime_c test_ops_window test_astype test_stress"

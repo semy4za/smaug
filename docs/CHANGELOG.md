@@ -5,6 +5,31 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-20 — 12.19 (metade SRCS): fontes C descobertas por glob nos 3 scripts
+
+Continuação do 12.29. O 12.19 apontava 5 listas duplicadas de SRCS/C_TESTS; o
+levantamento mostrou que são duas naturezas distintas, e só uma é limpa de
+resolver por descoberta automática.
+
+SRCS (fontes C) — as 3 cópias agora descobrem sozinhas: build.sh já era glob
+(12.29), Makefile passou a `$(wildcard src/*.c)`, make_coverage.sh deriva por glob
+bash + basename. Isso mata o risco central do achado: a cópia de coverage era a
+perigosa — esquecer um `.c` novo lá deixava o build verde enquanto o arquivo
+reportava 0% e ficava fora do selo. Agora coverage descobre igual ao build.
+Provado: um .c fake foi pego pelos três sem editar nenhuma lista.
+
+C_TESTS (binários de teste) — deixado registrado, não resolvido. O não-óbvio: ao
+contrário das SRCS (todas idênticas), os testes têm categorização semântica —
+test_allocfail exige -Wl,--wrap, test_stress é categoria à parte. Um glob puro
+pegaria os 13 mas quebraria a compilação especial. Unificar exigiria um manifesto
+de categorias (bem mais invasivo), e o risco é menor: esquecer um teste na lista
+apenas não o roda (o contador de checks muda, visível), não mente sobre cobertura.
+Registrado no 12.19 para fazer junto do item 10.
+
+Verificado que Makefile ($(wildcard)) e coverage (glob) produzem exatamente os 12
+fontes atuais. Cobertura reproduzida: 98.81% linha / 94.71% branch-alvo.
+
+---
 ## 2026-07-20 — 12.27: OOM parcial em dataset_to_table não vaza mais (L1)
 
 Achado (L1): `dataset_to_table` (io/csv.lua) alocava, por coluna, o nome
