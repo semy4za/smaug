@@ -459,5 +459,49 @@ do
     check(pcall(function() return dc:to_csv_mem() end), "12.3 categorical no to_csv (controle)")
 end
 
+-- ===================================================================
+-- 12.27: OOM parcial em dataset_to_table libera o que já foi alocado.
+-- Uma falha no meio do laço de colunas (ex.: create devolve nil → error)
+-- deixaria o parcial vazando, pois `t` nunca chega ao caller. O pcall
+-- interno captura, free_table_lua libera o parcial e o erro é repropagado.
+-- Simulamos a falha injetando um erro no get da 2ª coluna (a 1ª já alocada).
+do
+    local csv = require("smaug.io.csv")
+    local ds  = smaug.DataSet({ {"a", {1, 2}}, {"b", {3, 4}}, {"c", {5, 6}} })
+
+    local orig_raw = ds._raw_column
+    ds._raw_column = function(self, name)
+        local col = orig_raw(self, name)
+        if name == "b" then
+            -- proxy cujo :get lança → falha no meio do laço (após a coluna 'a')
+            return setmetatable({ _dtype = col._dtype, _name = col._name }, {
+                __index = function(_, k)
+                    if k == "get" then
+                        return function() error("smaug: OOM simulado (teste 12.27)", 3) end
+                    end
+                    return col[k]
+                end,
+            })
+        end
+        return col
+    end
+
+    local ok, err = pcall(function() return csv._dataset_to_table(ds) end)
+    ds._raw_column = orig_raw
+
+    check(not ok, "12.27 falha no meio da construção é capturada (não vaza silenciosamente)")
+    check(tostring(err):match("OOM simulado") ~= nil,
+          "12.27 erro original é repropagado")
+
+    -- Sem crash acima já prova que free_table_lua rodou sobre o parcial. Confirma
+    -- que o heap segue íntegro: uma nova construção+liberação funciona.
+    local ds2 = smaug.DataSet({ {"x", {1, 2, 3}} })
+    local ok2 = pcall(function()
+        local t = csv._dataset_to_table(ds2)
+        csv._free_table_lua(t, ds2:ncols())
+    end)
+    check(ok2, "12.27 heap íntegro após liberação do parcial")
+end
+
 
 print(string.format("OK — %d checks passaram (I/O CSV + dados reais)", n_ok))

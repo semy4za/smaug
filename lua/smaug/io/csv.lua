@@ -137,6 +137,11 @@ end
 -- DataSet → smaug_table_t (para escrita)
 -- ===================================================================
 
+-- free_table_lua é declarada aqui (forward) porque dataset_to_table a usa para
+-- liberar o parcial em caso de OOM no meio da construção (12.27); a definição
+-- vem logo abaixo.
+local free_table_lua
+
 local function dataset_to_table(ds)
     local ncols = ds:ncols()
     local nrows = ds:nrows()
@@ -152,6 +157,13 @@ local function dataset_to_table(ds)
     end
     ffi.fill(t.columns, ncols * col_size, 0)
 
+    -- 12.27: a construção abaixo aloca, por coluna, o nome (ffi.C.malloc) e a
+    -- série C (smaug_*_create). Um OOM no meio (create devolve nil → error)
+    -- deixaria o parcial vazando, pois `t` nunca chega ao caller para ser
+    -- liberado. Protegemos com pcall: em falha, free_table_lua libera o que já
+    -- foi alocado (seguro sobre parcial — o ffi.fill zerou tudo e o free pula
+    -- campos nil) e repropaga o erro original.
+    local build_ok, build_err = pcall(function()
     for ci, cname in ipairs(ds._col_names) do
         local col   = ds:_raw_column(cname)
         local dtype = col._dtype
@@ -223,11 +235,17 @@ local function dataset_to_table(ds)
             t.columns[idx].str = s
         end
     end
+    end)  -- fim do pcall de construção
+
+    if not build_ok then
+        free_table_lua(t, ncols)   -- libera o parcial (fill+guard nil = seguro)
+        error(build_err, 0)        -- repropaga o erro original (nível 0: sem prefixo extra)
+    end
 
     return t
 end
 
-local function free_table_lua(t, ncols)
+function free_table_lua(t, ncols)
     -- libera recursos alocados por dataset_to_table. IMPORTANTE (bug de heap
     -- no Windows): `name` e `columns` foram alocados com ffi.C.malloc (heap do
     -- luajit.exe), então DEVEM ser liberados com ffi.C.free — não com

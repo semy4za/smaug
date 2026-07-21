@@ -232,7 +232,7 @@ do parity (83 assimetrias: 51 só-Series, 32 só-DataSet, 44 em ambos):
 > Series acesso 34, DataSet core 212); equivalência Fedora de praxe para Lua-puro.
 > Build verde, parity 12/12.
 
-## 7. Completude do motor (Ring 0)  [Fedora]
+## 7. Completude do motor (Ring 0)  [Fedora]  [Done]
 
 O motor foi construído numérico-primeiro. Operações agnósticas a tipo e de tipo
 ordenável só existem em f64/i64 no C; para os demais dtypes a Lua reimplementa via
@@ -293,7 +293,7 @@ fallback element-wise. Depende do item 1 (nulidade coerente) já pronto.
 - 7.4 ✅ bool eq/ne no C (único dtype sem igualdade). C+header+cdef+wrapper Lua,
   teste C (+11), Lua (+6), allocfail (+20). Fedora-validado (Valgrind-clean + cobertura).
 
-## 8. Rolling → Ring 0  [Windows+Fedora]
+## 8. Rolling → Ring 0  [Windows+Fedora]  [Done]
 
 A versão Lua do rolling (Series e DataSet) reimplementa o que o C faz — e faz
 **mais** que o C (std/var/count/min_periods/expanding). "Mandar pro Ring 0" exige
@@ -916,16 +916,23 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
    declaração estava no preâmbulo, não no meio: quase todos os checks já
    contavam) — a remoção só tirou a redundância. Nenhum check novo: a validação
    sempre foi real, só o relato subcontava.
- - 12.27 **OOM parcial em `dataset_to_table` vaza (to_csv/to_json)** — [Windows]
-   (achado 2026-07-19, L1). `dataset_to_table` (`io/csv.lua`) aloca colunas C num
-   laço; se um `smaug_*_create` falhar no meio (linhas ~187/197/207/217 dão
-   `error("OOM")`), as colunas já alocadas não são liberadas — o `error` sobe
-   direto, pulando `free_table_lua`. Afeta `to_csv` e `to_json` (o json reusa o
-   mesmo `_dataset_to_table`). Assimétrico com o rigor do C (que protege OOM
-   parcial, ex.: `str_slots_reserve_one`). Raro (só sob OOM), mas real. Correção:
-   envolver a construção num `pcall` que libera o parcial antes de repropagar, ou
-   construir tudo e só então publicar. Uma correção no ponto compartilhado cobre
-   os dois I/O.
+ - 12.27 **CONCLUÍDO (2026-07-20) — OOM parcial em `dataset_to_table`.** [Windows]
+   `dataset_to_table` (`io/csv.lua`) alocava, por coluna, o nome (`ffi.C.malloc`)
+   e a série C (`smaug_*_create`) num laço; um OOM no meio (create → nil →
+   `error`) deixava o parcial vazando, porque `t` nunca chegava ao caller para ser
+   liberado. Afetava `to_csv` e `to_json` (o json reusa `_dataset_to_table`).
+   - **Correção:** o laço de construção passou a rodar dentro de um `pcall`; em
+     falha, `free_table_lua(t, ncols)` libera o que já foi alocado e o erro
+     original é repropagado (`error(err, 0)`). Funcionou porque `free_table_lua`
+     já era seguro sobre tabela parcial — o `ffi.fill(columns, 0)` zera tudo e o
+     free pula campos nil (cada série só é atribuída após criação bem-sucedida).
+     `free_table_lua` foi promovida a forward declaration (é usada por
+     `dataset_to_table`, que vem antes dela no arquivo).
+   - **Uma correção cobre os dois I/O** — está no ponto compartilhado, então
+     `to_json` herda (confirmado).
+   - **Provado:** injetando falha no `:get` da 2ª coluna (após a 1ª já alocada), o
+     erro é capturado, o parcial liberado (sem crash → free rodou) e o erro
+     repropagado; heap íntegro depois. Guard permanente em `test_csv` (+3).
  - 12.28 **CONCLUÍDO (2026-07-20) — eixo `15_abi_layout`.** [Windows] O `cdef` do
    `ffi_loader.lua` replicava à mão o layout das structs sem verificação: um
    esquecimento (campo renomeado/reordenado/tipo trocado) não quebrava o build,

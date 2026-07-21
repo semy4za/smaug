@@ -5,6 +5,32 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-20 — 12.27: OOM parcial em dataset_to_table não vaza mais (L1)
+
+Achado (L1): `dataset_to_table` (io/csv.lua) alocava, por coluna, o nome
+(ffi.C.malloc) e a série C (smaug_*_create) num laço. Um OOM no meio — create
+devolve nil → error — deixava o parcial vazando: `t` nunca chegava ao caller para
+ser liberado por free_table_lua. Afetava to_csv e to_json (reusa o mesmo
+_dataset_to_table). Assimétrico com o rigor do C, que protege OOM parcial
+(str_slots_reserve_one). Raro (só sob OOM), mas real, e num núcleo que tem
+allocfail justamente para esses caminhos.
+
+Correção: o laço passou a rodar dentro de um pcall; em falha, free_table_lua
+libera o parcial e o erro original é repropagado. O não-óbvio foi verificar que
+free_table_lua já era seguro sobre tabela parcial — o ffi.fill(columns, 0) zera
+tudo no início e o free pula campos nil, e cada série só é atribuída a
+columns[i] após create bem-sucedido. Então não precisou de bookkeeping extra de
+"quantas colunas alocadas": free_table_lua(t, ncols) sobre o parcial já é
+idempotente. free_table_lua virou forward declaration (dataset_to_table a usa e
+vem antes dela no arquivo).
+
+Uma correção no ponto compartilhado cobre os dois I/O (to_json herda —
+confirmado). Provado com injeção: erro no :get da 2ª coluna (1ª já alocada) →
+capturado, parcial liberado sem crash, erro repropagado, heap íntegro depois.
+Guard permanente em test_csv. Único dos colaterais desta leva com correção de
+comportamento (12.28/12.29 eram auditoria). Lua puro.
+
+---
 ## 2026-07-20 — 12.29: descoberta automática de fontes C (A3)
 
 Achado (A3): o eixo 14 (thread-safety) iterava uma lista fixa de `src/*.c`. Um

@@ -9,14 +9,14 @@ cfd9050ef0a0394ffc1acb1afacd2358274ffcd749e1846bab3a39ae7a448bc4     581  .\docs
 169580ce180057b12b223529ce84767b6ff0920a8773e7432fd6c6d91befaeb1     636  .\docs\API_Reference.md
 f86a0b4de99e5e911d631f16ecf7e1e7daee2661e885e93d715ff315b6b382cd     332  .\docs\ARCHITECTURE.md
 ef144b541b3c17465380a9dc7ec802faedee9fe48a229b85c7a69454bd2a981d     185  .\docs\Build_and_Testing.md
-1e44234b46e317ef14659d7cb461750fbb24d84425b2324461217efc536bc07d    3492  .\docs\CHANGELOG.md
+599f2a47fcec82ccf6c6d860282fffaff89592343c9c22a7277c5c11784c71be    3518  .\docs\CHANGELOG.md
 9a5745e0953b96ecc14c62e02951b104b7e2575938630a0bde0a5cecafee14ee      98  .\docs\CODE_REVIEW.md
 3af9912fef5a7c54ec786bf2b1e825638330972be6030f8ed196cffe42238751     440  .\docs\CONTRACT.md
 d48e78d3a4c9f4608ed021aec97d864bca97fa57dc74f902ef5b5d52e1a809c3     356  .\docs\COVERAGE.md
 9f89a9d98d9531648723af2b8aff51121dc75c71fb7bd0620ffb6b71938cbae3     173  .\docs\COW.md
-8cb0bc62d1e1f6b6778aee14d043d5f5becf50fdc1e84e5b4db520281d03be61     847  .\docs\PARITY_REPORT.md
+299025126f468a6a8cc4efd8a607a8ac1ea88ed22f28f33f9510773f4f4b0cf8     847  .\docs\PARITY_REPORT.md
 bcf9d770ee3130f0dd9685e3145fb1d185816ab73655471ce55e1dd258442f34     509  .\docs\README.md
-62a51d59f7c2b9adf7818340b905aa87d1787840e93ecb9bb162bf02b3999488    1025  .\docs\Roadmap.md
+19ef414c1963fc8fea38da6635e1ee83bf3d87b46884244914a89328e87f716a    1032  .\docs\Roadmap.md
 1722e1a5806e185b2f934f2a66ec5193cc6ab8dc5a03837be43be80628c8fb86      39  .\include\smaug.h
 6ece9315732efddf7180f7e867ec09888b8f87dfb83e5efeab2ee85752003114      59  .\include\smaug_astype.h
 963e21a0d5b9b1857da7bbe7310a4a9340057fcf7560272f062e4e83727c5da3      40  .\include\smaug_bool.h
@@ -57,7 +57,7 @@ f7a92f8d93301bd8bedc86f99b18fd66afa3bad4f3aa8d098bad889faa45cad7     354  .\lua\
 b8145c718e020c60ea4b8ed6387eb40635cdae59e7d757f1516d86b388dcb681      19  .\lua\smaug\core\warn.lua
 cb6eb2504fe19a3f2bc040b159633f08b83b92a54f82aa118b2c2bbffd261c26     599  .\lua\smaug\ffi_loader.lua
 2da93e9e4c23527f17a6817c1ecc84ca07333db8a63a6b7b32c27a642edb8371      58  .\lua\smaug\init.lua
-51d264a0a054549364c974437a158d777fd53e09ca417a063a1af95a6a33ec97     365  .\lua\smaug\io\csv.lua
+0f096cd9f6ff9df8d1a07ebcc73d1542f848e2090d0a32f60bd66bb496aa33d3     383  .\lua\smaug\io\csv.lua
 6d2a7b8ab404c243a1f3426019df80ba412fe74231fff5dccc8867db39ec0223      88  .\lua\smaug\io\json.lua
 21fbcfed7e8bee69a4dc3093d799102fc9b9840823d47e1d816adb0386579c77      94  .\Makefile
 71de3f49856f86c45e963f684e61d16e31a1e9530668664601605ea1e4b7fe7b     309  .\scripts\build.sh
@@ -113,7 +113,7 @@ ec7e7996532e3a70120c651e92c3e4feee7f582eb64ae5b5406bfd9250fd679a    1091  .\test
 b5b3eb45a964f5b68feb60792091b726b3ed6c6cdf0f4f8e4219d7a296cee6a0     198  .\tests\dataset\test_io_support.lua
 dc2b343b371f6005983f08cd8c22598bb250d7439b4dbad6c6d8639bdc602368     670  .\tests\dataset\test_relational.lua
 33822bb825ae2eed18bcc0e67fcfb4139e0ada76bbbcd8ca6d3b0990c9130fa5     306  .\tests\dataset\test_stat.lua
-2f4362866f7073d4d1d2894e90acca79e6b7b3d8e40182eda573894e35f4501b     463  .\tests\io\test_csv.lua
+66bb19ee613a0402a242a65aa087d19ba2c8f9017e7d3f34830ffb8ec1508a7f     507  .\tests\io\test_csv.lua
 7d003fa4dc45979b92dbb5bc010d6d1b258c5549109ee3ae8afd417f043765e4     179  .\tests\io\test_json.lua
 26ef3db8a6f25c3742aa2e0581ff468fe5f648fb289a6a607046b4c76104be71     174  .\tests\props\test_integration.lua
 508581de821c8e2c7fc49f35c7a89ac51a7aca7bf563a69ee39ad5b7fd61fa92     557  .\tests\props\test_props.lua
