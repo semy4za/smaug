@@ -43,6 +43,7 @@ EIXOS=(
     12_docs_sync
     13_tostring
     14_thread_safety
+    15_abi_layout
 )
 
 FAILED=()

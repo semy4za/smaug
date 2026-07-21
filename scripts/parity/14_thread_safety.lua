@@ -23,12 +23,41 @@ local C = dofile("scripts/parity/common.lua")
 --   * `const` (imutável — tabelas de lookup, literais)
 --   * um protótipo/definição de função (tem '(' antes do ';' ou '{')
 -- Buscamos `static <tipo> <nome>` fora de função, sem const.
-local files = {
-    "src/smaug_astype.c", "src/smaug_convert.c", "src/smaug_core.c",
-    "src/smaug_csv.c", "src/smaug_datetime.c", "src/smaug_json.c",
-    "src/smaug_ops_bool.c", "src/smaug_ops_f64.c", "src/smaug_ops_i64.c",
-    "src/smaug_ops_str.c", "src/smaug_ops_window.c", "src/smaug_str.c",
-}
+-- Descobre os fontes do Anel 0 a auditar SEM lista hardcoded (12.29/A3). Antes,
+-- uma lista fixa aqui não pegava um .c novo não-listado — passava em silêncio.
+-- Fonte primária: build/SOURCES (gravado por build.sh/build_win.ps1 a partir do
+-- glob que compilou — a lista exata do que foi construído, sem defasagem).
+-- Fallback: os src/*.c do MANIFEST (quando rodado standalone, sem build antes).
+-- Salvaguarda: se nenhuma fonte der lista, o eixo FALHA (não audita vazio em
+-- silêncio) — "falha visível > acerto adivinhado".
+local function discover_c_sources()
+    local files = {}
+    -- 1. build/SOURCES (uma path por linha, forward slash nos dois OS)
+    local src_list = C.read_file("build/SOURCES")
+    if src_list then
+        for path in src_list:gmatch("([^\r\n]+)") do
+            path = path:gsub("^%s+", ""):gsub("%s+$", "")
+            if path:match("%.c$") then files[#files+1] = path end
+        end
+    end
+    -- 2. Fallback: MANIFEST (formato "<hash> <linhas> ./src/X.c")
+    if #files == 0 then
+        local manifest = C.read_file("docs/MANIFEST.txt")
+        if manifest then
+            for path in manifest:gmatch("%./(src/[%w_]+%.c)") do
+                files[#files+1] = path
+            end
+        end
+    end
+    return files
+end
+
+local files = discover_c_sources()
+if #files == 0 then
+    io.stderr:write("eixo 14: nenhuma fonte C descoberta "
+        .. "(build/SOURCES ausente e MANIFEST sem src/*.c) — não é possível auditar\n")
+    os.exit(1)
+end
 
 local rows = {}
 local total_globais = 0
@@ -71,3 +100,8 @@ local out = {
 }
 
 io.write(table.concat(out, "\n"))
+
+-- Exit code: o runner (parity.sh/ps1) marca FALHOU se ≠ 0 — sem abortar o build
+-- (parity é indicador permanente). Alinhado ao eixo 15: um global mutável no
+-- Anel 0 é inconsistência real com o CONTRATO 11, tem de aparecer destacado.
+if total_globais > 0 then os.exit(1) end

@@ -1,7 +1,8 @@
 # Smaug — Relatório de Paridade
 
-> Arquivo gerado por `bash scripts/parity/parity.sh`. **Não editar à mão.**
-> Decisões conscientes de não-paridade ficam em `scripts/parity/exceptions.txt`.
+> Arquivo gerado por `bash scripts/parity/parity.sh` ou `powershell scripts/parity/parity.ps1`.
+> **Não editar à mão.** Decisões conscientes de não-paridade ficam em
+> `scripts/parity/exceptions.txt`.
 
 Convenção de status:
 
@@ -10,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-07-19 19:33:25 UTC
+Gerado em: 2026-07-21 13:40:36 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -808,6 +809,23 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 | `smaug_ops_window.c` | 🟩 | — |
 | `smaug_str.c` | 🟩 | — |
 
+## Eixo 15 — Layout de struct (ABI) — header ↔ cdef
+
+O `cdef` do `ffi_loader.lua` replica à mão o layout de cada struct dos headers C. Divergência = leitura de memória deslocada (corrupção silenciosa). Este eixo compara a sequência (tipo, nome) dos campos. Válido porque não há packing custom (salvaguarda checa a cada run). 🟥 = divergência real; 🟨 = struct não localizada.
+
+| struct | layout | nota |
+| :--- | :-: | :-: |
+| `smaug_metadata_t` | 🟩 | 4 campos, layout coerente |
+| `smaug_series_bool_t` | 🟩 | 5 campos, layout coerente |
+| `smaug_series_str_t` | 🟩 | 9 campos, layout coerente |
+| `smaug_series_dt_t` | 🟩 | 5 campos, layout coerente |
+| `smaug_column_t` | 🟩 | 6 campos, layout coerente |
+| `smaug_table_t` | 🟩 | 4 campos, layout coerente |
+| `smaug_csv_opts_t` | 🟩 | 6 campos, layout coerente |
+| `smaug_csv_write_opts_t` | 🟩 | 4 campos, layout coerente |
+| `smaug_json_write_opts_t` | 🟩 | 1 campos, layout coerente |
+| `smaug_sort_col_ffi_t` | 🟩 | 2 campos, layout coerente |
+
 ---
 
 ## Resumo executivo
@@ -815,10 +833,10 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 1012
+- 🟩 paridade: 1022
 - ⬜ exceção registrada: 215
-- 🟨 suspeita (revisar): 269
-- 🟥 inconsistência clara: 14
+- 🟨 suspeita (revisar): 270
+- 🟥 inconsistência clara: 15
 
 
 ## Como usar este relatório

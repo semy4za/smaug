@@ -5,6 +5,77 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-20 — 12.29: descoberta automática de fontes C (A3)
+
+Achado (A3): o eixo 14 (thread-safety) iterava uma lista fixa de `src/*.c`. Um
+`.c` novo não-listado não era auditado — passava em silêncio. O levantamento
+revelou que o problema era maior que o registrado: **três** listas de fontes, e
+as duas hardcoded eram só do Linux (`build.sh` `SRCS` e o eixo 14), enquanto o
+`build_win.ps1` já descobria via glob. A do `build.sh` era mais grave — um `.c`
+novo nem compilaria no Linux até editarem a lista. Optamos pelo escopo completo:
+alinhar o Linux ao Windows nas duas.
+
+Solução: `build.sh` usa `SRCS=(src/*.c)` (glob) e grava a lista descoberta em
+`build/SOURCES`; `build_win.ps1` grava o mesmo arquivo (normalizado para forward
+slash, formato único nos dois OS). O eixo 14 lê `build/SOURCES` — a lista fresca
+do que foi de fato compilado, sem defasagem — com fallback ao MANIFEST versionado
+quando rodado standalone, e falha-visível se nenhum der lista.
+
+O não-óbvio: por que `build/SOURCES` e não ler o MANIFEST direto. O parity roda
+ANTES do MANIFEST ser regenerado no build; ler o MANIFEST daria a lista do ciclo
+anterior (defasagem de 1 build — um `.c` novo só auditado na segunda rodada).
+`build/SOURCES` é gravado pelo mesmo glob que compilou, no início do build →
+o eixo audita exatamente o que foi construído, agora.
+
+Achado corrigido junto: o eixo 14 detectava global mutável (🟥) mas retornava
+exit 0 — nunca marcava FALHOU no runner. Verifiquei que era pré-existente (o
+único os.exit era a salvaguarda nova). Alinhei ao eixo 15: `os.exit(1)` se há
+global. Confirmado que isso não quebra o build — `parity.sh` sempre retorna 0,
+só destaca o eixo no relatório —, preservando a política "parity é indicador
+permanente". Provado nos dois sentidos: `.c` com global → 🟥 exit 1; limpo → 0.
+
+Nenhum C ou runtime tocado. `build/SOURCES` é gitignored (efêmero).
+
+---
+## 2026-07-20 — 12.28: eixo `15_abi_layout`, sincronia cdef↔header verificada
+
+Achado (A-FFI): o `cdef` do `ffi_loader.lua` replicava à mão o layout das structs
+dos headers, sem nada que verificasse a sincronia. Um campo renomeado, reordenado
+ou com tipo trocado num lado só não quebra o build — vira leitura de memória
+deslocada (o LuaJIT lê bytes errados). Mesma classe do A3 (eixo 14): coerência
+presumida, não verificada.
+
+**A decisão de desenho é o não-óbvio aqui.** Plano inicial: cruzar `ffi.offsetof`
+do cdef com os offsets reais que o C imprime — verificação do layout COMPILADO
+(D2). Isso exigiria o Lua rodar um binário C e ler stdout (`io.popen`), padrão sem
+precedente no projeto e frágil (PATH, portabilidade). Antes de montar essa ponte,
+verifiquei o pressuposto: **há packing custom?** Não — nenhum `#pragma pack`,
+`__attribute__((packed))`, bitfield ou `aligned` nos headers nem no cdef. Sem
+isso, C e LuaJIT-FFI usam o MESMO alinhamento padrão, então sequência textual
+idêntica de (tipo, nome) ⟹ layout idêntico em memória (confirmei empiricamente:
+sizeof=88 e todos os offsets batem byte a byte entre gcc e ffi.sizeof). Ou seja,
+a comparação textual (D1) é tão forte quanto a compilada NESTE projeto — sem a
+ponte frágil. Lição: por pouco não montei a solução complexa presumindo que era
+mais segura; a verificação mostrou a equivalência.
+
+Salvaguarda contra a única brecha do textual: o eixo re-checa a ausência de
+packing a cada run. Se algum dia entrar `#pragma pack`, ele falha avisando que a
+comparação textual deixou de bastar — o teste é consciente do próprio pressuposto.
+
+Detalhe que exigiu cuidado: resolver typedefs antes de comparar. O primeiro run
+acusou `series_dt` como divergente (`smaug_mask_t*` no header vs `uint8_t*` no
+cdef) — falso positivo, pois `smaug_mask_t` é `typedef uint8_t`. Em vez de
+presumir, verifiquei e adicionei resolução de alias. Ficou o achado colateral: o
+cdef usa os dois nomes para o mesmo tipo (inconsistência de estilo, inofensiva em
+layout) — registrado no 12.28 para limpeza futura.
+
+Escopo: 10 structs que cruzam a fronteira por layout (opacas como
+`smaug_hash_table_t` ficam de fora — o Lua nunca lê seus campos). Testado nos dois
+sentidos (pega divergência → exit 1; sincronizado → exit 0). Registrado em
+`parity.sh` e `parity.ps1`. Parity 14→15 eixos. Nenhum C ou runtime tocado —
+puramente auditoria.
+
+---
 ## 2026-07-19 — 10.5 Passo A: `core/keys.lua`, chave de igualdade com int64 exato (L2)
 
 Achado (L2): o padrão `type(v)..":"..tostring(v)` sobre `series:get(i)`, repetido

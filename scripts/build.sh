@@ -117,10 +117,14 @@ fi
 # ---------------------------------------------------------------------------
 # Listas de teste (fonte unica — espelha o Makefile)
 # ---------------------------------------------------------------------------
-SRCS=(src/smaug_core.c src/smaug_ops_f64.c src/smaug_ops_i64.c \
-      src/smaug_ops_bool.c src/smaug_str.c src/smaug_ops_str.c \
-      src/smaug_csv.c src/smaug_json.c src/smaug_datetime.c \
-      src/smaug_ops_window.c src/smaug_convert.c src/smaug_astype.c)
+# Fontes do backend C: descobre TODOS os src/*.c automaticamente, para nunca
+# dessincronizar quando um novo .c entra (espelha build_win.ps1 / A3, item 12.29).
+# O glob do bash expande ordenado alfabeticamente → build reproduzível.
+SRCS=(src/*.c)
+if [[ ${#SRCS[@]} -eq 0 || ! -e "${SRCS[0]}" ]]; then
+    echo "ERRO: nenhum fonte encontrado em src/*.c" >&2
+    exit 1
+fi
 
 C_TESTS_PLAIN=(test_alloc test_ops test_ops_edge test_bool \
                test_bool_lifecycle test_string test_cow test_io_c test_datetime_c \
@@ -159,6 +163,9 @@ run_result() {
 echo ""
 info "== Compilando build/libsmaug.so =="
 mkdir -p build
+# Exporta a lista de fontes descoberta (uma por linha) para o eixo 14 auditar
+# exatamente o que foi compilado — sem lista hardcoded, sem defasagem (12.29/A3).
+printf '%s\n' "${SRCS[@]}" > build/SOURCES
 gcc "${CFLAGS[@]}" -shared -o build/libsmaug.so "${SRCS[@]}"
 ok "OK -> build/libsmaug.so"
 

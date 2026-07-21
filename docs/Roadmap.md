@@ -615,7 +615,7 @@ na reconstrução e na canonicalização de chave).
     `smaug_convert` é a fonte única bidirecional texto↔número (`num→str` via
     `fmt`, `str→num` via `parse`/`_cstr`). Resta o débito 12.21 (JSON não-finitos).
 
-## 11. Ergonomia REPL  [Windows]
+## 11. Ergonomia REPL  [Windows]  [Done]
 
 **CONCLUÍDO (2026-07-13, Fedora — Windows dispensado por equivalência: Lua puro,
 sem caminho libc-divergente).** Fonte única `core/display.lua`
@@ -926,22 +926,50 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
    envolver a construção num `pcall` que libera o parcial antes de repropagar, ou
    construir tudo e só então publicar. Uma correção no ponto compartilhado cobre
    os dois I/O.
- - 12.28 **Sincronia cdef↔header (ABI) sem verificação automática** — [achado
-   2026-07-19, A-FFI]. O `cdef` do `ffi_loader.lua` replica manualmente o layout
-   das structs dos headers. Está correto hoje (verificado campo a campo:
-   `smaug_series_str_t`, `smaug_metadata_t`), mas é mantido por disciplina — um
-   esquecimento não quebra o build de forma óbvia, vira leitura de memória
-   deslocada (passa em teste pequeno, corrompe depois). Mesma classe do 12.20/A3:
-   coerência presumida, não verificada. Fix barato (confirmado: `ffi.offsetof`
-   funciona): um teste cruza `ffi.sizeof`/`offsetof` de cada struct com valores
-   que o C imprime via `sizeof`/`offsetof`. Fecha o buraco antes do 1.0.
- - 12.29 **Eixo 14 (thread-safety) com lista de `.c` hardcoded** — [achado
-   2026-07-19, A3]. `14_thread_safety.lua` itera uma lista fixa de `src/*.c`
-   (hoje 12/12 ✓) mas não detecta um `.c` NOVO não-listado — falha em silêncio.
-   Oportuno: o item 10 (Passo B do 10.5, prod, etc.) cria arquivos C. Respeitando
-   a restrição de não usar shell (Windows), cruzar com `MANIFEST.txt` (já gerado,
-   lista tudo) fecharia a completude. Mesma natureza do 12.19 (fontes de verdade
-   duplicadas).
+ - 12.28 **CONCLUÍDO (2026-07-20) — eixo `15_abi_layout`.** [Windows] O `cdef` do
+   `ffi_loader.lua` replicava à mão o layout das structs sem verificação: um
+   esquecimento (campo renomeado/reordenado/tipo trocado) não quebrava o build,
+   virava leitura de memória deslocada. Novo eixo de paridade compara a sequência
+   (tipo, nome) dos campos entre header e cdef para as 10 structs que cruzam a
+   fronteira por layout (opacas como `smaug_hash_table_t` ficam de fora).
+   - **Decisão de desenho (verificada, não presumida):** a ideia inicial era
+     cruzar `ffi.offsetof` (cdef) com offsets que o C imprime — mas isso exigiria
+     ponte C→Lua via `io.popen` (sem precedente no projeto, frágil). A verificação
+     mostrou que **não há packing custom** (nenhum `#pragma pack`/`packed`/
+     `aligned` nos headers nem no cdef) — logo C e LuaJIT-FFI usam o mesmo
+     alinhamento, e sequência textual idêntica de (tipo, nome) ⟹ layout idêntico
+     (confirmado empiricamente: sizeof/offsetof batem byte a byte). Comparação
+     textual passou a bastar, sem a ponte frágil. **Salvaguarda:** o eixo checa a
+     ausência de packing a cada run — se algum dia entrar, ele falha avisando que
+     a comparação textual deixou de valer.
+   - Resolve typedefs antes de comparar (`smaug_mask_t` ≡ `uint8_t`) para não dar
+     falso positivo. Testado nos dois sentidos: pega divergência (renomeei um
+     campo → 🟥, exit 1) e passa sincronizado (exit 0). Registrado nos dois
+     runners (`parity.sh` e `parity.ps1`). Parity 14→15 eixos.
+   - **Achado colateral (registrado, não corrigido aqui):** o cdef usa
+     `smaug_mask_t *null_mask` em 4 structs mas `uint8_t *null_mask` no
+     `series_dt` — inconsistência de estilo, inofensiva em layout (mesmo tipo).
+     Uniformizar para `smaug_mask_t` fecharia. Candidato a limpeza futura.
+ - 12.29 **CONCLUÍDO (2026-07-20) — descoberta automática de fontes C.** [Windows]
+   O `14_thread_safety.lua` iterava uma lista fixa de `src/*.c` e não detectava um
+   `.c` novo não-listado (falha em silêncio). O levantamento mostrou que o A3 era
+   mais amplo: **três** listas de fontes, duas hardcoded só no Linux —
+   `build.sh` (`SRCS`) e o eixo 14 — enquanto o `build_win.ps1` já descobre via
+   glob. A do `build.sh` era até mais grave (um `.c` novo nem compilava no Linux).
+   Escopo completo (decisão de alinhar Linux ao Windows):
+   - **`build.sh`:** `SRCS` vira `src/*.c` (glob do bash, ordenado). Grava a lista
+     descoberta em `build/SOURCES` (uma path por linha) logo após criar `build/`.
+   - **`build_win.ps1`:** já fazia glob; passou a gravar o mesmo `build/SOURCES`,
+     normalizado para forward slash (formato único nos dois OS).
+   - **Eixo 14:** sem lista hardcoded. Lê `build/SOURCES` (lista fresca do build,
+     sem defasagem); fallback ao `MANIFEST.txt` (versionado) quando rodado
+     standalone; se nenhum der lista, **falha visível** (não audita vazio).
+   - **Achado corrigido junto:** o eixo 14 detectava global mutável (🟥) mas
+     retornava exit 0 — nunca destacava no runner. Agora faz `os.exit(1)` se há
+     global (alinhado ao eixo 15). Não quebra o build (parity sempre `exit 0`),
+     só marca FALHOU no relatório — o comportamento certo para um achado real.
+   Provado: `.c` novo com global mutável passou a ser detectado (🟥, exit 1);
+   removido, volta verde. `build/SOURCES` é gitignored (efêmero).
 ## 13. Reescrita de exemplos + docstrings  [Windows]
 
 Doc reflete a API depois que ela para de mudar (itens 1–12).

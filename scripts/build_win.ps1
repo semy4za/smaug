@@ -108,6 +108,10 @@ $sources = @(Get-ChildItem -Path "src" -Filter "*.c" | ForEach-Object { "src\$($
 if ($sources.Count -eq 0) { throw "Nenhum fonte encontrado em src\*.c" }
 Write-Host ("Fontes ({0}): {1}" -f $sources.Count, ($sources -join ", ")) -ForegroundColor DarkGray
 
+# Exporta a lista de fontes para o eixo 14 auditar o que foi compilado (12.29/A3).
+# Normaliza para forward slash → build/SOURCES tem formato único nos dois OS.
+($sources | ForEach-Object { $_ -replace '\\', '/' }) | Set-Content -Path "build/SOURCES" -Encoding ASCII
+
 Write-Host ""
 Write-Host "== Compilando build\smaug.dll ==" -ForegroundColor Cyan
 & $gcc -std=c11 -Wall -Wextra -O2 -I".\include" -shared -static-libgcc -o "build\smaug.dll" @sources
