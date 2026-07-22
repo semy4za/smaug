@@ -1017,8 +1017,8 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
      só marca FALHOU no relatório — o comportamento certo para um achado real.
    Provado: `.c` novo com global mutável passou a ser detectado (🟥, exit 1);
    removido, volta verde. `build/SOURCES` é gitignored (efêmero).
- - 12.30 **Contrato de erro de escrita em I/O nunca implementado** — [achado
-   2026-07-21, review profunda do Anel 0]. `smaug_io.h` promete no cabeçalho:
+ - 12.30 **PARCIAL — Fase 1 concluída (2026-07-21). Contrato de erro de escrita
+   em I/O.** [Fase 1: Fedora] `smaug_io.h` promete no cabeçalho:
    "toda função que escreve retorna 0/-1 (checar `smaug_io_last_error()`)". Essa
    função **não existe** — nem protótipo, nem definição, nem cdef — em lugar
    nenhum do projeto (confirmado por leitura completa de `smaug_io.h` e
@@ -1041,12 +1041,29 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
      'path'"` — genérico, igual para qualquer causa. Na leitura, o mesmo tipo de
      falha (`fopen` de path inválido) já diz exatamente por quê. Viola em parte
      "falha visível": a falha é visível, a causa não.
-   - **Correção (não atacada aqui, registrada para decisão):** não precisa do
-     `last_error()` global prometido — mais simples seria as duas funções de
-     escrita ganharem uma forma paralela ao `make_error` (ex.: um out-param de
-     mensagem, ou mudar o retorno para algo que carregue `errno`/`strerror`).
-     Barato (o padrão já existe do lado da leitura, só falta espelhar), mas é
-     mudança de assinatura pública — decidir com calma quando for atacado.
+   - **Correção — Opção B (canal de erro no C, espelhando `make_error`).**
+     Descartadas: (A) resolver no Lua duplicaria a checagem `sep==decimal` que já
+     existe no C — fere "fonte única"; (C) implementar o `last_error()` global do
+     header exigiria `static` mutável — violaria a thread-safety do Anel 0 (o
+     eixo 14 pegaria como 🟥). A Opção B adiciona `char **err_out` às funções de
+     escrita, que recebe `strdup` da causa (heap da DLL → Lua libera com
+     `smaug_free`, respeitando o heap separado no Windows). Helper
+     `set_io_error()` em `smaug_io_internal.h`, ao lado do `make_error`.
+   - **Faseado (~45 call-sites, 33 em testes C; selo Fedora por ser C):**
+     - **Fase 1 — CONCLUÍDA (2026-07-21):** as 2 variantes `_mem`
+       (`smaug_write_csv_mem`/`smaug_write_json_mem`) — o bug mais grave: o NULL
+       colapsava OOM com `sep==decimal`, e o Lua repassava "OOM" (mensagem
+       factualmente errada). Agora err_out carrega a causa; o teste `sep==decimal`
+       em `test_io_c` verifica a mensagem (espelha o que o read já fazia via
+       `t->error`); guard Lua em `test_csv` (to_csv_mem não diz mais OOM);
+       allocfail cobre o `strdup` do set_io_error sob OOM. Contadores: test_io_c
+       312→315, test_csv 141→144, allocfail 1874→1878. Chamadas internas
+       `write→write_mem` passam err_out=NULL por ora.
+     - **Fase 2 — PENDENTE:** as 2 funções de arquivo (`smaug_write_csv`/
+       `smaug_write_json`), que hoje descartam `errno` do `fopen`/`fwrite`. Darão
+       err_out próprio e propagarão a causa da serialização + a de sistema
+       (`strerror(errno)`). Atualizar os 2 call-sites Lua (`M.write`) e os testes
+       C de path inválido (`test_io_c:719`/`:908`). Mesmo padrão da Fase 1.
 ## 13. Reescrita de exemplos + docstrings  [Windows]
 
 Doc reflete a API depois que ela para de mudar (itens 1–12).

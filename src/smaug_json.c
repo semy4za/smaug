@@ -550,8 +550,12 @@ static int write_json_string(wbuf_j_t *b, const char *s, size_t n) {
 
 char *smaug_write_json_mem(const smaug_table_t *t,
                             const smaug_json_write_opts_t *opts,
-                            size_t *out_len) {
-    if (!t || !out_len) return NULL;
+                            size_t *out_len, char **err_out) {
+    if (err_out) *err_out = NULL;   /* 12.30: limpa o slot; só preenche em erro */
+    if (!t || !out_len) {
+        set_io_error(err_out, "argumento nulo (tabela ou out_len)");
+        return NULL;
+    }
     int pretty = opts ? opts->pretty : 0; /* COV-EXCL-BR: NULL opts usa default 0; opts não-NULL cobre ambos */
     const char *nl   = pretty ? "\n" : "";
     const char *ind  = pretty ? "  " : "";
@@ -623,12 +627,15 @@ char *smaug_write_json_mem(const smaug_table_t *t,
     return b.data;
 
 oom:
+    set_io_error(err_out, "OOM ao serializar JSON");
     free(b.data); return NULL;
 }
 
 int smaug_write_json(const char *path, const smaug_table_t *t,
                      const smaug_json_write_opts_t *opts) {
-    size_t len; char *buf = smaug_write_json_mem(t, opts, &len);
+    /* 12.30 Fase 1: descarta a causa da serialização (err_out=NULL); Fase 2
+       dará err_out próprio a smaug_write_json. */
+    size_t len; char *buf = smaug_write_json_mem(t, opts, &len, NULL);
     if (!buf) return -1;
     FILE *f = fopen(path, "wb");
     if (!f) { free(buf); return -1; }

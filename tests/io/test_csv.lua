@@ -503,5 +503,19 @@ do
     check(ok2, "12.27 heap íntegro após liberação do parcial")
 end
 
+-- ===================================================================
+-- 12.30 (Fase 1): to_csv_mem comunica a CAUSA, não "OOM" genérico.
+-- Antes, qualquer NULL do C virava "OOM" no Lua — mentira quando a causa era
+-- sep==decimal (erro de configuração, não de memória). Agora o C manda a causa
+-- via err_out e o Lua a propaga.
+do
+    local ok, err = pcall(function()
+        return smaug.DataSet({ {"v", {1.5, 2.5}} }):to_csv_mem({ sep = ",", decimal = "," })
+    end)
+    check(not ok, "12.30 to_csv_mem com sep==decimal falha")
+    check(tostring(err):match("decimal") ~= nil, "12.30 mensagem cita a causa real (decimal)")
+    check(tostring(err):match("OOM") == nil,       "12.30 não mente dizendo OOM")
+end
+
 
 print(string.format("OK — %d checks passaram (I/O CSV + dados reais)", n_ok))

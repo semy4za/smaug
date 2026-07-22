@@ -413,14 +413,14 @@ ffi.cdef([[
     smaug_table_t*          smaug_read_csv(const char *path, const smaug_csv_opts_t *opts);
     smaug_table_t*          smaug_read_csv_mem(const char *buf, size_t len, const smaug_csv_opts_t *opts);
     int                     smaug_write_csv(const char *path, const smaug_table_t *t, const smaug_csv_write_opts_t *opts);
-    char*                   smaug_write_csv_mem(const smaug_table_t *t, const smaug_csv_write_opts_t *opts, size_t *out_len);
+    char*                   smaug_write_csv_mem(const smaug_table_t *t, const smaug_csv_write_opts_t *opts, size_t *out_len, char **err_out);
 
     typedef struct { int pretty; } smaug_json_write_opts_t;
 
     smaug_table_t*  smaug_read_json(const char *path);
     smaug_table_t*  smaug_read_json_mem(const char *buf, size_t len);
     int             smaug_write_json(const char *path, const smaug_table_t *t, const smaug_json_write_opts_t *opts);
-    char*           smaug_write_json_mem(const smaug_table_t *t, const smaug_json_write_opts_t *opts, size_t *out_len);
+    char*           smaug_write_json_mem(const smaug_table_t *t, const smaug_json_write_opts_t *opts, size_t *out_len, char **err_out);
 
     /* ===================================================================
        Datetime — dtype Tier 2 (epoch ms UTC)

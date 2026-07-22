@@ -68,10 +68,12 @@ int smaug_write_csv(const char *path, const smaug_table_t *t,
                     const smaug_csv_write_opts_t *opts);
 
 /* Escreve para um buffer alocado pelo callee (liberar com smaug_free).
-   *out_len recebe o número de bytes escritos. NULL em erro. */
+   *out_len recebe o número de bytes escritos. NULL em erro.
+   err_out (12.30): se != NULL, em erro recebe strdup da causa (ex.: sep igual a
+   decimal, OOM) — liberar com smaug_free. Pode ser NULL se a causa não interessa. */
 char* smaug_write_csv_mem(const smaug_table_t *t,
                            const smaug_csv_write_opts_t *opts,
-                           size_t *out_len);
+                           size_t *out_len, char **err_out);
 
 /* ===================================================================
    JSON
@@ -98,8 +100,10 @@ typedef struct {
 int smaug_write_json(const char *path, const smaug_table_t *t,
                      const smaug_json_write_opts_t *opts);
 
+/* err_out (12.30): se != NULL, em erro recebe strdup da causa — liberar com
+   smaug_free. Pode ser NULL. */
 char* smaug_write_json_mem(const smaug_table_t *t,
                             const smaug_json_write_opts_t *opts,
-                            size_t *out_len);
+                            size_t *out_len, char **err_out);
 
 #endif /* SMAUG_IO_H */

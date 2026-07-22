@@ -40,6 +40,21 @@ static inline const char *dtype_name(int dt) {
     }
 }
 
+/* Erro de escrita — preenche *err_out com strdup(msg) da causa (12.30).
+   Espelha o papel do t->error da leitura, mas para funções que não retornam
+   smaug_table_t. Convenção:
+   - err_out == NULL: caller não quer a causa (ignora silenciosamente).
+   - err_out != NULL: recebe strdup da mensagem (heap da DLL → o caller Lua
+     libera com smaug_free, respeitando o heap separado no Windows).
+   - strdup falha (OOM ao copiar): *err_out fica NULL; o caller cai no
+     fallback "erro desconhecido" — a falha continua sinalizada (retorno
+     NULL/-1), só sem a string. Nunca deixa lixo em *err_out.
+   NÃO é um smaug_io_last_error() global: estado global mutável violaria a
+   thread-safety do Anel 0 (ver eixo de paridade 14). */
+static inline void set_io_error(char **err_out, const char *msg) {
+    if (err_out) *err_out = strdup(msg);
+}
+
 /* Tabela de erro — aloca smaug_table_t com ->error preenchido. */
 static inline smaug_table_t *make_error(const char *msg) {
     smaug_table_t *t = calloc(1, sizeof(smaug_table_t));

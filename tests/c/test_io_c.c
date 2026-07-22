@@ -237,7 +237,7 @@ static void test_csv_decimal_roundtrip(void) {
     CHECK(t && !t->error,                 "roundtrip: read ok");
     smaug_csv_write_opts_t wo = smaug_csv_write_default_opts();
     wo.sep = ';'; wo.decimal = ',';
-    size_t len; char *out = smaug_write_csv_mem(t, &wo, &len);
+    size_t len; char *out = smaug_write_csv_mem(t, &wo, &len, NULL);
     CHECK(out != NULL,                    "roundtrip: write ok");
     CHECK(strstr(out, "3,25") != NULL,    "roundtrip: emite 3,25 com vírgula");
     CHECK(strstr(out, "3.25") == NULL,    "roundtrip: não emite ponto");
@@ -254,13 +254,22 @@ static void test_csv_sep_equals_decimal(void) {
     CHECK(strstr(t->error, "decimal") != NULL, "sep==decimal: mensagem orienta");
     smaug_table_free(t);
 
-    /* write: sep==decimal → NULL */
+    /* write: sep==decimal → NULL, e agora a causa é comunicada (12.30). Antes o
+       write só devolvia NULL — assimétrico com o read acima, que já orientava
+       via t->error. Agora err_out espelha esse papel. */
     const char *csv = "v\n1.5\n";
     smaug_table_t *t2 = smaug_read_csv_mem(csv, strlen(csv), NULL);
     smaug_csv_write_opts_t wo = smaug_csv_write_default_opts();
     wo.sep = ';'; wo.decimal = ';';
-    size_t len; char *out = smaug_write_csv_mem(t2, &wo, &len);
+    size_t len; char *werr = NULL;
+    char *out = smaug_write_csv_mem(t2, &wo, &len, &werr);
     CHECK(out == NULL,                    "sep==decimal: write retorna NULL");
+    CHECK(werr != NULL,                   "sep==decimal: write comunica a causa (12.30)");
+    CHECK(werr && strstr(werr, "decimal") != NULL, "sep==decimal: mensagem orienta (12.30)");
+    smaug_free(werr);
+    /* err_out == NULL é aceitável (caller sem interesse na causa) */
+    char *out2 = smaug_write_csv_mem(t2, &wo, &len, NULL);
+    CHECK(out2 == NULL,                   "sep==decimal: err_out NULL não crasha (12.30)");
     smaug_table_free(t2);
 }
 
@@ -542,7 +551,7 @@ static void test_csv_write_nan(void) {
 
     smaug_csv_write_opts_t wo = smaug_csv_write_default_opts();
     size_t len;
-    char *out = smaug_write_csv_mem(&t, &wo, &len);
+    char *out = smaug_write_csv_mem(&t, &wo, &len, NULL);
     CHECK(out != NULL,                         "write NaN: retorna buffer");
     CHECK(strstr(out, "nan") != NULL,          "write NaN: contém 'nan'");
     free(out);
@@ -562,7 +571,7 @@ static void test_csv_write_opts_zero_sep_quote(void) {
     smaug_csv_write_opts_t wo = smaug_csv_write_default_opts();
     wo.sep = 0; wo.quote = 0;
     size_t len;
-    char *out = smaug_write_csv_mem(&t, &wo, &len);
+    char *out = smaug_write_csv_mem(&t, &wo, &len, NULL);
     CHECK(out != NULL,             "write sep/quote=0: retorna buffer");
     CHECK(strstr(out, "a\n1\n") != NULL, "write sep/quote=0: cai pro default ','/'\"'");
     free(out);
@@ -590,7 +599,7 @@ static void test_csv_write_large_field(void) {
 
     smaug_csv_write_opts_t wo = smaug_csv_write_default_opts();
     size_t len;
-    char *out = smaug_write_csv_mem(&t, &wo, &len);
+    char *out = smaug_write_csv_mem(&t, &wo, &len, NULL);
     CHECK(out != NULL,        "write campo grande: retorna buffer");
     CHECK(len > big_len,      "write campo grande: buffer cresceu além do campo (header+\\n)");
     /* integridade: o campo de 10000 'x' precisa sair COMPLETO e sem corrupção
@@ -623,7 +632,7 @@ static void test_csv_write_field_with_sep(void) {
 
     smaug_csv_write_opts_t wo = smaug_csv_write_default_opts();
     size_t len;
-    char *out = smaug_write_csv_mem(&t, &wo, &len);
+    char *out = smaug_write_csv_mem(&t, &wo, &len, NULL);
     CHECK(out != NULL,              "write sep em campo: retorna buffer");
     CHECK(strstr(out, "\"a,b\"") != NULL, "write sep: campo entre aspas");
     free(out);
@@ -646,7 +655,7 @@ static void test_csv_write_field_with_quote(void) {
 
     smaug_csv_write_opts_t wo = smaug_csv_write_default_opts();
     size_t len;
-    char *out = smaug_write_csv_mem(&t, &wo, &len);
+    char *out = smaug_write_csv_mem(&t, &wo, &len, NULL);
     CHECK(out != NULL,                    "write aspas em campo: retorna buffer");
     CHECK(strstr(out, "\"a\"\"b\"") != NULL, "write aspas: escape correto");
     free(out);
@@ -669,7 +678,7 @@ static void test_csv_write_no_header(void) {
     smaug_csv_write_opts_t wo = smaug_csv_write_default_opts();
     wo.header = 0;
     size_t len;
-    char *out = smaug_write_csv_mem(&t, &wo, &len);
+    char *out = smaug_write_csv_mem(&t, &wo, &len, NULL);
     CHECK(out != NULL,                "write sem header: retorna buffer");
     CHECK(strstr(out, "v") == NULL,   "write sem header: sem nome de coluna");
     CHECK(strstr(out, "42") != NULL,  "write sem header: contém valor");
@@ -840,7 +849,7 @@ static void test_json_write_nan(void) {
 
     smaug_json_write_opts_t wo = {0};
     size_t len;
-    char *out = smaug_write_json_mem(&t, &wo, &len);
+    char *out = smaug_write_json_mem(&t, &wo, &len, NULL);
     CHECK(out != NULL,               "JSON write NaN: retorna buffer");
     CHECK(strstr(out, "null") != NULL,"JSON write NaN: NaN → null");
     free(out);
@@ -860,7 +869,7 @@ static void test_json_write_escape(void) {
 
     smaug_json_write_opts_t wo = {0};
     size_t len;
-    char *out = smaug_write_json_mem(&t, &wo, &len);
+    char *out = smaug_write_json_mem(&t, &wo, &len, NULL);
     CHECK(out != NULL,                    "JSON write escape: retorna buffer");
     CHECK(strstr(out, "\\n")  != NULL,    "JSON write escape: \\n");
     CHECK(strstr(out, "\\t")  != NULL,    "JSON write escape: \\t");
@@ -876,7 +885,7 @@ static void test_json_write_pretty(void) {
     smaug_table_t *t = smaug_read_json_mem(j, strlen(j));
     smaug_json_write_opts_t wo = {.pretty = 1};
     size_t len;
-    char *out = smaug_write_json_mem(t, &wo, &len);
+    char *out = smaug_write_json_mem(t, &wo, &len, NULL);
     CHECK(out != NULL,            "JSON pretty: retorna buffer");
     CHECK(strstr(out,"\n") != NULL,"JSON pretty: tem newlines");
     CHECK(strstr(out,"  ") != NULL,"JSON pretty: tem indentação");
@@ -928,7 +937,7 @@ static void test_csv_roundtrip_all_dtypes(void) {
     /* escreve e lê de volta */
     smaug_csv_write_opts_t wo = smaug_csv_write_default_opts();
     size_t len;
-    char *out = smaug_write_csv_mem(t, &wo, &len);
+    char *out = smaug_write_csv_mem(t, &wo, &len, NULL);
     CHECK(out != NULL, "roundtrip all: escrita ok");
 
     smaug_table_t *t2 = smaug_read_csv_mem(out, len, NULL);
@@ -956,7 +965,7 @@ static void test_json_roundtrip_all_dtypes(void) {
 
     smaug_json_write_opts_t wo = {0};
     size_t len;
-    char *out = smaug_write_json_mem(t, &wo, &len);
+    char *out = smaug_write_json_mem(t, &wo, &len, NULL);
     CHECK(out != NULL, "JSON roundtrip all: escrita ok");
 
     smaug_table_t *t2 = smaug_read_json_mem(out, len);
@@ -1036,7 +1045,7 @@ static void test_csv_write_null_args(void) {
     /* smaug_write_csv_mem(NULL,...) e (t, NULL, ...) — guards de fronteira
      * pública (linhas 424/426), nunca testados com argumento NULL real. */
     size_t len;
-    char *out1 = smaug_write_csv_mem(NULL, NULL, &len);
+    char *out1 = smaug_write_csv_mem(NULL, NULL, &len, NULL);
     CHECK(out1 == NULL, "write_csv_mem: t=NULL retorna NULL");
 
     smaug_series_i64_t *s = smaug_i64_create(1);
@@ -1046,11 +1055,11 @@ static void test_csv_write_null_args(void) {
     col.name = "v"; col.dtype = "int64"; col.i64 = s;
     t.columns = &col; t.ncols = 1; t.nrows = 1;
 
-    char *out2 = smaug_write_csv_mem(&t, NULL, &len);
+    char *out2 = smaug_write_csv_mem(&t, NULL, &len, NULL);
     CHECK(out2 != NULL, "write_csv_mem: opts=NULL usa default, sem erro");
     free(out2);
 
-    char *out3 = smaug_write_csv_mem(&t, NULL, NULL);
+    char *out3 = smaug_write_csv_mem(&t, NULL, NULL, NULL);
     CHECK(out3 == NULL, "write_csv_mem: out_len=NULL retorna NULL");
 
     smaug_i64_free(s);
@@ -1205,7 +1214,7 @@ static void test_json_bf_escape(void) {
     t.columns = &col; t.ncols = 1; t.nrows = 1;
     smaug_json_write_opts_t wo = {0};
     size_t len;
-    char *out = smaug_write_json_mem(&t, &wo, &len);
+    char *out = smaug_write_json_mem(&t, &wo, &len, NULL);
     CHECK(out != NULL, "JSON \\b\\f: retorna buffer");
     /* \b e \f não têm escape explícito no writer — viram \u0008 e \u000c */
     CHECK(strstr(out, "\\u0008") != NULL || strstr(out, "\\b") != NULL,
@@ -1323,7 +1332,7 @@ static void test_json_write_opts_null(void) {
     /* smaug_write_json_mem(NULL, ...) e (t, ..., NULL) — guards de fronteira
      * (linha 549: !t || !out_len). */
     size_t len;
-    char *out1 = smaug_write_json_mem(NULL, NULL, &len);
+    char *out1 = smaug_write_json_mem(NULL, NULL, &len, NULL);
     CHECK(out1 == NULL, "JSON write: t=NULL retorna NULL");
 
     smaug_series_i64_t *s = smaug_i64_create(1);
@@ -1334,7 +1343,7 @@ static void test_json_write_opts_null(void) {
     t.columns = &col; t.ncols = 1; t.nrows = 1;
 
     smaug_json_write_opts_t wo = {0};
-    char *out2 = smaug_write_json_mem(&t, &wo, NULL);
+    char *out2 = smaug_write_json_mem(&t, &wo, NULL, NULL);
     CHECK(out2 == NULL, "JSON write: out_len=NULL retorna NULL");
     smaug_i64_free(s);
 }
@@ -1355,7 +1364,7 @@ static void test_json_write_pretty_rich(void) {
 
     smaug_json_write_opts_t wo = {.pretty = 1};
     size_t len;
-    char *out = smaug_write_json_mem(&t, &wo, &len);
+    char *out = smaug_write_json_mem(&t, &wo, &len, NULL);
     CHECK(out != NULL,               "JSON write pretty rich: retorna buffer");
     CHECK(strstr(out, "\n") != NULL, "JSON write pretty rich: tem newline");
     CHECK(strstr(out, "null") != NULL, "JSON write pretty rich: null aparece");
@@ -1395,7 +1404,7 @@ static void test_json_write_large_string(void) {
 
     smaug_json_write_opts_t wo = {0};
     size_t len;
-    char *out = smaug_write_json_mem(&t, &wo, &len);
+    char *out = smaug_write_json_mem(&t, &wo, &len, NULL);
     CHECK(out != NULL,    "JSON write large: retorna buffer");
     CHECK(len > big_len,  "JSON write large: buffer maior que o campo (overhead JSON)");
     /* integridade: relê o JSON e confirma que a string de 10000 'x' voltou

@@ -1728,15 +1728,31 @@ static void af_csv_write(void) {
     for (long k = 0; k < MAX_IO_ALLOCS; k++) {
         reset(k);
         size_t len;
-        char *out = smaug_write_csv_mem(&t, &wo, &len);
+        char *out = smaug_write_csv_mem(&t, &wo, &len, NULL);
         if (out) { free(out); }
     }
     reset(-1);
     size_t len;
-    char *out = smaug_write_csv_mem(&t, &wo, &len);
+    char *out = smaug_write_csv_mem(&t, &wo, &len, NULL);
     OK(out != NULL && len > 0,         "csv_write: sucesso");
     OK(strstr(out, "\"a,b\"") != NULL, "csv_write: campo com vírgula escapado");
     free(out);
+
+    /* 12.30: com err_out != NULL, o set_io_error faz strdup da causa — que pode
+       falhar sob OOM. sep==decimal força o caminho de erro sem depender dos
+       mallocs internos do serializador; varremos o strdup do set_io_error. */
+    smaug_csv_write_opts_t wbad = smaug_csv_write_default_opts();
+    wbad.sep = ';'; wbad.decimal = ';';
+    for (long k = 0; k < 4; k++) {
+        reset(k);
+        char *werr = NULL; size_t len2;
+        char *o = smaug_write_csv_mem(&t, &wbad, &len2, &werr);
+        OK(o == NULL, "csv_write err_out: retorna NULL em sep==decimal sob OOM");
+        /* werr pode ser NULL (strdup falhou — fallback documentado) ou não;
+           qualquer um é válido, o essencial é não crashar nem vazar. */
+        if (werr) smaug_free(werr);
+    }
+    reset(-1);
     smaug_i64_free(si); smaug_f64_free(sf); smaug_bool_free(sb); smaug_str_free(ss);
 }
 
@@ -1826,12 +1842,12 @@ static void af_json_write(void) {
     for (long k = 0; k < MAX_IO_ALLOCS; k++) {
         reset(k);
         size_t len;
-        char *out = smaug_write_json_mem(&t, &wo, &len);
+        char *out = smaug_write_json_mem(&t, &wo, &len, NULL);
         if (out) { free(out); }
     }
     reset(-1);
     size_t len;
-    char *out = smaug_write_json_mem(&t, &wo, &len);
+    char *out = smaug_write_json_mem(&t, &wo, &len, NULL);
     OK(out != NULL && len > 0, "json_write: sucesso");
     free(out);
     smaug_i64_free(si); smaug_f64_free(sf); smaug_bool_free(sb); smaug_str_free(ss);
@@ -1855,12 +1871,12 @@ static void af_json_write_pretty(void) {
     for (long k = 0; k < MAX_IO_ALLOCS; k++) {
         reset(k);
         size_t len;
-        char *out = smaug_write_json_mem(&t, &wo, &len);
+        char *out = smaug_write_json_mem(&t, &wo, &len, NULL);
         if (out) { free(out); }
     }
     reset(-1);
     size_t len;
-    char *out = smaug_write_json_mem(&t, &wo, &len);
+    char *out = smaug_write_json_mem(&t, &wo, &len, NULL);
     OK(out != NULL && strstr(out,"\n") != NULL, "json_write_pretty: sucesso");
     free(out);
     smaug_i64_free(si); smaug_str_free(ss);

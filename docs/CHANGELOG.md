@@ -5,6 +5,39 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-21 — 12.30 Fase 1: to_csv_mem/to_json_mem comunicam a causa do erro
+
+Ataque faseado do 12.30 (contrato de erro de escrita). Fase 1: as duas variantes
+_mem, que tinham o bug mais grave — o retorno NULL colapsava OOM com sep==decimal,
+e o Lua repassava "OOM" mesmo quando a causa era erro de configuração (mensagem
+factualmente errada, não só imprecisa).
+
+Escolha de desenho (Opção B, das três levantadas): adicionar um out-param
+char **err_out às funções de escrita, espelhando o t->error que a leitura já usa.
+Helper set_io_error() em smaug_io_internal.h, ao lado do make_error. Rejeitadas:
+resolver no Lua duplicaria a checagem sep==decimal (fere fonte única); implementar
+o smaug_io_last_error() que o header promete exigiria static mutável — violaria a
+thread-safety do Anel 0 que o eixo 14 protege (seria um retrocesso auto-infligido,
+e o próprio contrato do header está obsoleto por isso).
+
+Detalhe de heap que o design respeita: err_out é strdup dentro da DLL, então o Lua
+libera com smaug_free (heap da DLL), nunca ffi.C.free — mesma regra do buffer de
+write_mem, por causa dos heaps separados de luajit.exe e smaug.dll no Windows.
+
+O teste sep==decimal em test_io_c já materializava o achado: verificava t->error
+com "decimal" no read, mas só out==NULL no write (assimetria escrita no próprio
+teste). Agora o write também verifica a causa. Guard Lua em test_csv confirma que
+to_csv_mem não diz mais OOM. Allocfail ganhou cobertura do strdup do set_io_error
+(err_out não-NULL sob OOM) — o novo ponto de alocação entra na mesma disciplina
+de alloc-failure do resto do projeto. test_io_c 312→315, test_csv 141→144,
+allocfail 1874→1878.
+
+Faseado porque a migração toca ~45 call-sites (33 em testes C) e muda assinatura
+pública — selo Fedora. Fase 2 (smaug_write_csv/json, o errno do fopen/fwrite)
+fica registrada para a próxima. Eixo 14 segue verde: nenhum estado global
+introduzido.
+
+---
 ## 2026-07-21 — 12.20: eixo 03 ampliado (4 frentes) + 12.30 registrado (review do Anel 0)
 
 Pedido explícito antes de tocar em código: revisão profunda do Anel 0, "nunca

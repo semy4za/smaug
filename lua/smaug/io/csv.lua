@@ -365,10 +365,15 @@ function M.write_mem(ds, opts)
         if opts.header ~= nil then wopts.header = opts.header and 1 or 0 end
     end
     local outlen = ffi.new("size_t[1]")
-    local buf = C.smaug_write_csv_mem(t, wopts, outlen)
+    local errp   = ffi.new("char*[1]")   -- 12.30: recebe a causa; C zera em sucesso
+    local buf = C.smaug_write_csv_mem(t, wopts, outlen, errp)
     free_table_lua(t, ds:ncols())
     if buf == nil then
-        error("smaug: to_csv_mem — OOM", 2)
+        -- antes: "OOM" fixo — mentia quando a causa era sep==decimal. Agora o C
+        -- diz a causa (heap da DLL → liberar com smaug_free, não ffi.C.free).
+        local msg = errp[0] ~= nil and ffi.string(errp[0]) or "erro desconhecido"
+        if errp[0] ~= nil then C.smaug_free(errp[0]) end
+        error("smaug: to_csv_mem — " .. msg, 2)
     end
     local result = ffi.string(buf, outlen[0])
     C.smaug_free(buf)

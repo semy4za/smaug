@@ -75,10 +75,13 @@ function M.write_mem(ds, opts)
     local wopts = ffi.new("smaug_json_write_opts_t")
     wopts.pretty = (opts and opts.pretty) and 1 or 0
     local outlen = ffi.new("size_t[1]")
-    local buf = C.smaug_write_json_mem(t, wopts, outlen)
+    local errp   = ffi.new("char*[1]")   -- 12.30: recebe a causa; C zera em sucesso
+    local buf = C.smaug_write_json_mem(t, wopts, outlen, errp)
     csv._free_table_lua(t, ds:ncols())
     if buf == nil then
-        error("smaug: to_json_mem — OOM", 2)
+        local msg = errp[0] ~= nil and ffi.string(errp[0]) or "erro desconhecido"
+        if errp[0] ~= nil then C.smaug_free(errp[0]) end
+        error("smaug: to_json_mem — " .. msg, 2)
     end
     local result = ffi.string(buf, outlen[0])
     C.smaug_free(buf)

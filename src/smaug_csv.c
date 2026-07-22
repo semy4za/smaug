@@ -452,15 +452,23 @@ static int write_field(wbuf_t *b, const char *s, size_t n, char sep, char quote)
 }
 
 char *smaug_write_csv_mem(const smaug_table_t *t,
-                           const smaug_csv_write_opts_t *opts, size_t *out_len) {
-    if (!t || !out_len) return NULL;
+                           const smaug_csv_write_opts_t *opts, size_t *out_len,
+                           char **err_out) {
+    if (err_out) *err_out = NULL;   /* 12.30: limpa o slot; só preenche em erro */
+    if (!t || !out_len) {
+        set_io_error(err_out, "argumento nulo (tabela ou out_len)");
+        return NULL;
+    }
     smaug_csv_write_opts_t def = smaug_csv_write_default_opts();
     if (!opts) opts = &def;
     char sep = opts->sep ? opts->sep : ',';   /* fallback defensivo (ver test_csv_write_opts_zero_sep_quote) */
     char quote = opts->quote ? opts->quote : '"'; /* fallback defensivo (ver test_csv_write_opts_zero_sep_quote) */
     char decimal = opts->decimal ? opts->decimal : '.'; /* fallback defensivo: campo zerado → '.' */
     /* H.5.c: sep == decimal produziria CSV ilegível (campo e decimal colidem). */
-    if (sep == decimal) return NULL;
+    if (sep == decimal) {
+        set_io_error(err_out, "separador de campo e decimal não podem ser iguais");
+        return NULL;
+    }
     wbuf_t b = {0};
 
     if (opts->header) {
@@ -513,12 +521,15 @@ char *smaug_write_csv_mem(const smaug_table_t *t,
     if (wbuf_pushc(&b, '\0')) goto oom;
     *out_len = b.len - 1;  /* out_len não inclui o \0 */
     return b.data;
-oom: free(b.data); return NULL;
+oom: set_io_error(err_out, "OOM ao serializar CSV"); free(b.data); return NULL;
 }
 
 int smaug_write_csv(const char *path, const smaug_table_t *t,
                     const smaug_csv_write_opts_t *opts) {
-    size_t len; char *buf = smaug_write_csv_mem(t, opts, &len);
+    /* 12.30 Fase 1: por ora descarta a causa da serialização (err_out=NULL). A
+       Fase 2 dará a smaug_write_csv seu próprio err_out e propagará esta causa
+       + a de fopen/fwrite. */
+    size_t len; char *buf = smaug_write_csv_mem(t, opts, &len, NULL);
     if (!buf) return -1;
     FILE *f = fopen(path, "wb");
     if (!f) { free(buf); return -1; }
