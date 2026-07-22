@@ -898,11 +898,41 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
      (mais invasivo). Menos perigoso que a de coverage: esquecer um teste aqui
      apenas não o roda (visível no contador de checks), não mente sobre cobertura.
      Candidato a fazer junto do item 10, quando `.c`/testes novos entrarem.
- - 12.20 **`03_c_lua_mirror` não audita `astype.h`/`convert.h`** — [achado
-   2026-07-09]. O eixo lê `smaug.h`+`_string/_datetime/_numeric/_bool/_core.h`,
-   mas não os headers do 10.7; as 12 primitivas + 2 parsers ficam fora do radar
-   C↔Lua. Adicionar `smaug_astype.h`/`smaug_convert.h` à lista do eixo. Não é
-   bug de código; lacuna de cobertura do próprio checker.
+ - 12.20 **CONCLUÍDO (2026-07-21) — eixo 03 ampliado em 4 frentes.** [Windows]
+   O achado original citava só `astype.h`/`convert.h`; a revisão profunda do
+   Anel 0 (pedida antes de tocar em código, "nunca supor") mostrou que a lacuna
+   era maior — o eixo tinha 3 problemas adicionais que ninguém tinha registrado.
+   Escopo final, 4 frentes:
+   - **Frente 1 — `smaug_ops_window.h` ausente.** As 16 funções de rolling
+     (`smaug_{f64,i64}_rolling_*`) nunca entravam na composição de headers do
+     eixo — encaixam perfeitamente no padrão existente (`smaug_{dtype}_{sufixo}`).
+     Adicionado; resultado 🟩 direto (usadas via `_types.lua`/`_d.rolling_*`).
+   - **Frente 2 — falso-negativo estrutural em `bool` (achado da revisão, não
+     do texto original).** Rodando o eixo antes de mexer, a taxa de 🟨 em bool
+     era 47% (9/19) — muito acima dos outros dtypes (4–6%). Causa: as funções
+     que o Lua REALMENTE usa (`smaug_bool_series_and/or/xor/count_true/any/all`)
+     vivem em `smaug_numeric.h`, não em `smaug_bool.h` — a composição de
+     `headers.bool` não incluía `hdr_numeric`, então nem eram buscadas (sumiam
+     do relatório, não apareciam nem 🟩 nem 🟨). As de `smaug_bool.h` sem
+     `_series_` são primitivas cruas de uso interno (arrays, não Series) —
+     corretamente sem caminho Lua direto. Corrigido incluindo `hdr_numeric` na
+     composição de bool: 19→42 funções auditadas, taxa de 🟨 cai para 21%
+     (9/42) — e os 9 que sobram são exatamente as primitivas cruas esperadas.
+   - **Frente 3 — `astype.h`, matriz origem×destino (o achado original).** As 12
+     funções (`smaug_{origem}_to_{destino}`) não cabem no padrão "1 dtype +
+     sufixo" — carregam DOIS dtypes no nome. Encaixá-las na tabela por-dtype
+     confundiria ("função to_f64 do dtype i64"). Seção própria: matriz
+     origem→destino, extrator dedicado (`gmatch` do padrão `_to_`). 12/12 🟩
+     (usadas de fato em `_transform.lua`, confirmado).
+   - **Frente 4 — `convert.h`, fora de escopo por natureza (decisão, não
+     lacuna).** As 6 funções (`parse_i64/f64`, `fmt_i64/f64` + variantes _cstr)
+     são infraestrutura interna entre `.c` files — zero ocorrências no cdef,
+     nunca expostas ao Lua por design. Incluí-las marcaria 🟨 PERMANENTE — ruído,
+     não achado. Registrada como nota textual no cabeçalho do eixo, não como
+     seção/tabela.
+   Cobertura total do eixo: 209→258 funções auditadas (+49), zero ruído novo.
+   Vínculo: a revisão profunda também achou o 12.30 (contrato de erro de escrita
+   em I/O nunca implementado) — registrado à parte, não é do eixo 03.
  - 12.21 **CONCLUÍDO (2026-07-14).** O registro mirava o JSON; a revisão do Ring
    0 (pedida pelo Gui) mostrou que o problema era o **vocabulário de não-finitos
    como um todo**, sem regra: `smaug_convert.c` escrevia `"nan"` como valor
@@ -987,6 +1017,36 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
      só marca FALHOU no relatório — o comportamento certo para um achado real.
    Provado: `.c` novo com global mutável passou a ser detectado (🟥, exit 1);
    removido, volta verde. `build/SOURCES` é gitignored (efêmero).
+ - 12.30 **Contrato de erro de escrita em I/O nunca implementado** — [achado
+   2026-07-21, review profunda do Anel 0]. `smaug_io.h` promete no cabeçalho:
+   "toda função que escreve retorna 0/-1 (checar `smaug_io_last_error()`)". Essa
+   função **não existe** — nem protótipo, nem definição, nem cdef — em lugar
+   nenhum do projeto (confirmado por leitura completa de `smaug_io.h` e
+   `smaug_io_internal.h`).
+   - **A assimetria é real e específica, não geral.** O lado de LEITURA está bem
+     construído: `make_error()` (`smaug_io_internal.h`) aloca a `smaug_table_t`
+     com `->error = strdup(msg)`, tratado até no caso raro de falha do próprio
+     `strdup` (não deixa `error` NULL por acidente — o caller leria como
+     sucesso). Usado consistentemente em TODOS os pontos de falha de
+     `smaug_read_csv_mem`/`smaug_read_json_mem` (separador=decimal, entrada
+     vazia, sem colunas, "não foi possível abrir", OOM em vários pontos) — sem
+     lacuna, li os dois parsers inteiros.
+   - **O lado de ESCRITA descarta a causa que já tinha em mãos.** Li
+     `smaug_write_csv` (csv.c) e `smaug_write_json` (json.c) por inteiro: os dois
+     têm a MESMA estrutura — `fopen(path,"wb")` falha → `free(buf); return -1` —
+     sem checar `errno` (que já contém a causa exata: permissão negada, diretório
+     inexistente, etc.) e sem diferenciar de uma falha de `fwrite` parcial (disco
+     cheio no meio). A assinatura retorna só `int`, sem onde guardar mensagem.
+   - **Por que importa:** o Lua repassa isso como `"to_csv — falha ao escrever
+     'path'"` — genérico, igual para qualquer causa. Na leitura, o mesmo tipo de
+     falha (`fopen` de path inválido) já diz exatamente por quê. Viola em parte
+     "falha visível": a falha é visível, a causa não.
+   - **Correção (não atacada aqui, registrada para decisão):** não precisa do
+     `last_error()` global prometido — mais simples seria as duas funções de
+     escrita ganharem uma forma paralela ao `make_error` (ex.: um out-param de
+     mensagem, ou mudar o retorno para algo que carregue `errno`/`strerror`).
+     Barato (o padrão já existe do lado da leitura, só falta espelhar), mas é
+     mudança de assinatura pública — decidir com calma quando for atacado.
 ## 13. Reescrita de exemplos + docstrings  [Windows]
 
 Doc reflete a API depois que ela para de mudar (itens 1–12).

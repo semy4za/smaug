@@ -11,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-07-21 15:11:37 UTC
+Gerado em: 2026-07-22 12:10:45 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -266,8 +266,10 @@ Cada assimetria é classificada: 🟩 ambos · 🟦 par de nome · ⬜ intencion
 
 Cada função pública do backend C deveria ter caminho no frontend Lua (direto via FFI ou exposto via método Series). 🟨 = função C que não aparece em `lua/smaug/core/series.lua` (pode ser órfã ou exposta indiretamente via outro nome).
 
+**Fora de escopo por natureza (12.20 frente 4):** `smaug_convert.h` (`smaug_parse_i64/f64`, `smaug_fmt_i64/f64` e variantes _cstr — 6 funções) não entra nas tabelas acima. São infraestrutura interna de parsing/formatação usada entre arquivos C (astype.c, csv.c, json.c) — nunca expostas ao Lua via FFI (confirmado: zero ocorrências no cdef). Colocá-las aqui as marcaria 🟨 permanentemente — ruído, não achado, já que por design não devem ter caminho Lua direto.
 
-### f64 — 53 funções C
+
+### f64 — 60 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -311,6 +313,13 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `mul_scalar` | 🟩 |  |
 | `ne` | 🟩 |  |
 | `rank` | 🟩 |  |
+| `rolling_count` | 🟩 |  |
+| `rolling_max` | 🟩 |  |
+| `rolling_mean` | 🟩 |  |
+| `rolling_min` | 🟩 |  |
+| `rolling_std` | 🟩 |  |
+| `rolling_sum` | 🟩 |  |
+| `rolling_var` | 🟩 |  |
 | `select` | 🟩 |  |
 | `set` | 🟩 |  |
 | `set_null` | 🟩 |  |
@@ -326,7 +335,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `view` | 🟩 |  |
 
 
-### i64 — 52 funções C
+### i64 — 59 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -369,6 +378,13 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `mul_scalar` | 🟩 |  |
 | `ne` | 🟩 |  |
 | `rank` | 🟩 |  |
+| `rolling_count` | 🟩 |  |
+| `rolling_max` | 🟩 |  |
+| `rolling_mean` | 🟩 |  |
+| `rolling_min` | 🟩 |  |
+| `rolling_std` | 🟩 |  |
+| `rolling_sum` | 🟩 |  |
+| `rolling_var` | 🟩 |  |
 | `select` | 🟩 |  |
 | `set` | 🟩 |  |
 | `set_null` | 🟩 |  |
@@ -384,7 +400,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `view` | 🟩 |  |
 
 
-### bool — 19 funções C
+### bool — 42 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -393,18 +409,41 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `any` | 🟨 |  |
 | `append` | 🟩 |  |
 | `append_null` | 🟩 |  |
+| `argmax` | 🟩 |  |
+| `argmin` | 🟩 |  |
+| `argsort` | 🟩 |  |
+| `bfill` | 🟩 |  |
 | `clone` | 🟩 |  |
+| `coalesce_scalar` | 🟩 |  |
+| `count_nonnull` | 🟩 |  |
 | `count_true` | 🟨 |  |
 | `create` | 🟩 |  |
 | `create_from_array` | 🟨 |  |
 | `create_with_capacity` | 🟨 |  |
+| `eq` | 🟩 |  |
+| `ffill` | 🟩 |  |
+| `filter` | 🟩 |  |
 | `free` | 🟩 |  |
 | `get` | 🟩 |  |
 | `is_null` | 🟩 |  |
+| `max` | 🟩 |  |
+| `min` | 🟩 |  |
+| `ne` | 🟩 |  |
 | `not` | 🟨 |  |
 | `or` | 🟨 |  |
+| `rank` | 🟩 |  |
+| `series_all` | 🟩 |  |
+| `series_and` | 🟩 |  |
+| `series_any` | 🟩 |  |
+| `series_count_true` | 🟩 |  |
+| `series_not` | 🟩 |  |
+| `series_or` | 🟩 |  |
+| `series_xor` | 🟩 |  |
 | `set` | 🟩 |  |
 | `set_null` | 🟩 |  |
+| `shift` | 🟩 |  |
+| `sort` | 🟩 |  |
+| `take` | 🟩 |  |
 | `view` | 🟩 |  |
 | `xor` | 🟨 |  |
 
@@ -504,6 +543,26 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `weekday` | 🟩 |  |
 | `year` | 🟩 |  |
 | `yearday` | 🟩 |  |
+
+
+### astype — conversão cross-dtype (12 funções C)
+
+Matriz origem→destino (`smaug_astype.h`); não cabe na tabela por-dtype acima porque o nome carrega dois dtypes, não um.
+
+| origem | destino | função C | exposta em Lua? |
+| :--- | :-: | :-: | :-: |
+| i64 | f64 | `smaug_i64_to_f64` | 🟩 |
+| f64 | i64 | `smaug_f64_to_i64` | 🟩 |
+| i64 | dt | `smaug_i64_to_dt` | 🟩 |
+| dt | i64 | `smaug_dt_to_i64` | 🟩 |
+| f64 | dt | `smaug_f64_to_dt` | 🟩 |
+| dt | f64 | `smaug_dt_to_f64` | 🟩 |
+| i64 | str | `smaug_i64_to_str` | 🟩 |
+| f64 | str | `smaug_f64_to_str` | 🟩 |
+| dt | str | `smaug_dt_to_str` | 🟩 |
+| str | i64 | `smaug_str_to_i64` | 🟩 |
+| str | f64 | `smaug_str_to_f64` | 🟩 |
+| str | dt | `smaug_str_to_dt` | 🟩 |
 
 ## Eixo 4 — Paridade Anel 2 (operações relacionais) por dtype
 
@@ -833,9 +892,9 @@ O `cdef` do `ffi_loader.lua` replica à mão o layout de cada struct dos headers
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 1022
+- 🟩 paridade: 1071
 - ⬜ exceção registrada: 215
-- 🟨 suspeita (revisar): 270
+- 🟨 suspeita (revisar): 271
 - 🟥 inconsistência clara: 15
 
 

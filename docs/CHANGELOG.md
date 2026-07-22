@@ -5,6 +5,50 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-21 — 12.20: eixo 03 ampliado (4 frentes) + 12.30 registrado (review do Anel 0)
+
+Pedido explícito antes de tocar em código: revisão profunda do Anel 0, "nunca
+suponha nada". O achado original do 12.20 (eixo 03 não audita astype.h/
+convert.h) virou 4 frentes depois da verificação — duas a mais que ninguém
+tinha registrado.
+
+Frente 1 (ops_window.h ausente): as 16 funções de rolling nunca entravam na
+composição de headers do eixo, apesar de encaixarem perfeitamente no padrão
+existente. Resultado 🟩 direto ao adicionar.
+
+Frente 2 (o achado que a revisão descobriu, não o texto original): rodando o
+eixo antes de mexer em qualquer coisa, bool tinha 47% de 🟨 — muito acima dos
+outros dtypes. Investigando por que, achei que as funções que o Lua realmente
+usa em massa (smaug_bool_series_and/or/xor/count_true/any/all) vivem em
+smaug_numeric.h, não em smaug_bool.h — e a composição de headers.bool não
+incluía numeric.h, então essas 7 funções nem eram buscadas, sumiam do relatório
+sem aparecer nem 🟩 nem 🟨. As de bool.h sem "_series_" são primitivas cruas
+corretamente sem caminho Lua (arrays, não Series). Corrigido: 19→42 funções
+auditadas, 🟨 cai para 21% — e o que sobra é exatamente o esperado.
+
+Frente 3 (astype.h, o achado original): 12 funções smaug_{origem}_to_{destino}
+carregam dois dtypes no nome — não cabem no padrão "1 dtype + sufixo" do eixo.
+Encaixar na tabela por-dtype confundiria. Seção própria: matriz origem→destino.
+12/12 🟩.
+
+Frente 4 (convert.h, decisão consciente de excluir): as 6 funções são
+infraestrutura interna entre .c files, zero no cdef, nunca deveriam aparecer no
+espelho C↔Lua. Incluí-las marcaria 🟨 permanente — ruído, não achado. Nota
+textual no cabeçalho do eixo, não seção nova.
+
+Cobertura do eixo: 209→258 funções, zero ruído novo.
+
+Achado colateral da mesma revisão, registrado à parte como 12.30 (não é do eixo
+03): smaug_io.h promete "checar smaug_io_last_error()" para escrita, mas essa
+função não existe em lugar nenhum — nem protótipo, nem definição, nem cdef. Li
+smaug_io.h e smaug_io_internal.h por inteiro para confirmar. A leitura tem
+mecanismo rico (make_error() preenche t->error consistentemente, com cuidado
+até no caso de OOM ao copiar a própria mensagem); a escrita (smaug_write_csv/
+smaug_write_json, ambos lidos por inteiro) descarta errno do fopen/fwrite e
+retorna só -1 — mesma estrutura idêntica nos dois. Correção não atacada agora
+(mudaria assinatura pública), só registrada para decisão futura.
+
+---
 ## 2026-07-20 — 12.19 (metade SRCS): fontes C descobertas por glob nos 3 scripts
 
 Continuação do 12.29. O 12.19 apontava 5 listas duplicadas de SRCS/C_TESTS; o
