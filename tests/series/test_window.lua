@@ -333,4 +333,36 @@ check(ndn:count_nonnull() == 2 and ndn:get(1) == nd:get(2), "dt shift(-1)")
 -- validação de entrada mantida
 check(not pcall(function() return nf:shift(1.5) end), "shift(1.5) erra (não-inteiro)")
 
+-- ===================================================================
+-- 7.2a — argmin/argmax em str e bool: o gate na Lua é por CAPACIDADE
+-- (self._d.argmin), não por dtype. O Anel 0 já tinha smaug_str_argmin e
+-- smaug_bool_argmin (testados em test_ops_window) e o descritor já os ligava,
+-- mas um guard por dtype barrava str/bool antes do gate — capacidade morta.
+-- Nenhum teste Lua exercitava esses dtypes, por isso a suíte ficava verde.
+local as = S.from_table({"banana", "abacaxi", "caju"})
+check(as:argmin() == 2, "7.2a str argmin = 2 (abacaxi, lexicográfico, 1-based)")
+check(as:argmax() == 3, "7.2a str argmax = 3 (caju)")
+check(as:min() == as:get(as:argmin()), "7.2a str min == get(argmin)")
+check(as:max() == as:get(as:argmax()), "7.2a str max == get(argmax)")
+
+-- str: vazia é a menor; prefixo mais curto vem antes
+local as2 = S.from_table({"z", NA, "", "m"})
+check(as2:argmin() == 3, "7.2a str argmin ignora NA e acha a vazia")
+check(as2:argmax() == 1, "7.2a str argmax = 1 (z)")
+check(S.from_table({"abc", "ab"}):argmin() == 2, "7.2a str prefixo: 'ab' < 'abc'")
+
+-- bool: false < true
+local ab = S.from_table({true, false, true})
+check(ab:argmin() == 2, "7.2a bool argmin = 2 (false < true)")
+check(ab:argmax() == 1, "7.2a bool argmax = 1 (true)")
+
+-- aliases idxmin/idxmax herdam o comportamento
+check(as:idxmin() == as:argmin(), "7.2a str idxmin == argmin")
+check(ab:idxmax() == ab:argmax(), "7.2a bool idxmax == argmax")
+
+-- bordas: toda-NA e vazia → nil (SIZE_MAX do C traduzido)
+check(S.from_table({NA, NA}, "string"):argmin() == nil, "7.2a str toda-NA = nil")
+check(S.from_table({}, "string"):argmin() == nil,        "7.2a str vazia = nil")
+check(S.from_table({NA, NA}, "bool"):argmax() == nil,    "7.2a bool toda-NA = nil")
+
 print(string.format("OK — %d checks passaram (Series: rolling, expanding, cumsum, cummin, cummax, diff, shift, ffill, bfill, argmin, argmax)", n_ok))

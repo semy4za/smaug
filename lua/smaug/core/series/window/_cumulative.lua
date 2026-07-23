@@ -152,45 +152,32 @@ return function(I)
     end
 
     -- argmin(): índice 1-based do mínimo (ignora nulos). nil se vazia ou toda nula.
-    -- f64/i64: C. datetime: Lua.
+    -- Gate por CAPACIDADE (`self._d.argmin`), não por dtype (7.2a): todo dtype com
+    -- descritor C delega ao Anel 0 — f64/i64 (numérico), dt (cronológico), str
+    -- (lexicográfico por bytes), bool (false<true). Sem fallback element-wise: o
+    -- Anel 1 não reimplementa o motor. categorical é Lua puro (sem `_d`) e recebe
+    -- erro orientado.
     function methods.argmin(self)
-        if self._dtype ~= "float64" and self._dtype ~= "int64" and self._dtype ~= "datetime" then
-            error("smaug: argmin() requer dtype numérico ou datetime, não '"..self._dtype.."'", 2)
+        local fn = self._d and self._d.argmin
+        if not fn then
+            error("smaug: argmin() não suportado para dtype '"..self._dtype.."'", 2)
         end
-        if self._d.argmin then
-            local idx = self._d.argmin(self._c)
-            local n   = tonumber(idx)
-            if n == nil or n >= tonumber(self._c.size) then return nil end
-            return n + 1   -- 0-based → 1-based
-        end
-        local best_v, best_i = nil, nil
-        for i = 1, self:len() do
-            local v = self:get(i)
-            if v ~= nil and (best_v == nil or v < best_v) then
-                best_v, best_i = v, i
-            end
-        end
-        return best_i
+        local idx = fn(self._c)
+        local n   = tonumber(idx)
+        -- C devolve 0-based; SIZE_MAX (≥ size) sinaliza vazia/toda-NA.
+        if n == nil or n >= tonumber(self._c.size) then return nil end
+        return n + 1   -- 0-based → 1-based
     end
 
-    -- argmax(): índice 1-based do máximo (ignora nulos).
+    -- argmax(): índice 1-based do máximo (ignora nulos). Mesmo gate do argmin.
     function methods.argmax(self)
-        if self._dtype ~= "float64" and self._dtype ~= "int64" and self._dtype ~= "datetime" then
-            error("smaug: argmax() requer dtype numérico ou datetime, não '"..self._dtype.."'", 2)
+        local fn = self._d and self._d.argmax
+        if not fn then
+            error("smaug: argmax() não suportado para dtype '"..self._dtype.."'", 2)
         end
-        if self._d.argmax then
-            local idx = self._d.argmax(self._c)
-            local n   = tonumber(idx)
-            if n == nil or n >= tonumber(self._c.size) then return nil end
-            return n + 1
-        end
-        local best_v, best_i = nil, nil
-        for i = 1, self:len() do
-            local v = self:get(i)
-            if v ~= nil and (best_v == nil or v > best_v) then
-                best_v, best_i = v, i
-            end
-        end
-        return best_i
+        local idx = fn(self._c)
+        local n   = tonumber(idx)
+        if n == nil or n >= tonumber(self._c.size) then return nil end
+        return n + 1
     end
 end

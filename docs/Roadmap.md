@@ -266,6 +266,20 @@ fallback element-wise. Depende do item 1 (nulidade coerente) já pronto.
     sem fallback. Removidas 4 exceptions órfãs do parity (argmin/argmax × str/bool).
     Teste C +24 (test_ops_window 314→338), Lua +9 (test_window 93→102). argmin/argmax
     não alocam → allocfail inalterado. Aguarda Fedora p/ Valgrind+cobertura.
+    - **Correção (2026-07-22, achado da auditoria dos itens 1–11):** o Anel 0 e o
+      descritor estavam corretos, mas o gate na Lua **não** era por capacidade —
+      `_cumulative.lua` mantinha um guard por dtype (`~= float64 and ~= int64 and
+      ~= datetime`) que barrava str/bool **antes** de chegar em `self._d.argmin`.
+      Resultado: capacidade morta — `smaug_str_argmin`/`smaug_bool_argmin` prontos,
+      testados no C (411 checks) e ligados no descritor (`_types.lua` 191-192,
+      299-300), mas inacessíveis pelo Lua. Nenhum teste Lua exercitava argmin/argmax
+      em str/bool, por isso a suíte ficava verde e a lacuna não aparecia.
+      Corrigido: guard por dtype → gate por capacidade (`self._d and self._d.argmin`),
+      como o item já descrevia; fallback element-wise removido (era código morto —
+      os 5 dtypes com descritor têm argmin; categorical não expõe o método).
+      Aliases `idxmin`/`idxmax` herdam (delegam a argmin/argmax). +14 guards em
+      `test_window` (122→136), cobrindo str/bool, bordas (toda-NA, vazia) e os
+      aliases. Lua puro — fecha no Windows.
   - 7.2b ✅ **min/max** em dt/str/bool (decisão: retornam valor). dt → int64
     (sentinela INT64_MIN, via reduce_num); str → ponteiro+len materializado por
     wrapper no descritor (ffi.string), "" distinta de NULL; bool → Shape 1

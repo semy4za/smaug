@@ -5,6 +5,40 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-22 — auditoria dos itens 1–11 + correção do 7.2a (capacidade morta)
+
+Auditoria reversa pedida pelo Gui: em vez de confiar na marca [Done], verificar no
+código se o trabalho existe. Dez dos onze itens confirmados, vários com prova
+empírica — var([1,2,3])=1.0 (ddof=1 do 5.0), get_raw preservando
+9007199254740993LL (9.1), mutar column() não altera o frame (E2 do 9.2 morto),
+to_string exibindo int64 exato via cell_of→get_raw (11.4), pad/cell_str
+consolidados em display.lua (11.5), eixo 02 com 0 gaps reais (6.4).
+
+Um achado: o 7.2a afirmava "gate na Lua passou a ser por capacidade
+(self._d.argmin), sem fallback" — mas o código tinha um guard por dtype que
+barrava str/bool antes de alcançar esse gate. O Anel 0 estava certo o tempo
+todo: smaug_str_argmin/argmax e smaug_bool_argmin/argmax existem, são testados no
+C (test_ops_window, incluindo "str argmin = 1 (abacaxi)") e o descritor já os
+ligava. Capacidade morta: escrita, testada, ligada, inacessível.
+
+Por que ninguém viu: nenhum teste Lua chamava argmin/argmax em string ou bool. A
+suíte ficava verde porque a lacuna nunca era exercitada do lado do Anel 1 — o
+tipo de ponto cego que só uma auditoria de "o que foi prometido existe mesmo?"
+encontra.
+
+Correção: guard por dtype → gate por capacidade, exatamente como o item já
+descrevia. O fallback element-wise saiu junto (código morto: os 5 dtypes com
+descritor têm argmin, e categorical nem expõe o método). Os aliases idxmin/idxmax
+herdam de graça, pois delegam. +14 guards em test_window (122→136) cobrindo str,
+bool, bordas (toda-NA, vazia) e os aliases — provados nos dois sentidos
+(reintroduzi a regressão, o teste quebrou; restaurei, voltou verde).
+
+Detalhe menor registrado: o roadmap cita datetime/_dt.lua, mas o arquivo vive em
+temporal/_dt.lua — caminho da época do registro, não erro de trabalho.
+
+Lua puro, nenhum C tocado. Contadores do resto da suíte idênticos ao baseline.
+
+---
 ## 2026-07-21 — 12.30 Fase 1: to_csv_mem/to_json_mem comunicam a causa do erro
 
 Ataque faseado do 12.30 (contrato de erro de escrita). Fase 1: as duas variantes

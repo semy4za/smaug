@@ -11,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-07-22 18:39:22 UTC
+Gerado em: 2026-07-23 14:32:38 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -23,8 +23,8 @@ Cada linha = um método rastreado em `Series.methods` ou `CategoricalSeries`. Co
 | `all` | ⬜ | ⬜ | 🟩 | ⬜ | ⬜ | ⬜ |
 | `any` | ⬜ | ⬜ | 🟩 | ⬜ | ⬜ | ⬜ |
 | `append` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
-| `argmax` | 🟩 | 🟩 | ⬜ | ⬜ | 🟩 | ⬜ |
-| `argmin` | 🟩 | 🟩 | ⬜ | ⬜ | 🟩 | ⬜ |
+| `argmax` | 🟩 | 🟩 | ⬜ | ⬜ | 🟨 | ⬜ |
+| `argmin` | 🟩 | 🟩 | ⬜ | ⬜ | 🟨 | ⬜ |
 | `argsort` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
 | `astype` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
 | `autocorr` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟨 |
@@ -121,7 +121,7 @@ Cada linha = um método rastreado em `Series.methods` ou `CategoricalSeries`. Co
 | `view` | 🟩 | 🟩 | 🟨 | ⬜ | 🟨 | 🟩 |
 | `where` | 🟩 | 🟩 | 🟨 | 🟨 | 🟨 | 🟩 |
 
-**Sumário Eixo 1:** 101 métodos × 6 dtypes = 606 células · 🟩 276 (45.5%) · ⬜ 135 (22.3%) · 🟨 195 (32.2%)
+**Sumário Eixo 1:** 101 métodos × 6 dtypes = 606 células · 🟩 274 (45.2%) · ⬜ 135 (22.3%) · 🟨 197 (32.5%)
 
 ## Eixo 2 — Paridade Series ↔ DataSet (classificada)
 
@@ -786,7 +786,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `series/test_access` | 121 | 19 | 12 | — | 9 | 1 | — |
 | `series/test_reduce` | 57 | 7 | 2 | 3 | 4 | 2 | — |
 | `series/test_stat` | 70 | 6 | 12 | — | 9 | — | — |
-| `series/test_window` | 123 | 10 | 12 | 2 | 5 | 2 | — |
+| `series/test_window` | 137 | 10 | 12 | 3 | 7 | 2 | — |
 | `series/test_predicates` | 175 | 8 | 49 | 3 | 15 | 2 | — |
 | `series/test_selection` | 54 | 6 | 4 | 6 | 6 | 2 | — |
 | `series/test_str` | 273 | 4 | 9 | 1 | 50 | — | — |
@@ -801,7 +801,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 79 | 19 | 2 | 2 | 4 | 1 | 1 |
 
-**Total de checks:** 2650
+**Total de checks:** 2664
 
 ### Menções totais por dtype (toda a suite)
 
@@ -809,8 +809,8 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | :--- | :-: |
 | float64 | 198 |
 | int64 | 342 |
-| bool | 66 |
-| string | 223 |
+| bool | 67 |
+| string | 225 |
 | datetime | 93 |
 | categorical | 62 |
 
@@ -892,9 +892,9 @@ O `cdef` do `ffi_loader.lua` replica à mão o layout de cada struct dos headers
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 1071
+- 🟩 paridade: 1069
 - ⬜ exceção registrada: 215
-- 🟨 suspeita (revisar): 271
+- 🟨 suspeita (revisar): 273
 - 🟥 inconsistência clara: 15
 
 
