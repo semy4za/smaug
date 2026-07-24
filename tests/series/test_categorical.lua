@@ -890,5 +890,35 @@ do
           "11.2 .cat proxy __tostring legível")
 end
 
+-- =====================================================================
+-- 12.15 — CategoricalSeries: índice não-inteiro é erro, não nil silencioso.
+-- O guard checava tipo e faixa mas não `i % 1 ~= 0`, então get(1.5) devolvia
+-- nil calado, divergindo de Series:get(1.5) que erra. O guard estava copiado
+-- em get/is_null/set/set_null (4×); agora é o helper único check_cat_index,
+-- espelhando o I.check_index canônico da Series.
+do
+    local c = S({"a", "b", "c"}, "categorical")
+
+    -- os 4 pontos rejeitam índice fracionário (antes: get/is_null devolviam nil;
+    -- set/set_null gravavam em chave fracionária silenciosamente)
+    check(not pcall(function() return c:get(1.5) end),      "12.15 get(1.5) erra (não nil)")
+    check(not pcall(function() return c:is_null(1.5) end),  "12.15 is_null(1.5) erra")
+    check(not pcall(function() return c:set(1.5, "x") end), "12.15 set(1.5) erra")
+    check(not pcall(function() return c:set_null(1.5) end), "12.15 set_null(1.5) erra")
+
+    -- paridade com a Series struct: mesmo input, mesmo comportamento
+    local s = S({"a", "b", "c"})
+    check(not pcall(function() return s:get(1.5) end),      "12.15 paridade: Series:get(1.5) também erra")
+
+    -- caminho normal intacto: inteiros válidos funcionam, bordas erram como antes
+    check(c:get(2) == "b",                                  "12.15 get(inteiro válido) intacto")
+    check(c:is_null(1) == false,                            "12.15 is_null(inteiro) intacto")
+    check(not pcall(function() return c:get(0) end),        "12.15 get(0) ainda erra (faixa)")
+    check(not pcall(function() return c:get(99) end),       "12.15 get(99) ainda erra (faixa)")
+    check(not pcall(function() return c:get("x") end),      "12.15 get(string) ainda erra (tipo)")
+    c:set(1, "z"); check(c:get(1) == "z",                   "12.15 set(inteiro) intacto")
+    c:set_null(3); check(c:is_null(3) == true,              "12.15 set_null(inteiro) intacto")
+end
+
 
 print(string.format("OK — %d checks passaram (Series: categorical + completude datetime/categorical)", n_ok))

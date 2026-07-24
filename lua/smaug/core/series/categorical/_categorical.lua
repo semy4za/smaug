@@ -21,6 +21,20 @@ return function(I)
     CategoricalSeries._dtype  = "categorical"
     I.CategoricalSeries = CategoricalSeries
 
+    -- check_cat_index (12.15): guarda canônico de índice, espelhando o
+    -- I.check_index da Series struct. O categorical é Lua puro (_size, sem _c),
+    -- então não dá para reusar o da Series diretamente — mas a REGRA é a mesma,
+    -- incluindo `i % 1 ~= 0` (inteiro), que faltava aqui e deixava get(1.5)
+    -- devolver nil em silêncio, divergindo de Series:get(1.5) que erra. Antes,
+    -- este guard estava copiado em get/is_null/set/set_null (4×) sem a checagem
+    -- de inteiro; agora é ponto único. `Err.describe` evita despejar dados na
+    -- mensagem se `i` for um objeto (mesma proteção do 12.9).
+    local function check_cat_index(self, i)
+        if type(i) ~= "number" or i < 1 or i > self._size or i % 1 ~= 0 then
+            error("smaug: índice "..Err.describe(i).." fora dos limites [1, "..self._size.."]", 3)
+        end
+    end
+
     -- Construtor interno
     local function cat_new(codes, levels, level_map, n, name)
         return setmetatable({
@@ -119,25 +133,19 @@ return function(I)
     end
 
     function CategoricalSeries:get(i)
-        if type(i) ~= "number" or i < 1 or i > self._size then
-            error("smaug: índice "..Err.describe(i).." fora dos limites [1, "..self._size.."]", 2)
-        end
+        check_cat_index(self, i)
         local c = self._codes[i]
         if c == nil then return nil end
         return self._levels[c]
     end
 
     function CategoricalSeries:is_null(i)
-        if type(i) ~= "number" or i < 1 or i > self._size then
-            error("smaug: índice "..Err.describe(i).." fora dos limites [1, "..self._size.."]", 2)
-        end
+        check_cat_index(self, i)
         return self._codes[i] == nil
     end
 
     function CategoricalSeries:set(i, v)
-        if type(i) ~= "number" or i < 1 or i > self._size then
-            error("smaug: índice "..Err.describe(i).." fora dos limites [1, "..self._size.."]", 2)
-        end
+        check_cat_index(self, i)
         if v == nil or v == NA then self._codes[i] = nil; return end
         local s   = tostring(v)
         local idx = self._level_map[s]
@@ -150,9 +158,7 @@ return function(I)
     end
 
     function CategoricalSeries:set_null(i)
-        if type(i) ~= "number" or i < 1 or i > self._size then
-            error("smaug: índice "..Err.describe(i).." fora dos limites [1, "..self._size.."]", 2)
-        end
+        check_cat_index(self, i)
         self._codes[i] = nil
     end
 

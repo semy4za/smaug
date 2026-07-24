@@ -5,6 +5,30 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-23 — 12.15: CategoricalSeries rejeita índice não-inteiro
+
+Bug de falha-silenciosa: CategoricalSeries:get(1.5) devolvia nil calado, enquanto
+Series:get(1.5) erra. O guard checava type=="number" e faixa, mas não i % 1 ~= 0.
+Pior nos setters: set(1.5, x) gravava numa chave fracionária de _codes, sem
+reclamar.
+
+O guard estava copiado em 4 pontos (get/is_null/set/set_null — o achado dizia 3;
+o set_null tinha passado batido). Extraído para check_cat_index, um helper único
+que espelha o I.check_index canônico da Series. Não deu para reusar o da Series
+diretamente: o categorical é Lua puro (_size/_codes), sem a struct _c que o
+check_index da Series acessa — mas a regra de validação é idêntica, incluindo o
+i % 1 ~= 0 que faltava. Corrige o bug e remove a duplicação num movimento só.
+
++12 guards em test_categorical (299→311): os 4 pontos rejeitam fracionário,
+paridade explícita com Series:get(1.5), e caminho normal preservado (inteiro
+válido lê/escreve, faixa e tipo continuam errando). Provados nos dois sentidos.
+
+Mesmo tema das últimas auditorias: falha silenciosa é o que mais escapa neste
+projeto, e categorical:get/is_null não tinham teste de índice inválido antes.
+
+Lua puro, nenhum C tocado.
+
+---
 ## 2026-07-23 — auditoria do item 10: classificação corrigida + degrau em between/abs/round/clip
 
 Mesma lente da auditoria dos itens 1–11, agora no item 10. Os cinco subitens

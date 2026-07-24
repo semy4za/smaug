@@ -851,13 +851,16 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
   em vez de delegar. Se a regra de interpolação mudar num lugar, diverge. De
   quebra: `col:get(i)` em loop + `table.sort` em Lua (element-wise no Anel 1).
   Delegar a `I.quantile_sorted`.
-- 12.15 **`CategoricalSeries:get` aceita índice não-inteiro em silêncio** —
-  [Windows] (achado 2026-07-05). O guard (`categorical/_categorical.lua`) checa
-  tipo e faixa mas **não** inteiro (falta `i % 1 ~= 0`), divergindo do
-  `check_index` canônico da Series. Provado: `get(1.5)` → `nil` silencioso, onde
-  `Series:get(1.5)` erra (viola falha-visível). O mesmo guard está repetido 3×
-  (get/is_null/set) — delegar ao `check_index` canônico corrige os três de uma
-  vez.
+- 12.15 **CONCLUÍDO (2026-07-23).** [Windows] `CategoricalSeries` aceitava índice
+  não-inteiro em silêncio — `get(1.5)` devolvia `nil` calado, onde `Series:get(1.5)`
+  erra (viola falha-visível). O guard (`categorical/_categorical.lua`) checava tipo
+  e faixa mas faltava `i % 1 ~= 0`. E estava copiado em **4** pontos (o achado dizia
+  3): `get`/`is_null`/`set`/`set_null`. Extraído para o helper único
+  `check_cat_index`, espelhando o `I.check_index` canônico da Series — não dá para
+  reusar o da Series diretamente porque o categorical é Lua puro (`_size`, sem `_c`),
+  mas a regra é a mesma. Corrige o bug e mata a duplicação de uma vez. +12 guards em
+  `test_categorical` (299→311): os 4 pontos rejeitam fracionário, paridade com
+  Series, caminho normal (inteiro válido, faixa, tipo) intacto. Lua puro.
 - 12.16 **`fillna` de datetime aceitar string ISO** — [Windows] (registrado
   2026-07-07, futuro próximo). O `check_value` de datetime já aceita `number`
   (epoch_ms) **ou** string ISO 8601, como `set`/`append`. Mas o `fillna` de

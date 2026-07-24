@@ -1,8 +1,7 @@
 # Smaug — Relatório de Paridade
 
-> Arquivo gerado por `bash scripts/parity/parity.sh` ou `powershell scripts/parity/parity.ps1`.
-> **Não editar à mão.** Decisões conscientes de não-paridade ficam em
-> `scripts/parity/exceptions.txt`.
+> Arquivo gerado por `bash scripts/parity/parity.sh`. **Não editar à mão.**
+> Decisões conscientes de não-paridade ficam em `scripts/parity/exceptions.txt`.
 
 Convenção de status:
 
@@ -11,7 +10,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-07-24 16:35:52 UTC
+Gerado em: 2026-07-24 23:45:49 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -744,7 +743,7 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 242/242 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 239/239 erros com prefixo `smaug:` (100.0%)
 - `dataset.lua`: 94/94 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
@@ -791,7 +790,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `series/test_selection` | 54 | 6 | 4 | 6 | 6 | 2 | — |
 | `series/test_str` | 273 | 4 | 9 | 1 | 50 | — | — |
 | `series/test_dt` | 272 | 3 | 6 | 2 | 12 | 62 | — |
-| `series/test_categorical` | 300 | 7 | 7 | 8 | 5 | 13 | 58 |
+| `series/test_categorical` | 312 | 7 | 7 | 8 | 5 | 13 | 59 |
 | `dataset/test_core` | 238 | 30 | 33 | 8 | 14 | — | 1 |
 | `dataset/test_relational` | 174 | 10 | 58 | 4 | 34 | — | — |
 | `dataset/test_stat` | 91 | 10 | 16 | 1 | 13 | — | — |
@@ -801,7 +800,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 79 | 19 | 2 | 2 | 4 | 1 | 1 |
 
-**Total de checks:** 2677
+**Total de checks:** 2689
 
 ### Menções totais por dtype (toda a suite)
 
@@ -812,7 +811,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | bool | 67 |
 | string | 225 |
 | datetime | 93 |
-| categorical | 62 |
+| categorical | 63 |
 
 ## Eixo 12 — Sincronização docs ↔ código
 
