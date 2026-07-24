@@ -5,6 +5,49 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-23 — auditoria do item 10: classificação corrigida + degrau em between/abs/round/clip
+
+Mesma lente da auditoria dos itens 1–11, agora no item 10. Os cinco subitens
+concluídos (10.5-A, 10.6, 10.7, 10.8, 10.9) confirmados no código, com prova
+empírica onde dava: nunique=2 para ...992/...993 (10.5-A), combine_first delegando
+de fato ao coalesce (10.6, lido por inteiro), i64→str preservando ...993 exato
+(10.7), astype/csv/json todos chamando smaug_fmt_* e try_i64 sendo wrapper puro de
+smaug_parse_i64_cstr (10.9).
+
+O achado principal foi de classificação. O cabeçalho do item 10 afirmava que
+"10.1–10.4 não são bugs — são assimetrias de vetorização (performance)". Testando
+em vez de acreditar: between(x, x) no próprio x devolvia FALSE para
+x = 9007199254740993, e abs(-9007199254740993) devolvia 9007199254740992. Ou seja,
+10.2 e 10.3 são defeito de correção da mesma família do 10.5–10.7 — a mesma
+degradação por get()/tonumber() —, e estavam classificados como performance, o que
+os manteve no fim da fila. Cabeçalho corrigido.
+
+Correção aplicada agora: o degrau check_int64_lossless, que estava órfão desde que
+o 10.6/10.7 desceram ao Anel 0 (ninguém mais o chamava), voltou a ser usado — é
+exatamente para isso que existe. Roda em between, abs, round e clip, trocando
+corrupção silenciosa por falha visível. Nas três do map, o degrau vai dentro da
+closure, aproveitando que o map já passa (v, i) — uma passada só, sem custo extra.
+map() ficou de fora por decisão: é API genérica onde o caller escolhe dtype de
+saída e closure; bloquear seria invasivo.
+
+Isto é paliativo, não conserto: quando 10.2/10.3 descerem ao Anel 0, o degrau sai
+e o suporte a int64 > 2^53 passa a ser real. Mesmo padrão do Passo A do 10.6/10.7.
+
+Por que passou despercebido: Series:abs(), :round() e :clip() não tinham NENHUM
+teste direto — eram exercitados só via DataFrame, e nunca com int64 grande. +13
+guards em test_access (127→140) cobrindo recusa acima de 2^53, mensagem com o
+valor exato, fronteira 2^53 ainda aceita, e caminho normal intacto. Provados nos
+dois sentidos.
+
+Segundo achado, registrado sem atacar: cinco comentários no código dizem "bool
+fica no Anel 1 até 10.8", mas o 10.8 fechou com escopo redefinido e não trouxe
+bool para as famílias do 10.6/10.7. Falta smaug_bool_coalesce (existe só a
+_scalar), smaug_bool_select e os pares de astype com bool. Sem risco de int64 —
+é coerência de anel. A decidir: item próprio e reapontar os comentários.
+
+Lua puro, nenhum C tocado.
+
+---
 ## 2026-07-22 — auditoria dos itens 1–11 + correção do 7.2a (capacidade morta)
 
 Auditoria reversa pedida pelo Gui: em vez de confiar na marca [Done], verificar no

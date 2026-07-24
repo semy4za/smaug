@@ -425,12 +425,22 @@ espontânea; são decisões de contrato com aresta, que precisam estar resolvida
 Mesma tese do item 7 (completude do motor), agora para **transformações
 element-wise**. A exploração de 2026-06-30 mapeou operações que fazem o loop em
 Lua cruzando FFI por elemento, quando o padrão correto (delegar ao descritor → C)
-já existe e é seguido em toda a aritmética (o `binop` é exemplar). Em 10.1–10.4
-não são bugs — são assimetrias de vetorização (performance): 1 travessia FFI por
-linha vs 1 total. Em 10.5–10.7 a assimetria vem com **defeito de correção**: o
-loop Lua round-tripa por `get()`/`tonumber()`, corrompendo int64 acima de 2^53 no
-que escreve ou na chave que compara (mesma natureza da Sub-A do 9.1, reintroduzida
-na reconstrução e na canonicalização de chave).
+já existe e é seguido em toda a aritmética (o `binop` é exemplar).
+
+**Classificação corrigida (2026-07-23, auditoria do item 10).** O texto original
+dizia que "10.1–10.4 não são bugs — são assimetrias de vetorização (performance)".
+Isso estava **errado para 10.2 e 10.3**, e foi provado empiricamente na auditoria:
+`between(x, x)` no próprio `x` devolvia **false** para `x = 9007199254740993`, e
+`abs(-9007199254740993)` devolvia `9007199254740992` — corrupção **silenciosa**,
+sem aviso nem erro. A causa é a mesma do 10.5–10.7: o loop Lua round-tripa por
+`get()`/`tonumber()` (double), perdendo dígitos acima de 2^53. Classificação real:
+- **10.1 e 10.4 — performance.** Confirmado: `.dt`/`.str` operam sobre epoch_ms e
+  strings, sem risco de degradação; `prod()` devolve double por escolha de tipo de
+  retorno (discutível à parte, não é corrupção de leitura).
+- **10.2, 10.3, 10.5–10.7 — defeito de correção.** A assimetria vem com perda
+  silenciosa de dado. 10.5–10.7 já foram tratados; **10.2/10.3 ganharam o degrau
+  paliativo** (falha visível) na mesma auditoria — ver abaixo —, mas a correção
+  de verdade (descer ao Anel 0) continua pendente.
 
 > **Meta-decisão:** levar ao Anel 0 o que o projeto já sabe fazer (o `binop`
 > prova o padrão). Onde a primitiva escalar já existe mas falta a vetorizada,
@@ -442,10 +452,29 @@ na reconstrução e na canonicalização de chave).
 - 10.2 **`between()` compõe no C** (E4). Element-wise (máscara `ge & le`); os
   comparadores `gt/lt/ge/le` já existem no Anel 0 — compor em C e usar o motor,
   eliminando o loop Lua.
+  - **Degrau paliativo aplicado (2026-07-23).** É **defeito de correção**, não
+    performance: o loop lê via `get()` (double) e a comparação ficava errada em
+    silêncio — `between(x, x)` no próprio `x` devolvia **false** para
+    `x = 9007199254740993`. `check_int64_lossless` passou a rodar por elemento
+    não-nulo, trocando o resultado errado por falha visível. Não substitui a
+    vetorização: quando `between` descer ao Anel 0, o degrau sai (o C compara os
+    int64 exatos e o suporte a > 2^53 passa a ser real).
 - 10.3 **`abs`/`round`/`clip` → Ring 0** (E5). Element-wise matemáticos fixos, hoje
   via `self:map(closure)` (FFI por elemento). Provável que **falte a primitiva C**
   — então "delegar" aqui é criar a primitiva vetorizada, não só religar. Confirmar
   no fonte antes de executar.
+  - **Degrau paliativo aplicado (2026-07-23).** Também **defeito de correção**:
+    `abs(-9007199254740993)` devolvia `9007199254740992` — perda silenciosa de
+    dígito, e `clip` idem. As três (`abs`/`round`/`clip`) passam pelo `map`, que
+    lê via `get()`; o degrau roda dentro da closure (o `map` já passa `(v, i)`,
+    então é uma passada só, sem custo extra). `map()` **ficou de fora por
+    decisão**: é API genérica onde o caller escolhe o dtype de saída e a própria
+    closure — bloquear seria invasivo.
+  - **Lacuna de teste que escondeu isto:** `Series:abs()`, `:round()` e `:clip()`
+    não tinham **nenhum** teste direto (só via DataFrame, e nunca com int64 > 2^53).
+    Guards adicionados em `test_access` (+13, 127→140): recusa acima de 2^53,
+    mensagem nomeando a operação e mostrando o valor exato, fronteira 2^53 exato
+    ainda aceita, caminho normal (int64 pequeno, float64, nulos) intacto.
 - 10.4 **família `.dt` e `.str` vetorizadas** (E6). `dt_component` chama
   `C.smaug_dt_year(v)` **por elemento** num loop Lua — a lógica escalar está no C,
   falta a versão de série (`smaug_dt_year_series(s) → série`). Mesmo padrão em
@@ -606,6 +635,19 @@ na reconstrução e na canonicalização de chave).
   `smaug_bool_coalesce_scalar` — fecha a família `coalesce_scalar` (i64/f64/dt/str)
   — e `fillna(bool)` delega a ela. As primitivas C raw permanecem (são o motor que
   as `smaug_bool_series_*` reusam). Detalhe no CHANGELOG.
+  - **Achado da auditoria (2026-07-23) — cinco comentários órfãos apontam para
+    este item, que já fechou.** O 10.8 encerrou com escopo **redefinido** (o
+    achado original era o `boolseries.lua` órfão), mas cinco pontos do código
+    dizem "bool fica no Anel 1 **até 10.8**", esperando que ele trouxesse bool
+    para as famílias do 10.6/10.7: `_predicates.lua:264` (combine_first),
+    `_selection.lua:143`/`:203` (where/mask), `_transform.lua:29`/`:277` (astype).
+    Quem ler o código vai buscar o 10.8, ver "CONCLUÍDO" e concluir que bool foi
+    resolvido — não foi. **O que falta para bool, medido no fonte:**
+    `smaug_bool_coalesce` (série; existe só a `_scalar`), `smaug_bool_select`, e
+    **nenhum** par de `astype` com bool (a matriz é 4×4 dos dtypes de struct).
+    Sem risco de int64 aqui (bool não degrada), então é coerência de anel, não
+    correção. **A decidir:** abrir item próprio para "bool nas famílias 10.6/10.7"
+    e reapontar os cinco comentários para ele.
 - 10.9 **Formatação de serialização canônica (`smaug_fmt_f64`/`smaug_fmt_i64`)** —
   [decidido 2026-07-09, follow-up do 10.7]. Hoje `%.17g`/`%lld` estão hardcoded
   em 3 pontos C que concordam mas duplicam: `astype`, `csv`, `json`. Criar fonte

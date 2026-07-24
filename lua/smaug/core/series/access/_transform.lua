@@ -20,6 +20,7 @@ return function(I)
     local NA      = I.NA
     local is_na   = I.is_na
     local check_value = I.check_value                     -- porteiro canônico (9.1)
+    local check_i64   = I.check_int64_lossless            -- degrau 10.3 (int64 > 2^53)
     -- (o degrau check_int64_lossless e o trunc_to_int saíram no 10.7 Passo B:
     --  astype migrou ao Anel 0 e não faz mais round-trip por get())
 
@@ -437,12 +438,23 @@ return function(I)
     -- =====================================================================
     -- abs, round, clip
     -- =====================================================================
+    -- Degrau 10.3: as três leem o valor via map → self:get(i), que passa por
+    -- tonumber(double). Em int64 > 2^53 isso PERDIA DÍGITOS EM SILÊNCIO
+    -- (abs(-9007199254740993) devolvia 9007199254740992). check_i64 troca a
+    -- corrupção calada por falha visível, mesmo padrão do 10.6/10.7 Passo A.
+    -- Paliativo até estas operações descerem ao Anel 0 (item 10.3).
+    -- map() fica de fora por decisão: é API genérica onde o caller escolhe o
+    -- dtype de saída e a closure — bloquear seria invasivo.
 
     function methods.abs(self)
         if self._dtype ~= "float64" and self._dtype ~= "int64" then
             error("smaug: abs() requer dtype numérico, não '"..self._dtype.."'", 2)
         end
-        return self:map(function(v) return v ~= nil and math.abs(v) or nil end, self._dtype, self._name)
+        return self:map(function(v, i)
+            if v == nil then return nil end
+            check_i64(self, i, "abs()")
+            return math.abs(v)
+        end, self._dtype, self._name)
     end
 
     function methods.round(self, ndigits)
@@ -451,8 +463,9 @@ return function(I)
         end
         ndigits = ndigits or 0
         local factor = 10 ^ ndigits
-        return self:map(function(v)
+        return self:map(function(v, i)
             if v == nil then return nil end
+            check_i64(self, i, "round()")
             if v >= 0 then
                 return math.floor(v * factor + 0.5) / factor
             else
@@ -466,8 +479,9 @@ return function(I)
             error("smaug: clip() requer dtype numérico, não '"..self._dtype.."'", 2)
         end
         if lo == nil and hi == nil then return self:clone() end
-        return self:map(function(v)
+        return self:map(function(v, i)
             if v == nil then return nil end
+            check_i64(self, i, "clip()")
             if lo ~= nil and v < lo then return lo end
             if hi ~= nil and v > hi then return hi end
             return v

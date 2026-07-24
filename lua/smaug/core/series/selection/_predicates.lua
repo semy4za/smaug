@@ -14,6 +14,7 @@ return function(I)
     local Series  = I.Series
     local NA      = I.NA
     local wrap    = I.wrap
+    local check_i64 = I.check_int64_lossless   -- degrau 10.2 (int64 > 2^53)
 
     -- =====================================================================
     -- F.2 — Predicados
@@ -40,6 +41,11 @@ return function(I)
             if v == nil then
                 vals[i] = NA
             else
+                -- Degrau 10.2: get() passa por tonumber(double); em int64 > 2^53
+                -- a comparação abaixo ficava ERRADA EM SILÊNCIO — between(x, x)
+                -- no próprio x devolvia false, porque o valor lido já vinha
+                -- degradado. Falha visível até between() descer ao Anel 0.
+                check_i64(self, i, "between()")
                 local ge_lo = inc_lo and (v >= lo) or (v > lo)
                 local le_hi = inc_hi and (v <= hi) or (v < hi)
                 vals[i] = (ge_lo and le_hi)

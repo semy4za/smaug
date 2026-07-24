@@ -429,5 +429,48 @@ do
     check(sx.at[1] == 1,                         "12.12 Series: acessor .at intacto")
 end
 
+-- =====================================================================
+-- Degrau 10.2/10.3: between/abs/round/clip leem via map→get() (double).
+-- Em int64 > 2^53 isso CORROMPIA EM SILÊNCIO — abs(-9007199254740993)
+-- devolvia 9007199254740992, e between(x,x) no próprio x dava false.
+-- Agora falham visível (check_int64_lossless), até descerem ao Anel 0.
+-- Estas operações não tinham NENHUM teste direto de Series antes — foi
+-- por isso que a corrupção passou despercebida.
+-- =====================================================================
+do
+    local ffi = require("ffi")
+    local BIG = ffi.new("int64_t", 9007199254740993LL)    -- 2^53 + 1
+    local big = S.new("int64", 1, "big"); big:set(1, BIG)
+
+    -- as quatro recusam em vez de corromper
+    check(not pcall(function() return big:abs()   end), "10.3 abs() recusa int64 > 2^53")
+    check(not pcall(function() return big:round() end), "10.3 round() recusa int64 > 2^53")
+    check(not pcall(function() return big:clip(0, BIG) end), "10.3 clip() recusa int64 > 2^53")
+    check(not pcall(function() return big:between(0, BIG) end), "10.2 between() recusa int64 > 2^53")
+
+    -- a mensagem orienta: diz a operação e mostra o valor exato
+    local ok, err = pcall(function() return big:abs() end)
+    check(not ok and tostring(err):match("abs%(%)") ~= nil,
+          "10.3 mensagem nomeia a operação")
+    check(not ok and tostring(err):match("9007199254740993") ~= nil,
+          "10.3 mensagem mostra o valor exato (não o degradado)")
+
+    -- limite: 2^53 exato ainda passa (fronteira é > 2^53, igual ao check_value)
+    local lim = S.new("int64", 1, "lim"); lim:set(1, ffi.new("int64_t", 9007199254740992LL))
+    check(pcall(function() return lim:abs() end), "10.3 abs() aceita 2^53 exato")
+
+    -- caminho normal intacto: int64 pequeno e float64 seguem funcionando
+    local sm = S.from_table({-3, 2}, "int64")
+    check(sm:abs():get(1) == 3,          "10.3 abs() int64 pequeno intacto")
+    check(sm:clip(-1, 1):get(1) == -1,   "10.3 clip() int64 pequeno intacto")
+    check(sm:between(-5, 5):get(1) == true, "10.2 between() int64 pequeno intacto")
+    local f = S.from_table({-1.7, 2.3})
+    check(f:abs():get(1) == 1.7,         "10.3 abs() float64 intacto")
+    check(f:round():get(1) == -2,        "10.3 round() float64 intacto")
+    -- nulos continuam nulos (o degrau só roda em índice não-nulo)
+    local wn = S.new("int64", 2, "wn"); wn:set_null(1); wn:set(2, 5)
+    check(wn:abs():is_null(1),           "10.3 abs() preserva nulo")
+end
+
 
 print(string.format("OK — %d checks passaram (Series: acesso, edge cases, fillna)", n_ok))
