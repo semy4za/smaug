@@ -1123,6 +1123,39 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
        err_out próprio e propagarão a causa da serialização + a de sistema
        (`strerror(errno)`). Atualizar os 2 call-sites Lua (`M.write`) e os testes
        C de path inválido (`test_io_c:719`/`:908`). Mesmo padrão da Fase 1.
+ - 12.31 **Inferência de tipos incompatíveis gera container natimorto** — [Fedora]
+   (Lua puro; equivalência). Achado durante a reescrita do Contrato 1 (2026-07-24).
+   `infer_dtype` (`_factories.lua`, Bloco H) decide o dtype de uma tabela Lua por
+   **rank** (`bool` > `string` > `float64` > `int64`). O rank foi pensado para o
+   caso numérico — `{1, 2.5}` → `float64` é promoção segura (int→float, Contrato 1)
+   e deve permanecer. Mas em tipos `type()`-incompatíveis ele infere o de maior
+   rank e o `set`/`check_value` seguinte **rejeita os valores dos outros tipos** —
+   a construção quebra com mensagem que fala do `set`, não da inferência.
+   - **Provado (2026-07-24):** `from_table({1, "x"})` infere `string` → `set(número)`
+     → *"valor para string deve ser uma string Lua; recebido number"* (o usuário
+     passou `{1,"x"}`, não pediu string — mensagem enganosa). `from_table({true, 1})`
+     infere `bool` → mesmo desfecho. Afeta `from_table`, `DataSet.__call` e
+     `Series.full` (todos via `infer_dtype`). **`map` está fora** — já falha
+     visível por caminho próprio (`check_map_value`: "tipo inconsistente no
+     índice N").
+   - **Enquadramento (Contrato 1 novo).** Promoção segura existe só dentro do
+     numérico (int→float não perde informação). Tipos cross-família (número+string,
+     bool+número) **não têm supertipo seguro** — forçar `string` via rank é
+     exatamente a *adivinhação de semântica* que o Contrato 1 recusa (inferir que
+     o número "vira texto"). Hoje a inferência adivinha e a validação desmente:
+     as duas discordam entre si.
+   - **Decisão (2026-07-24):** mistura incompatível → **erro claro na inferência**,
+     nomeando os tipos presentes e pedindo dtype explícito, ANTES de construir.
+     Não cair em `string` via `tostring` (seria a adivinhação). A promoção
+     numérica (`int`+`float` → `float`) permanece intacta — é o único widening
+     seguro.
+   - **Escopo:** `infer_dtype`/`infer_dtype_from_value` (`_factories.lua`, Bloco H,
+     fonte única). Anel 1, Lua puro → equivalência Fedora. Guard permanente:
+     mistura incompatível erra na inferência; `{1,2.5}` → float64 e casos
+     homogêneos intactos.
+   - **Vínculo:** Contrato 1 (reescrito 2026-07-24); item 12.3 (inferência de
+     tipos, concluído). Distinto de 12.25/12.26 (inferência de **texto** no CSV —
+     parsing, não rank de tabela Lua).
 ## 13. Reescrita de exemplos + docstrings  [Windows]
 
 Doc reflete a API depois que ela para de mudar (itens 1–12).

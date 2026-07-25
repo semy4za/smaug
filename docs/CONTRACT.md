@@ -8,10 +8,14 @@ testado, e que não muda sem decisão explícita e versionada.
 
 ## Ring 1 — Frontend Lua
 
-### Contrato 1 — sem coerção implícita de dtype
+### Contrato 1 — promoção segura; nunca narrowing ou adivinhação em silêncio
 
 ```lua
 local smaug = require("smaug")
+
+-- dtype INFERIDO quando omitido (do conteúdo)
+smaug.Series.from_table({1, 2, 3})     -- int64
+smaug.Series.from_table({1, 2, 3.5})   -- float64  (o fracionário promove)
 
 local payload = {
     {"produto", {"caneta", "caderno", "régua"}, "string"},
@@ -19,19 +23,41 @@ local payload = {
 }
 local ds = smaug.DataSet(payload)
 
-ds["qtd"]:set(1, 1.5)   -- erro
-ds["qtd"]:set(1, "x")   -- erro
-ds["qtd"]:set(1, 12)    -- ok
+-- dtype FIXADO: só entra o que preserva a informação
+ds["qtd"]:set(1, 12)    -- ok    (int64 <- inteiro)
+ds["qtd"]:set(1, 1.5)   -- erro  (narrowing: perderia a fração)
+ds["qtd"]:set(1, "x")   -- erro  (adivinharia parse)
+
+-- promoção sem perda é automática
+local preco = smaug.Series.float64(1)
+preco:set(1, 5)         -- ok -> 5.0  (widening seguro: int -> float64)
 ```
 
 ```
-smaug: valor para int64 deve ser inteiro (sem coerção)
-smaug: valor para int64 deve ser inteiro (sem coerção)
+smaug: valor para int64 deve ser inteiro (sem coerção); recebido 1.5
+smaug: valor para int64 deve ser inteiro (sem coerção); recebido x
 ```
 
-O frontend recusa qualquer valor que exigiria coerção silenciosa. Não há
-surpresa de truncagem, arredondamento ou conversão implícita. Quando o dtype
-importa, ele é explícito — sempre.
+O dtype é **inferido** quando omitido (inteiro → `int64`, fracionário → `float64`,
+`string`, `boolean` → `bool`; lista vazia ou só-nula → `string`) e **explícito**
+quando informado. Fixado o dtype, o frontend aceita apenas o que **preserva a
+informação**:
+
+- **Promoção sem perda é automática.** `int → float64` entra e vira float — todo
+  inteiro representável é float exato, e float é o topo da hierarquia numérica.
+  Não é adivinhação: é widening.
+- **Narrowing e adivinhação são recusados.** Perder dígito (`float → int64`;
+  `number > 2^53`), adivinhar parse (`number ↔ string`) ou semântica
+  (`number → bool`) falha com erro — nunca em silêncio.
+
+Narrowing **intencional** é o `astype` (Contrato 2): explícito, tolerante,
+inconversível vira `null`. Preservação exata de `int64` além de 2^53 exige a
+**forma exata** — `cdata int64_t` na entrada, `get_raw` na leitura (o `number`
+Lua já perdeu o dígito antes de chegar; a lib não recupera, só torna visível).
+
+O princípio não é *"sem conversão"* — é **sem perda nem adivinhação em silêncio**.
+O que cabe sem perder informação, entra; o que exigiria decidir pelo usuário,
+**falha visível**, e o usuário decide com `astype`.
 
 ---
 
