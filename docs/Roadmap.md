@@ -449,16 +449,39 @@ sem aviso nem erro. A causa é a mesma do 10.5–10.7: o loop Lua round-tripa po
 - 10.1 **`prod()` → Ring 0** (E3). Única redução escalar fora do C — sum/mean/min/
   max/std/var todas têm primitiva; existe `cumprod`, falta `prod`. Assimetria por
   omissão (passou batido no item 5). Criar `smaug_f64_prod`/`smaug_i64_prod`.
-- 10.2 **`between()` compõe no C** (E4). Element-wise (máscara `ge & le`); os
-  comparadores `gt/lt/ge/le` já existem no Anel 0 — compor em C e usar o motor,
-  eliminando o loop Lua.
+- 10.2 **`between()` → Anel 0, com a fronteira do escalar consertada** (E4). Dois
+  passos: a entrada do limite (Anel 1) e a composição no motor (Anel 0).
+  - **Passo A — fronteira do escalar aceita int64 exato** (Anel 1, Lua puro →
+    equivalência). Achado 2026-07-24: os wrappers `cmp_gt/lt/ge/le/eq/ne` do
+    descritor i64 (`_types.lua`) exigem `type(t) == "number"` — **rejeitam cdata**
+    (a forma exata) e deixam `number > 2^53` **degradar em silêncio**. Provado:
+    `s:eq(9007199254740993)` marca a linha errada, calado; cdata dá
+    "comparação i64 espera número". É a mesma família do 9.1 Sub-B (guard
+    `type=="number"` recusando cdata), num call-site que o 9.1 não varreu.
+    Corrupção silenciosa **viva** nos comparadores diretos (todo filtro usa), e
+    **co-requisito** do Passo B (o limite do `between` entra por aqui). Sob o
+    Contrato 1 (reescrito 2026-07-24) a decisão deixa de ser ambígua: `number >
+    2^53` é **narrowing consumado na origem** → **erro por origem** (o double já
+    perdeu o dígito antes de chegar); cdata `int64_t`/`uint64_t` é a forma exata
+    → **aceita**. Desenho: unificar só o **reconhecimento estrutural** do escalar
+    (cdata / number-inteiro / inválido — idêntico ao ramo int64 do `check_value`);
+    a **política de overflow** fica no call-site, porque diverge por contrato
+    (`set` avisa-aceita dado do usuário; comparação recusa limite degradado —
+    fonte única do *reconhecimento*, não da política).
+  - **Passo B — composição no motor** (Anel 0, `[Fedora]`). `between(lo,hi)` ≡
+    máscara `ge(lo) & le(hi)` (ajustando `inclusive` p/ gt/lt) — os comparadores
+    e `smaug_bool_and` já existem no Anel 0. Compor **no C** e usar o motor (não
+    encadear no Lua: orquestração de máscara no Anel 1 duplicaria conceito entre
+    camadas, P3), eliminando o loop elemento-a-elemento. **Depende do Passo A** (o
+    limite precisa entrar exato, senão o valor da série fica exato mas o limite
+    degrada — não fecharia "> 2^53 real").
   - **Degrau paliativo aplicado (2026-07-23).** É **defeito de correção**, não
     performance: o loop lê via `get()` (double) e a comparação ficava errada em
     silêncio — `between(x, x)` no próprio `x` devolvia **false** para
     `x = 9007199254740993`. `check_int64_lossless` passou a rodar por elemento
     não-nulo, trocando o resultado errado por falha visível. Não substitui a
-    vetorização: quando `between` descer ao Anel 0, o degrau sai (o C compara os
-    int64 exatos e o suporte a > 2^53 passa a ser real).
+    vetorização: quando `between` descer ao Anel 0 (Passo B), o degrau sai (o C
+    compara os int64 exatos e o suporte a > 2^53 passa a ser real).
 - 10.3 **`abs`/`round`/`clip` → Ring 0** (E5). Element-wise matemáticos fixos, hoje
   via `self:map(closure)` (FFI por elemento). Provável que **falte a primitiva C**
   — então "delegar" aqui é criar a primitiva vetorizada, não só religar. Confirmar
@@ -467,9 +490,19 @@ sem aviso nem erro. A causa é a mesma do 10.5–10.7: o loop Lua round-tripa po
     `abs(-9007199254740993)` devolvia `9007199254740992` — perda silenciosa de
     dígito, e `clip` idem. As três (`abs`/`round`/`clip`) passam pelo `map`, que
     lê via `get()`; o degrau roda dentro da closure (o `map` já passa `(v, i)`,
-    então é uma passada só, sem custo extra). `map()` **ficou de fora por
-    decisão**: é API genérica onde o caller escolhe o dtype de saída e a própria
-    closure — bloquear seria invasivo.
+    então é uma passada só, sem custo extra). **`map()` reclassificado sob o
+    Contrato 1 (2026-07-24):** hoje `map(fn, "int64")` sobre int64 > 2^53 entrega
+    o valor **degradado** à closure (`v = get(i)` → double) e grava sem aviso —
+    provado: entra `...993`, sai `...992`. Isso é **narrowing silencioso**, o
+    único que o Contrato 1 reescrito proíbe; a justificativa antiga ("API
+    genérica, o caller escolhe dtype e closure, bloquear seria invasivo") não
+    sobrevive ao princípio — "o caller escolheu" não autoriza degradar em
+    silêncio. Decisão a tomar (**preservar-ou-recusar**, nunca degradar): (a) com
+    dtype de saída int64, passar o valor **cru** (cdata `get_raw`) à closure —
+    preserva, mas muda o que a closure recebe (cdata int64_t, não `number`: a
+    aritmética Lua difere, pode quebrar closures que assumem number); ou (b)
+    recusar int64 > 2^53 na entrada do `map`, como as demais (falha visível, mesma
+    fronteira do degrau). Item próprio — não é mais "fora por decisão".
   - **Lacuna de teste que escondeu isto:** `Series:abs()`, `:round()` e `:clip()`
     não tinham **nenhum** teste direto (só via DataFrame, e nunca com int64 > 2^53).
     Guards adicionados em `test_access` (+13, 127→140): recusa acima de 2^53,
