@@ -420,6 +420,62 @@ espontânea; são decisões de contrato com aresta, que precisam estar resolvida
     selo final.
   - Vínculo: COW.md (string ❌→✅); CODE_REVIEW A7 (posse de dados).
 
+- 9.3 **Fronteira do escalar int-based nos call-sites de operação** — [Fedora]
+  (Anel 1, Lua puro → equivalência). Reabre o bloco 9: o 9.1 varreu a **entrada**
+  (`check_value`/`get_raw`), mas os call-sites de **operação** (comparadores,
+  aritmética escalar) ficaram com o guard cru `type=="number"` — rejeitam a forma
+  exata (`cdata int64_t`) e engolem `number > 2^53` degradado, sem o aviso que o
+  `check_value` daria. Mesma família do 9.1 Sub-B, nos pontos que o 9.1 não
+  alcançou. Achado 2026-07-24 (análise do 10.2 + reescrita do Contrato 1).
+  - **Diagnóstico (provado 2026-07-24).** Família de escalar int64 mutuamente
+    incoerente hoje: `s:eq(number>2^53)` degrada calado e rejeita cdata;
+    `s + number>2^53` opera no degradado e rejeita cdata; `s:fillna(...)` já
+    correto (usa o porteiro canônico `check_value` — aceita cdata, preserva). O
+    `fillna` é o **modelo**; comparadores e aritmética são os atrasados.
+  - **Desenho — porteiro classificador (fonte única).** Extrair do ramo int64 do
+    `check_value` (`_core.lua:63-87`) um `normalize_int_scalar(v)` **puro**, que
+    devolve `(classe, valor)` sem avisar nem errar. Classes: `number_ok`,
+    `number_overflow` (>2^53), `cdata_i64`, `cdata_u64_ok`, `uint_overflow`,
+    `not_integer`, `invalid`. A **política** fica no call-site — a única classe que
+    diverge é `number_overflow`:
+    - **entrada-de-dado** (`set`/`append`/`fillna`, via `check_value`):
+      `number_overflow` → **avisa-aceita** (Sub-A irrecuperável, escolha do
+      usuário); demais classes idênticas ao atual (equivalência, provada por
+      `test_constructors` 9.1.1-9.1.3).
+    - **operação** (comparadores, aritmética): `number_overflow` → **erro por
+      origem** (o double já perdeu o dígito; o resultado seria mentira); cdata
+      exato → aceita. Coerente com o Contrato 1 (narrowing consumado recusado).
+  - **Fase 1 — comparadores** (`cmp_*`, int64 + datetime). Reaponta os 12 wrappers
+    (6 int64 `_types.lua:129-134` + 6 datetime `:260-265`) do guard cru para o
+    porteiro + política de operação. Gesto cirúrgico. **Destrava o 10.2** (os
+    limites do `between` entram exatos). Datetime entra por **coerência de família
+    int-based** (epoch_ms é `int64_t`): benefício latente (epoch > 2^53 ms = ano
+    287586), custo ~zero — mesmo precedente do `keys.lua` (10.5-A). NB: datetime
+    compartilha o porteiro só no **threshold**; sua *entrada* tem parse próprio
+    (number|string|cdata epoch no `append`) e não é tocada.
+  - **Fase 2 — aritmética escalar** (`binop` série×escalar + comutativo, e
+    `floordiv`; **só int64** — datetime não tem `*_scalar`). Integra o porteiro na
+    camada de promoção N.1-N.3 do `binop` (`_bool_ops.lua:123-133`), **completando
+    a intenção já registrada do N.2** (*"evita o truncamento silencioso do escalar
+    na FFI"*, que só cobriu o caso fracionário; `number > 2^53` é o mesmo problema,
+    deixado de fora). Mais teste (interação promoção × cdata × 2^53). Fase separada
+    por risco não-uniforme.
+  - **Não-escopo (explícito, não é esquecimento).** `f64`/`string`/`bool` fora:
+    double é nativo (number já exato), string sem degradação, bool sem
+    comparadores de ordem. Unificar os guards crus deles depois é *limpeza de
+    código* separada, não correção. `map` → item à parte (10.3 reclassificado).
+    `fillna` → já resolvido (é o modelo).
+  - **Doc.** Contrato 1 ganha uma linha registrando a divergência: *parâmetros de
+    operação recusam `number > 2^53` onde o armazenamento avisa-aceita* — senão o
+    leitor não entende por que `eq(number grande)` erra e `set`/`fillna` avisam.
+    Sub-passo da Fase 1 (a divergência nasce ali).
+  - **Selo.** Anel 1, Lua puro → fecha por equivalência Fedora (`test_constructors`
+    9.1.x prova a extração; testes novos para os call-sites de operação). Sem C,
+    sem ABI.
+  - **Vínculo:** 9.1 (Sub-B, mesma família); Contrato 1 (reescrito 2026-07-24);
+    10.2 Passo B (consumidor da Fase 1); 10.3 (`map`, item irmão); `keys.lua`
+    (precedente de datetime latente).
+
 ## 10. Completude de vetorização (Anel 0)  [Fedora]
 
 Mesma tese do item 7 (completude do motor), agora para **transformações
@@ -449,32 +505,18 @@ sem aviso nem erro. A causa é a mesma do 10.5–10.7: o loop Lua round-tripa po
 - 10.1 **`prod()` → Ring 0** (E3). Única redução escalar fora do C — sum/mean/min/
   max/std/var todas têm primitiva; existe `cumprod`, falta `prod`. Assimetria por
   omissão (passou batido no item 5). Criar `smaug_f64_prod`/`smaug_i64_prod`.
-- 10.2 **`between()` → Anel 0, com a fronteira do escalar consertada** (E4). Dois
-  passos: a entrada do limite (Anel 1) e a composição no motor (Anel 0).
-  - **Passo A — fronteira do escalar aceita int64 exato** (Anel 1, Lua puro →
-    equivalência). Achado 2026-07-24: os wrappers `cmp_gt/lt/ge/le/eq/ne` do
-    descritor i64 (`_types.lua`) exigem `type(t) == "number"` — **rejeitam cdata**
-    (a forma exata) e deixam `number > 2^53` **degradar em silêncio**. Provado:
-    `s:eq(9007199254740993)` marca a linha errada, calado; cdata dá
-    "comparação i64 espera número". É a mesma família do 9.1 Sub-B (guard
-    `type=="number"` recusando cdata), num call-site que o 9.1 não varreu.
-    Corrupção silenciosa **viva** nos comparadores diretos (todo filtro usa), e
-    **co-requisito** do Passo B (o limite do `between` entra por aqui). Sob o
-    Contrato 1 (reescrito 2026-07-24) a decisão deixa de ser ambígua: `number >
-    2^53` é **narrowing consumado na origem** → **erro por origem** (o double já
-    perdeu o dígito antes de chegar); cdata `int64_t`/`uint64_t` é a forma exata
-    → **aceita**. Desenho: unificar só o **reconhecimento estrutural** do escalar
-    (cdata / number-inteiro / inválido — idêntico ao ramo int64 do `check_value`);
-    a **política de overflow** fica no call-site, porque diverge por contrato
-    (`set` avisa-aceita dado do usuário; comparação recusa limite degradado —
-    fonte única do *reconhecimento*, não da política).
-  - **Passo B — composição no motor** (Anel 0, `[Fedora]`). `between(lo,hi)` ≡
-    máscara `ge(lo) & le(hi)` (ajustando `inclusive` p/ gt/lt) — os comparadores
-    e `smaug_bool_and` já existem no Anel 0. Compor **no C** e usar o motor (não
-    encadear no Lua: orquestração de máscara no Anel 1 duplicaria conceito entre
-    camadas, P3), eliminando o loop elemento-a-elemento. **Depende do Passo A** (o
-    limite precisa entrar exato, senão o valor da série fica exato mas o limite
-    degrada — não fecharia "> 2^53 real").
+- 10.2 **`between()` → Anel 0** (E4). Element-wise: `between(lo,hi)` ≡ máscara
+  `ge(lo) & le(hi)` (ajustando `inclusive` p/ gt/lt) — os comparadores e
+  `smaug_bool_and` já existem no Anel 0. Compor **no C** e usar o motor (não
+  encadear no Lua: orquestração de máscara no Anel 1 duplicaria conceito entre
+  camadas, P3), eliminando o loop elemento-a-elemento.
+  - **Depende de 9.3 Fase 1** (fronteira do escalar). A composição preserva o
+    *valor da série* exato, mas os *limites* `lo`/`hi` entram pela fronteira do
+    comparador — que hoje rejeita cdata e degrada `number > 2^53`. Sem a Fase 1 do
+    9.3, o `between` vetorizado fica com o valor exato e o limite degradado — não
+    fecharia "> 2^53 real". A fronteira do escalar migrou para o 9.3 (é correção de
+    fronteira, Anel 1, família 9 — não vetorização); aqui fica só a descida ao
+    motor, que a consome.
   - **Degrau paliativo aplicado (2026-07-23).** É **defeito de correção**, não
     performance: o loop lê via `get()` (double) e a comparação ficava errada em
     silêncio — `between(x, x)` no próprio `x` devolvia **false** para
