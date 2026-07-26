@@ -7,6 +7,8 @@
 -- Adicionar um novo dtype = novo bloco aqui + backend C.
 -- Zero toque na lógica da Series.
 
+local int_scalar = require("smaug.core.int_scalar")
+
 return function(I)
     local C       = I.C
     local ffi     = I.ffi
@@ -126,12 +128,12 @@ return function(I)
             filter = C.smaug_i64_filter,
             gt = C.smaug_i64_gt, lt = C.smaug_i64_lt, eq = C.smaug_i64_eq,
             ge = C.smaug_i64_ge, le = C.smaug_i64_le, ne = C.smaug_i64_ne,
-            cmp_gt = function(c, t, om) if type(t)~="number" then error("smaug: comparação i64 espera número",4) end return C.smaug_i64_gt(c,t,om) end,
-            cmp_lt = function(c, t, om) if type(t)~="number" then error("smaug: comparação i64 espera número",4) end return C.smaug_i64_lt(c,t,om) end,
-            cmp_eq = function(c, t, om) if type(t)~="number" then error("smaug: comparação i64 espera número",4) end return C.smaug_i64_eq(c,t,om) end,
-            cmp_ge = function(c, t, om) if type(t)~="number" then error("smaug: comparação i64 espera número",4) end return C.smaug_i64_ge(c,t,om) end,
-            cmp_le = function(c, t, om) if type(t)~="number" then error("smaug: comparação i64 espera número",4) end return C.smaug_i64_le(c,t,om) end,
-            cmp_ne = function(c, t, om) if type(t)~="number" then error("smaug: comparação i64 espera número",4) end return C.smaug_i64_ne(c,t,om) end,
+            cmp_gt = function(c, t, om) return C.smaug_i64_gt(c, int_scalar.check_operation(t, "comparação i64", 5), om) end,
+            cmp_lt = function(c, t, om) return C.smaug_i64_lt(c, int_scalar.check_operation(t, "comparação i64", 5), om) end,
+            cmp_eq = function(c, t, om) return C.smaug_i64_eq(c, int_scalar.check_operation(t, "comparação i64", 5), om) end,
+            cmp_ge = function(c, t, om) return C.smaug_i64_ge(c, int_scalar.check_operation(t, "comparação i64", 5), om) end,
+            cmp_le = function(c, t, om) return C.smaug_i64_le(c, int_scalar.check_operation(t, "comparação i64", 5), om) end,
+            cmp_ne = function(c, t, om) return C.smaug_i64_ne(c, int_scalar.check_operation(t, "comparação i64", 5), om) end,
             argsort = C.smaug_i64_argsort,
             is_int_sentinel = function(v) return v == I64_MIN end,
             -- Grupo A (Fase 3 Ring 0): janela e redução posicional
@@ -257,12 +259,12 @@ return function(I)
             rank    = C.smaug_dt_rank,
             min     = C.smaug_dt_min,
             max     = C.smaug_dt_max,
-            cmp_gt = function(c, t, om) if type(t)~="number" then error("smaug: comparação de datetime espera epoch_ms (número)",4) end return C.smaug_dt_gt(c, t, om) end,
-            cmp_lt = function(c, t, om) if type(t)~="number" then error("smaug: comparação de datetime espera epoch_ms (número)",4) end return C.smaug_dt_lt(c, t, om) end,
-            cmp_eq = function(c, t, om) if type(t)~="number" then error("smaug: comparação de datetime espera epoch_ms (número)",4) end return C.smaug_dt_eq(c, t, om) end,
-            cmp_ge = function(c, t, om) if type(t)~="number" then error("smaug: comparação de datetime espera epoch_ms (número)",4) end return C.smaug_dt_ge(c, t, om) end,
-            cmp_le = function(c, t, om) if type(t)~="number" then error("smaug: comparação de datetime espera epoch_ms (número)",4) end return C.smaug_dt_le(c, t, om) end,
-            cmp_ne = function(c, t, om) if type(t)~="number" then error("smaug: comparação de datetime espera epoch_ms (número)",4) end return C.smaug_dt_ne(c, t, om) end,
+            cmp_gt = function(c, t, om) return C.smaug_dt_gt(c, int_scalar.check_operation(t, "comparação de datetime (epoch_ms)", 5), om) end,
+            cmp_lt = function(c, t, om) return C.smaug_dt_lt(c, int_scalar.check_operation(t, "comparação de datetime (epoch_ms)", 5), om) end,
+            cmp_eq = function(c, t, om) return C.smaug_dt_eq(c, int_scalar.check_operation(t, "comparação de datetime (epoch_ms)", 5), om) end,
+            cmp_ge = function(c, t, om) return C.smaug_dt_ge(c, int_scalar.check_operation(t, "comparação de datetime (epoch_ms)", 5), om) end,
+            cmp_le = function(c, t, om) return C.smaug_dt_le(c, int_scalar.check_operation(t, "comparação de datetime (epoch_ms)", 5), om) end,
+            cmp_ne = function(c, t, om) return C.smaug_dt_ne(c, int_scalar.check_operation(t, "comparação de datetime (epoch_ms)", 5), om) end,
             is_int_sentinel = function(v) return v == I64_MIN end,
         },
         bool = {

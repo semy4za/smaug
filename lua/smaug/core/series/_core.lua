@@ -5,7 +5,8 @@
 -- Produz em I: I.Series, I.methods, I.wrap, I.check_index, I.check_value,
 --              I.checkrc, I.require_op, I.reduce_num, I.SMG_ERR_NOMEM
 
-local Err = require("smaug.core.errors")
+local Err        = require("smaug.core.errors")
+local int_scalar = require("smaug.core.int_scalar")
 
 return function(I)
     local C      = I.C
@@ -55,33 +56,34 @@ return function(I)
     end
     I.check_index = check_index
 
-    local INT64_MAX_MAG = 9007199254740992  -- 2^53: teto de precisão exata do double
-    local INT64_MAX_U   = 9223372036854775807ULL  -- teto de int64_t, visto como uint64_t
+    -- Fonte única das constantes int64: int_scalar (alias local para os usos abaixo).
+    local INT64_MAX_MAG = int_scalar.INT64_MAX_MAG  -- 2^53: teto de precisão exata do double
+    local INT64_MAX_U   = int_scalar.INT64_MAX_U    -- teto de int64_t, visto como uint64_t
 
     local function check_value(self, v, level)
         local dt = self._dtype
         if dt == "int64" then
-            local tv = type(v)
-            if tv == "number" then
-                if v % 1 ~= 0 then
-                    error("smaug: valor para int64 deve ser inteiro (sem coerção); "
-                          .. "recebido " .. tostring(v), level or 3)
-                end
-                if v > INT64_MAX_MAG or v < -INT64_MAX_MAG then
-                    warn("valor " .. tostring(v) .. " para int64 excede 2^53; "
-                         .. "literais Lua acima desse limite podem já ter perdido "
-                         .. "precisão antes de chegar aqui — use ffi.new(\"int64_t\", ...) "
-                         .. "ou o sufixo LL para preservar o valor exato")
-                end
-            elseif tv == "cdata" and ffi.istype("uint64_t", v) then
-                if v > INT64_MAX_U then
-                    error("smaug: valor uint64_t (" .. tostring(v) .. ") excede o "
-                          .. "range de int64 (máx " .. tostring(INT64_MAX_U) .. "); "
-                          .. "wraparound não é permitido", level or 3)
-                end
-            elseif tv == "cdata" and ffi.istype("int64_t", v) then
-                -- cdata int64_t: já preserva os 64 bits, nada a checar aqui.
-            else
+            -- Reconhecimento pela fonte unica (int_scalar.classify); a POLITICA de
+            -- entrada-de-dado fica aqui, inline: number_overflow AVISA-e-aceita (a
+            -- Sub-A e irrecuperavel; o valor vira dado do usuario, a escolha e
+            -- dele). Os error/warn ficam neste frame -> `level` identico ao
+            -- comportamento pre-9.3 (equivalencia, provada por 9.1.1-9.1.3).
+            local cls = int_scalar.classify(v)
+            if cls == "number_ok" or cls == "number_at_boundary"
+               or cls == "cdata_i64" or cls == "cdata_u64_ok" then
+                -- forma exata (cdata) ou number ate 2^53: nada a fazer. O boundary
+                -- (== 2^53) e aceito sem aviso -> preserva o `> 2^53` pre-9.3 da
+                -- entrada (so avisa ACIMA; a operacao e que recusa o boundary).
+            elseif cls == "number_overflow" then
+                warn("valor " .. tostring(v) .. " para int64 excede 2^53; "
+                     .. "literais Lua acima desse limite podem já ter perdido "
+                     .. "precisão antes de chegar aqui — use ffi.new(\"int64_t\", ...) "
+                     .. "ou o sufixo LL para preservar o valor exato")
+            elseif cls == "uint_overflow" then
+                error("smaug: valor uint64_t (" .. tostring(v) .. ") excede o "
+                      .. "range de int64 (máx " .. tostring(INT64_MAX_U) .. "); "
+                      .. "wraparound não é permitido", level or 3)
+            else  -- not_integer, invalid
                 error("smaug: valor para int64 deve ser inteiro (sem coerção); "
                       .. "recebido " .. tostring(v), level or 3)
             end

@@ -698,6 +698,65 @@ do
 end
 
 
+-- ===================================================================
+-- 9.3: fronteira do escalar int-based nos call-sites de OPERAÇÃO
+-- (comparadores). O 9.1 curou a ENTRADA; aqui os comparadores param de
+-- rejeitar cdata (a forma exata) e de engolir number >= 2^53 degradado.
+-- Fonte única: core/int_scalar.lua (classify + check_operation). O limiar
+-- da operação é >= 2^53 (o boundary == 2^53 é ambíguo: 2^53+1 degrada para
+-- lá), mais estrito que a entrada (> 2^53), por isso vive aqui, não no 9.1.
+-- ===================================================================
+do
+    local ffi = require("ffi")
+    local A = ffi.new("int64_t", 9007199254740992LL)  -- 2^53
+    local B = ffi.new("int64_t", 9007199254740993LL)  -- 2^53 + 1
+    local s = S.from_table({A, B}, "int64", "id")
+
+    -- 9.3.1 — cdata int64_t no threshold: aceito e distingue exato (antes era
+    -- rejeitado com "espera número"). eq(2^53+1) marca só a linha 2.
+    local m = s:eq(B)
+    check(m:get(1) == false and m:get(2) == true,
+          "9.3.1 comparador aceita cdata int64_t e distingue 2^53+1 de 2^53")
+    local mg = s:gt(A)
+    check(mg:get(1) == false and mg:get(2) == true,
+          "9.3.1 comparador gt com cdata int64_t exato")
+
+    -- 9.3.2 — number >= 2^53 no threshold: RECUSADO (era degradação silenciosa).
+    -- 2^53+1 como number degrada para 2^53 (boundary); acima idem.
+    local ok_boundary = pcall(function() return s:eq(9007199254740993) end)
+    check(ok_boundary == false,
+          "9.3.2 number 2^53+1 (degrada p/ 2^53) recusado na comparação")
+    local ok_over = pcall(function() return s:eq(9007199254740994) end)
+    check(ok_over == false, "9.3.2 number > 2^53 recusado na comparação")
+
+    -- 9.3.3 — number seguro (< 2^53): comparação normal, sem cerimônia.
+    local sp = S.from_table({ffi.new("int64_t", 5LL), ffi.new("int64_t", 9LL)}, "int64")
+    local ms = sp:eq(5)
+    check(ms:get(1) == true and ms:get(2) == false,
+          "9.3.3 number < 2^53 compara normal")
+
+    -- 9.3.4 — uint64_t no range aceito; > INT64_MAX recusado (sem wraparound).
+    local ok_u = pcall(function() return sp:eq(ffi.new("uint64_t", 5)) end)
+    check(ok_u == true, "9.3.4 comparador aceita uint64_t no range")
+    local ok_uwrap = pcall(function() return sp:eq(18446744073709551615ULL) end)
+    check(ok_uwrap == false, "9.3.4 uint64_t > INT64_MAX recusado na comparação")
+
+    -- 9.3.5 — não-inteiro e tipo inválido recusados (sem coerção, Contrato 1).
+    local ok_frac = pcall(function() return sp:eq(1.5) end)
+    check(ok_frac == false, "9.3.5 number fracionário recusado na comparação")
+    local ok_str = pcall(function() return sp:eq("x") end)
+    check(ok_str == false, "9.3.5 tipo inválido recusado na comparação")
+
+    -- 9.3.6 — datetime herda a fronteira no threshold (epoch_ms é int64_t):
+    -- number >= 2^53 recusado (latente, mas coerente); epoch seguro compara.
+    local d = S.from_table({0, 1000}, "datetime")
+    local ok_dtnum = pcall(function() return d:gt(9007199254740993) end)
+    check(ok_dtnum == false, "9.3.6 datetime: number >= 2^53 recusado no threshold")
+    local ok_dtok = pcall(function() return d:gt(500) end)
+    check(ok_dtok == true, "9.3.6 datetime: epoch_ms seguro compara normal")
+end
+
+
 
 local smaug  = require("smaug")
 local Series = smaug.Series

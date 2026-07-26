@@ -59,6 +59,16 @@ O princípio não é *"sem conversão"* — é **sem perda nem adivinhação em 
 O que cabe sem perder informação, entra; o que exigiria decidir pelo usuário,
 **falha visível**, e o usuário decide com `astype`.
 
+**Entrada vs. operação no limiar 2^53.** Um `number` que armazena dado
+(`set`/`append`/`fillna`) e um `number` que parametriza uma operação
+(comparação, aritmética escalar) recebem o mesmo valor com políticas diferentes,
+por uma razão: no armazenamento o valor *é* o dado do usuário — acima de 2^53 ele
+**avisa e aceita** (a perda é irrecuperável na origem, a escolha é dele); numa
+operação o valor é *operando* e o resultado seria uma mentira silenciosa — a
+partir de 2^53 (inclusive, pois `2^53+1` degrada para `2^53`) ele **recusa**.
+Em ambos, a forma exata (`cdata int64_t`) sempre preserva. Fonte única do
+reconhecimento: `core/int_scalar.lua` (ver Roadmap 9.3).
+
 ---
 
 ### Contrato 2 — `astype` converte por elemento, tolerante a falha
