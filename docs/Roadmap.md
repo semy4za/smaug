@@ -445,14 +445,28 @@ espontânea; são decisões de contrato com aresta, que precisam estar resolvida
     - **operação** (comparadores, aritmética): `number_overflow` → **erro por
       origem** (o double já perdeu o dígito; o resultado seria mentira); cdata
       exato → aceita. Coerente com o Contrato 1 (narrowing consumado recusado).
-  - **Fase 1 — comparadores** (`cmp_*`, int64 + datetime). Reaponta os 12 wrappers
-    (6 int64 `_types.lua:129-134` + 6 datetime `:260-265`) do guard cru para o
-    porteiro + política de operação. Gesto cirúrgico. **Destrava o 10.2** (os
-    limites do `between` entram exatos). Datetime entra por **coerência de família
-    int-based** (epoch_ms é `int64_t`): benefício latente (epoch > 2^53 ms = ano
-    287586), custo ~zero — mesmo precedente do `keys.lua` (10.5-A). NB: datetime
-    compartilha o porteiro só no **threshold**; sua *entrada* tem parse próprio
-    (number|string|cdata epoch no `append`) e não é tocada.
+  - **Fase 1 — comparadores** (`cmp_*`, int64 + datetime). **[Done — Fedora
+    2026-07-26]** Reaponta os 12 wrappers (6 int64 + 6 datetime) do guard cru
+    para o porteiro `int_scalar.check_operation` — aceitam `cdata int64_t` (forma
+    exata) e recusam `number >= 2^53` por origem. `check_value` delega o
+    reconhecimento a `int_scalar.classify` com política de storage inline (level
+    preservado → equivalência 9.1.x). **Destrava o 10.2** (os limites do `between`
+    entram exatos). Datetime entrou por **coerência de família int-based** (epoch_ms
+    é `int64_t`): benefício latente (epoch > 2^53 ms = ano 287586), custo ~zero —
+    precedente do `keys.lua` (10.5-A). NB: datetime compartilha o porteiro só no
+    **threshold**; sua *entrada* tem parse próprio (não tocada).
+    - **Achado (2026-07-26):** o caso canônico `number 2^53+1` degrada para
+      **exatamente 2^53**, então o limiar `> 2^53` o deixava escapar. Corrigido com
+      a classe `number_at_boundary` (`== 2^53`, ambíguo): a operação recusa
+      `>= 2^53`; a entrada preserva `> 2^53`. Sem a leitura/teste teria passado
+      silencioso.
+    - Testes: `test_constructors` 9.3.1-9.3.6 (cdata aceito e distingue, `number
+      >= 2^53` recusado, uint no range, fracionário/inválido, datetime); 9.1.x
+      provam a equivalência da extração. Contrato 1 ganhou a nota da divergência
+      entrada-vs-operação.
+    - **Selo Fedora:** Valgrind-clean (0 erros, 13 binários); 15/15 parity; linha
+      98.82%, branch-alvo 94.73%; property-based 360862 checks. Lua puro → sem C,
+      sem ABI (dispensa Windows).
   - **Fase 2 — aritmética escalar** (`binop` série×escalar + comutativo, e
     `floordiv`; **só int64** — datetime não tem `*_scalar`). Integra o porteiro na
     camada de promoção N.1-N.3 do `binop` (`_bool_ops.lua:123-133`), **completando
