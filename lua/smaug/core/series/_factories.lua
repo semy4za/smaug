@@ -38,32 +38,60 @@ return function(I)
     end
     I.infer_dtype_from_value = infer_dtype_from_value
 
-    -- Prioridade quando a lista mistura tipos compatíveis com mais de um
-    -- dtype (ex.: int64 e float64 juntos → float64 "vence", igual ao
-    -- comportamento que já existia no DataSet.__call antes desta unificação).
-    -- bool nunca se mistura de fato com os outros (type() é mutuamente
-    -- exclusivo), então a ordem aqui só importa pro caso numérico.
-    local DTYPE_RANK = { bool = 4, string = 3, float64 = 2, int64 = 1 }
+    -- Famílias de tipo (12.31). Dentro de uma família há promoção segura; entre
+    -- famílias, não existe supertipo — e escolher um seria adivinhar.
+    -- `int64` e `float64` são a MESMA família: int→float não perde informação
+    -- (Contrato 1, promoção segura). `string` e `bool` são famílias próprias:
+    -- misturar com número exigiria adivinhar parse ("1" vira 1?) ou semântica
+    -- (1 vira true?), exatamente o que o Contrato 1 recusa.
+    --
+    -- Antes daqui a decisão era por RANK (bool > string > float64 > int64), o
+    -- que em mistura incompatível escolhia o de maior rank e produzia um
+    -- container que rejeitava a própria lista: `{1, "x"}` inferia string e
+    -- estourava no set com "valor para string deve ser uma string Lua" — uma
+    -- mensagem sobre um dtype que o usuário nunca pediu. Inferência e validação
+    -- discordavam entre si. Agora o erro nasce na inferência, nomeando o
+    -- conflito. O rank sobrevive só onde faz sentido: dentro do numérico.
+    local DTYPE_FAMILY = { int64 = "numérico", float64 = "numérico",
+                           string = "string",  bool    = "bool" }
+    local NUMERIC_RANK = { int64 = 1, float64 = 2 }   -- fracionário vence
 
     -- infer_dtype(arr): decide o dtype de uma tabela Lua de valores brutos.
     -- Ignora nulos (nil/NA) ao decidir — lista vazia ou só-nula cai em
     -- "string" (H.6.2, fallback universal, coerente com o CSV). Elementos de
     -- tipo não suportado (table, function, ...) são ignorados aqui; o erro
     -- claro acontece depois, no set/append via check_value, não na inferência.
-    local function infer_dtype(arr)
-        local best, best_rank = nil, 0
+    -- Mistura de famílias incompatíveis → erro AQUI (12.31).
+    local function infer_dtype(arr, level)
+        local family, first_dt, first_at        -- primeira família vista
+        local num_best, num_rank = nil, 0
         local n = #arr
         for i = 1, n do
             local v = arr[i]
             if not is_na(v) then
                 local dt = infer_dtype_from_value(v)
                 if dt then
-                    local rank = DTYPE_RANK[dt]
-                    if rank > best_rank then best, best_rank = dt, rank end
+                    local fam = DTYPE_FAMILY[dt]
+                    if family == nil then
+                        family, first_dt, first_at = fam, dt, i
+                    elseif fam ~= family then
+                        error("smaug: não foi possível inferir o dtype: a lista mistura "
+                              .. "tipos sem promoção segura entre si — " .. first_dt
+                              .. " no índice " .. first_at .. " e " .. dt
+                              .. " no índice " .. i .. ". Informe o dtype "
+                              .. "explicitamente (ex.: from_table(t, \"string\")) ou "
+                              .. "uniformize os valores.", level or 4)
+                    end
+                    if fam == "numérico" then
+                        local r = NUMERIC_RANK[dt]
+                        if r > num_rank then num_best, num_rank = dt, r end
+                    end
                 end
             end
         end
-        return best or "string"
+        if family == nil      then return "string" end   -- vazia ou só-nula
+        if family == "numérico" then return num_best end -- int64 ou float64
+        return family                                    -- "string" ou "bool"
     end
     I.infer_dtype = infer_dtype
     Series.infer_dtype = infer_dtype   -- público: reusado por DataSet (H.2/H.6)

@@ -1020,4 +1020,66 @@ do
 end
 
 
+-- ===================================================================
+-- 12.31: inferência por FAMÍLIAS de tipo (não mais por rank).
+-- O rank (bool > string > float64 > int64) escolhia o de maior rank em
+-- mistura incompatível e produzia um container que rejeitava a própria
+-- lista: {1,"x"} inferia string e estourava no set com "valor para
+-- string deve ser uma string Lua" — sobre um dtype que o usuário nunca
+-- pediu. Inferência e validação discordavam. Agora o erro nasce na
+-- inferência, nomeando o conflito e a posição.
+-- ===================================================================
+do
+    -- 12.31.1 — promoção segura dentro da família numérica: INTACTA.
+    -- int→float não perde informação (Contrato 1), então mistura numérica
+    -- promove em vez de errar. Independente da ordem.
+    check(S.from_table({1, 2, 3})._dtype == "int64",     "12.31.1 só inteiros → int64")
+    check(S.from_table({1, 2.5})._dtype == "float64",    "12.31.1 int+float → float64")
+    check(S.from_table({2.5, 1})._dtype == "float64",    "12.31.1 promoção independe da ordem")
+    check(S.from_table({1, NA, 2.5})._dtype == "float64","12.31.1 nulos não atrapalham a promoção")
+
+    -- 12.31.2 — famílias homogêneas seguem iguais.
+    check(S.from_table({"a", "b"})._dtype == "string",   "12.31.2 só strings → string")
+    check(S.from_table({true, false})._dtype == "bool",  "12.31.2 só booleanos → bool")
+    check(S.from_table({})._dtype == "string",           "12.31.2 lista vazia → string")
+    check(S.from_table({NA})._dtype == "string",         "12.31.2 só-nula → string")
+
+    -- 12.31.3 — mistura entre famílias: erro NA INFERÊNCIA (antes: container
+    -- natimorto). Não há supertipo seguro entre número e texto/booleano:
+    -- escolher um exigiria adivinhar parse ou semântica (Contrato 1 recusa).
+    check(not pcall(function() return S.from_table({1, "x"}) end),
+          "12.31.3 número + string recusado")
+    check(not pcall(function() return S.from_table({true, 1}) end),
+          "12.31.3 booleano + número recusado")
+    check(not pcall(function() return S.from_table({"a", true}) end),
+          "12.31.3 string + booleano recusado")
+    check(not pcall(function() return S.from_table({1.5, "x"}) end),
+          "12.31.3 float + string recusado")
+
+    -- 12.31.4 — a mensagem orienta: nomeia os dois tipos E as posições, e diz
+    -- o que fazer. Sem isso o usuário procuraria o erro no lugar errado.
+    local ok, err = pcall(function() return S.from_table({1, "x"}) end)
+    local msg = tostring(err)
+    check(not ok and msg:match("int64") and msg:match("string"),
+          "12.31.4 mensagem nomeia os dois dtypes em conflito")
+    check(msg:match("índice 1") and msg:match("índice 2"),
+          "12.31.4 mensagem aponta as posições")
+    check(msg:match("dtype") ~= nil,
+          "12.31.4 mensagem orienta a informar o dtype")
+
+    -- 12.31.5 — dtype EXPLÍCITO continua mandando: a inferência nem roda.
+    -- Aqui o erro é o do check_value (o usuário pediu string e passou número),
+    -- que é outro contrato — e correto.
+    local ok2, err2 = pcall(function() return S.from_table({1, "x"}, "string") end)
+    check(not ok2 and tostring(err2):match("valor para string") ~= nil,
+          "12.31.5 dtype explícito ignora a inferência (erro é do check_value)")
+    check(S.from_table({1, 2}, "float64")._dtype == "float64",
+          "12.31.5 dtype explícito compatível constrói normal")
+
+    -- 12.31.6 — o mesmo vale pela superfície pública smaug.Series(...).
+    check(not pcall(function() return smaug.Series({1, "x"}) end),
+          "12.31.6 smaug.Series() herda a regra")
+end
+
+
 print(string.format("OK — %d checks passaram (Series: constructors, f64, i64, bool, aritmética, lifecycle, map)", n_ok))

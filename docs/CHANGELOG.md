@@ -5,6 +5,43 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-27 — 12.31: inferência de dtype passa a decidir por família, não por rank
+
+Achado na reescrita do Contrato 1: `from_table({1, "x"})` inferia `string`, porque
+o rank (bool > string > float64 > int64) mandava escolher o de maior rank, e
+depois estourava no `set` com *"valor para string deve ser uma string Lua"*. O
+usuário nunca pediu string. A inferência escolhia um dtype e a validação o
+desmentia — as duas discordavam entre si, e a mensagem apontava para o lugar
+errado, o que é pior que não avisar.
+
+A causa é que o rank foi desenhado para o caso numérico, onde ele está certo:
+`{1, 2.5}` → float64 é promoção segura, e int→float não perde informação. O erro
+foi generalizar isso para tipos que não têm supertipo. Entre número e texto não
+existe promoção — escolher string significaria decidir que o número "vira texto",
+que é a adivinhação de semântica que o Contrato 1 recusa.
+
+Trocado por famílias: `int64` e `float64` são a mesma família, `string` e `bool`
+são famílias próprias. Dentro do numérico o rank sobrevive (o fracionário vence);
+entre famílias, erro na inferência, nomeando os dois dtypes e as duas posições.
+Nomear a posição importa: é a diferença entre "conserte sua lista" e "conserte sua
+lista no índice 2".
+
+Raio de alcance verificado antes de mexer, porque é fonte única: `infer_dtype` é
+chamada só pelo `from_table`, o DataSet passa por ela, e o CSV **não** usa (tem
+inferência de texto própria, 12.25/12.26). `infer_dtype_from_value` ficou intacta.
+
+O `level` do erro foi medido, não estimado — e deu 4, não 3. Motivo: o
+`Series.from_table` é **sobrescrito** no `init.lua` para interceptar categorical, e
+esse wrapper adiciona um frame. Com 3 o erro não apontava a linha do usuário. Já
+tinha acontecido algo parecido no 9.3 (metamétodo 3, método `:` 4); a lição é que
+`level` em Lua é empírico.
+
++18 checks (363 → 381), com mutação verificada: fundir as famílias faz o teste
+abortar.
+
+Lua puro, nenhum C tocado.
+
+---
 ## 2026-07-27 — 10.2 fatia 1: between desce ao Anel 0 (f64 + i64)
 
 Primeiro item do bloco 10 a sair depois que o 9.3 destravou a fronteira do
