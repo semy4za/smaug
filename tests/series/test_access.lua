@@ -430,23 +430,24 @@ do
 end
 
 -- =====================================================================
--- Degrau 10.2/10.3: between/abs/round/clip leem via map→get() (double).
--- Em int64 > 2^53 isso CORROMPIA EM SILÊNCIO — abs(-9007199254740993)
--- devolvia 9007199254740992, e between(x,x) no próprio x dava false.
--- Agora falham visível (check_int64_lossless), até descerem ao Anel 0.
--- Estas operações não tinham NENHUM teste direto de Series antes — foi
--- por isso que a corrupção passou despercebida.
+-- Degrau 10.3: abs/round/clip leem via map→get() (double). Em int64 > 2^53
+-- isso CORROMPIA EM SILÊNCIO — abs(-9007199254740993) devolvia
+-- 9007199254740992. Agora falham visível (check_int64_lossless), até
+-- descerem ao Anel 0. Estas operações não tinham NENHUM teste direto de
+-- Series antes — foi por isso que a corrupção passou despercebida.
+--
+-- `between` SAIU do degrau no 10.2 (fatia 1): desceu ao Anel 0 e agora
+-- compara int64 exato — ver o bloco 10.2 logo abaixo.
 -- =====================================================================
 do
     local ffi = require("ffi")
     local BIG = ffi.new("int64_t", 9007199254740993LL)    -- 2^53 + 1
     local big = S.new("int64", 1, "big"); big:set(1, BIG)
 
-    -- as quatro recusam em vez de corromper
+    -- as três ainda recusam em vez de corromper (10.3 pendente)
     check(not pcall(function() return big:abs()   end), "10.3 abs() recusa int64 > 2^53")
     check(not pcall(function() return big:round() end), "10.3 round() recusa int64 > 2^53")
     check(not pcall(function() return big:clip(0, BIG) end), "10.3 clip() recusa int64 > 2^53")
-    check(not pcall(function() return big:between(0, BIG) end), "10.2 between() recusa int64 > 2^53")
 
     -- a mensagem orienta: diz a operação e mostra o valor exato
     local ok, err = pcall(function() return big:abs() end)
@@ -470,6 +471,71 @@ do
     -- nulos continuam nulos (o degrau só roda em índice não-nulo)
     local wn = S.new("int64", 2, "wn"); wn:set_null(1); wn:set(2, 5)
     check(wn:abs():is_null(1),           "10.3 abs() preserva nulo")
+end
+
+
+-- =====================================================================
+-- 10.2 (fatia 1: f64+i64) — between desceu ao Anel 0.
+-- Primitiva dedicada de passada única (smaug_{f64,i64}_between), com
+-- inc_lo/inc_hi cobrindo os quatro modos. Em int64 a comparação é feita
+-- em int64_t puro: > 2^53 passa a funcionar DE VERDADE, não só a falhar
+-- visível. Os limites entram pela fronteira do escalar (9.3): cdata
+-- exato aceito, number >= 2^53 recusado por origem.
+-- =====================================================================
+do
+    local ffi = require("ffi")
+    local A  = ffi.new("int64_t", 9007199254740992LL)   -- 2^53
+    local B  = ffi.new("int64_t", 9007199254740993LL)   -- 2^53 + 1
+    local Cc = ffi.new("int64_t", 9007199254740995LL)   -- 2^53 + 3
+    local s  = S.from_table({A, B, Cc}, "int64", "big")
+
+    -- 10.2.1 — o caso que antes era erro visível (e antes disso, silenciosamente
+    -- errado): between(x, x) no próprio x. Só a linha de B pode ser true.
+    local m = s:between(B, B)
+    check(m:get(1) == false and m:get(2) == true and m:get(3) == false,
+          "10.2.1 between exato em int64 > 2^53 (era falha visível)")
+
+    -- 10.2.2 — os quatro modos de inclusividade, com limites nas pontas.
+    local both = s:between(A, Cc)
+    check(both:get(1) and both:get(2) and both:get(3),
+          "10.2.2 inclusive=both inclui as duas pontas")
+    local neither = s:between(A, Cc, "neither")
+    check(neither:get(1) == false and neither:get(2) == true and neither:get(3) == false,
+          "10.2.2 inclusive=neither exclui as duas pontas")
+    local left = s:between(A, Cc, "left")
+    check(left:get(1) == true and left:get(3) == false,
+          "10.2.2 inclusive=left inclui só a inferior")
+    local right = s:between(A, Cc, "right")
+    check(right:get(1) == false and right:get(3) == true,
+          "10.2.2 inclusive=right inclui só a superior")
+
+    -- 10.2.3 — limite como number >= 2^53 é recusado (fronteira 9.3), porque
+    -- já degradou na origem; o resultado sairia errado em silêncio.
+    check(not pcall(function() return s:between(9007199254740993, Cc) end),
+          "10.2.3 limite inferior number >= 2^53 recusado")
+    check(not pcall(function() return s:between(A, 9007199254740993) end),
+          "10.2.3 limite superior number >= 2^53 recusado")
+
+    -- 10.2.4 — nulo propaga nulo; NaN em f64 é false com máscara válida.
+    local wn = S.new("int64", 3, "wn")
+    wn:set(1, 10); wn:set_null(2); wn:set(3, 20)
+    local rn = wn:between(0, 15)
+    check(rn:get(1) == true and rn:is_null(2) and rn:get(3) == false,
+          "10.2.4 nulo propaga nulo")
+    local fn = S.from_table({1.0, 0/0, 3.0}, "float64", "f")
+    local rf = fn:between(0.5, 3.5)
+    check(rf:get(1) == true and rf:get(2) == false and rf:get(3) == true,
+          "10.2.4 NaN → false (não nulo), coerente com os comparadores")
+    check(not rf:is_null(2), "10.2.4 NaN tem máscara válida")
+
+    -- 10.2.5 — série vazia não estoura.
+    check(S.int64(0):between(1, 5):len() == 0, "10.2.5 série vazia → len 0")
+
+    -- 10.2.6 — string/datetime seguem no fallback Lua (fatia 2), intactos.
+    local st = S.from_table({"a", "c", "e"}, "string", "s")
+    local rs = st:between("a", "c")
+    check(rs:get(1) and rs:get(2) and rs:get(3) == false,
+          "10.2.6 string ainda no fallback, correto")
 end
 
 

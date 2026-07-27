@@ -165,14 +165,14 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `:map(fn, [dtype])` | transforma elemento a elemento |
 
 > **Escalar int64 em operação (9.3):** quando o escalar *parametriza* uma operação
-> — comparadores (`:gt`/`:lt`/`:eq`/`:ge`/`:le`/`:ne`) e aritmética escalar
-> (`+ - * //`) sobre série `int64` — vale a forma exata: `cdata int64_t`
-> (`ffi.new("int64_t", …)` ou sufixo `LL`) é **aceito e preservado**; um `number`
-> Lua a partir de 2^53 é **recusado com erro**, porque já perdeu precisão na
-> origem e o resultado sairia errado em silêncio. O limiar inclui 2^53 porque
-> `2^53+1` degrada exatamente para lá. Regra distinta da de *armazenar* dado
-> (`:set`/`:append`/`:fillna`), que **avisa e aceita** — ver Contrato 1.
-> `datetime` herda a regra no threshold (epoch_ms é `int64_t`).
+> — comparadores (`:gt`/`:lt`/`:eq`/`:ge`/`:le`/`:ne`), `:between` (ambos os
+> limites) e aritmética escalar (`+ - * //`) sobre série `int64` — vale a forma
+> exata: `cdata int64_t` (`ffi.new("int64_t", …)` ou sufixo `LL`) é **aceito e
+> preservado**; um `number` Lua a partir de 2^53 é **recusado com erro**, porque
+> já perdeu precisão na origem e o resultado sairia errado em silêncio. O limiar
+> inclui 2^53 porque `2^53+1` degrada exatamente para lá. Regra distinta da de
+> *armazenar* dado (`:set`/`:append`/`:fillna`), que **avisa e aceita** — ver
+> Contrato 1. `datetime` herda a regra no threshold (epoch_ms é `int64_t`).
 > `Series + cdata` é a forma suportada; `cdata + Series` não é interceptável
 > (o LuaJIT resolve o operador do próprio cdata antes).
 

@@ -73,6 +73,12 @@ return function(I)
             cmp_ge = function(c, t, om) if type(t)~="number" then error("smaug: comparação f64 espera número",4) end return C.smaug_f64_ge(c,t,om) end,
             cmp_le = function(c, t, om) if type(t)~="number" then error("smaug: comparação f64 espera número",4) end return C.smaug_f64_le(c,t,om) end,
             cmp_ne = function(c, t, om) if type(t)~="number" then error("smaug: comparação f64 espera número",4) end return C.smaug_f64_ne(c,t,om) end,
+            cmp_between = function(c, lo, hi, inc_lo, inc_hi, om)
+                if type(lo)~="number" or type(hi)~="number" then
+                    error("smaug: between f64 espera números",5)
+                end
+                return C.smaug_f64_between(c, lo, hi, inc_lo, inc_hi, om)
+            end,
             argsort = C.smaug_f64_argsort,
             is_int_sentinel = function(_) return false end,
             -- Grupo A (Fase 3 Ring 0): janela e redução posicional
@@ -134,6 +140,14 @@ return function(I)
             cmp_ge = function(c, t, om) return C.smaug_i64_ge(c, int_scalar.check_operation(t, "comparação i64", 5), om) end,
             cmp_le = function(c, t, om) return C.smaug_i64_le(c, int_scalar.check_operation(t, "comparação i64", 5), om) end,
             cmp_ne = function(c, t, om) return C.smaug_i64_ne(c, int_scalar.check_operation(t, "comparação i64", 5), om) end,
+            -- between: os DOIS limites passam pela fronteira do escalar (9.3) —
+            -- cdata int64_t aceito e exato; number >= 2^53 recusado por origem.
+            -- É o que faz o suporte a > 2^53 ser real, e não só o valor da série.
+            cmp_between = function(c, lo, hi, inc_lo, inc_hi, om)
+                lo = int_scalar.check_operation(lo, "between i64 (limite inferior)", 5)
+                hi = int_scalar.check_operation(hi, "between i64 (limite superior)", 5)
+                return C.smaug_i64_between(c, lo, hi, inc_lo, inc_hi, om)
+            end,
             argsort = C.smaug_i64_argsort,
             is_int_sentinel = function(v) return v == I64_MIN end,
             -- Grupo A (Fase 3 Ring 0): janela e redução posicional

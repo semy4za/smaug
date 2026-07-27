@@ -577,27 +577,48 @@ sem aviso nem erro. A causa é a mesma do 10.5–10.7: o loop Lua round-tripa po
 - 10.1 **`prod()` → Ring 0** (E3). Única redução escalar fora do C — sum/mean/min/
   max/std/var todas têm primitiva; existe `cumprod`, falta `prod`. Assimetria por
   omissão (passou batido no item 5). Criar `smaug_f64_prod`/`smaug_i64_prod`.
-- 10.2 **`between()` → Anel 0** (E4). Element-wise: `between(lo,hi)` ≡ máscara
-  `ge(lo) & le(hi)` (ajustando `inclusive` p/ gt/lt) — os comparadores e
-  `smaug_bool_and` já existem no Anel 0. Compor **no C** e usar o motor (não
-  encadear no Lua: orquestração de máscara no Anel 1 duplicaria conceito entre
-  camadas, P3), eliminando o loop elemento-a-elemento.
-  - **Depende de 9.3 Fase 1 — SATISFEITA** (selo Fedora 2026-07-26). A composição
-    preserva o *valor da série* exato, mas os *limites* `lo`/`hi` entram pela
-    fronteira do comparador, que antes do 9.3 rejeitava cdata e degradava
-    `number > 2^53` — o `between` vetorizado ficaria com o valor exato e o limite
-    degradado, sem fechar "> 2^53 real". Com a Fase 1 selada, os limites já entram
-    exatos (`int_scalar.check_operation`: cdata aceito, `number >= 2^53` recusado
-    por origem). A fronteira do escalar migrou para o 9.3 (é correção de fronteira,
-    Anel 1, família 9 — não vetorização); aqui fica só a descida ao motor, que a
-    consome. **Item desbloqueado.**
-  - **Degrau paliativo aplicado (2026-07-23).** É **defeito de correção**, não
-    performance: o loop lê via `get()` (double) e a comparação ficava errada em
-    silêncio — `between(x, x)` no próprio `x` devolvia **false** para
-    `x = 9007199254740993`. `check_int64_lossless` passou a rodar por elemento
-    não-nulo, trocando o resultado errado por falha visível. Não substitui a
-    vetorização: quando `between` descer ao Anel 0 (este item), o degrau sai (o C
-    compara os int64 exatos e o suporte a > 2^53 passa a ser real).
+- 10.2 **`between()` → Anel 0** (E4). Element-wise. **Fatiado por risco:** a
+  correção de 2^53 é toda em int64, mas o loop no Anel 1 é dos quatro dtypes —
+  fazer só um deixaria a desparidade de pé. Fatiar é aditivo (nada se joga fora),
+  então custa no máximo um selo extra, nunca retrabalho.
+  - **Fatia 1 — `float64` + `int64`: [Done — Fedora+Windows 2026-07-27]**
+    `smaug_f64_between` / `smaug_i64_between`: **primitiva dedicada de passada
+    única**, não composição interna de `ge`+`le`. Motivo: compor exigiria três
+    pares de alocação (result+mask) e três varreduras para o que uma varredura e
+    um par fazem, e os quatro modos de `inclusive` obrigariam a alternar
+    `ge`/`gt` e `le`/`lt` dinamicamente. Os dois `bool` (`inc_lo`/`inc_hi`)
+    cobrem os quatro modos direto.
+    - Em int64 a comparação é feita em `int64_t` puro — **> 2^53 passa a
+      funcionar de verdade**, não só a falhar visível. `between(x, x)` no próprio
+      `x` para `x = 9007199254740993` agora acerta; era erro visível (degrau) e,
+      antes dele, silenciosamente `false`. **O degrau saiu do `between`.**
+    - Os **dois limites** entram pela fronteira do escalar (9.3): cdata exato
+      aceito, `number >= 2^53` recusado por origem. Sem isso o valor da série
+      seria exato e o limite viria degradado — é o que faz o suporte ser real.
+    - NaN em f64 → `0` com máscara **válida** (comparação com NaN é falsa, não é
+      null), coerente com os comparadores e com o CODE_REVIEW A3. Nulo propaga
+      nulo. Série vazia → len 0.
+    - Testes: `test_access` 10.2.1-10.2.6 (exatidão > 2^53, os quatro modos,
+      limite number recusado, nulo/NaN, vazia, fallback intacto). **Mutação
+      verificada:** inverter a inclusividade e reintroduzir a comparação via
+      `double` fazem o teste abortar. Varredura OOM: `af_f64_between` /
+      `af_i64_between` (allocfail 1878 → 1898).
+    - Selo: Valgrind-clean, 15/15 parity, cobertura mantida. **FFI/ABI** (cdefs
+      novos) → confirmação Windows MSYS2-UCRT64 obrigatória e feita.
+  - **Fatia 2 — `datetime` + `string`** (pendente). `datetime` é gesto igual ao
+    i64 (epoch_ms é `int64_t`), mas o arquivo usa macro geradora (`DT_CMP_IMPL`)
+    e `between` não cabe nela (dois limites + dois flags) — nasce função normal.
+    `string` **deve reusar `str_cmp_at`** (a colação já é fonte única em
+    `str_compare`); reimplementar `memcmp` duplicaria semântica de ordenação
+    entre funções. Enquanto não entrar, `between` mantém o fallback em Lua com o
+    degrau para esses dois — estado **transitório e documentado no código**, não
+    desparidade permanente.
+  - **Degrau paliativo (2026-07-23) — saiu de `between` na fatia 1.** Era
+    **defeito de correção**, não performance: o loop lia via `get()` (double) e a
+    comparação ficava errada em silêncio. `check_int64_lossless` trocou o
+    resultado errado por falha visível; a vetorização trocou a falha visível por
+    resultado certo. Segue ativo em `abs`/`round`/`clip` (10.3) e no fallback de
+    datetime/string até a fatia 2.
 - 10.3 **`abs`/`round`/`clip` → Ring 0** (E5). Element-wise matemáticos fixos, hoje
   via `self:map(closure)` (FFI por elemento). Provável que **falte a primitiva C**
   — então "delegar" aqui é criar a primitiva vetorizada, não só religar. Confirmar

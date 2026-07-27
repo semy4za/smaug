@@ -5,6 +5,49 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-27 — 10.2 fatia 1: between desce ao Anel 0 (f64 + i64)
+
+Primeiro item do bloco 10 a sair depois que o 9.3 destravou a fronteira do
+escalar. O `between` fazia o loop em Lua lendo por `get()` — double — e por isso
+carregava o degrau desde 23/07: em int64 acima de 2^53 a comparação saía errada
+em silêncio (`between(x, x)` no próprio `x` devolvia false), e o degrau trocou
+isso por falha visível. Agora a falha visível virou resultado certo.
+
+Desvio do que estava registrado, e vale o registro do porquê. O roadmap dizia
+"compor `ge & le` no C". Lendo a implementação real, compor internamente custaria
+três pares de alocação (result+mask) e três varreduras para o que uma varredura e
+um par fazem — e os quatro modos de `inclusive` obrigariam a alternar `ge`/`gt` e
+`le`/`lt` dinamicamente. Primitiva dedicada de passada única com dois `bool`
+(`inc_lo`/`inc_hi`) resolve os quatro modos direto e é mais simples. O propósito
+do item (tirar o loop do Anel 1) é servido melhor assim.
+
+O 9.3 paga aqui, e essa é a parte que não é óbvia: vetorizar sozinho não bastaria.
+O C compara o valor da série exato, mas os *limites* entram pela fronteira do
+escalar — que antes do 9.3 rejeitava cdata e degradava number. Sem a Fase 1, o
+`between` vetorizado teria valor exato e limite degradado, e o suporte a > 2^53
+continuaria de mentira. Os dois limites passam por `int_scalar.check_operation`.
+
+Fatiado em f64+i64 agora, dt+str depois. A correção de 2^53 é toda em int64, mas
+o loop no Anel 1 é dos quatro dtypes — fazer só o int64 deixaria a desparidade de
+pé. Fatiar é aditivo (nada se joga fora), então o custo máximo é um selo extra,
+nunca retrabalho. Enquanto a fatia 2 não entra, `between` é híbrido: delega para
+f64/i64, mantém o loop com degrau para datetime/string. Transitório e documentado
+no código, não desparidade permanente.
+
+Um teste existente falhou, e era pra falhar: `test_access` asseverava que
+`between` **recusa** int64 > 2^53 — o comportamento do degrau. O degrau saiu do
+`between`, então a asserção virou o oposto (agora tem que acertar). Atualizada, e
+o bloco separado: 10.3 (abs/round/clip) segue no degrau.
+
+Cobertura de falha de alocação para as duas funções novas (`af_f64_between`,
+`af_i64_between`): allocfail 1878 → 1898 verificações. Mutação verificada em
+dois eixos — inverter a inclusividade e reintroduzir a comparação via double
+fazem o teste abortar.
+
++11 checks em test_access (140 → 151). FFI/ABI (cdefs novos), então Windows
+obrigatório além do Fedora.
+
+---
 ## 2026-07-26 — 9.4: nlargest/nsmallest devolviam valor que não estava nos dados
 
 Achado na leitura macro do item 10, olhando o que ainda faz loop em Lua sobre

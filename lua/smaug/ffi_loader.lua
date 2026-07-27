@@ -107,6 +107,8 @@ ffi.cdef([[
     uint8_t* smaug_f64_ge(const smaug_series_f64_t *s, double threshold, smaug_mask_t **out_mask);
     uint8_t* smaug_f64_le(const smaug_series_f64_t *s, double threshold, smaug_mask_t **out_mask);
     uint8_t* smaug_f64_ne(const smaug_series_f64_t *s, double threshold, smaug_mask_t **out_mask);
+    uint8_t* smaug_f64_between(const smaug_series_f64_t *s, double lo, double hi,
+                               bool inc_lo, bool inc_hi, smaug_mask_t **out_mask);
 
     /* --- Ordenacao --- */
     size_t*             smaug_f64_argsort(const smaug_series_f64_t *s, bool ascending);
@@ -195,6 +197,8 @@ ffi.cdef([[
     uint8_t* smaug_i64_ge(const smaug_series_i64_t *s, int64_t threshold, smaug_mask_t **out_mask);
     uint8_t* smaug_i64_le(const smaug_series_i64_t *s, int64_t threshold, smaug_mask_t **out_mask);
     uint8_t* smaug_i64_ne(const smaug_series_i64_t *s, int64_t threshold, smaug_mask_t **out_mask);
+    uint8_t* smaug_i64_between(const smaug_series_i64_t *s, int64_t lo, int64_t hi,
+                               bool inc_lo, bool inc_hi, smaug_mask_t **out_mask);
 
     /* --- Ordenacao --- */
     size_t*             smaug_i64_argsort(const smaug_series_i64_t *s, bool ascending);

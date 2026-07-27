@@ -8,6 +8,7 @@
 -- Contribui: todos os methods acima
 
 local keys = require("smaug.core.keys")
+local ffi  = require("ffi")
 
 return function(I)
     local methods = I.methods
@@ -15,12 +16,25 @@ return function(I)
     local NA      = I.NA
     local wrap    = I.wrap
     local check_i64 = I.check_int64_lossless   -- degrau 10.2 (int64 > 2^53)
+    local bool_series_from_raw = I.bool_series_from_raw
 
     -- =====================================================================
     -- F.2 — Predicados
     -- =====================================================================
 
     -- between(lo, hi, [inclusive]): máscara booleana lo ≤ x ≤ hi.
+    --
+    -- 10.2 (fatia 1: f64+i64): quando o descritor tem `cmp_between`, delega ao
+    -- Anel 0 — uma passada em C, comparação no tipo nativo. Em int64 isso torna
+    -- o suporte a > 2^53 REAL (antes o loop lia por get()→double e a comparação
+    -- saía errada em silêncio; o degrau `check_i64` trocava isso por falha
+    -- visível). Os limites entram pela fronteira do escalar (9.3), que aceita
+    -- cdata exato e recusa number >= 2^53 — sem isso, o valor da série seria
+    -- exato mas o limite viria degradado.
+    --
+    -- `datetime` e `string` ainda não têm a primitiva (fatia 2) e seguem no loop
+    -- Lua com o degrau. Estado TRANSITÓRIO e consciente: o fallback sai quando a
+    -- fatia 2 entrar, e este ramo inteiro morre com ele.
     function methods.between(self, lo, hi, inclusive)
         if self._dtype ~= "float64" and self._dtype ~= "int64"
            and self._dtype ~= "datetime" and self._dtype ~= "string" then
@@ -34,6 +48,15 @@ return function(I)
         end
         local inc_lo = (inclusive == "both" or inclusive == "left")
         local inc_hi = (inclusive == "both" or inclusive == "right")
+
+        local cmp_between = self._d.cmp_between
+        if cmp_between then
+            local om   = ffi.new("smaug_mask_t*[1]")
+            local vals = cmp_between(self._c, lo, hi, inc_lo, inc_hi, om)
+            if vals == nil then error("smaug: between() falhou", 2) end
+            return bool_series_from_raw(vals, om[0], self:len(), self._name)
+        end
+
         local n    = self:len()
         local vals = {}
         for i = 1, n do
@@ -45,6 +68,8 @@ return function(I)
                 -- a comparação abaixo ficava ERRADA EM SILÊNCIO — between(x, x)
                 -- no próprio x devolvia false, porque o valor lido já vinha
                 -- degradado. Falha visível até between() descer ao Anel 0.
+                -- (Alcança só datetime/string agora; em datetime é latente —
+                -- epoch_ms > 2^53 é o ano 287586.)
                 check_i64(self, i, "between()")
                 local ge_lo = inc_lo and (v >= lo) or (v > lo)
                 local le_hi = inc_hi and (v <= hi) or (v < hi)

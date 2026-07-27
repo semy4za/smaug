@@ -468,6 +468,38 @@ uint8_t *smaug_i64_ne(const smaug_series_i64_t *s, int64_t threshold,
     return result;
 }
 
+/* between: lo <= v <= hi (inclusividade independente por lado) em UMA passada.
+   Ver a nota em smaug_f64_between sobre por que não compõe ge+le internamente.
+   Aqui o ponto extra é precisão: os limites chegam como int64_t e a comparação
+   é feita em int64_t — sem round-trip por double, valores acima de 2^53 são
+   comparados exatos. O frontend garante que um `number` Lua degradado não chega
+   até aqui (int_scalar.check_operation recusa >= 2^53; ver 9.3 Fase 1). */
+uint8_t *smaug_i64_between(const smaug_series_i64_t *s, int64_t lo, int64_t hi,
+                           bool inc_lo, bool inc_hi, smaug_mask_t **out_mask) {
+    if (!s) return NULL;
+    uint8_t      *result = malloc(s->size * sizeof(uint8_t));
+    smaug_mask_t *mask   = NULL;
+    if (!result) return NULL;
+    if (out_mask) {
+        mask = malloc(s->size * sizeof(smaug_mask_t));
+        if (!mask) { free(result); return NULL; }
+        *out_mask = mask;
+    }
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            int64_t v  = s->data[i];
+            bool    ok = (inc_lo ? (v >= lo) : (v > lo))
+                      && (inc_hi ? (v <= hi) : (v < hi));
+            result[i] = ok ? 1 : 0;
+            if (mask) mask[i] = SMAUG_MASK_VALID;
+        } else {
+            result[i] = 0;
+            if (mask) mask[i] = SMAUG_MASK_NULL;
+        }
+    }
+    return result;
+}
+
 /* ===================================================================
    ORDENAÇÃO
    Retorna NULL se houver NULLs na série (posição de NA é indefinida).

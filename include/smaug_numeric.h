@@ -54,6 +54,10 @@ uint8_t* smaug_f64_eq(const smaug_series_f64_t *s, double threshold, smaug_mask_
 uint8_t* smaug_f64_ge(const smaug_series_f64_t *s, double threshold, smaug_mask_t **out_mask);
 uint8_t* smaug_f64_le(const smaug_series_f64_t *s, double threshold, smaug_mask_t **out_mask);
 uint8_t* smaug_f64_ne(const smaug_series_f64_t *s, double threshold, smaug_mask_t **out_mask);
+/* between: lo..hi numa passada; inc_lo/inc_hi dao os 4 modos de inclusividade.
+   NaN -> 0 com mascara VALIDA (comparacao com NaN e' falsa, nao e' null). */
+uint8_t* smaug_f64_between(const smaug_series_f64_t *s, double lo, double hi,
+                           bool inc_lo, bool inc_hi, smaug_mask_t **out_mask);
 
 /* Ordenação (argsort retorna NULL se há nulos; caller libera com smaug_free) */
 size_t*             smaug_f64_argsort(const smaug_series_f64_t *s, bool ascending);
@@ -128,6 +132,10 @@ uint8_t* smaug_i64_eq(const smaug_series_i64_t *s, int64_t threshold, smaug_mask
 uint8_t* smaug_i64_ge(const smaug_series_i64_t *s, int64_t threshold, smaug_mask_t **out_mask);
 uint8_t* smaug_i64_le(const smaug_series_i64_t *s, int64_t threshold, smaug_mask_t **out_mask);
 uint8_t* smaug_i64_ne(const smaug_series_i64_t *s, int64_t threshold, smaug_mask_t **out_mask);
+/* between: lo..hi numa passada; inc_lo/inc_hi dao os 4 modos de inclusividade.
+   Comparacao em int64_t puro — exata acima de 2^53 (sem round-trip por double). */
+uint8_t* smaug_i64_between(const smaug_series_i64_t *s, int64_t lo, int64_t hi,
+                           bool inc_lo, bool inc_hi, smaug_mask_t **out_mask);
 
 /* Ordenação */
 size_t*             smaug_i64_argsort(const smaug_series_i64_t *s, bool ascending);

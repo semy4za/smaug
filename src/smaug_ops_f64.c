@@ -470,6 +470,39 @@ uint8_t *smaug_f64_ne(const smaug_series_f64_t *s, double threshold,
     return result;
 }
 
+/* between: lo <= v <= hi (inclusividade independente por lado) em UMA passada.
+   Não compõe ge+le internamente de propósito: compor exigiria três alocações de
+   par (result+mask) e três varreduras, para o que uma varredura e um par fazem.
+   inc_lo/inc_hi escolhem >= vs > e <= vs < — cobre os quatro modos do
+   `inclusive` do frontend (both/left/right/neither).
+   NaN: qualquer comparação com NaN é falsa, então NaN → 0 com máscara VÁLIDA
+   (não é null). Coerente com os comparadores e com o CODE_REVIEW A3. */
+uint8_t *smaug_f64_between(const smaug_series_f64_t *s, double lo, double hi,
+                           bool inc_lo, bool inc_hi, smaug_mask_t **out_mask) {
+    if (!s) return NULL;
+    uint8_t      *result = malloc(s->size * sizeof(uint8_t));
+    smaug_mask_t *mask   = NULL;
+    if (!result) return NULL;
+    if (out_mask) {
+        mask = malloc(s->size * sizeof(smaug_mask_t));
+        if (!mask) { free(result); return NULL; }
+        *out_mask = mask;
+    }
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            double v  = s->data[i];
+            bool   ok = (inc_lo ? (v >= lo) : (v > lo))
+                     && (inc_hi ? (v <= hi) : (v < hi));
+            result[i] = ok ? 1 : 0;
+            if (mask) mask[i] = SMAUG_MASK_VALID;
+        } else {
+            result[i] = 0;
+            if (mask) mask[i] = SMAUG_MASK_NULL;
+        }
+    }
+    return result;
+}
+
 /* ===================================================================
    ORDENAÇÃO
    argsort/sort retornam NULL se a série contém NULLs (posição de NA
