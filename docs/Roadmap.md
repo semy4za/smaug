@@ -582,19 +582,21 @@ sem aviso nem erro. A causa é a mesma do 10.5–10.7: o loop Lua round-tripa po
   `smaug_bool_and` já existem no Anel 0. Compor **no C** e usar o motor (não
   encadear no Lua: orquestração de máscara no Anel 1 duplicaria conceito entre
   camadas, P3), eliminando o loop elemento-a-elemento.
-  - **Depende de 9.3 Fase 1** (fronteira do escalar). A composição preserva o
-    *valor da série* exato, mas os *limites* `lo`/`hi` entram pela fronteira do
-    comparador — que hoje rejeita cdata e degrada `number > 2^53`. Sem a Fase 1 do
-    9.3, o `between` vetorizado fica com o valor exato e o limite degradado — não
-    fecharia "> 2^53 real". A fronteira do escalar migrou para o 9.3 (é correção de
-    fronteira, Anel 1, família 9 — não vetorização); aqui fica só a descida ao
-    motor, que a consome.
+  - **Depende de 9.3 Fase 1 — SATISFEITA** (selo Fedora 2026-07-26). A composição
+    preserva o *valor da série* exato, mas os *limites* `lo`/`hi` entram pela
+    fronteira do comparador, que antes do 9.3 rejeitava cdata e degradava
+    `number > 2^53` — o `between` vetorizado ficaria com o valor exato e o limite
+    degradado, sem fechar "> 2^53 real". Com a Fase 1 selada, os limites já entram
+    exatos (`int_scalar.check_operation`: cdata aceito, `number >= 2^53` recusado
+    por origem). A fronteira do escalar migrou para o 9.3 (é correção de fronteira,
+    Anel 1, família 9 — não vetorização); aqui fica só a descida ao motor, que a
+    consome. **Item desbloqueado.**
   - **Degrau paliativo aplicado (2026-07-23).** É **defeito de correção**, não
     performance: o loop lê via `get()` (double) e a comparação ficava errada em
     silêncio — `between(x, x)` no próprio `x` devolvia **false** para
     `x = 9007199254740993`. `check_int64_lossless` passou a rodar por elemento
     não-nulo, trocando o resultado errado por falha visível. Não substitui a
-    vetorização: quando `between` descer ao Anel 0 (Passo B), o degrau sai (o C
+    vetorização: quando `between` descer ao Anel 0 (este item), o degrau sai (o C
     compara os int64 exatos e o suporte a > 2^53 passa a ser real).
 - 10.3 **`abs`/`round`/`clip` → Ring 0** (E5). Element-wise matemáticos fixos, hoje
   via `self:map(closure)` (FFI por elemento). Provável que **falte a primitiva C**

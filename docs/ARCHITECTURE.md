@@ -91,10 +91,13 @@ Transforma mecanismos do Anel 0 em estruturas semânticas. Define a forma
 como usuários interagem e raciocinam sobre dados.
 
 **Responsabilidades:**
-- `Series` — coluna tipada 1D com null handling (dtypes: f64/i64/bool/string)
+- `Series` — coluna tipada 1D com null handling. Dtypes **Tier 1** (com backend
+  C, um descritor por tipo): `float64`, `int64`, `bool`, `string`, `datetime`.
+  Dtype **Tier 2** (Lua puro, sem backend C, construído sobre os Tier 1):
+  `CategoricalSeries` (dictionary encoding — códigos + níveis).
 - `DataSet` — coleção de Series alinhadas
 - Filtros, agregações, ordenação, transformações elementares
-- Ergonomia Lua: açúcar sintático, metamétodos, accessor `.str`
+- Ergonomia Lua: açúcar sintático, metamétodos, accessors `.str` / `.dt` / `.cat`
 
 **Dependência:** Anel 1 → Anel 0.
 
