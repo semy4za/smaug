@@ -617,14 +617,40 @@ sem aviso nem erro. A causa é a mesma do 10.5–10.7: o loop Lua round-tripa po
       os testes acima; a métrica voltou a 94.76%.
     - **FFI/ABI** (cdefs novos) → Windows obrigatório, feito. Falta Valgrind
       (Fedora) para fechar o selo.
-  - **Fatia 2 — `datetime` + `string`** (pendente). `datetime` é gesto igual ao
-    i64 (epoch_ms é `int64_t`), mas o arquivo usa macro geradora (`DT_CMP_IMPL`)
-    e `between` não cabe nela (dois limites + dois flags) — nasce função normal.
-    `string` **deve reusar `str_cmp_at`** (a colação já é fonte única em
-    `str_compare`); reimplementar `memcmp` duplicaria semântica de ordenação
-    entre funções. Enquanto não entrar, `between` mantém o fallback em Lua com o
-    degrau para esses dois — estado **transitório e documentado no código**, não
-    desparidade permanente.
+  - **Fatia 2 — `datetime` + `string`** (pendente; desenho aprovado 2026-07-27,
+    execução liberada após o selo Fedora da fatia 1).
+    - **Não é só completude de vetorização — fecha uma violação de P3.** Enquanto
+      um dtype seguir no fallback, o loop de comparação element-wise continua
+      existindo no Anel 1, duplicando um conceito que já vive no Anel 0. Com os
+      quatro delegando, o fallback e o import do `check_i64` **somem do
+      `_predicates.lua`** e o `between` fica com ~15 linhas. Por isso os dois
+      dtypes juntos, não um agora e outro depois.
+    - **`datetime`:** gesto igual ao i64 (epoch_ms é `int64_t`), mas **fora** da
+      macro `DT_CMP_IMPL` — `between` tem dois limites e dois flags, não cabe na
+      forma dela. Nasce função normal ao lado. Os dois limites passam por
+      `int_scalar.check_operation` (latente: 2^53 ms é o ano 287586).
+    - **`string`:** **deve reusar `str_cmp_at`** (`smaug_ops_str.c:24`), que é a
+      fonte única da colação — lexicográfico por byte, prefixo igual desempata
+      pela mais curta. Reimplementar `memcmp` duplicaria semântica de ordenação
+      entre funções. E **não** compor via `str_compare` duas vezes: três pares de
+      alocação de novo. Uma passada chamando `str_cmp_at` duas vezes por elemento.
+    - **D1 (decidida) — alocação da máscara: condicional**, como f64/i64, não
+      "sempre aloca e libera" como o `DT_CMP_IMPL`. Quem lê vai comparar os quatro
+      `between` entre si, não `dt_between` com `dt_gt`; evita malloc inútil; e a
+      divergência registrada aponta para convergir nesse sentido. Aposta baixa:
+      ambos os padrões são corretos, a diferença é superfície de teste OOM.
+    - **D2 (decidida) — série vazia: convenção local de cada arquivo.** `str` usa
+      `malloc(size ? size : 1)`, f64/i64/dt usam `malloc(size * sizeof(...))`.
+      É outra divergência entre dtypes (registrada), mas uniformizar no meio do
+      10.2 seria misturar escopo.
+    - **D3 (decidida) — guarda de alvo nulo em string** vale para os **dois**
+      limites (`str_compare` já tem `if (!target && target_len > 0) return NULL`).
+    - Assinaturas: `smaug_dt_between(s, lo, hi, inc_lo, inc_hi, out_mask)` e
+      `smaug_str_between(s, lo, lo_len, hi, hi_len, inc_lo, inc_hi, out_mask)`.
+    - **Lição da fatia 1 a repetir:** os quatro modos de `inclusive` têm de ser
+      exercitados **em cada dtype**, mais `out_mask == NULL` e série NULL — senão
+      a branch-alvo cai (aconteceu: 94.73% → 94.39%). Mais `af_dt_between` e
+      `af_str_between` no harness OOM. **FFI/ABI** → Windows obrigatório.
   - **Degrau paliativo (2026-07-23) — saiu de `between` na fatia 1.** Era
     **defeito de correção**, não performance: o loop lia via `get()` (double) e a
     comparação ficava errada em silêncio. `check_int64_lossless` trocou o
@@ -1305,6 +1331,27 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
        err_out próprio e propagarão a causa da serialização + a de sistema
        (`strerror(errno)`). Atualizar os 2 call-sites Lua (`M.write`) e os testes
        C de path inválido (`test_io_c:719`/`:908`). Mesmo padrão da Fase 1.
+ - 12.33 **Duas semânticas visíveis ao usuário sem contrato** — [Fedora]
+   (doc; sem C, sem Lua). Achado ao verificar o desenho da fatia 2 do 10.2 contra
+   o CONTRACT (2026-07-27). Nenhum dos 11 contratos cobre:
+   - **Colação de string.** `str_cmp_at` (`smaug_ops_str.c:24`) define
+     lexicográfico **por byte**, com prefixo igual desempatando pela **mais
+     curta**. Isso existe só num comentário de código, e determina o que
+     `sort`, `min`/`max`, os seis comparadores e o `between` de string devolvem —
+     semântica visível ao usuário. Sem contrato, não se sabe se é promessa ou
+     detalhe de implementação: alguém poderia trocar por colação por locale
+     achando que é melhoria, e nada diz que isso quebraria expectativa. Fica mais
+     exposto com `between` (consulta por faixa).
+   - **Propagação de nulo em comparação.** Nulo entra → nulo sai, consistente nos
+     seis comparadores de cada dtype e no `between`. Implementado certo, nunca
+     prometido. O Contrato 6 fala de `filter` descartando `NA`; o 9 distingue NaN
+     (valor) de ausência (`null_mask`); a propagação em si não está em lugar
+     nenhum.
+   - **Não é bug** — os dois comportamentos existem e estão corretos e uniformes.
+     É lacuna de contrato: comportamento sem promessa é comportamento que pode
+     mudar por acidente. Vira Contrato 12 e 13, ou notas nos existentes (o de
+     nulo talvez caiba como parágrafo no Contrato 9).
+   - **Vínculo:** 10.2 fatia 2 (que tornou as duas visíveis); Contrato 6, 9.
  - 12.32 **Dois geradores de MANIFEST divergentes + ausência de procedência** —
    **[Windows PENDENTE · Fedora PENDENTE]** (scripts; sem C, sem Lua).
    Achado no checkup de doc (2026-07-27).
