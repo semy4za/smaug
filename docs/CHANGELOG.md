@@ -5,6 +5,69 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-27 — 12.32: um gerador de MANIFEST só, e ele agora diz qual árvore descreve
+
+Duas correções que nasceram do mesmo incidente. Um zip veio da máquina Windows
+atrás do Fedora, e o MANIFEST validou **limpo** — porque um MANIFEST sempre
+valida contra a árvore que o gerou. Hash de arquivo prova consistência interna,
+nunca atualidade. O erro só apareceu quando fui procurar o trabalho da sessão e
+ele não estava lá.
+
+A primeira correção é a que eu tinha proposto: os dois geradores divergiam. Ao
+ler o código, não eram dois eixos como eu havia reportado no checkup — eram seis.
+Separador de caminho, BOM, fim de linha, texto do cabeçalho (cada script nomeava
+a si mesmo, então os arquivos nunca bateriam nem em árvore idêntica), critério de
+ordenação (`LC_ALL=C sort` sobre caminho relativo contra `Sort-Object` sobre
+caminho absoluto) e contagem de linhas (`wc -l` conta quebras, `(Get-Content).Count`
+conta linhas, e discordam em arquivo sem quebra final).
+
+Em vez de fazer as duas implementações concordarem — o que exigiria sincronia
+eterna, e eu nem podia testar o `.ps1` aqui — o `.ps1` virou wrapper que delega ao
+`.sh` pelo bash do MSYS2. O bash já é requisito do fluxo Windows, então não entra
+dependência nova. Divergência deixa de ser possível por construção, que é o mesmo
+raciocínio do `keys.lua` e do `int_scalar.lua`: fonte única resolve, vigilância
+não.
+
+A segunda correção é a que importa mais, e é a que me obrigou a corrigir minha
+própria justificativa: unificar o formato **não** teria pego o incidente. Nenhum
+formato pega. O que pega é procedência — o cabeçalho agora traz
+`# Arvore: <commit>`, com `+ alteracoes nao commitadas` quando o working tree está
+sujo e `sem git` fora de repositório. Agora um zip diz de qual árvore veio antes
+de qualquer análise.
+
+Consumidores checados antes de mexer, porque o MANIFEST é lido por código:
+`parity/14_thread_safety` tem um fallback que o parseia (`%./(src/[%w_]+%.c)`, não
+colide com a linha nova) e `make verify` só regenera e faz diff. Efeito colateral
+aceito: em árvore suja o `make verify` mostra também a linha de procedência
+mudando — informação correta, a árvore está suja mesmo.
+
+O `.sh` foi testado nos três casos (fora de git, repo limpo, repo sujo). O `.ps1`
+**não pôde ser testado** — não há PowerShell no ambiente de desenvolvimento. E ele
+falhou na primeira execução real, de um jeito que rende duas lições.
+
+A primeira: achar o bash não basta. As coreutils que o `.sh` usa vivem em
+`C:\msys64\usr\bin`, e o `build_win.ps1` só põe `ucrt64\bin` no PATH — de onde vêm
+gcc e luajit. Bash não-interativo não lê `/etc/profile`, então herda o PATH do
+Windows sem as ferramentas, e o script morre em `sha256sum: command not found`. O
+wrapper agora garante o diretório das coreutils.
+
+A segunda é mais séria e só apareceu porque a primeira falhou: o `.sh` escrevia
+direto no arquivo final. O redirecionamento trunca o alvo **antes** de qualquer
+falha, então sobrou um MANIFEST só com cabeçalho — e o arquivo válido anterior foi
+destruído. Pior: um MANIFEST truncado *parece* bom (cabeçalho certo, formato
+certo) e omite arquivos, e como a verificação só confere o que está listado, a
+omissão não seria detectada. Uma falha barulhenta virando silenciosa, que é
+exatamente o que o projeto não aceita. Corrigido com verificação prévia das
+ferramentas (erro claro antes de tocar no arquivo) e escrita atômica (temporário
++ `mv` no sucesso, com `trap` limpando o lixo).
+
+Vale registrar o encadeamento: o wrapper falhar foi bom. Ele falhou alto, e ao
+investigar por que, apareceu um risco que estava lá desde sempre e nunca tinha se
+manifestado.
+
+Nenhum C, nenhum Lua.
+
+---
 ## 2026-07-27 — 12.31: inferência de dtype passa a decidir por família, não por rank
 
 Achado na reescrita do Contrato 1: `from_table({1, "x"})` inferia `string`, porque

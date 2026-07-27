@@ -1305,6 +1305,62 @@ Baixo risco, não bloqueiam nada acima. Varredura de limpeza.
        err_out próprio e propagarão a causa da serialização + a de sistema
        (`strerror(errno)`). Atualizar os 2 call-sites Lua (`M.write`) e os testes
        C de path inválido (`test_io_c:719`/`:908`). Mesmo padrão da Fase 1.
+ - 12.32 **Dois geradores de MANIFEST divergentes + ausência de procedência** —
+   **[Windows PENDENTE · Fedora PENDENTE]** (scripts; sem C, sem Lua).
+   Achado no checkup de doc (2026-07-27).
+   - **Problema A — duas implementações que divergiam em seis eixos.**
+     `make_manifest.sh` e `make_manifest.ps1` eram independentes e produziam
+     arquivos diferentes para a MESMA árvore: separador de caminho
+     (`./docs/x.md` vs `.\docs\x.md`), BOM (o `.ps1` gravava), fim de linha
+     (LF vs CRLF), texto do cabeçalho (cada um nomeava a si mesmo, então nunca
+     bateriam), critério de ordenação (`LC_ALL=C sort` sobre caminho relativo vs
+     `Sort-Object FullName` sobre caminho absoluto) e contagem de linhas
+     (`wc -l` conta quebras; `(Get-Content).Count` conta linhas — discordam em
+     arquivo sem quebra final). Consequência: o MANIFEST é versionado, então
+     trocar de plataforma reescrevia as 126 linhas (diff-fantasma no histórico),
+     e comparar integridade **entre máquinas** — a razão de existir do arquivo —
+     era impossível porque nenhuma linha batia.
+   - **Decisão: fonte única por construção.** Fazer duas implementações
+     concordarem exigiria mantê-las em sincronia para sempre. O `.ps1` virou
+     **wrapper fino** que delega ao `.sh` via bash do MSYS2 — que já é requisito
+     do fluxo Windows (gcc e luajit vêm dele), então não acrescenta dependência.
+     Divergência deixa de ser possível, em vez de depender de vigilância.
+   - **Problema B — o MANIFEST não dizia QUAL árvore ele descreve.** Hash de
+     arquivo prova consistência interna, não atualidade: um MANIFEST antigo
+     valida limpo contra a própria árvore antiga. Em 2026-07-27 um zip da
+     máquina Windows (atrás do Fedora) passou na verificação de integridade sem
+     levantar suspeita — o formato unificado **não** teria pego isso, só a
+     procedência pega. Cabeçalho ganhou `# Arvore: <commit curto>`, com
+     `+ alteracoes nao commitadas` quando o working tree está sujo, e `sem git`
+     fora de repositório (degrada com elegância).
+   - **Consumidores verificados antes de mexer:** `parity/14_thread_safety`
+     (fallback que lê o MANIFEST com `%./(src/[%w_]+%.c)` — não colide com a
+     linha nova) e `make verify` (só regenera e faz `git diff`). Ambos intactos.
+   - **Efeito colateral aceito:** em árvore suja, `make verify` passa a mostrar
+     também a linha de procedência mudando. É informação correta, não ruído — a
+     árvore está suja mesmo.
+   - **Achado na primeira execução real (2026-07-27), que o teste teria pego.**
+     O wrapper falhou no Windows com `sha256sum: command not found`. Causa: achar
+     o bash não basta. As coreutils que o `.sh` usa ficam em
+     `C:\msys64\usr\bin`, enquanto o `build_win.ps1` põe no PATH apenas
+     `C:\msys64\ucrt64\bin` (gcc e luajit) — e bash **não-interativo não lê
+     `/etc/profile`**, então herda o PATH do Windows sem as ferramentas. O
+     wrapper passou a garantir o diretório das coreutils no PATH.
+   - **Falha secundária que a primeira expôs — truncamento.** O `.sh` escrevia
+     direto no arquivo final (`{ ... } > "$out"`), então o redirecionamento
+     truncava o MANIFEST **antes** de a falha acontecer: sobrava só o cabeçalho,
+     o arquivo válido anterior era destruído, e o resultado *parecia* bom
+     (cabeçalho certo, formato certo) mas omitia arquivos. Como a verificação só
+     confere o que está listado, omissão não seria detectada — uma falha
+     barulhenta virava silenciosa. Corrigido com **verificação prévia** das
+     ferramentas (erro claro antes de tocar no arquivo) e **escrita atômica**
+     (monta em temporário, `mv` só no sucesso, `trap` limpa o lixo).
+   - **Verificação:** o `.sh` foi testado em cinco cenários — fora de git, repo
+     limpo, repo sujo, ferramenta ausente (erro claro, arquivo intacto) e falha
+     no meio da execução (arquivo preservado byte a byte, sem temporário órfão).
+     O `.ps1` **não pôde ser testado** (sem PowerShell no ambiente de
+     desenvolvimento); a primeira correção veio da execução real no Windows e
+     precisa de nova rodada para confirmar.
  - 12.31 **Inferência de tipos incompatíveis gerava container natimorto** —
    **[Windows OK 2026-07-27 · selo Fedora PENDENTE]** (Lua puro; equivalência).
    Achado durante a reescrita do Contrato 1 (2026-07-24), corrigido em 27/07.
