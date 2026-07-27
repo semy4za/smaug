@@ -77,6 +77,14 @@ function M.classify(v)
     return "invalid", v
 end
 
+-- is_int_cdata(v): true se v e cdata int-based (int64_t ou uint64_t) - a forma
+-- exata que preserva os 64 bits. Usado pelos guards de entrada da aritmetica
+-- escalar para decidir se o escalar entra pela via int-based (ver 9.3 Fase 2).
+function M.is_int_cdata(v)
+    return type(v) == "cdata"
+       and (ffi.istype("int64_t", v) or ffi.istype("uint64_t", v))
+end
+
 -- check_operation(v, what, level): politica de OPERACAO (comparadores, aritmetica
 -- escalar). Devolve v pronto para o FFI (o C recebe int64_t exato) ou erra
 -- visivel. `what` rotula a operacao; `level` aponta o call-site do usuario.

@@ -5,7 +5,8 @@
 -- Produz em I: I.bool_mask_parts, I.bool_series_from_raw, I.binop, I.kleene_binop
 -- Contribui: Series.__add, __mul, __sub, __div, __len, __tostring, __newindex
 
-local Display = require("smaug.core.display")
+local Display    = require("smaug.core.display")
+local int_scalar = require("smaug.core.int_scalar")
 
 return function(I)
     local Series  = I.Series
@@ -120,12 +121,20 @@ return function(I)
             if r == nil then error("smaug: '"..opname.."' falhou", 2) end
             return wrap(r, a._dtype, a._name)
         end
-        if getmetatable(a) == Series and type(b) == "number" then
-            -- série × escalar. Promove série int64 → float64 quando o escalar é
-            -- fracionário (N.2: evita o truncamento silencioso do escalar na FFI)
-            -- ou quando a op é divisão (N.3).
-            if a._dtype == "int64" and (b % 1 ~= 0 or series_fn == "div") then
-                a = to_f64(a)
+        if getmetatable(a) == Series and (type(b) == "number"
+                or (a._dtype == "int64" and int_scalar.is_int_cdata(b))) then
+            -- série × escalar. Para série int64, a promoção N.2/N.3 vem PRIMEIRO
+            -- (fracionário ou divisão → float64, e o escalar vira double legítimo);
+            -- se a série PERMANECE int64, o escalar vai ao C como int64_t e passa
+            -- pela fonte única (int_scalar): aceita cdata int64_t (forma exata) e
+            -- number < 2^53; recusa number >= 2^53 por origem (9.3 Fase 2). cdata
+            -- só chega aqui com série int64 (guard) — série float mantém o erro.
+            if a._dtype == "int64" then
+                if type(b) == "number" and (b % 1 ~= 0 or series_fn == "div") then
+                    a = to_f64(a)
+                else
+                    b = int_scalar.check_operation(b, "'"..opname.."' com escalar int64", 3)
+                end
             end
             local r = a._d[scalar_fn](a._c, b)
             if r == nil then error("smaug: '"..opname.."' falhou", 2) end
@@ -133,8 +142,17 @@ return function(I)
         end
         if type(a) == "number" and getmetatable(b) == Series then
             if scalar_left_ok == "commute" then
-                if b._dtype == "int64" and a % 1 ~= 0 then
-                    b = to_f64(b)
+                -- escalar × série (comutativo: add/mul). `a` é sempre number aqui:
+                -- `cdata + Series` não é interceptável (o LuaJIT resolve o __add do
+                -- próprio cdata int64_t antes de chegar em Series.__add), então o
+                -- usuário deve escrever `Series + cdata`. number >= 2^53 é recusado
+                -- pela fonte única, como no lado direito.
+                if b._dtype == "int64" then
+                    if a % 1 ~= 0 then
+                        b = to_f64(b)
+                    else
+                        a = int_scalar.check_operation(a, "'"..opname.."' com escalar int64", 3)
+                    end
                 end
                 local r = b._d[scalar_fn](b._c, a)
                 if r == nil then error("smaug: '"..opname.."' falhou", 2) end
@@ -182,11 +200,15 @@ return function(I)
             local r = a._d.div(a._c, b._c)
             if r == nil then error("smaug: floordiv falhou", 2) end
             return wrap(r, "int64", a._name)
-        elseif type(b) == "number" then
-            if b % 1 ~= 0 then
+        elseif type(b) == "number" or int_scalar.is_int_cdata(b) then
+            if type(b) == "number" and b % 1 ~= 0 then
                 error("smaug: floordiv por escalar exige inteiro; recebido "..
                       tostring(b), 2)
             end
+            -- fonte única: aceita cdata int64_t exato; recusa number >= 2^53.
+            -- level 4: método `:` insere um frame C de dispatch (o metamétodo do
+            -- binop não tem — por isso lá é 3).
+            b = int_scalar.check_operation(b, "floordiv por escalar", 4)
             local r = a._d.div_scalar(a._c, b)
             if r == nil then error("smaug: floordiv falhou (divisão por zero?)", 2) end
             return wrap(r, "int64", a._name)

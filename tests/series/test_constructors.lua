@@ -757,6 +757,48 @@ do
 end
 
 
+-- ===================================================================
+-- 9.3 Fase 2: fronteira do escalar na ARITMÉTICA escalar (binop +
+-- floordiv, só int64). Mesma fonte única (int_scalar); o porteiro entra
+-- DEPOIS da promoção N.2/N.3 (fracionário/divisão → float64), quando a
+-- série permanece int64. cdata só é aceito com série int64 (D1=b).
+-- ===================================================================
+do
+    local ffi = require("ffi")
+    local B = ffi.new("int64_t", 9007199254740993LL)  -- 2^53 + 1
+    local s = S.from_table({ffi.new("int64_t", 1LL)}, "int64", "x")
+
+    -- 9.3.7 — cdata int64_t no escalar: aceito e preserva exato (antes: erro).
+    check((s + B):get_raw(1) == 9007199254740994LL,
+          "9.3.7 série int64 + cdata int64_t preserva exato")
+    check((s:floordiv(B)):get_raw(1) == 0LL,
+          "9.3.7 floordiv por cdata int64_t exato")
+
+    -- 9.3.8 — number >= 2^53 no escalar: RECUSADO (antes: degradava calado).
+    check(pcall(function() return s + 9007199254740993 end) == false,
+          "9.3.8 série int64 + number >= 2^53 recusado")
+    check(pcall(function() return 9007199254740993 + s end) == false,
+          "9.3.8 number >= 2^53 + série (comutativo) recusado")
+    check(pcall(function() return s:floordiv(9007199254740993) end) == false,
+          "9.3.8 floordiv por number >= 2^53 recusado")
+
+    -- 9.3.9 — comportamento preservado: number seguro, promoção, float puro.
+    check((s + 10):get_raw(1) == 11LL, "9.3.9 int64 + number seguro ok")
+    check((s + 1.5):get(1) == 2.5, "9.3.9 int64 + fracionário promove a float64 (N.2)")
+    local sf = S.from_table({1.0}, "float64", "f")
+    check((sf + 2.5):get(1) == 3.5, "9.3.9 float64 + number segue normal")
+
+    -- 9.3.10 — D1: série float64 + cdata int64_t mantém erro (fora do escopo;
+    -- float não preserva, o porteiro só vale para série int64).
+    check(pcall(function() return sf + B end) == false,
+          "9.3.10 float64 + cdata int64_t mantém erro (D1=b)")
+
+    -- NB: `cdata + Series` (cdata à esquerda) não é interceptável — o LuaJIT
+    -- resolve o __add do próprio cdata int64_t antes de Series.__add. A forma
+    -- suportada é `Series + cdata` (9.3.7). Documentado, não testável aqui.
+end
+
+
 
 local smaug  = require("smaug")
 local Series = smaug.Series
