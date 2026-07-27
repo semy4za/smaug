@@ -44,8 +44,18 @@ Cobertura de falha de alocação para as duas funções novas (`af_f64_between`,
 dois eixos — inverter a inclusividade e reintroduzir a comparação via double
 fazem o teste abortar.
 
-+11 checks em test_access (140 → 151). FFI/ABI (cdefs novos), então Windows
-obrigatório além do Fedora.
+Achado que o número pegou e a leitura não pegaria: a primeira leva de testes
+exercitava os quatro modos de `inclusive` só em `int64`, e a branch-alvo **caiu**
+de 94.73% para 94.39%. Cada dtype tem implementação própria — testar os modos num
+não prova nada sobre o outro, e os ramos `inc_lo`/`inc_hi` falsos do f64 nunca
+rodavam. Faltavam também os caminhos `out_mask == NULL` e série NULL nos dois, que
+o frontend nunca exercita porque sempre pede a máscara (os comparadores antigos já
+tinham esses testes em `test_ops_edge`; o between não herdou sozinho). Corrigido;
+a métrica subiu para 94.76%, acima do baseline.
+
++16 checks em test_access (140 → 156) e +15 em test_ops_edge (292 → 307). FFI/ABI
+(cdefs novos), então Windows obrigatório — feito. Valgrind ainda pendente (só roda
+no Fedora), então o selo do item não fechou.
 
 ---
 ## 2026-07-26 — 9.4: nlargest/nsmallest devolviam valor que não estava nos dados

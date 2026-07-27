@@ -528,14 +528,30 @@ do
           "10.2.4 NaN → false (não nulo), coerente com os comparadores")
     check(not rf:is_null(2), "10.2.4 NaN tem máscara válida")
 
-    -- 10.2.5 — série vazia não estoura.
-    check(S.int64(0):between(1, 5):len() == 0, "10.2.5 série vazia → len 0")
+    -- 10.2.5 — os quatro modos TAMBÉM em f64. Sem isto os ramos inc_lo/inc_hi
+    -- falsos de smaug_f64_between nunca são exercitados (a cobertura de
+    -- branch-alvo cai): cada dtype tem sua própria implementação, e testar os
+    -- modos só no int64 não prova nada sobre o f64.
+    local fm = S.from_table({1.0, 2.0, 3.0}, "float64", "fm")
+    local fb = fm:between(1.0, 3.0)
+    check(fb:get(1) and fb:get(2) and fb:get(3), "10.2.5 f64 both")
+    local fnei = fm:between(1.0, 3.0, "neither")
+    check(fnei:get(1) == false and fnei:get(2) == true and fnei:get(3) == false,
+          "10.2.5 f64 neither")
+    local fl = fm:between(1.0, 3.0, "left")
+    check(fl:get(1) == true and fl:get(3) == false, "10.2.5 f64 left")
+    local fr = fm:between(1.0, 3.0, "right")
+    check(fr:get(1) == false and fr:get(3) == true, "10.2.5 f64 right")
 
-    -- 10.2.6 — string/datetime seguem no fallback Lua (fatia 2), intactos.
+    -- 10.2.6 — série vazia não estoura (nos dois dtypes).
+    check(S.int64(0):between(1, 5):len() == 0, "10.2.6 série int64 vazia → len 0")
+    check(S.float64(0):between(1, 5):len() == 0, "10.2.6 série f64 vazia → len 0")
+
+    -- 10.2.7 — string/datetime seguem no fallback Lua (fatia 2), intactos.
     local st = S.from_table({"a", "c", "e"}, "string", "s")
     local rs = st:between("a", "c")
     check(rs:get(1) and rs:get(2) and rs:get(3) == false,
-          "10.2.6 string ainda no fallback, correto")
+          "10.2.7 string ainda no fallback, correto")
 end
 
 

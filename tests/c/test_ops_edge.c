@@ -239,6 +239,30 @@ static void f64_compare_edge(void) {
     OK(m && m[1] == 0x00, "f64 ne mask NULL -> 0");
     free(r); free(m);
 
+    /* between: mesma matriz de ramos. Serie tem {1, NULL, 3}. */
+    OK(smaug_f64_between(NULL, 0, 5, true, true, NULL) == NULL,
+       "f64 between NULL serie -> NULL");
+
+    r = smaug_f64_between(s, 1, 3, true, true, NULL);   /* out_mask NULL */
+    OK(r != NULL && r[0] == 1 && r[2] == 1, "f64 between sem out_mask");
+    free(r);
+
+    m = NULL; r = smaug_f64_between(s, 1, 3, true, true, &m);
+    OK(m && m[0] == 0xFF && m[1] == 0x00, "f64 between mask valido/NULL");
+    OK(r[1] == 0, "f64 between NULL no elemento -> 0");
+    free(r); free(m);
+
+    /* os quatro modos de inclusividade, com os limites nas pontas (1 e 3) */
+    r = smaug_f64_between(s, 1, 3, false, false, NULL);
+    OK(r && r[0] == 0 && r[2] == 0, "f64 between neither exclui as pontas");
+    free(r);
+    r = smaug_f64_between(s, 1, 3, true, false, NULL);
+    OK(r && r[0] == 1 && r[2] == 0, "f64 between left");
+    free(r);
+    r = smaug_f64_between(s, 1, 3, false, true, NULL);
+    OK(r && r[0] == 0 && r[2] == 1, "f64 between right");
+    free(r);
+
     smaug_f64_free(s);
 }
 
@@ -309,6 +333,34 @@ static void i64_scalar_compare_sort_edge(void) {
     c = smaug_i64_ge(a, 10, &mi); OK(mi && mi[0] == 0xFF && mi[1] == 0x00, "i64 ge mask valido/NULL"); free(c); free(mi);
     mi = NULL; c = smaug_i64_le(a, 10, &mi); OK(mi && mi[1] == 0x00, "i64 le mask NULL -> 0"); free(c); free(mi);
     mi = NULL; c = smaug_i64_ne(a, 10, &mi); OK(mi && mi[1] == 0x00, "i64 ne mask NULL -> 0"); free(c); free(mi);
+
+    /* between: mesma matriz de ramos (a = [10, null]) */
+    OK(smaug_i64_between(NULL, 0, 5, true, true, NULL) == NULL, "i64 between NULL -> NULL");
+    c = smaug_i64_between(a, 10, 10, true, true, NULL);   /* out_mask NULL */
+    OK(c && c[0] == 1, "i64 between sem out_mask");
+    free(c);
+    mi = NULL; c = smaug_i64_between(a, 0, 20, true, true, &mi);
+    OK(mi && mi[0] == 0xFF && mi[1] == 0x00, "i64 between mask valido/NULL");
+    OK(c[1] == 0, "i64 between NULL no elemento -> 0");
+    free(c); free(mi);
+    /* os quatro modos, limites nas pontas (serie tem 10) */
+    c = smaug_i64_between(a, 10, 10, false, false, NULL);
+    OK(c && c[0] == 0, "i64 between neither exclui as pontas"); free(c);
+    c = smaug_i64_between(a, 10, 20, true, false, NULL);
+    OK(c && c[0] == 1, "i64 between left inclui a inferior"); free(c);
+    c = smaug_i64_between(a, 0, 10, false, true, NULL);
+    OK(c && c[0] == 1, "i64 between right inclui a superior"); free(c);
+
+    /* exatidao acima de 2^53 no nivel C: 2^53+1 e 2^53+3 sao vizinhos que o
+       double confundiria (ambos cairiam em multiplos de 2). Aqui a comparacao
+       e int64_t pura, entao between(2^53+1, 2^53+1) tem de isolar o primeiro. */
+    smaug_series_i64_t *big = smaug_i64_create(2);
+    smaug_i64_set(big, 0, 9007199254740993LL);   /* 2^53 + 1 */
+    smaug_i64_set(big, 1, 9007199254740995LL);   /* 2^53 + 3 */
+    c = smaug_i64_between(big, 9007199254740993LL, 9007199254740993LL, true, true, NULL);
+    OK(c && c[0] == 1 && c[1] == 0, "i64 between exato acima de 2^53");
+    free(c);
+    smaug_i64_free(big);
 
     /* sort/argsort recusam NULL */
     OK(smaug_i64_argsort(a, true) == NULL, "i64 argsort recusa NULL");

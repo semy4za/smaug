@@ -581,7 +581,11 @@ sem aviso nem erro. A causa é a mesma do 10.5–10.7: o loop Lua round-tripa po
   correção de 2^53 é toda em int64, mas o loop no Anel 1 é dos quatro dtypes —
   fazer só um deixaria a desparidade de pé. Fatiar é aditivo (nada se joga fora),
   então custa no máximo um selo extra, nunca retrabalho.
-  - **Fatia 1 — `float64` + `int64`: [Done — Fedora+Windows 2026-07-27]**
+  - **Fatia 1 — `float64` + `int64`: [Windows OK 2026-07-27 · selo Fedora
+    PENDENTE]** Confirmada no MSYS2-UCRT64 (carga dos `cdef` novos, 11 binários C,
+    suíte Lua completa, 15/15 parity). Falta o selo `[Fedora]`: **Valgrind** não
+    roda no Windows. Cobertura já medida fora do Fedora (gcov): linha 98.83%,
+    branch-alvo 94.76% — acima do baseline anterior (98.82% / 94.73%).
     `smaug_f64_between` / `smaug_i64_between`: **primitiva dedicada de passada
     única**, não composição interna de `ge`+`le`. Motivo: compor exigiria três
     pares de alocação (result+mask) e três varreduras para o que uma varredura e
@@ -598,13 +602,21 @@ sem aviso nem erro. A causa é a mesma do 10.5–10.7: o loop Lua round-tripa po
     - NaN em f64 → `0` com máscara **válida** (comparação com NaN é falsa, não é
       null), coerente com os comparadores e com o CODE_REVIEW A3. Nulo propaga
       nulo. Série vazia → len 0.
-    - Testes: `test_access` 10.2.1-10.2.6 (exatidão > 2^53, os quatro modos,
-      limite number recusado, nulo/NaN, vazia, fallback intacto). **Mutação
-      verificada:** inverter a inclusividade e reintroduzir a comparação via
-      `double` fazem o teste abortar. Varredura OOM: `af_f64_between` /
-      `af_i64_between` (allocfail 1878 → 1898).
-    - Selo: Valgrind-clean, 15/15 parity, cobertura mantida. **FFI/ABI** (cdefs
-      novos) → confirmação Windows MSYS2-UCRT64 obrigatória e feita.
+    - Testes: `test_access` 10.2.1-10.2.7 (exatidão > 2^53, os quatro modos em
+      **ambos** os dtypes, limite number recusado, nulo/NaN, vazia, fallback
+      intacto) e `test_ops_edge` (nível C: série NULL, `out_mask` NULL, nulo no
+      elemento, quatro modos, exatidão > 2^53). **Mutação verificada:** inverter
+      a inclusividade e reintroduzir a comparação via `double` fazem o teste
+      abortar. Varredura OOM: `af_f64_between` / `af_i64_between` (allocfail
+      1878 → 1898).
+    - **Achado de cobertura (2026-07-27):** a primeira leva de testes exercitava
+      os quatro modos só em `int64`; os ramos `inc_lo`/`inc_hi` falsos do f64 e
+      os caminhos `out_mask == NULL` / série NULL de ambos ficaram descobertos, e
+      a branch-alvo **caiu** de 94.73% para 94.39%. Cada dtype tem implementação
+      própria — testar os modos num não prova nada sobre o outro. Corrigido com
+      os testes acima; a métrica voltou a 94.76%.
+    - **FFI/ABI** (cdefs novos) → Windows obrigatório, feito. Falta Valgrind
+      (Fedora) para fechar o selo.
   - **Fatia 2 — `datetime` + `string`** (pendente). `datetime` é gesto igual ao
     i64 (epoch_ms é `int64_t`), mas o arquivo usa macro geradora (`DT_CMP_IMPL`)
     e `between` não cabe nela (dois limites + dois flags) — nasce função normal.
