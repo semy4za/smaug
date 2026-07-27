@@ -5,6 +5,98 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-26 — 9.4: nlargest/nsmallest devolviam valor que não estava nos dados
+
+Achado na leitura macro do item 10, olhando o que ainda faz loop em Lua sobre
+FFI. Série `{…992, …993, …995}` (int64 acima de 2^53): `nlargest(2)` devolvia
+`…996` e `…992`. O `…996` é o ponto: não é um valor impreciso, é um valor que
+**nunca existiu na série**. Numa operação de seleção — o contrato é "os N maiores
+QUE ESTÃO nos dados" — isso é invenção, não perda de precisão. Um `abs()` errado
+dá um número errado e o usuário pode desconfiar; um `nlargest` que inventa dado
+não tem como ser percebido.
+
+Mecanismo: `c_sorted_nonnull` normalizava o buffer do C para `double[?]` — o
+comentário até vendia isso como "uniforme para f64 e i64", mas a uniformidade era
+obtida degradando o int64. Acima de 2^53 só os inteiros pares são representáveis
+em double, então `…995` arredonda para `…996`. Depois `math.floor` e `from_table`
+gravavam o resultado.
+
+Agravante que merece nota: **avisava**. O `from_table` chamava `check_value`, que
+disparava "literais Lua acima desse limite podem já ter perdido precisão". Só que
+o usuário não escreveu literal nenhum — o valor veio dos dados dele. O aviso
+existia e apontava para a causa errada, o que é pior que não avisar: manda
+investigar o lugar errado.
+
+Correção: a normalização deixou de ser escondida na leitura. `c_sorted_nonnull`
+virou duas — `c_sorted_nonnull_native` devolve o buffer no tipo nativo
+(`int64_t[?]` em int64) e concentra a chamada C, a cópia e o free; a antiga virou
+wrapper fino que converte para double. `nlargest`/`nsmallest` usam a nativa e
+entregam o cdata direto ao `from_table`, que aceita cdata desde o 9.1 — sem
+`tonumber`, sem `math.floor`. A conversão para double continua existindo, mas
+agora é um passo explícito e documentado, não um efeito colateral da leitura.
+
+Ficam na versão double, e isso é limitação de contrato, não bug: `median`,
+`quantile`, `skew`, `kurtosis`. Interpolação e momentos são float por natureza, e
+o retorno é `number` Lua — que não comporta > 2^53 mesmo se calculássemos exato.
+Registrado como limitação. `mode` já estava certo (migrado ao `keys.lua` no
+10.5-A).
+
+De brinde, um vazamento: o ramo f64 devolvia `nil, 0` sem liberar o ponteiro do C
+quando `ptr != NULL` e `n == 0`. O ramo i64 já tratava — desparidade entre os dois
+ramos da mesma função. Agora ambos liberam.
+
++10 checks em test_selection (56→66), com mutação verificada: reintroduzir o
+`tonumber` faz o teste abortar.
+
+Lua puro, nenhum C tocado.
+
+---
+## 2026-07-26 — 9.3: fronteira do escalar int-based (comparadores + aritmética)
+
+O 9.1 tinha curado a *entrada* de int64 (check_value/get_raw), mas os call-sites
+de *operação* ficaram para trás com o guard cru `type(v)=="number"`: comparadores
+e aritmética escalar rejeitavam `cdata int64_t` — a única forma que preserva os
+64 bits — e engoliam `number > 2^53` degradado sem nem o aviso que a entrada dá.
+Diagnóstico: `s:eq(number grande)` marcava a linha errada em silêncio, `s + number
+grande` operava no valor errado, enquanto `fillna` já estava correto (usa o
+porteiro canônico). Mesma família, três comportamentos diferentes.
+
+Criado `core/int_scalar.lua` como fonte única — mesmo padrão do `keys.lua`.
+Separa RECONHECIMENTO de POLÍTICA: `classify(v)` é puro (não avisa, não erra) e
+devolve a classe da forma; cada call-site aplica a política que o seu contrato
+pede. A divergência é de uma classe só: `number` grande **avisa-e-aceita** na
+entrada (o valor vira dado do usuário, a perda é irrecuperável, a escolha é
+dele) e **erra** na operação (é operando; o resultado seria mentira). Módulo
+próprio em vez de função no `_core` porque `_types.lua` roda ANTES do `_core` no
+init — dependência de ordem seria frágil.
+
+Achado que quase passou: o caso canônico `2^53+1` degrada para **exatamente
+2^53**, então o limiar `> 2^53` deixava escapar justamente o valor de teste. Daí
+a classe `number_at_boundary`: a operação recusa `>= 2^53` (o boundary é
+ambíguo — pode ser 2^53 legítimo ou 2^53+1 degradado), a entrada preserva o
+`> 2^53` de antes. Sem rodar o teste isso teria fechado como resolvido.
+
+Fase 2 (aritmética) trouxe dois achados que só apareceram medindo. Primeiro:
+`cdata + Series` é **inalcançável** — o LuaJIT resolve o `__add` do próprio cdata
+antes de chegar em `Series.__add`, então o ramo comutativo para cdata-à-esquerda
+era dead code (removido; a forma suportada é `Series + cdata`). Segundo: o
+`level` do erro depende da mecânica de chamada — metamétodo usa 3, método `:`
+tem um frame [C] de dispatch extra e precisa de 4. Medido com `debug.getinfo`,
+não estimado.
+
+Ordem importa no `binop`: a promoção N.2/N.3 vem primeiro (fracionário ou `/`
+→ float64, e o escalar vira double legítimo); só se a série permanece int64 o
+escalar passa pelo porteiro. Decidido que `float64 + cdata int64_t` mantém o
+erro — float não preserva por natureza, aceitar não ganharia nada.
+
++9 checks (354→363). Contrato 1 ganhou a nota da divergência entrada-vs-operação;
+README teve a nota do 2^53 corrigida (estava dizendo que where/mask/astype
+recusam, mas essas migraram no 10.6/10.7). Destrava o 10.2: os limites do
+`between` agora entram exatos.
+
+Lua puro, nenhum C tocado.
+
+---
 ## 2026-07-23 — 12.15: CategoricalSeries rejeita índice não-inteiro
 
 Bug de falha-silenciosa: CategoricalSeries:get(1.5) devolvia nil calado, enquanto

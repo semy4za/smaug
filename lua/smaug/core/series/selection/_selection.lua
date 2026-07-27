@@ -6,7 +6,7 @@
 -- Contribui: methods.where, mask, Series.ifelse, nlargest, nsmallest,
 --            gt, lt, eq, ge, le, ne, filter, land, lor, lxor, lnot,
 --            count_true, any, all, isna, notna, sin, cos, tan, exp, log, sqrt,
---            c_sorted_nonnull usada por nlargest/nsmallest
+--            c_sorted_nonnull_native usada por nlargest/nsmallest (9.4: exato)
 
 return function(I)
     local methods          = I.methods
@@ -19,7 +19,7 @@ return function(I)
     local bool_mask_parts  = I.bool_mask_parts
     local bool_series_from_raw = I.bool_series_from_raw
     local kleene_binop     = I.kleene_binop
-    local c_sorted_nonnull = I.c_sorted_nonnull
+    local c_sorted_nonnull_native = I.c_sorted_nonnull_native
 
     -- =====================================================================
     -- Comparações → Series<bool>
@@ -227,6 +227,13 @@ return function(I)
     -- nlargest / nsmallest
     -- =====================================================================
 
+    -- 9.4: usam o buffer NATIVO (int64_t[?] em int64). Antes passavam por
+    -- tonumber() → double, o que em int64 > 2^53 não só perdia dígito como
+    -- FABRICAVA valor fora do dataset (…995 virava …996, arredondado para o
+    -- double representável mais próximo). Numa operação de seleção — "devolva
+    -- os N maiores QUE ESTÃO nos dados" — isso é invenção, não degradação.
+    -- O cdata int64_t vai direto ao from_table, que o aceita desde o 9.1.
+
     function methods.nlargest(self, n)
         if self._dtype ~= "float64" and self._dtype ~= "int64" then
             error("smaug: nlargest() requer dtype numérico, não '"..self._dtype.."'", 2)
@@ -234,12 +241,11 @@ return function(I)
         if type(n) ~= "number" or n < 1 then
             error("smaug: nlargest() espera n >= 1", 2)
         end
-        local arr, m = c_sorted_nonnull(self)
+        local arr, m = c_sorted_nonnull_native(self)
         local result = {}
         local take   = math.min(n, m)
         for i = 0, take - 1 do
-            local v = tonumber(arr[m - 1 - i])
-            result[i + 1] = (self._dtype == "int64") and math.floor(v) or v
+            result[i + 1] = arr[m - 1 - i]
         end
         return Series.from_table(result, self._dtype, self._name)
     end
@@ -251,12 +257,11 @@ return function(I)
         if type(n) ~= "number" or n < 1 then
             error("smaug: nsmallest() espera n >= 1", 2)
         end
-        local arr, m = c_sorted_nonnull(self)
+        local arr, m = c_sorted_nonnull_native(self)
         local result = {}
         local take   = math.min(n, m)
         for i = 0, take - 1 do
-            local v = tonumber(arr[i])
-            result[i + 1] = (self._dtype == "int64") and math.floor(v) or v
+            result[i + 1] = arr[i]
         end
         return Series.from_table(result, self._dtype, self._name)
     end

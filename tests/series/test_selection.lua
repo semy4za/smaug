@@ -212,4 +212,48 @@ do
 end
 
 
+-- ===================================================================
+-- 9.4: nlargest/nsmallest preservam int64 exato (não fabricam valor)
+-- Antes liam o buffer via tonumber() → double: em int64 > 2^53 o valor
+-- não só perdia dígito como podia virar um número FORA do dataset
+-- (…995 → …996, arredondado para o double representável mais próximo).
+-- Numa operação de seleção isso é invenção de dado. Agora usam o buffer
+-- nativo (int64_t[?]) e passam o cdata direto ao from_table.
+-- ===================================================================
+do
+    local ffi = require("ffi")
+    local a = ffi.new("int64_t", 9007199254740992LL)  -- 2^53
+    local b = ffi.new("int64_t", 9007199254740993LL)  -- 2^53 + 1
+    local c = ffi.new("int64_t", 9007199254740995LL)  -- 2^53 + 3 (vira …996 em double)
+    local s = S.from_table({a, b, c}, "int64", "big")
+
+    -- 9.4.1 — os valores devolvidos ESTÃO no dataset (nada fabricado).
+    local top = s:nlargest(2)
+    check(top:get_raw(1) == 9007199254740995LL,
+          "9.4.1 nlargest devolve o maior exato (não …996 fabricado)")
+    check(top:get_raw(2) == 9007199254740993LL,
+          "9.4.1 nlargest devolve o segundo maior exato")
+
+    -- 9.4.2 — nsmallest idem, e a ordem é crescente.
+    local bot = s:nsmallest(2)
+    check(bot:get_raw(1) == 9007199254740992LL, "9.4.2 nsmallest menor exato")
+    check(bot:get_raw(2) == 9007199254740993LL, "9.4.2 nsmallest segundo exato")
+
+    -- 9.4.3 — dtype preservado e n > len não estoura.
+    check(top._dtype == "int64", "9.4.3 nlargest preserva dtype int64")
+    check(s:nlargest(10):len() == 3, "9.4.3 n > len devolve o que há")
+
+    -- 9.4.4 — float64 segue igual (double é nativo, nada a preservar).
+    local f = S.from_table({3.5, 1.25, 9.75}, "float64", "f")
+    check(f:nlargest(1):get(1) == 9.75, "9.4.4 float64 nlargest inalterado")
+    check(f:nsmallest(1):get(1) == 1.25, "9.4.4 float64 nsmallest inalterado")
+
+    -- 9.4.5 — nulos continuam ignorados (sorted_nonnull), sem degradar o resto.
+    local sn = S.from_table({b, NA, c}, "int64", "comnull")
+    local t2 = sn:nlargest(2)
+    check(t2:len() == 2, "9.4.5 nulos ignorados")
+    check(t2:get_raw(1) == 9007199254740995LL, "9.4.5 exatidão mantida com nulos")
+end
+
+
 print(string.format("OK — %d checks passaram (Series: at/iat, where, mask, ifelse, isna/notna)", n_ok))

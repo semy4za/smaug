@@ -454,12 +454,35 @@ não `NaN`); divisão por zero → `null` (não `NaN`, não `Inf`).
 
 > **int64 acima de 2^53:** um literal Lua grande (ex. `9007199254740993`) já
 > chega truncado, porque o Lua o representa como `double` antes de entrar na
-> lib. Para preservar os 64 bits, use `ffi.new("int64_t", ...)` ou o sufixo
-> `LL`, e leia de volta com `s:get_raw(i)` (o `get` normal converte para
-> `double`). As operações já no Anel 0 (aritmética, `fillna`, `combine_first`)
-> preservam o valor exato; as que ainda rodam no Anel 1 (`where`/`mask`/`ifelse`,
-> `astype`) **recusam** valores > 2^53 com erro visível em vez de corromper, até
-> serem migradas. A entrada por literal grande ainda dispara aviso.
+> lib — repare que ele degrada para exatamente `9007199254740992` (2^53). Para
+> preservar os 64 bits, use `ffi.new("int64_t", ...)` ou o sufixo `LL`, e leia
+> de volta com `s:get_raw(i)` (o `get` normal converte para `double`).
+>
+> A regra é **preservar ou recusar, nunca degradar em silêncio**, com duas
+> políticas conforme o papel do valor:
+>
+> - **Guardar dado** (`set`, `append`, `fillna`): um `number` acima de 2^53
+>   **avisa e aceita** — a perda já aconteceu na origem e a escolha é sua.
+> - **Parametrizar operação** (comparações `gt`/`lt`/`eq`/…, aritmética escalar
+>   `+ - * //`): um `number` a partir de 2^53 **é recusado com erro** — o
+>   resultado sairia errado em silêncio. A forma exata (`cdata`) é aceita e
+>   preservada.
+>
+> ```lua
+> local ffi = require("ffi")
+> local big = ffi.new("int64_t", 9007199254740993LL)
+>
+> s:eq(big)                      -- ok: compara exato
+> s + big                        -- ok: preserva os 64 bits
+> s:eq(9007199254740993)         -- erro: o number já degradou
+> ```
+>
+> `Series + cdata` é a forma suportada; `cdata + Series` não é interceptável (o
+> LuaJIT resolve o operador do próprio cdata antes). As operações já no Anel 0
+> (aritmética, `fillna`, `combine_first`, `where`/`mask`/`ifelse`, `astype`)
+> preservam o valor exato; as que ainda rodam elemento-a-elemento no Anel 1
+> (`between`, `abs`, `clip`, `round`) **recusam** valores acima de 2^53 com erro
+> visível em vez de corromper, até serem migradas.
 
 ---
 

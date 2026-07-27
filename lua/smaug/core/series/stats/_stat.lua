@@ -21,30 +21,48 @@ return function(I)
     -- Helpers de ordenação/sorted (Grupo B Ring 0)
     -- =====================================================================
 
-    -- c_sorted_nonnull: chama sorted_nonnull C conforme o dtype.
-    -- Devolve (double_array, n). Uniforme para f64 e i64.
-    local function c_sorted_nonnull(self)
+    -- c_sorted_nonnull_native: chama sorted_nonnull do C conforme o dtype e
+    -- devolve o buffer NO TIPO NATIVO — double[?] para float64, int64_t[?] para
+    -- int64 — mais n. Fonte única da chamada C, da cópia e do free.
+    -- Quem devolve Series do MESMO dtype (nlargest/nsmallest) usa esta: passar
+    -- por double fabricaria valores fora do dataset em int64 > 2^53 (ver 9.4).
+    local function c_sorted_nonnull_native(self)
         local out_n = ffi.new("size_t[1]")
         if self._dtype == "float64" then
             local ptr = C.smaug_f64_sorted_nonnull(self._c, out_n)
+            if ptr == nil then return nil, 0 end
             local n = tonumber(out_n[0])
-            if ptr == nil or n == 0 then return nil, 0 end
+            if n == 0 then C.smaug_free(ptr); return nil, 0 end
             local arr = ffi.new("double[?]", n)
             ffi.copy(arr, ptr, n * ffi.sizeof("double"))
             C.smaug_free(ptr)
             return arr, n
         else  -- int64
             local iptr = C.smaug_i64_sorted_nonnull(self._c, out_n)
+            if iptr == nil then return nil, 0 end
             local n = tonumber(out_n[0])
-            if iptr == nil or n == 0 then
-                if iptr ~= nil then C.smaug_free(iptr) end
-                return nil, 0
-            end
-            local arr = ffi.new("double[?]", n)
-            for i = 0, n - 1 do arr[i] = tonumber(iptr[i]) end
+            if n == 0 then C.smaug_free(iptr); return nil, 0 end
+            local arr = ffi.new("int64_t[?]", n)
+            ffi.copy(arr, iptr, n * ffi.sizeof("int64_t"))
             C.smaug_free(iptr)
             return arr, n
         end
+    end
+    I.c_sorted_nonnull_native = c_sorted_nonnull_native
+
+    -- c_sorted_nonnull: o mesmo buffer, normalizado para double[?]. Uniforme
+    -- para f64 e i64 — para os consumidores que calculam estatística de ponto
+    -- flutuante (median, quantile, skew, kurtosis: interpolação e momentos são
+    -- float por natureza, e o retorno é number Lua, que não comporta > 2^53 de
+    -- todo jeito). A normalização é EXPLÍCITA aqui, não escondida na leitura:
+    -- em int64 > 2^53 ela perde dígito — limitação registrada no 9.4.
+    local function c_sorted_nonnull(self)
+        local arr, n = c_sorted_nonnull_native(self)
+        if n == 0 then return nil, 0 end
+        if self._dtype ~= "int64" then return arr, n end
+        local out = ffi.new("double[?]", n)
+        for i = 0, n - 1 do out[i] = tonumber(arr[i]) end
+        return out, n
     end
     I.c_sorted_nonnull = c_sorted_nonnull
 

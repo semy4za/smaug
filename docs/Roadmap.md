@@ -420,8 +420,9 @@ espontânea; são decisões de contrato com aresta, que precisam estar resolvida
     selo final.
   - Vínculo: COW.md (string ❌→✅); CODE_REVIEW A7 (posse de dados).
 
-- 9.3 **Fronteira do escalar int-based nos call-sites de operação** — [Fedora]
-  (Anel 1, Lua puro → equivalência). Reabre o bloco 9: o 9.1 varreu a **entrada**
+- 9.3 **Fronteira do escalar int-based nos call-sites de operação** — **[Done —
+  Fedora 2026-07-26]** (Anel 1, Lua puro → equivalência; ambas as fases seladas).
+  Reabre o bloco 9: o 9.1 varreu a **entrada**
   (`check_value`/`get_raw`), mas os call-sites de **operação** (comparadores,
   aritmética escalar) ficaram com o guard cru `type=="number"` — rejeitam a forma
   exata (`cdata int64_t`) e engolem `number > 2^53` degradado, sem o aviso que o
@@ -468,27 +469,84 @@ espontânea; são decisões de contrato com aresta, que precisam estar resolvida
       98.82%, branch-alvo 94.73%; property-based 360862 checks. Lua puro → sem C,
       sem ABI (dispensa Windows).
   - **Fase 2 — aritmética escalar** (`binop` série×escalar + comutativo, e
-    `floordiv`; **só int64** — datetime não tem `*_scalar`). Integra o porteiro na
-    camada de promoção N.1-N.3 do `binop` (`_bool_ops.lua:123-133`), **completando
-    a intenção já registrada do N.2** (*"evita o truncamento silencioso do escalar
-    na FFI"*, que só cobriu o caso fracionário; `number > 2^53` é o mesmo problema,
-    deixado de fora). Mais teste (interação promoção × cdata × 2^53). Fase separada
-    por risco não-uniforme.
+    `floordiv`; **só int64** — datetime não tem `*_scalar`). **[Done — Fedora
+    2026-07-26]** Integra o porteiro na camada de promoção N.1-N.3 do `binop`,
+    **completando a intenção já registrada do N.2** (*"evita o truncamento
+    silencioso do escalar na FFI"*, que só cobriu o caso fracionário). Ordem que
+    importa: a promoção vem **primeiro** (fracionário ou `/` → float64, o escalar
+    vira double legítimo); se a série **permanece int64**, o escalar passa pelo
+    porteiro. `is_int_cdata` adicionado ao `int_scalar` para os guards de entrada.
+    - **D1 (decidida):** `float64 + cdata int64_t` **mantém o erro** — o porteiro
+      só vale com série int64. Float não preserva por natureza; aceitar não
+      ganharia nada e alargaria a superfície.
+    - **Achado — `cdata + Series` é inalcançável.** O LuaJIT resolve o `__add` do
+      próprio `cdata int64_t` antes de chegar em `Series.__add`, então o ramo
+      comutativo para cdata-à-esquerda era **dead code** (removido). A forma
+      suportada é `Series + cdata`; documentado no código e no teste.
+    - **Achado — o `level` do erro depende da mecânica de chamada.** Metamétodo
+      (`binop`) usa level 3; método `:` (`floordiv`) tem um frame `[C]` de
+      dispatch extra e precisa de 4. Medido com `debug.getinfo`, não estimado.
+    - **Nuance (design, não furo):** `/` promove a float64 por N.3 — não preserva
+      int64 por definição; o divisor cdata vira double como em qualquer divisão
+      verdadeira. Fora da questão de preservação.
+    - Testes: `test_constructors` 9.3.7-9.3.10 (cdata preservado em `+`/`floordiv`,
+      `number >= 2^53` recusado nos três call-sites, comportamento preservado para
+      number seguro/promoção/float, D1).
+    - **Selo Fedora:** Valgrind-clean (0 erros, 13 binários); 15/15 parity; linha
+      98.82%, branch-alvo 94.73%; 363 checks no `test_constructors`; property-based
+      360862 checks.
   - **Não-escopo (explícito, não é esquecimento).** `f64`/`string`/`bool` fora:
     double é nativo (number já exato), string sem degradação, bool sem
     comparadores de ordem. Unificar os guards crus deles depois é *limpeza de
     código* separada, não correção. `map` → item à parte (10.3 reclassificado).
     `fillna` → já resolvido (é o modelo).
-  - **Doc.** Contrato 1 ganha uma linha registrando a divergência: *parâmetros de
-    operação recusam `number > 2^53` onde o armazenamento avisa-aceita* — senão o
+  - **Doc.** Contrato 1 ganhou a linha registrando a divergência: *parâmetros de
+    operação recusam `number >= 2^53` onde o armazenamento avisa-aceita* — senão o
     leitor não entende por que `eq(number grande)` erra e `set`/`fillna` avisam.
-    Sub-passo da Fase 1 (a divergência nasce ali).
+    README: nota do int64 > 2^53 atualizada para o estado real (2026-07-26).
   - **Selo.** Anel 1, Lua puro → fecha por equivalência Fedora (`test_constructors`
-    9.1.x prova a extração; testes novos para os call-sites de operação). Sem C,
+    9.1.x prova a extração; 9.3.x provam os call-sites de operação). Sem C,
     sem ABI.
   - **Vínculo:** 9.1 (Sub-B, mesma família); Contrato 1 (reescrito 2026-07-24);
-    10.2 Passo B (consumidor da Fase 1); 10.3 (`map`, item irmão); `keys.lua`
-    (precedente de datetime latente).
+    10.2 (consumidor da Fase 1 — limites do `between` entram exatos); 10.3
+    (`map`, item irmão); `keys.lua` (precedente de datetime latente).
+
+- 9.4 **`nlargest`/`nsmallest` fabricavam valor fora do dataset** — **[Done —
+  Fedora 2026-07-26]** (Anel 1, Lua puro → equivalência). Achado 2026-07-26 na
+  leitura macro do item 10. Categoria **acima** de degradação: numa operação de
+  *seleção* — cujo contrato é "devolva os N maiores **que estão** nos dados" —
+  o retorno continha um número **ausente do dataset**.
+  - **Provado.** Série `{…992, …993, …995}`: `nlargest(2)` devolvia `…996` e
+    `…992`. Mecanismo: `c_sorted_nonnull` normalizava o buffer para `double[?]`
+    (`arr[i] = tonumber(iptr[i])`), e acima de 2^53 só os pares são
+    representáveis — `…995` arredonda para `…996`, valor que nunca existiu.
+    Agravante: **avisava**, mas com mensagem enganosa (o warn do `check_value`
+    fala em "literais Lua", e o usuário não escreveu literal — o valor veio dos
+    dados dele), apontando a causa errada.
+  - **Correção.** `c_sorted_nonnull` foi separada em duas, com a normalização
+    deixando de ser escondida: `c_sorted_nonnull_native` devolve o buffer **no
+    tipo nativo** (`double[?]` para f64, `int64_t[?]` para int64) e é a fonte
+    única da chamada C, da cópia e do `free`; `c_sorted_nonnull` virou um wrapper
+    fino que normaliza para `double[?]`. `nlargest`/`nsmallest` passaram à
+    nativa e entregam o `cdata int64_t` direto ao `from_table` (que o aceita
+    desde o 9.1) — sem `tonumber`, sem `math.floor`.
+  - **Limitação registrada (não é bug).** `median`, `quantile`, `skew` e
+    `kurtosis` seguem na versão `double`: interpolação e momentos são float por
+    natureza e o retorno é `number` Lua, que não comporta > 2^53 de todo jeito.
+    Em int64 > 2^53 esses valores perdem dígito — limitação de tipo de retorno,
+    documentada, distinta da corrupção de container tipado que era o 9.4.
+    `mode` está correto (migrado ao `keys.lua` no 10.5-A).
+  - **Bug secundário corrigido.** O ramo f64 vazava o ponteiro do C quando
+    `ptr != NULL` e `n == 0` (`return nil, 0` antes do `smaug_free`); o ramo i64
+    já tratava. Agora ambos liberam.
+  - Testes: `test_selection` 9.4.1-9.4.5 (valores exatos e presentes no dataset,
+    dtype preservado, `n > len`, f64 inalterado, nulos ignorados). **Mutação
+    verificada:** reintroduzir o `tonumber` faz o 9.4.1 abortar.
+  - **Selo Fedora:** suíte verde (66 checks em `test_selection`, +10); 15/15
+    parity. Lua puro → sem C, sem ABI.
+  - **Vínculo:** 9.1 Sub-A (`get_raw` existe porque `get`/`tonumber` degrada —
+    mesma fronteira de leitura); 9.3 (fronteira do escalar); 10.5-A (`keys.lua`,
+    que já curou `mode`).
 
 ## 10. Completude de vetorização (Anel 0)  [Fedora]
 
