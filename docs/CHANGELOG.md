@@ -5,6 +5,117 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-07-27 — Roadmap enxuto: só o que falta, e uma porta de entrega de verdade
+
+O roadmap tinha 1562 linhas e ~70% delas descreviam trabalho já feito. Um arquivo
+que deveria responder "o que falta" respondia principalmente "o que já foi" — e a
+resposta útil ficava soterrada.
+
+Antes de cortar, duas verificações que mudaram o plano. A primeira: o `CHANGELOG`
+tem 103 entradas e cobre todos os itens fechados, então copiar o detalhe para lá
+seria **duplicar**, não mover — o raciocínio já estava preservado. A segunda, mais
+importante: o **código referencia números de item pesadamente** em comentários que
+explicam por que ele é como é — `10.6` aparece 52 vezes, `12.21` 30, `9.1` 25.
+Apagar as entradas orfanaria essas referências: alguém lendo `-- ver 10.6` não
+acharia nada.
+
+Daí a forma escolhida. Os itens fechados viraram **stubs resolvíveis** num "Índice
+do concluído" — número, título, uma linha —, suficiente para resolver uma
+referência do código, com o detalhe apontando para o `CHANGELOG`. Os abertos
+ficaram por inteiro. 1562 → ~700 linhas, sem perder rastreabilidade.
+
+O item 14 foi reescrito. Era um checklist de quatro linhas; virou a **porta de
+entrega**, com cinco frentes. As três primeiras verificam o que existe: leitura
+linha a linha do C (não rodar a suíte — *ler*, porque a suíte prova o que foi
+testado e a leitura acha o que ninguém pensou em testar), coerência de camada nos
+anéis 1–3, e contratos contra código. A quarta é execução nas duas plataformas com
+contagens que precisam bater. A quinta é a que faltava: **superfície externa** —
+LICENSE (inexistente, e sem ela ninguém pode legalmente usar o projeto), fronteira
+público×interno, política de versão, instalação, taxonomia de erro e medição de
+performance. Correção interna não substitui isso; sem esses pontos o projeto é
+excelente e inutilizável por quem não é o autor.
+
+Cada frente cita os precedentes concretos que a motivaram, para não virar
+checklist genérico: a nota de 2^53 que ficou errada por semanas com o eixo de doc
+verde, a divergência de contagem de binários entre Fedora (12) e Windows (11), as
+convenções de alocação que diferem por dtype.
+
+Aberto no caminho: **12.34** — a colação de string está implementada cinco vezes.
+Quatro em C são duplicação injustificada (duas delas no mesmo arquivo, 200 linhas
+de distância, com o comentário de uma admitindo que repete a outra) e colapsam num
+núcleo folha. A quinta é o `CategoricalSeries` comparando com o `<` do Lua, o que
+está arquiteturalmente certo — ele é Tier 2, Lua puro — mas depende de o LuaJIT
+ordenar por `memcmp`. No Lua padrão seria `strcoll`, dependente de locale, e o
+categorical divergiria em silêncio. Vira teste de invariante.
+
+Nenhum C, nenhum Lua.
+
+---
+## 2026-07-27 — selo Fedora: fecha 10.2 fatia 1, 12.31 e 12.32
+
+Valgrind 0 erros nos 13 binários, incluindo os dois `between` novos e a varredura
+de falha de alocação (1898 verificações). Cobertura **acima** do baseline anterior:
+linha 98.83% contra 98.82%, branch-alvo 94.78% contra 94.73% — o código novo entrou
+integralmente coberto, depois da correção dos ramos que faltavam.
+
+O detalhe que vale registrar é a **igualdade de contagem entre plataformas**:
+`test_ops_edge` 307, `test_access` 156, `test_constructors` 381, `allocfail` 1898,
+idênticos no Fedora e no MSYS2-UCRT64. Divergência de contagem entre plataformas
+seria sintoma de comportamento dependente de ambiente, não detalhe de relatório.
+
+Fecha três itens que estavam represados esperando o Valgrind — só um deles tocava
+C. Com a fatia 1 selada, a fatia 2 do 10.2 (datetime + string) está desbloqueada,
+com o desenho já aprovado.
+
+Fica registrado que o Fedora roda **12** binários em C e o Windows **11**: falta
+`test_astype` na lista do `build_win.ps1`. Não afeta estes itens (astype não foi
+tocado), mas significa que a matriz de conversão nunca foi confirmada no Windows.
+
+---
+## 2026-07-27 — Roadmap enxugado: só o que falta, e uma porta de entrega
+
+O Roadmap tinha 1562 linhas e ~1086 delas descreviam trabalho **já concluído** —
+dez temas inteiros mais 29 subitens dos blocos 10 e 12. Ler o que falta exigia
+garimpar. Reduzido para 658 linhas.
+
+A primeira ideia era mover o conteúdo concluído para cá. Ao verificar, não fazia
+sentido: este CHANGELOG tem 103 entradas e já cobre cada item fechado, com o
+raciocínio, as medições e os achados da sessão em que fechou. Copiar 1086 linhas
+seria duplicar o registro, não movê-lo. O CHANGELOG **já é** o histórico; o
+Roadmap é que estava fazendo o papel errado.
+
+Mas apagar os itens não era opção, e isso só ficou claro ao olhar o código: os
+comentários referenciam números de item o tempo todo para explicar por que o
+código é como é — `10.6` aparece 52 vezes, `12.21` 30, `9.1` 25. Apagar as
+entradas orfanaria essas referências: quem lesse `-- ver 10.6` não acharia nada.
+Então o concluído virou um **índice de stubs resolvíveis** — número, título, uma
+linha — com o detalhe apontando para cá. Resolve a referência sem carregar o peso.
+
+O item 14 deixou de ser quatro linhas genéricas e virou uma **porta de entrega**
+com cinco frentes. As três primeiras verificam o que existe: leitura linha a linha
+do C (não rodar a suíte — ler, porque a suíte prova o que foi testado e a leitura
+acha o que ninguém pensou em testar), coerência dos anéis 1–3, e contratos contra
+o código. A quarta é a verificação executável nas duas plataformas. A quinta é
+nova e desconfortável: a superfície externa — `LICENSE` inexistente, fronteira
+público/interno que é só um comentário, sem política de versão, sem instalação,
+erros que só existem como string, e performance que nunca foi medida enquanto
+correção é medida à exaustão. Sem isso o projeto é excelente e inutilizável por
+quem não é o autor.
+
+A leitura do C que preparou o item 14 rendeu dois itens novos. **12.33:** colação
+de string e propagação de nulo em comparação são semânticas visíveis ao usuário e
+não têm contrato — e a doc atual chega a errar, dizendo que a lógica de três
+valores "propaga NA", quando Kleene absorve (`false AND nulo = false`). **12.34:**
+a colação está implementada **cinco vezes** — quatro em C, sendo duas delas no
+mesmo arquivo a 200 linhas de distância, e uma em Lua no `CategoricalSeries`. As
+quatro do C são duplicação e colapsam num núcleo folha. A quinta é legítima
+(categorical é Tier 2, Lua puro; chamar o C por elemento seria o antipadrão que o
+item 10 combate), mas funciona por uma razão que ninguém escreveu: o LuaJIT
+compara string por byte, não por `strcoll`. Vira teste.
+
+Nenhum código tocado.
+
+---
 ## 2026-07-27 — 12.32: um gerador de MANIFEST só, e ele agora diz qual árvore descreve
 
 Duas correções que nasceram do mesmo incidente. Um zip veio da máquina Windows
