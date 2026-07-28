@@ -118,6 +118,15 @@ projeto. Aqui fica só o suficiente para resolver uma referência.
 
 **Subitens fechados do bloco 10** (completude de vetorização)
 
+- 10.2 — `between` → Anel 0 nos **quatro** dtypes ordenáveis (f64/i64/datetime/
+  string). Primitiva dedicada de passada única em vez de compor `ge`+`le`
+  internamente (que custaria três pares de alocação e três varreduras); os dois
+  `bool` `inc_lo`/`inc_hi` cobrem os quatro modos de `inclusive`. Fechou também
+  uma violação de **P3**: o fallback em Lua e o degrau `check_i64` saíram do
+  `_predicates.lua`, e a comparação element-wise deixou de existir em dois anéis.
+  Em int64 o suporte a > 2^53 virou real — os limites entram exatos pela fronteira
+  do escalar (9.3). Fatiado em f64+i64 e depois dt+str; a lição de cobertura das
+  duas fatias está no `CHANGELOG` (testar os modos num dtype não cobre os outros).
 - 10.5 — chave de igualdade/cardinalidade → int64 exato (L2). Passo A: `core/keys.lua`
   como fonte única de codificação de chave. Passo B (hash no Anel 0) segue aberto → ver 10.5-B abaixo.
 - 10.6 — família seleção/preenchimento por máscara (`fillna`/`combine_first`/`where`/`select`/`ffill`) → Anel 0.
@@ -190,93 +199,35 @@ correto — delegar ao descritor → C — já existe. Subitens 10.5 a 10.9 fech
 - 10.1 **`prod()` → Ring 0** (E3). Única redução escalar fora do C — sum/mean/min/
   max/std/var todas têm primitiva; existe `cumprod`, falta `prod`. Assimetria por
   omissão (passou batido no item 5). Criar `smaug_f64_prod`/`smaug_i64_prod`.
-- 10.2 **`between()` → Anel 0** (E4). Element-wise. **Fatiado por risco:** a
-  correção de 2^53 é toda em int64, mas o loop no Anel 1 é dos quatro dtypes —
-  fazer só um deixaria a desparidade de pé. Fatiar é aditivo (nada se joga fora),
-  então custa no máximo um selo extra, nunca retrabalho.
-  - **Fatia 1 — `float64` + `int64`: [Done — Fedora + Windows 2026-07-27]**
-    Selo Fedora: Valgrind 0 erros nos 13 binários; cobertura linha 98.83% e
-    branch-alvo 94.78% (**acima** do baseline anterior, 98.82% / 94.73%);
-    15/15 parity. Windows MSYS2-UCRT64 com contagens idênticas — `test_ops_edge`
-    307, `test_access` 156, `allocfail` 1898.
-    `smaug_f64_between` / `smaug_i64_between`: **primitiva dedicada de passada
-    única**, não composição interna de `ge`+`le`. Motivo: compor exigiria três
-    pares de alocação (result+mask) e três varreduras para o que uma varredura e
-    um par fazem, e os quatro modos de `inclusive` obrigariam a alternar
-    `ge`/`gt` e `le`/`lt` dinamicamente. Os dois `bool` (`inc_lo`/`inc_hi`)
-    cobrem os quatro modos direto.
-    - Em int64 a comparação é feita em `int64_t` puro — **> 2^53 passa a
-      funcionar de verdade**, não só a falhar visível. `between(x, x)` no próprio
-      `x` para `x = 9007199254740993` agora acerta; era erro visível (degrau) e,
-      antes dele, silenciosamente `false`. **O degrau saiu do `between`.**
-    - Os **dois limites** entram pela fronteira do escalar (9.3): cdata exato
-      aceito, `number >= 2^53` recusado por origem. Sem isso o valor da série
-      seria exato e o limite viria degradado — é o que faz o suporte ser real.
-    - NaN em f64 → `0` com máscara **válida** (comparação com NaN é falsa, não é
-      null), coerente com os comparadores e com o CODE_REVIEW A3. Nulo propaga
-      nulo. Série vazia → len 0.
-    - Testes: `test_access` 10.2.1-10.2.7 (exatidão > 2^53, os quatro modos em
-      **ambos** os dtypes, limite number recusado, nulo/NaN, vazia, fallback
-      intacto) e `test_ops_edge` (nível C: série NULL, `out_mask` NULL, nulo no
-      elemento, quatro modos, exatidão > 2^53). **Mutação verificada:** inverter
-      a inclusividade e reintroduzir a comparação via `double` fazem o teste
-      abortar. Varredura OOM: `af_f64_between` / `af_i64_between` (allocfail
-      1878 → 1898).
-    - **Achado de cobertura (2026-07-27):** a primeira leva de testes exercitava
-      os quatro modos só em `int64`; os ramos `inc_lo`/`inc_hi` falsos do f64 e
-      os caminhos `out_mask == NULL` / série NULL de ambos ficaram descobertos, e
-      a branch-alvo **caiu** de 94.73% para 94.39%. Cada dtype tem implementação
-      própria — testar os modos num não prova nada sobre o outro. Corrigido com
-      os testes acima; a métrica voltou a 94.76%.
-    - **FFI/ABI** (cdefs novos) → Windows obrigatório e Fedora com Valgrind:
-      ambos feitos. Selo completo.
-  - **Fatia 2 — `datetime` + `string`: [Fedora OK 2026-07-27 · Windows
-    PENDENTE]** Valgrind 0 erros nos 13 binários; cobertura 94.86% branch-alvo e
-    98.84% linha. Falta o `build_win.ps1`: são `cdef` novos, e o `str_between`
-    tem assinatura larga com dois pares (ponteiro, tamanho) — se o layout de
-    argumentos divergir na ABI do Windows, o Fedora passa e o Windows quebra.
-    Com esse selo o **10.2 fecha inteiro**.
-    - **Não era só completude de vetorização — fechou uma violação de P3.** O
-      fallback em Lua e o import órfão do `check_i64` **saíram** do
-      `_predicates.lua` (o `between` era o único consumidor do degrau ali): a
-      comparação element-wise deixou de existir em dois anéis. Por isso os dois
-      dtypes juntos, não um agora e outro depois.
-    - **`datetime`:** função normal **ao lado** da `DT_CMP_IMPL` — a macro assume
-      um threshold e um operador, e aqui são dois limites e dois flags; forçar
-      caberia só deformando a macro para todos os outros usos. Os dois limites
-      passam por `int_scalar.check_operation` (latente: 2^53 ms é o ano 287586).
-    - **`string`:** reusa `str_cmp_at` (`ops_str.c:24`), a fonte única da colação
-      — lexicográfica por bytes, prefixo igual desempata pela mais curta.
-      Reimplementar `memcmp` criaria a quinta cópia da regra (ver 12.34). Também
-      não compõe via `str_compare` duas vezes: seriam três pares de alocação.
-    - **D1/D2/D3 aplicadas** conforme decidido: máscara alocada só quando pedida
-      (como f64/i64, não "sempre aloca e libera" da macro dt); `malloc` na
-      convenção local de cada arquivo; guarda de ponteiro nulo nos **dois** alvos.
-    - **O trabalho de cobertura foi a parte difícil, e a lição da fatia 1 se
-      repetiu.** A branch-alvo **caiu** primeiro (94.78% → 94.66%). Em vez de
-      adivinhar, o mapa de ramos descobertos do próprio `COVERAGE.md` apontou
-      cinco pontos precisos: (a) a guarda `!lo && lo_len > 0` com **len 0** —
-      alvo nulo com comprimento zero é string vazia, não chamada inválida, e sem
-      esse caso a segunda condição nunca é avaliada; (b) `malloc(size ? size : 1)`
-      exigia série vazia **pedindo a máscara**; (c) o `if (mask)` falso dentro do
-      ramo de nulo, que o frontend nunca alcança porque sempre pede a máscara;
-      (d) no `dt`, o **curto-circuito do `&&`** — com `lo` acima de tudo o lado
-      direito nem é avaliado, e nenhum teste anterior falhava pela esquerda.
-      Fechado em **94.84% branch-alvo e 98.84% linha**, ambos acima do baseline.
-    - Testes: `test_access` 10.2.7-10.2.10 (os quatro modos **em cada** dtype,
-      desempate por prefixo, nulo nos quatro, bool recusado), bordas em C
-      (`test_string` 132→142, `test_datetime_c` 462→473) e varreduras OOM
-      `af_str_between` / `af_dt_between` (allocfail 1898→1918). **Mutação
-      verificada nas duas** — inverter a inclusividade superior aborta o teste.
-    - **Lacuna pré-existente anotada:** o `datetime` não tem varredura OOM de
-      comparador nenhum; a do `between` foi a primeira. Não expandido aqui.
-    **defeito de correção**, não performance: o loop lia via `get()` (double) e a
-    comparação ficava errada em silêncio. `check_int64_lossless` trocou o
-    resultado errado por falha visível; a vetorização trocou a falha visível por
-    resultado certo. Segue ativo em `abs`/`round`/`clip` (10.3) e no fallback de
-    datetime/string até a fatia 2.
 - 10.3 **Família matemática element-wise → Anel 0** (E5).
-  **[Bloco de design aprovado 2026-07-27; execução pendente]**
+  **[Fatia A: Windows OK · Fedora PENDENTE · Fatia B: não iniciada]** Fatiado por concern e
+  por arquivo Lua: **A** = as seis matemáticas (`_selection.lua`), mecânicas e
+  sem decisão semântica; **B** = `abs`/`round`/`clip` (`_transform.lua`), a
+  família que preserva dtype, onde vivem as três decisões e o degrau que sai.
+  - **Fatia A — `sin`/`cos`/`tan`/`exp`/`log`/`sqrt`: [implementada
+    2026-07-27 · selos PENDENTES]** Uma **macro** (`F64_MATH_IMPL`) gera os seis
+    corpos, que diferiam apenas pela função de libm — seis corpos à mão seriam
+    seis lugares para repetir cada correção, e cinco para esquecê-la. Padrão que
+    a casa já usa (`DT_CMP_IMPL`). Entrada int64 não tem versão própria (Opção
+    1): o frontend encadeia `astype("float64")` — já vetorizado (10.7) — e chama
+    a versão f64; converter antes não perde nada porque a saída é f64 de todo
+    jeito. Testes guiados por **tabela** pelo mesmo motivo da macro: cada
+    instanciação tem os próprios ramos, então cobrir uma não cobre as outras
+    cinco (lição do 10.2 fatia 1). `test_ops_edge` 307→346, `test_integration`
+    78→92, allocfail 1918→**1972**; Windows MSYS2-UCRT64 confirmado 2026-07-27
+    (falta o Fedora: Valgrind e cobertura não rodam lá).
+    Cobertura **subiu** (94.81→94.87% branch-alvo)
+    com descobertos **iguais em 227** — as seis entraram 100% cobertas. Mutação
+    verificada em dois eixos: tirar a propagação de nulo e trocar `sqrt` por
+    `fabs` abortam o teste. `tan` não era exercitada antes.
+  - **Fatia B — `abs`/`round`/`clip`** (não iniciada). Aqui ficam as três
+    decisões e o degrau `check_i64`, que só sai quando as três descerem.
+  **Correção ao desenho original (2026-07-27):** são **12** funções em C, não 11
+  — a decisão "`round(int64)` preserva int64" tornou `round` uma operação que
+  preserva dtype, exigindo versão i64; o número anterior assumia saída f64. E a
+  macro cobre **7**, não 6: `abs` de f64 tem a mesma forma das seis (unária,
+  f64→f64, só troca a função de libm — `fabs`). Resultado: 1 macro + 5 corpos à
+  mão para 12 funções.
   Confirmado no fonte: **não existe nenhuma** dessas primitivas no Anel 0 — nem
   para f64. "Delegar" aqui é criar as primitivas, não religar.
   - **Escopo real: nove operações, não três.** O item nasceu como
@@ -525,9 +476,10 @@ Vinte e quatro subitens já fecharam (ver índice acima). Restam:
    `cdef` — **não muda ABI**). Valgrind 0 erros; cobertura confirmou a previsão
    exata: **226 ramos descobertos antes e depois**, com 24 ramos cobertos a menos
    no total (a lógica duplicada). MANIFEST 126→128 arquivos.
-   **Ressalva:** o `build_win.ps1` foi editado (lista de testes Lua) e **não
-   pôde ser testado** — sem PowerShell no ambiente de desenvolvimento. A próxima
-   execução no Windows valida a edição; o C em si não exige Windows.
+   A edição do `build_win.ps1` (lista de testes Lua), que não pôde ser testada no
+   ambiente de desenvolvimento, foi **confirmada no Windows em 2026-07-27**: os
+   dois testes de `core/` passaram a aparecer na saída de lá, o que também
+   comprovou na prática o achado das listas divergentes.
    - **Resolvido:** núcleo único `smaug_cmp_bytes(pa, la, pb, lb)` em
      `include/smaug_str_internal.h` (`static inline`, no padrão do
      `smaug_io_internal.h` — não exporta símbolo). As quatro implementações

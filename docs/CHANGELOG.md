@@ -51,6 +51,65 @@ categorical divergiria em silêncio. Vira teste de invariante.
 Nenhum C, nenhum Lua.
 
 ---
+## 2026-07-27 — 10.2 fechado, e a edição não testada do build_win.ps1 se provou
+
+Uma rodada no Windows fechou três pendências. A fatia 2 do 10.2 atravessou a ABI
+do MSYS2-UCRT64 — o `str_between` tem a assinatura mais larga do conjunto, com
+dois pares (ponteiro, tamanho), que é justamente o caso em que o Linux passa e o
+Windows quebra. **Com isso o 10.2 está completo: os quatro dtypes ordenáveis
+comparam no Anel 0**, e o item saiu da timeline para o índice do concluído.
+
+A edição do `build_win.ps1` que eu havia entregue com a ressalva de "não pôde ser
+testada" funcionou: `core/test_keys` e `core/test_collation` apareceram na saída
+do Windows. Isso confirmou na prática o achado das listas divergentes — os dois
+testes existiam e passavam, mas o Windows nunca os rodava. O `test_keys` guarda a
+correção do int64 > 2^53 desde o 10.5; passou meses verificado em uma só das três
+configurações.
+
+A fatia A do 10.3 também passou no Windows, mas segue **sem selo**: Valgrind e
+cobertura só rodam no Fedora, e é lá que a medição vale.
+
+Fica registrado o que ainda diverge entre plataformas: Fedora roda 12 binários em
+C, Windows 11 — falta `test_astype` na lista do `build_win.ps1`. A matriz de
+conversão nunca foi confirmada na ABI do Windows.
+
+---
+## 2026-07-27 — 10.3 fatia A: as seis matemáticas descem ao Anel 0, por macro
+
+`sin`, `cos`, `tan`, `exp`, `log` e `sqrt` eram seis `self:map(closure)` — loop em
+Lua cruzando FFI por elemento, o padrão que o item 10 existe para eliminar. Agora
+são seis funções em C geradas por **uma** macro, porque diferiam exclusivamente
+pela função de libm que aplicam. Seis corpos escritos à mão seriam seis lugares
+para repetir cada correção futura e cinco para esquecê-la; a casa já usa esse
+padrão no `DT_CMP_IMPL`.
+
+Entrada int64 não ganhou versão própria (Opção 1, decidida no bloco de design): a
+saída é `float64` independente da entrada, então o frontend encadeia
+`astype("float64")` — já vetorizado — e chama a versão f64. Não é reimplementação,
+são duas chamadas do Anel 0 em sequência; e converter antes não perde nada que a
+operação não fosse perder.
+
+Os testes foram escritos guiados por tabela pelo mesmo motivo de a implementação
+ser macro: depois da expansão, **cada instanciação é um corpo próprio**, com seus
+próprios ramos. Cobrir `sqrt` não cobre `tan`. É a mesma lição da fatia 1 do 10.2,
+onde testar os quatro modos só em int64 deixou os ramos do f64 descobertos. De
+quebra apareceu que `tan` não era exercitada por teste nenhum.
+
+Cobertura subiu de 94.81% para 94.87% de branch-alvo com o número de descobertos
+**inalterado em 227** — as seis entraram integralmente cobertas. Mutação verificada
+em dois eixos: remover a propagação de nulo e trocar `sqrt` por `fabs` abortam o
+teste.
+
+Duas correções ao desenho que estava registrado, achadas relendo o código antes de
+escrever. São **12** funções em C, não 11: a decisão "`round(int64)` preserva
+int64" tornou `round` uma operação que preserva dtype, e o número anterior assumia
+saída f64. E a macro cobre **7**, não 6 — `abs` de f64 tem exatamente a mesma forma
+das seis, só troca a função de libm por `fabs`. Fica 1 macro + 5 corpos à mão.
+
+Fatia B (`abs`/`round`/`clip`) segue aberta: é onde estão as três decisões
+semânticas e o degrau que só sai quando as três descerem.
+
+---
 ## 2026-07-27 — 12.34: uma colação só, e dois buracos de build que ela expôs
 
 A regra de ordenação de string estava escrita em quatro lugares do C. Agora está

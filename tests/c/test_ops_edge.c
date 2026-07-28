@@ -239,6 +239,45 @@ static void f64_compare_edge(void) {
     OK(m && m[1] == 0x00, "f64 ne mask NULL -> 0");
     free(r); free(m);
 
+    /* --- 10.3 fatia A: as seis matematicas ---------------------------------
+       Sao geradas por macro (F64_MATH_IMPL), mas cada instanciacao tem os
+       proprios ramos: cobrir uma NAO cobre as outras cinco. Tabela em vez de
+       seis blocos iguais -- mesmo motivo de a implementacao ser macro. */
+    {
+        typedef smaug_series_f64_t *(*mathfn)(const smaug_series_f64_t *);
+        struct { const char *nome; mathfn fn; } fns[] = {
+            {"sin", smaug_f64_sin}, {"cos", smaug_f64_cos}, {"tan", smaug_f64_tan},
+            {"exp", smaug_f64_exp}, {"log", smaug_f64_log}, {"sqrt", smaug_f64_sqrt},
+        };
+        for (size_t k = 0; k < sizeof(fns)/sizeof(fns[0]); k++) {
+            OK(fns[k].fn(NULL) == NULL, "f64 math NULL serie -> NULL");
+
+            /* s = {1, NULL, 3}: exercita os dois ramos de SMAUG_VALID */
+            smaug_series_f64_t *r = fns[k].fn(s);
+            OK(r != NULL, "f64 math devolve serie");
+            OK(SMAUG_NULL(r->null_mask, 1), "f64 math propaga nulo");
+            OK(SMAUG_VALID(r->null_mask, 0), "f64 math preserva valido");
+            smaug_f64_free(r);
+
+            /* serie vazia nao estoura */
+            smaug_series_f64_t *vazia = smaug_f64_create(0);
+            OK(vazia != NULL, "f64 create(0) para math");
+            smaug_series_f64_t *rv = fns[k].fn(vazia);
+            OK(rv != NULL, "f64 math em serie vazia");
+            smaug_f64_free(rv); smaug_f64_free(vazia);
+        }
+        /* dominio invalido: NaN como VALOR (mascara valida), nao nulo nem erro */
+        smaug_series_f64_t *neg = smaug_f64_create(1);
+        smaug_f64_set(neg, 0, -4.0);
+        smaug_series_f64_t *rn = smaug_f64_sqrt(neg);
+        OK(rn && isnan(rn->data[0]), "sqrt(-4) -> NaN");
+        OK(rn && SMAUG_VALID(rn->null_mask, 0), "sqrt(-4) mascara VALIDA (Contrato 9)");
+        smaug_f64_free(rn);
+        rn = smaug_f64_log(neg);
+        OK(rn && isnan(rn->data[0]), "log(-4) -> NaN");
+        smaug_f64_free(rn); smaug_f64_free(neg);
+    }
+
     /* between: mesma matriz de ramos. Serie tem {1, NULL, 3}. */
     OK(smaug_f64_between(NULL, 0, 5, true, true, NULL) == NULL,
        "f64 between NULL serie -> NULL");

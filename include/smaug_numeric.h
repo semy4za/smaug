@@ -25,6 +25,17 @@ smaug_series_f64_t* smaug_f64_sub_scalar(const smaug_series_f64_t *a, double sca
 smaug_series_f64_t* smaug_f64_mul_scalar(const smaug_series_f64_t *a, double scalar);
 smaug_series_f64_t* smaug_f64_div_scalar(const smaug_series_f64_t *a, double scalar);
 
+/* Matematicas element-wise: unarias, f64 -> f64, nulo propaga.
+   Dominio invalido (sqrt/log de negativo) devolve NaN -- valor presente, nao
+   nulo nem erro (Contrato 9). Entrada int64 nao tem versao propria: a saida e
+   f64 de todo jeito, entao o frontend encadeia astype (10.3, Opcao 1). */
+smaug_series_f64_t* smaug_f64_sin (const smaug_series_f64_t *a);
+smaug_series_f64_t* smaug_f64_cos (const smaug_series_f64_t *a);
+smaug_series_f64_t* smaug_f64_tan (const smaug_series_f64_t *a);
+smaug_series_f64_t* smaug_f64_exp (const smaug_series_f64_t *a);
+smaug_series_f64_t* smaug_f64_log (const smaug_series_f64_t *a);
+smaug_series_f64_t* smaug_f64_sqrt(const smaug_series_f64_t *a);
+
 /* coalesce_scalar (null-mask): onde self[i] é nulo, entra value; senão self[i].
    NaN existente preservado (opera sobre máscara). Serve fillna. */
 smaug_series_f64_t* smaug_f64_coalesce_scalar(const smaug_series_f64_t *self, double value);

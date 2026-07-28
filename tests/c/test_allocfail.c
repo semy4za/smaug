@@ -295,6 +295,26 @@ static void af_f64_le(void) {
     }
     smaug_f64_free(x);
 }
+/* 10.3 fatia A: as seis matematicas. Uma varredura por funcao -- sao corpos
+   distintos apos a expansao da macro, entao cada uma tem seus proprios pontos
+   de alocacao. Tabela em vez de seis funcoes iguais. */
+static void af_f64_math(void) {
+    typedef smaug_series_f64_t *(*mathfn)(const smaug_series_f64_t *);
+    mathfn fns[] = { smaug_f64_sin, smaug_f64_cos, smaug_f64_tan,
+                     smaug_f64_exp, smaug_f64_log, smaug_f64_sqrt };
+    double arr[3] = {1, 2, 3};
+    reset(-1);
+    smaug_series_f64_t *x = smaug_f64_create_from_array(arr, 3);
+    assert(x);
+    for (size_t f = 0; f < sizeof(fns)/sizeof(fns[0]); f++) {
+        for (long k = 0; k < MAX_ALLOCS; k++) {
+            reset(k);
+            smaug_series_f64_t *r = fns[f](x);
+            if (r) { OK(r->size == 3, "f64 math size ok"); smaug_f64_free(r); }
+        }
+    }
+    smaug_f64_free(x);
+}
 static void af_f64_between(void) {
     double arr[3] = {1, 2, 3};
     smaug_series_f64_t *x = smaug_f64_create_from_array(arr, 3);
@@ -2453,6 +2473,7 @@ int main(void) {
     af_f64_le();
     af_f64_ne();
     af_f64_between();
+    af_f64_math();
     af_f64_argsort();
     af_f64_sort();
     af_f64_take();

@@ -171,4 +171,29 @@ local smath = S.from_table({4.0, NA}, "float64")
 check(smath:sqrt():get(1) == 2.0,     "sqrt propaga não-nulo")
 check(smath:sqrt():is_null(2),         "sqrt propaga NA")
 
+-- 10.3 fatia A: as seis desceram ao Anel 0.
+-- Entrada int64 não tem versão própria em C (Opção 1): o frontend encadeia
+-- astype("float64") e chama a versão f64. A saída é float64 nos dois casos.
+local si = S.from_table({0, 1, 4}, "int64")
+check(si:sqrt():get(3) == 2.0,          "10.3 sqrt aceita int64 (via astype)")
+check(si:sqrt()._dtype == "float64",    "10.3 saída é float64 mesmo com entrada int64")
+check(approx(si:exp():get(1), 1.0),     "10.3 exp de int64")
+check(si:sqrt():len() == 3,             "10.3 tamanho preservado")
+
+-- domínio inválido → NaN como VALOR presente (Contrato 9), não nulo nem erro
+local sneg = S.from_table({-4.0}, "float64")
+check(sneg:sqrt():get(1) ~= sneg:sqrt():get(1), "10.3 sqrt(-4) = NaN")
+check(not sneg:sqrt():is_null(1),       "10.3 NaN tem máscara válida, não é nulo")
+check(sneg:log():get(1) ~= sneg:log():get(1),   "10.3 log(-4) = NaN")
+
+-- tan não era exercitada antes; cada função da macro é um corpo próprio
+check(approx(S.from_table({0.0}, "float64"):tan():get(1), 0.0), "10.3 tan(0)=0")
+
+-- dtype não numérico recusado nas seis
+for _, fn in ipairs({"sin","cos","tan","exp","log","sqrt"}) do
+    local sstr = S.from_table({"a"}, "string")
+    check(not pcall(function() return sstr[fn](sstr) end),
+          "10.3 " .. fn .. "() recusa dtype não numérico")
+end
+
 print(string.format("OK — %d checks passaram (integração: reduções avançadas, rank, skew, kurtosis, mad, sem, funções matemáticas)", n_ok))

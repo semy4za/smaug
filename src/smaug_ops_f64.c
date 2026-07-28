@@ -154,6 +154,48 @@ smaug_series_f64_t *smaug_f64_div_scalar(const smaug_series_f64_t *a, double sca
     return r;
 }
 
+/* ===================================================================
+   MATEMÁTICAS ELEMENT-WISE — unárias, f64 -> f64
+   ===================================================================
+   As seis (sin/cos/tan/exp/log/sqrt) diferem APENAS pela função de libm que
+   aplicam: mesma alocação, mesmo laço, mesma propagação de nulo. Escritas à
+   mão seriam seis corpos idênticos -- seis lugares onde uma correção precisa
+   ser repetida, e cinco onde ela pode ser esquecida. A macro é o padrão que a
+   casa já usa para famílias assim (DT_CMP_IMPL, em smaug_datetime.c).
+
+   Nulo propaga: alloc_result devolve tudo marcado como nulo, e o laço só
+   marca VÁLIDO onde havia valor.
+
+   Domínio: sqrt(-4) e log(-4) devolvem NaN, não erro nem nulo -- é o que a
+   libm faz, e é coerente com o Contrato 9 (não-finito é VALOR presente;
+   ausência é null_mask). Quem quiser tratar chama isna()/isnan() depois.
+
+   Entrada int64 não tem versão própria de propósito (10.3, Opção 1): a saída
+   é f64 de todo jeito, então o Anel 1 encadeia astype("float64") -- já
+   vetorizado -- e chama estas. Converter antes não perde nada que a operação
+   não fosse perder, e evita seis funções gêmeas só para trocar o tipo de
+   entrada. */
+#define F64_MATH_IMPL(name, fn)                                              \
+smaug_series_f64_t *smaug_f64_##name(const smaug_series_f64_t *a) {           \
+    if (!a) return NULL;                                                      \
+    smaug_series_f64_t *r = alloc_result(a->size);                            \
+    if (!r) return NULL;                                                      \
+    for (size_t i = 0; i < a->size; i++) {                                    \
+        if (SMAUG_VALID(a->null_mask, i)) {                                   \
+            r->data[i]      = fn(a->data[i]);                                 \
+            r->null_mask[i] = SMAUG_MASK_VALID;                               \
+        }                                                                     \
+    }                                                                         \
+    return r;                                                                 \
+}
+
+F64_MATH_IMPL(sin,  sin)
+F64_MATH_IMPL(cos,  cos)
+F64_MATH_IMPL(tan,  tan)
+F64_MATH_IMPL(exp,  exp)
+F64_MATH_IMPL(log,  log)
+F64_MATH_IMPL(sqrt, sqrt)
+
 /* coalesce_scalar (natureza null-mask): onde self[i] é nulo, entra `value`;
    senão, mantém self[i]. Serve fillna. Opera sobre a MÁSCARA, não sobre o
    valor: NaN existente (máscara válida) é preservado como está — coerente com

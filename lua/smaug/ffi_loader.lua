@@ -91,6 +91,12 @@ ffi.cdef([[
     smaug_series_f64_t* smaug_f64_sub_scalar(const smaug_series_f64_t *a, double scalar);
     smaug_series_f64_t* smaug_f64_mul_scalar(const smaug_series_f64_t *a, double scalar);
     smaug_series_f64_t* smaug_f64_div_scalar(const smaug_series_f64_t *a, double scalar);
+    smaug_series_f64_t* smaug_f64_sin (const smaug_series_f64_t *a);
+    smaug_series_f64_t* smaug_f64_cos (const smaug_series_f64_t *a);
+    smaug_series_f64_t* smaug_f64_tan (const smaug_series_f64_t *a);
+    smaug_series_f64_t* smaug_f64_exp (const smaug_series_f64_t *a);
+    smaug_series_f64_t* smaug_f64_log (const smaug_series_f64_t *a);
+    smaug_series_f64_t* smaug_f64_sqrt(const smaug_series_f64_t *a);
 
     /* --- Reducoes --- */
     double smaug_f64_sum (const smaug_series_f64_t *s, bool ignore_na);

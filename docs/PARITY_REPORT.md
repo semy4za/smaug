@@ -1,7 +1,8 @@
 # Smaug — Relatório de Paridade
 
-> Arquivo gerado por `bash scripts/parity/parity.sh`. **Não editar à mão.**
-> Decisões conscientes de não-paridade ficam em `scripts/parity/exceptions.txt`.
+> Arquivo gerado por `bash scripts/parity/parity.sh` ou `powershell scripts/parity/parity.ps1`.
+> **Não editar à mão.** Decisões conscientes de não-paridade ficam em
+> `scripts/parity/exceptions.txt`.
 
 Convenção de status:
 
@@ -10,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-07-28 02:01:58 UTC
+Gerado em: 2026-07-28 13:23:22 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -268,7 +269,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 **Fora de escopo por natureza (12.20 frente 4):** `smaug_convert.h` (`smaug_parse_i64/f64`, `smaug_fmt_i64/f64` e variantes _cstr — 6 funções) não entra nas tabelas acima. São infraestrutura interna de parsing/formatação usada entre arquivos C (astype.c, csv.c, json.c) — nunca expostas ao Lua via FFI (confirmado: zero ocorrências no cdef). Colocá-las aqui as marcaria 🟨 permanentemente — ruído, não achado, já que por design não devem ter caminho Lua direto.
 
 
-### f64 — 61 funções C
+### f64 — 67 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -284,6 +285,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `clone` | 🟩 |  |
 | `coalesce` | 🟩 |  |
 | `coalesce_scalar` | 🟩 |  |
+| `cos` | 🟨 |  |
 | `count_nonfinite` | 🟨 |  |
 | `count_nonnull` | 🟩 |  |
 | `create` | 🟩 |  |
@@ -297,6 +299,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `div` | 🟩 |  |
 | `div_scalar` | 🟩 |  |
 | `eq` | 🟩 |  |
+| `exp` | 🟨 |  |
 | `ffill` | 🟩 |  |
 | `filter` | 🟩 |  |
 | `free` | 🟩 |  |
@@ -305,6 +308,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `gt` | 🟩 |  |
 | `is_null` | 🟩 |  |
 | `le` | 🟩 |  |
+| `log` | 🟨 |  |
 | `lt` | 🟩 |  |
 | `max` | 🟩 |  |
 | `mean` | 🟩 |  |
@@ -324,13 +328,16 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `set` | 🟩 |  |
 | `set_null` | 🟩 |  |
 | `shift` | 🟩 |  |
+| `sin` | 🟨 |  |
 | `sort` | 🟩 |  |
 | `sorted_nonnull` | 🟩 |  |
+| `sqrt` | 🟨 |  |
 | `std` | 🟩 |  |
 | `sub` | 🟩 |  |
 | `sub_scalar` | 🟩 |  |
 | `sum` | 🟩 |  |
 | `take` | 🟩 |  |
+| `tan` | 🟨 |  |
 | `var` | 🟩 |  |
 | `view` | 🟩 |  |
 
@@ -747,7 +754,7 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 230/230 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 231/231 erros com prefixo `smaug:` (100.0%)
 - `dataset.lua`: 94/94 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
@@ -802,18 +809,18 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `io/test_csv` | 138 | 3 | 7 | 2 | 11 | 4 | 1 |
 | `io/test_json` | 48 | 4 | 4 | 1 | 2 | 2 | — |
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
-| `props/test_integration` | 79 | 19 | 2 | 2 | 4 | 1 | 1 |
+| `props/test_integration` | 88 | 23 | 3 | 2 | 5 | 1 | 1 |
 
-**Total de checks:** 2765
+**Total de checks:** 2774
 
 ### Menções totais por dtype (toda a suite)
 
 | dtype | menções |
 | :--- | :-: |
-| float64 | 207 |
-| int64 | 356 |
+| float64 | 211 |
+| int64 | 357 |
 | bool | 69 |
-| string | 234 |
+| string | 235 |
 | datetime | 96 |
 | categorical | 63 |
 
@@ -897,7 +904,7 @@ O `cdef` do `ffi_loader.lua` replica à mão o layout de cada struct dos headers
 
 - 🟩 paridade: 1073
 - ⬜ exceção registrada: 215
-- 🟨 suspeita (revisar): 273
+- 🟨 suspeita (revisar): 279
 - 🟥 inconsistência clara: 15
 
 

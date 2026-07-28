@@ -267,18 +267,34 @@ return function(I)
     end
 
     -- =====================================================================
-    -- Funções matemáticas vetorizadas
+    -- Funções matemáticas vetorizadas → Anel 0 (10.3 fatia A)
     -- =====================================================================
-    local _math_fns = {
-        sin  = math.sin,  cos = math.cos, tan = math.tan,
-        exp  = math.exp,  log = math.log, sqrt = math.sqrt,
-    }
-    for fname, fn in pairs(_math_fns) do
+    -- As seis desceram para o C, onde uma macro gera os seis corpos idênticos
+    -- (F64_MATH_IMPL). Antes eram `self:map(closure, "float64")`, ou seja um
+    -- loop em Lua cruzando FFI por elemento — o padrão que o item 10 existe
+    -- para eliminar.
+    --
+    -- A saída é sempre float64, INDEPENDENTE da entrada. Isso é o que permite
+    -- não haver versão int64 no C (Opção 1): para série int64 encadeamos
+    -- `astype("float64")` — que já é vetorizado no Anel 0 (10.7) — e chamamos
+    -- a versão f64. Não é reimplementação: são duas chamadas do Anel 0 em
+    -- sequência. E converter antes não perde nada, porque a operação ia
+    -- devolver double de todo jeito.
+    --
+    -- Nulo propaga (o C só marca válido onde havia valor). Domínio inválido
+    -- (`sqrt(-4)`, `log(-4)`) dá NaN, não erro nem nulo — Contrato 9: não-finito
+    -- é valor presente; ausência é null_mask.
+    local _math_fns = { "sin", "cos", "tan", "exp", "log", "sqrt" }
+    for _, fname in ipairs(_math_fns) do
+        local cfn = C["smaug_f64_" .. fname]
         methods[fname] = function(self)
             if self._dtype ~= "float64" and self._dtype ~= "int64" then
                 error("smaug: "..fname.."() requer dtype numérico, não '"..self._dtype.."'", 2)
             end
-            return self:map(function(v) return v ~= nil and fn(v) or nil end, "float64", self._name)
+            local src = (self._dtype == "int64") and self:astype("float64") or self
+            local r = cfn(src._c)
+            if r == nil then error("smaug: "..fname.."() falhou", 2) end
+            return wrap(r, "float64", self._name)
         end
     end
 end
