@@ -230,9 +230,12 @@ correto — delegar ao descritor → C — já existe. Subitens 10.5 a 10.9 fech
       os testes acima; a métrica voltou a 94.76%.
     - **FFI/ABI** (cdefs novos) → Windows obrigatório e Fedora com Valgrind:
       ambos feitos. Selo completo.
-  - **Fatia 2 — `datetime` + `string`: [implementada 2026-07-27 · selos
-    PENDENTES]** Falta `build.sh --all` (Fedora/Valgrind) e `build_win.ps1`
-    (FFI/ABI). Com ela o **10.2 fecha inteiro**.
+  - **Fatia 2 — `datetime` + `string`: [Fedora OK 2026-07-27 · Windows
+    PENDENTE]** Valgrind 0 erros nos 13 binários; cobertura 94.86% branch-alvo e
+    98.84% linha. Falta o `build_win.ps1`: são `cdef` novos, e o `str_between`
+    tem assinatura larga com dois pares (ponteiro, tamanho) — se o layout de
+    argumentos divergir na ABI do Windows, o Fedora passa e o Windows quebra.
+    Com esse selo o **10.2 fecha inteiro**.
     - **Não era só completude de vetorização — fechou uma violação de P3.** O
       fallback em Lua e o import órfão do `check_i64` **saíram** do
       `_predicates.lua` (o `between` era o único consumidor do degrau ali): a
@@ -517,9 +520,14 @@ Vinte e quatro subitens já fecharam (ver índice acima). Restam:
      nulo talvez caiba como parágrafo no Contrato 9).
    - **Vínculo:** 10.2 fatia 2 (que tornou as duas visíveis); Contrato 6, 9;
      item 12.34 (a colação está implementada cinco vezes).
- - 12.34 **Colação de string implementada cinco vezes** — **[implementada
-   2026-07-27 · selo Fedora PENDENTE]** (refatoração interna do C: nenhuma função
-   pública nova, nenhum `cdef` — **não muda ABI**, fecha só com Fedora).
+ - 12.34 **Colação de string implementada cinco vezes** — **[Done — Fedora
+   2026-07-27]** (refatoração interna do C: nenhuma função pública nova, nenhum
+   `cdef` — **não muda ABI**). Valgrind 0 erros; cobertura confirmou a previsão
+   exata: **226 ramos descobertos antes e depois**, com 24 ramos cobertos a menos
+   no total (a lógica duplicada). MANIFEST 126→128 arquivos.
+   **Ressalva:** o `build_win.ps1` foi editado (lista de testes Lua) e **não
+   pôde ser testado** — sem PowerShell no ambiente de desenvolvimento. A próxima
+   execução no Windows valida a edição; o C em si não exige Windows.
    - **Resolvido:** núcleo único `smaug_cmp_bytes(pa, la, pb, lb)` em
      `include/smaug_str_internal.h` (`static inline`, no padrão do
      `smaug_io_internal.h` — não exporta símbolo). As quatro implementações

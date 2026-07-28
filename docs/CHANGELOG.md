@@ -96,6 +96,22 @@ Cobertura: descobertos 227 antes, 227 depois. A refatoração removeu 24 ramos q
 estavam totalmente cobertos e não criou nenhum descoberto — o percentual mexeu só
 porque o denominador encolheu.
 
+**Selo Fedora (mesmo dia):** Valgrind 0 erros nos 13 binários. A medição no
+ambiente autoritativo confirmou a previsão com precisão — **226 ramos descobertos
+antes e 226 depois**, com 24 ramos cobertos a menos no total. É a evidência de que
+a refatoração foi neutra em comportamento: só saiu código redundante, e ele estava
+inteiramente testado. MANIFEST 126→128 arquivos (o header interno e o teste de
+colação).
+
+Os dois testes de `core/` apareceram na saída da suíte pela primeira vez, o que
+confirma na prática o achado das listas divergentes: o `test_keys` existia e
+passava, mas o build só o rodava numa das três configurações.
+
+Ressalva registrada: o `build_win.ps1` foi editado e **não pôde ser testado** —
+não há PowerShell no ambiente de desenvolvimento. Mesma situação do
+`make_manifest.ps1`, que falhou na primeira execução real. A próxima rodada no
+Windows valida a edição.
+
 ---
 ## 2026-07-27 — 10.2 fatia 2: between fecha nos quatro dtypes, e o Anel 1 para de comparar
 
