@@ -111,23 +111,12 @@ return function(I)
     end
     I.check_value = check_value
 
-    -- check_int64_lossless (degrau 10.6/10.7): garante que ler o valor int64 do
-    -- indice i via get() (tonumber->double) NAO corromperia digitos. Fronteira
-    -- unica: o mesmo INT64_MAX_MAG (2^53) do check_value. Le o valor CRU (cdata
-    -- int64_t, sem tonumber) so para comparar magnitude -- deteccao, nao conversao.
-    -- PALIATIVO: sai quando fillna/astype forem ao Anel 0 (10.6/10.7). Contrato:
-    -- chamado so em indice nao-nulo de serie int64. `op` rotula a operacao.
-    local function check_int64_lossless(self, i, op)
-        if self._dtype ~= "int64" then return end
-        local raw = self._d.get(self._c, i - 1, nil)   -- cdata int64_t, sem tonumber
-        if raw > INT64_MAX_MAG or raw < -INT64_MAX_MAG then
-            error("smaug: " .. op .. " nao preserva o valor int64 " .. tostring(raw)
-                  .. " no indice " .. i .. " (excede 2^53; a conversao interna via "
-                  .. "double perderia digitos). Suporte a int64 > 2^53 nesta operacao "
-                  .. "chega com a vetorizacao (Anel 0).", 3)
-        end
-    end
-    I.check_int64_lossless = check_int64_lossless
+    -- check_int64_lossless APOSENTADO (10.3, 2026-07-27). Era o degrau que
+    -- trocava corrupcao silenciosa por falha visivel nas operacoes que liam
+    -- int64 via get() -> double: fillna/astype (10.6/10.7), between (10.2) e
+    -- abs/round/clip (10.3). Todas desceram ao Anel 0 e passaram a fazer
+    -- aritmetica no tipo nativo, entao o degrau ficou sem consumidor e foi
+    -- removido em vez de virar codigo morto. O historico esta no CHANGELOG.
 
     local function checkrc(rc, what)
         if rc == 0 then return end

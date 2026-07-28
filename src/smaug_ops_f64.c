@@ -195,6 +195,66 @@ F64_MATH_IMPL(tan,  tan)
 F64_MATH_IMPL(exp,  exp)
 F64_MATH_IMPL(log,  log)
 F64_MATH_IMPL(sqrt, sqrt)
+/* abs entra aqui e não como corpo próprio: tem exatamente a mesma forma das
+   seis acima -- unária, f64 -> f64, só troca a função de libm por fabs. A
+   diferença em relação às outras é semântica (preserva dtype, então existe
+   versão int64), não estrutural. */
+F64_MATH_IMPL(abs, fabs)
+
+/* round: half-away-from-zero, a MESMA regra que o frontend aplicava em Lua
+   (floor(v*f + 0.5) para v >= 0; ceil(v*f - 0.5) para v < 0). ndigits negativo
+   arredonda casas ANTES da vírgula: round(1234.0, -2) = 1200.
+   Sem status: em f64 não há caso sem resposta -- ndigits extremo faz o fator
+   virar infinito e o resultado NaN, que é VALOR presente pelo Contrato 9, o
+   mesmo que a versão Lua já produzia. */
+smaug_series_f64_t *smaug_f64_round(const smaug_series_f64_t *a, int ndigits) {
+    if (!a) return NULL;
+    smaug_series_f64_t *r = alloc_result(a->size);
+    if (!r) return NULL;
+    double factor = pow(10.0, (double)ndigits);
+    for (size_t i = 0; i < a->size; i++) {
+        if (SMAUG_VALID(a->null_mask, i)) {
+            double v = a->data[i];
+            r->data[i] = (v >= 0.0) ? floor(v * factor + 0.5) / factor
+                                    : ceil (v * factor - 0.5) / factor;
+            r->null_mask[i] = SMAUG_MASK_VALID;
+        }
+    }
+    return r;
+}
+
+/* clip: limita ao intervalo [lo, hi]. has_lo/has_hi expressam limite ausente
+   (o frontend aceita nil em qualquer um dos dois) -- mesmo padrão de
+   inc_lo/inc_hi do between, em vez de sentinela mágica.
+
+   lo > hi é ERRO (10.3), não resultado. Antes disto o frontend devolvia algo
+   incoerente: o `return lo` curto-circuitava antes de checar `hi`, então
+   {1,5,9}:clip(8,2) dava {8,8,2} -- um resultado que não está dentro de faixa
+   nenhuma. Faixa contraditória não tem semântica válida; adivinhar qual limite
+   "vence" seria escolher pelo usuário. */
+smaug_series_f64_t *smaug_f64_clip(const smaug_series_f64_t *a,
+                                   double lo, bool has_lo,
+                                   double hi, bool has_hi,
+                                   smaug_status_t *status) {
+    if (status) *status = SMG_OK;
+    if (!a) { if (status) *status = SMG_ERR_ARGUMENT; return NULL; }
+    if (has_lo && has_hi && lo > hi) {
+        if (status) *status = SMG_ERR_ARGUMENT;
+        return NULL;
+    }
+    smaug_series_f64_t *r = alloc_result(a->size);
+    if (!r) return NULL;
+    for (size_t i = 0; i < a->size; i++) {
+        if (SMAUG_VALID(a->null_mask, i)) {
+            double v = a->data[i];
+            if (has_lo && v < lo) v = lo;
+            if (has_hi && v > hi) v = hi;
+            r->data[i]      = v;
+            r->null_mask[i] = SMAUG_MASK_VALID;
+        }
+    }
+    return r;
+}
 
 /* coalesce_scalar (natureza null-mask): onde self[i] é nulo, entra `value`;
    senão, mantém self[i]. Serve fillna. Opera sobre a MÁSCARA, não sobre o

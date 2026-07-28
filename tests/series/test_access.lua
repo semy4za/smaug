@@ -430,47 +430,96 @@ do
 end
 
 -- =====================================================================
--- Degrau 10.3: abs/round/clip leem via map→get() (double). Em int64 > 2^53
--- isso CORROMPIA EM SILÊNCIO — abs(-9007199254740993) devolvia
--- 9007199254740992. Agora falham visível (check_int64_lossless), até
--- descerem ao Anel 0. Estas operações não tinham NENHUM teste direto de
--- Series antes — foi por isso que a corrupção passou despercebida.
+-- 10.3 fatia B — abs/round/clip desceram ao Anel 0.
 --
--- `between` SAIU do degrau no 10.2 (fatia 1): desceu ao Anel 0 e agora
--- compara int64 exato — ver o bloco 10.2 logo abaixo.
+-- Estas três CORROMPIAM EM SILÊNCIO acima de 2^53: liam por map→get()→double,
+-- e abs(-9007199254740993) devolvia 9007199254740992. O degrau
+-- check_int64_lossless trocou a corrupção calada por falha visível; a descida
+-- trocou a falha visível por resultado certo. Com isso o degrau ficou sem
+-- consumidor no projeto inteiro e foi APOSENTADO.
+--
+-- Elas não tinham NENHUM teste direto de Series antes do degrau — foi por isso
+-- que a corrupção passou despercebida por tanto tempo.
 -- =====================================================================
 do
     local ffi = require("ffi")
-    local BIG = ffi.new("int64_t", 9007199254740993LL)    -- 2^53 + 1
+    local BIG = ffi.new("int64_t", 9007199254740993LL)     -- 2^53 + 1
+    local NEG = ffi.new("int64_t", -9007199254740993LL)
+
+    -- 10.3.1 — o caso que era corrupção, depois erro, e agora é resultado certo
+    local neg = S.new("int64", 1, "neg"); neg:set(1, NEG)
+    check(neg:abs():get_raw(1) == BIG,
+          "10.3.1 abs preserva int64 > 2^53 exato (era ...992 corrompido)")
+    check(neg:abs()._dtype == "int64", "10.3.1 abs preserva dtype")
+
     local big = S.new("int64", 1, "big"); big:set(1, BIG)
+    check(big:clip(NEG, BIG):get_raw(1) == BIG, "10.3.1 clip preserva exato")
 
-    -- as três ainda recusam em vez de corromper (10.3 pendente)
-    check(not pcall(function() return big:abs()   end), "10.3 abs() recusa int64 > 2^53")
-    check(not pcall(function() return big:round() end), "10.3 round() recusa int64 > 2^53")
-    check(not pcall(function() return big:clip(0, BIG) end), "10.3 clip() recusa int64 > 2^53")
+    -- 10.3.2 — round em int64 preserva int64 (antes devolvia float64, que
+    -- degradava > 2^53 justamente na operação que este item conserta)
+    check(big:round()._dtype == "int64",       "10.3.2 round(int64) devolve int64")
+    check(big:round():get_raw(1) == BIG,       "10.3.2 round(n>=0) é identidade exata")
+    check(big:round(3):get_raw(1) == BIG,      "10.3.2 ndigits positivo também é identidade")
 
-    -- a mensagem orienta: diz a operação e mostra o valor exato
-    local ok, err = pcall(function() return big:abs() end)
-    check(not ok and tostring(err):match("abs%(%)") ~= nil,
-          "10.3 mensagem nomeia a operação")
-    check(not ok and tostring(err):match("9007199254740993") ~= nil,
-          "10.3 mensagem mostra o valor exato (não o degradado)")
+    -- 10.3.3 — ndigits < 0 faz trabalho real, em aritmética inteira
+    local q = S.from_table({1234, -1567, 7}, "int64")
+    check(q:round(-2):get(1) == 1200,   "10.3.3 round(1234,-2)=1200")
+    check(q:round(-2):get(2) == -1600,  "10.3.3 round(-1567,-2)=-1600 (half-away-from-zero)")
+    check(q:round(-3):get(1) == 1000,   "10.3.3 round(1234,-3)=1000")
+    check(q:round(-1):get(3) == 10,     "10.3.3 round(7,-1)=10")
 
-    -- limite: 2^53 exato ainda passa (fronteira é > 2^53, igual ao check_value)
-    local lim = S.new("int64", 1, "lim"); lim:set(1, ffi.new("int64_t", 9007199254740992LL))
-    check(pcall(function() return lim:abs() end), "10.3 abs() aceita 2^53 exato")
+    -- 10.3.3b — o PONTO EXATO de meio caminho, que distingue half-away-from-zero
+    -- de qualquer variante. Sem estes casos, trocar `>=` por `>` no desempate
+    -- passa despercebido (a mutação passou até estes testes existirem).
+    local h = S.from_table({1250, -1250, 1350, 50}, "int64")
+    check(h:round(-2):get(1) == 1300,  "10.3.3b round(1250,-2)=1300 (meio → afasta do zero)")
+    check(h:round(-2):get(2) == -1300, "10.3.3b round(-1250,-2)=-1300 (simétrico)")
+    check(h:round(-2):get(3) == 1400,  "10.3.3b round(1350,-2)=1400")
+    check(h:round(-2):get(4) == 100,   "10.3.3b round(50,-2)=100 (meio de zero afasta)")
+    -- abaixo do meio arredonda para baixo, nos dois sinais
+    local u = S.from_table({1249, -1249}, "int64")
+    check(u:round(-2):get(1) == 1200,  "10.3.3b round(1249,-2)=1200")
+    check(u:round(-2):get(2) == -1200, "10.3.3b round(-1249,-2)=-1200")
 
-    -- caminho normal intacto: int64 pequeno e float64 seguem funcionando
+    -- 10.3.4 — as três decisões: casos sem resposta erram, não adivinham
+    local m = S.new("int64", 1, "min")
+    m:set(1, ffi.new("int64_t", -9223372036854775807LL - 1))   -- INT64_MIN
+    local ok_min, e_min = pcall(function() return m:abs() end)
+    check(not ok_min, "10.3.4 abs(INT64_MIN) erra (não tem contrapartida positiva)")
+    check(tostring(e_min):match("INT64_MIN") ~= nil,
+          "10.3.4 mensagem nomeia a causa, não só 'falhou'")
+
+    local ok_clip, e_clip = pcall(function() return S.from_table({1,5,9},"int64"):clip(8,2) end)
+    check(not ok_clip, "10.3.4 clip(lo>hi) erra (antes devolvia {8,8,2}, fora de faixa)")
+    check(tostring(e_clip):match("contradit") ~= nil, "10.3.4 mensagem explica a faixa")
+
+    check(not pcall(function() return q:round(-19) end),
+          "10.3.4 round(-19) erra (fator 10^19 não cabe em int64)")
+
+    -- 10.3.5 — caminho normal intacto nos dois dtypes
     local sm = S.from_table({-3, 2}, "int64")
-    check(sm:abs():get(1) == 3,          "10.3 abs() int64 pequeno intacto")
-    check(sm:clip(-1, 1):get(1) == -1,   "10.3 clip() int64 pequeno intacto")
-    check(sm:between(-5, 5):get(1) == true, "10.2 between() int64 pequeno intacto")
-    local f = S.from_table({-1.7, 2.3})
-    check(f:abs():get(1) == 1.7,         "10.3 abs() float64 intacto")
-    check(f:round():get(1) == -2,        "10.3 round() float64 intacto")
-    -- nulos continuam nulos (o degrau só roda em índice não-nulo)
+    check(sm:abs():get(1) == 3,          "10.3.5 abs int64 pequeno")
+    check(sm:clip(-1, 1):get(1) == -1,   "10.3.5 clip int64 pequeno")
+    check(sm:clip(nil, 1):get(2) == 1,   "10.3.5 clip só com limite superior")
+    check(sm:clip(-1, nil):get(1) == -1, "10.3.5 clip só com limite inferior")
+    local f = S.from_table({-1.7, 2.345})
+    check(f:abs():get(1) == 1.7,         "10.3.5 abs float64")
+    check(f:round():get(1) == -2,        "10.3.5 round float64 half-away-from-zero")
+    check(f:round(2):get(2) == 2.35,     "10.3.5 round float64 com ndigits")
+    check(f:clip(-1, 1):get(1) == -1,    "10.3.5 clip float64")
+
+    -- 10.3.6 — nulo propaga nas três, nos dois dtypes
     local wn = S.new("int64", 2, "wn"); wn:set_null(1); wn:set(2, 5)
-    check(wn:abs():is_null(1),           "10.3 abs() preserva nulo")
+    check(wn:abs():is_null(1),           "10.3.6 abs preserva nulo (int64)")
+    check(wn:round():is_null(1),         "10.3.6 round preserva nulo (int64)")
+    check(wn:clip(0, 10):is_null(1),     "10.3.6 clip preserva nulo (int64)")
+    local fn = S.from_table({4.0, NA}, "float64")
+    check(fn:abs():is_null(2),           "10.3.6 abs preserva nulo (f64)")
+
+    -- 10.3.7 — série vazia e dtype não numérico
+    check(S.int64(0):abs():len() == 0,   "10.3.7 série vazia não estoura")
+    check(not pcall(function() return S.from_table({"a"},"string"):abs() end),
+          "10.3.7 dtype não numérico recusado")
 end
 
 

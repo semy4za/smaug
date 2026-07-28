@@ -278,6 +278,137 @@ static void f64_compare_edge(void) {
         smaug_f64_free(rn); smaug_f64_free(neg);
     }
 
+    /* --- 10.3 fatia B: abs/round/clip -------------------------------------
+       O frontend SEMPRE passa ponteiro de status e nunca passa serie NULL,
+       entao esses ramos so existem se testados aqui. Mesma licao das fatias
+       anteriores: o que o Lua nao alcanca, o teste em C tem de alcancar. */
+    {
+        /* f64: serie s = {1, NULL, 3} ja montada acima */
+        OK(smaug_f64_abs(NULL) == NULL,                    "f64 abs NULL -> NULL");
+        OK(smaug_f64_round(NULL, 2) == NULL,               "f64 round NULL -> NULL");
+        OK(smaug_f64_clip(NULL, 0, true, 1, true, NULL) == NULL, "f64 clip NULL -> NULL");
+
+        smaug_series_f64_t *ra = smaug_f64_abs(s);
+        OK(ra && SMAUG_NULL(ra->null_mask, 1), "f64 abs propaga nulo");
+        smaug_f64_free(ra);
+
+        smaug_series_f64_t *rr = smaug_f64_round(s, 0);
+        OK(rr && SMAUG_NULL(rr->null_mask, 1), "f64 round propaga nulo");
+        smaug_f64_free(rr);
+
+        /* status NULL: ramo que o frontend nunca exercita */
+        smaug_series_f64_t *rc = smaug_f64_clip(s, 0, true, 2, true, NULL);
+        OK(rc && SMAUG_NULL(rc->null_mask, 1), "f64 clip sem status propaga nulo");
+        OK(rc && rc->data[0] == 1.0, "f64 clip dentro da faixa mantem");
+        smaug_f64_free(rc);
+        OK(smaug_f64_clip(s, 5, true, 1, true, NULL) == NULL, "f64 clip lo>hi sem status");
+
+        /* status preenchido nos dois desfechos */
+        smaug_status_t st = SMG_ERR_OOB;
+        smaug_series_f64_t *ok1 = smaug_f64_clip(s, 0, true, 9, true, &st);
+        OK(ok1 && st == SMG_OK, "f64 clip sucesso zera status");
+        smaug_f64_free(ok1);
+        OK(smaug_f64_clip(s, 9, true, 0, true, &st) == NULL && st == SMG_ERR_ARGUMENT,
+           "f64 clip lo>hi marca SMG_ERR_ARGUMENT");
+
+        /* limites ausentes: has_lo/has_hi falsos */
+        smaug_series_f64_t *nolo = smaug_f64_clip(s, 0, false, 2, true, NULL);
+        OK(nolo && nolo->data[2] == 2.0, "f64 clip so com limite superior");
+        smaug_f64_free(nolo);
+        smaug_series_f64_t *nohi = smaug_f64_clip(s, 2, true, 0, false, NULL);
+        OK(nohi && nohi->data[0] == 2.0, "f64 clip so com limite inferior");
+        smaug_f64_free(nohi);
+
+        /* i64 */
+        int64_t ia[3] = {-15, 25, 30};
+        smaug_series_i64_t *xi = smaug_i64_create_from_array(ia, 3);
+        smaug_i64_set_null(xi, 1);
+
+        OK(smaug_i64_abs(NULL, NULL) == NULL,               "i64 abs NULL -> NULL");
+        OK(smaug_i64_round(NULL, -1, NULL) == NULL,         "i64 round NULL -> NULL");
+        OK(smaug_i64_clip(NULL, 0, true, 1, true, NULL) == NULL, "i64 clip NULL -> NULL");
+
+        /* serie NULL COM status: `if (!a) { if (status) ... }` e condicao
+           composta -- serie NULL sem status cobre so metade dela */
+        smaug_status_t sn = SMG_OK;
+        OK(smaug_i64_abs(NULL, &sn) == NULL && sn == SMG_ERR_ARGUMENT,
+           "i64 abs NULL marca status");
+        sn = SMG_OK;
+        OK(smaug_i64_round(NULL, -1, &sn) == NULL && sn == SMG_ERR_ARGUMENT,
+           "i64 round NULL marca status");
+        sn = SMG_OK;
+        OK(smaug_i64_clip(NULL, 0, true, 1, true, &sn) == NULL && sn == SMG_ERR_ARGUMENT,
+           "i64 clip NULL marca status");
+        sn = SMG_OK;
+        OK(smaug_f64_clip(NULL, 0, true, 1, true, &sn) == NULL && sn == SMG_ERR_ARGUMENT,
+           "f64 clip NULL marca status");
+
+        smaug_series_i64_t *ia1 = smaug_i64_abs(xi, NULL);   /* status NULL */
+        OK(ia1 && ia1->data[0] == 15, "i64 abs sem status");
+        OK(ia1 && SMAUG_NULL(ia1->null_mask, 1), "i64 abs propaga nulo");
+        smaug_i64_free(ia1);
+
+        smaug_series_i64_t *ir0 = smaug_i64_round(xi, 0, NULL);
+        OK(ir0 && ir0->data[0] == -15, "i64 round(0) identidade");
+        OK(ir0 && SMAUG_NULL(ir0->null_mask, 1), "i64 round propaga nulo");
+        smaug_i64_free(ir0);
+
+        smaug_series_i64_t *irn = smaug_i64_round(xi, -1, NULL);
+        OK(irn && irn->data[0] == -20, "i64 round(-1) de -15 = -20 (afasta do zero)");
+        smaug_i64_free(irn);
+
+        smaug_series_i64_t *ic = smaug_i64_clip(xi, 0, true, 28, true, NULL);
+        OK(ic && ic->data[0] == 0 && ic->data[2] == 28, "i64 clip sem status");
+        smaug_i64_free(ic);
+        OK(smaug_i64_clip(xi, 9, true, 0, true, NULL) == NULL, "i64 clip lo>hi sem status");
+
+        /* INT64_MIN em abs: erro, com e sem status */
+        smaug_series_i64_t *mn = smaug_i64_create(1);
+        smaug_i64_set(mn, 0, INT64_MIN);
+        smaug_status_t sm = SMG_OK;
+        OK(smaug_i64_abs(mn, &sm) == NULL && sm == SMG_ERR_ARGUMENT,
+           "i64 abs(INT64_MIN) marca SMG_ERR_ARGUMENT");
+        OK(smaug_i64_abs(mn, NULL) == NULL, "i64 abs(INT64_MIN) sem status");
+        smaug_i64_free(mn);
+
+        /* round: fator grande demais, e overflow do resultado perto do teto */
+        OK(smaug_i64_round(xi, -19, NULL) == NULL, "i64 round(-19) fator nao cabe");
+        smaug_status_t so = SMG_OK;
+        OK(smaug_i64_round(xi, -25, &so) == NULL && so == SMG_ERR_ARGUMENT,
+           "i64 round(-25) marca status");
+        smaug_series_i64_t *top = smaug_i64_create(1);
+        smaug_i64_set(top, 0, INT64_MAX);
+        smaug_status_t sv = SMG_OK;
+        OK(smaug_i64_round(top, -3, &sv) == NULL && sv == SMG_ERR_ARGUMENT,
+           "i64 round de INT64_MAX estoura ao arredondar para cima");
+        smaug_i64_free(top);
+
+        /* overflow NEGATIVO: o outro lado da guarda (q < INT64_MIN / factor).
+           INT64_MIN arredondado para baixo sai da faixa pelo piso. */
+        smaug_series_i64_t *bot = smaug_i64_create(1);
+        smaug_i64_set(bot, 0, INT64_MIN);
+        smaug_status_t sb = SMG_OK;
+        OK(smaug_i64_round(bot, -3, &sb) == NULL && sb == SMG_ERR_ARGUMENT,
+           "i64 round de INT64_MIN estoura pelo piso");
+        smaug_i64_free(bot);
+
+        /* series vazias nos dois dtypes */
+        smaug_series_i64_t *vi = smaug_i64_create(0);
+        smaug_series_i64_t *rv = smaug_i64_abs(vi, NULL);
+        OK(rv != NULL, "i64 abs em serie vazia");
+        smaug_i64_free(rv);
+        rv = smaug_i64_round(vi, -2, NULL);
+        OK(rv != NULL, "i64 round em serie vazia");
+        smaug_i64_free(rv); smaug_i64_free(vi);
+
+        smaug_series_f64_t *vf = smaug_f64_create(0);
+        smaug_series_f64_t *rvf = smaug_f64_abs(vf);
+        OK(rvf != NULL, "f64 abs em serie vazia");
+        smaug_f64_free(rvf); smaug_f64_free(vf);
+
+        smaug_i64_free(xi);
+    }
+
     /* between: mesma matriz de ramos. Serie tem {1, NULL, 3}. */
     OK(smaug_f64_between(NULL, 0, 5, true, true, NULL) == NULL,
        "f64 between NULL serie -> NULL");

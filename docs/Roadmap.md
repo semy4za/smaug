@@ -200,12 +200,13 @@ correto — delegar ao descritor → C — já existe. Subitens 10.5 a 10.9 fech
   max/std/var todas têm primitiva; existe `cumprod`, falta `prod`. Assimetria por
   omissão (passou batido no item 5). Criar `smaug_f64_prod`/`smaug_i64_prod`.
 - 10.3 **Família matemática element-wise → Anel 0** (E5).
-  **[Fatia A: Windows OK · Fedora PENDENTE · Fatia B: não iniciada]** Fatiado por concern e
+  **[A e B: Windows OK 2026-07-27 · selo Fedora PENDENTE]** As nove operações
+  estão no Anel 0. Falta Valgrind e cobertura, que só rodam no Fedora. Fatiado por concern e
   por arquivo Lua: **A** = as seis matemáticas (`_selection.lua`), mecânicas e
   sem decisão semântica; **B** = `abs`/`round`/`clip` (`_transform.lua`), a
   família que preserva dtype, onde vivem as três decisões e o degrau que sai.
-  - **Fatia A — `sin`/`cos`/`tan`/`exp`/`log`/`sqrt`: [implementada
-    2026-07-27 · selos PENDENTES]** Uma **macro** (`F64_MATH_IMPL`) gera os seis
+  - **Fatia A — `sin`/`cos`/`tan`/`exp`/`log`/`sqrt`: [Windows OK · Fedora
+    PENDENTE]** Uma **macro** (`F64_MATH_IMPL`) gera os seis
     corpos, que diferiam apenas pela função de libm — seis corpos à mão seriam
     seis lugares para repetir cada correção, e cinco para esquecê-la. Padrão que
     a casa já usa (`DT_CMP_IMPL`). Entrada int64 não tem versão própria (Opção
@@ -220,8 +221,37 @@ correto — delegar ao descritor → C — já existe. Subitens 10.5 a 10.9 fech
     com descobertos **iguais em 227** — as seis entraram 100% cobertas. Mutação
     verificada em dois eixos: tirar a propagação de nulo e trocar `sqrt` por
     `fabs` abortam o teste. `tan` não era exercitada antes.
-  - **Fatia B — `abs`/`round`/`clip`** (não iniciada). Aqui ficam as três
-    decisões e o degrau `check_i64`, que só sai quando as três descerem.
+  - **Fatia B — `abs`/`round`/`clip`: [Windows OK · Fedora PENDENTE]** As três preservam dtype, então têm versão int64 — e é aí que
+    está o ponto: a aritmética passou a ser inteira pura, sem ponto flutuante
+    em lugar nenhum. `abs(-9007199254740993)` devolve o valor **exato**; antes
+    do degrau devolvia `...992` corrompido, e com o degrau errava.
+    `f64_abs` entrou na macro (`fabs`), não como corpo próprio.
+    - **O degrau `check_int64_lossless` foi APOSENTADO.** Com `abs`/`round`/
+      `clip` no Anel 0, ele ficou sem consumidor no projeto inteiro — os
+      anteriores (fillna/astype no 10.6/10.7, `between` no 10.2) já haviam
+      saído. Removido do `_core.lua` em vez de virar código morto. É o fim do
+      paliativo de 2026-07-23.
+    - **As três decisões implementadas**, todas via `smaug_status_t` com
+      mensagem que explica a causa: `abs(INT64_MIN)` não tem contrapartida
+      positiva; `clip(lo > hi)` é faixa contraditória (antes devolvia `{8,8,2}`,
+      fora de qualquer faixa); `round` em int64 erra se `|ndigits| >= 19` (o
+      fator não cabe) ou se o resultado sair da faixa — verificado **antes** de
+      multiplicar, porque depois seria UB.
+    - **`round(int64)` preserva int64.** Com `ndigits >= 0` é identidade,
+      implementada como **cópia sem aritmética**: uma versão genérica que
+      fizesse `v * 10^n / 10^n` passaria por double e degradaria acima de 2^53,
+      reintroduzindo o bug que o item existe para matar. Com `ndigits < 0`
+      quantiza por `10^|n|` em aritmética inteira.
+    - **Uma mutação escapou e virou teste.** Trocar `m >= half` por `m > half`
+      no desempate passou pelos testes — eles não exercitavam o **ponto exato**
+      de meio caminho. Corrigido com `round(1250,-2)=1300`, `round(-1250,-2)=
+      -1300` e vizinhos; a mutação passou a ser detectada.
+    - **Cobertura, terceira vez a mesma lição.** Caiu para 94.20% ao entrar,
+      porque os ramos `if (status)` e `if (!a)` **nunca são exercitados pelo
+      frontend** (ele sempre passa status e nunca passa série NULL). Testes em C
+      com série NULL × status NULL/não-NULL, overflow nos dois sentidos e séries
+      vazias fecharam em **94.94%**, acima do baseline.
+    - `test_access` 168→191, `test_ops_edge` 346→381, allocfail 1972→**2032**.
   **Correção ao desenho original (2026-07-27):** são **12** funções em C, não 11
   — a decisão "`round(int64)` preserva int64" tornou `round` uma operação que
   preserva dtype, exigindo versão i64; o número anterior assumia saída f64. E a
@@ -648,7 +678,13 @@ adiado com justificativa registrada.
 
 - **Versão em inglês** — documentação, mensagens de erro e i18n. Trilha própria;
   mensagens de erro são API, mas a internacionalização completa é projeto à parte.
-- **Trilha Analítica** — Matrix → Tensor → ML.
+- **Trilha Analítica** — Matrix (Anel 6) → Tensor + grafo + autograd (Anel 7) →
+  ML (Anel 8, dividido em preparação/ML clássico, treino e inferência). O
+  conteúdo de cada anel, os princípios que regem a trilha (escopo do "zero
+  dependências", ser dono da estrutura e não da aritmética, treino × inferência,
+  corpus antes de modelo) e o critério de verificação estão no `ARCHITECTURE`,
+  não aqui: **são visão arquitetural, não itens de timeline**. Este Roadmap lista
+  compromissos com selo; aquilo é destino sem data.
 - **Trilha Projeto** — I/O estendido (SQL, Excel, Parquet) → Persistência → Models.
 - **Frentes diferidas** — `replace({de=para})`, índice/MultiIndex, plotting,
   tipos extras (float32, int32/16/8). Só se caso real justificar.

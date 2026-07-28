@@ -3,12 +3,13 @@
 -- Transformações elementares: sort, view, take, astype, fillna, map, abs, round, clip.
 -- Recebe I com: I.methods, I.Series, I.wrap, I.DTYPES, I.ffi, I.C,
 --               I.NA, I.is_na, I.is_nan, I.infer_dtype_from_value,
---               I.check_int64_lossless
+--               (I.check_int64_lossless foi aposentado no 10.3)
 -- Contribui: methods.sort, argsort, view, take, dropna, head, tail,
 --            to_table, astype, fillna, map, abs, round, clip
 
 local Display = require("smaug.core.display")
 local Err     = require("smaug.core.errors")
+local int_scalar = require("smaug.core.int_scalar")   -- fronteira do escalar (9.3)
 
 return function(I)
     local methods = I.methods
@@ -20,9 +21,9 @@ return function(I)
     local NA      = I.NA
     local is_na   = I.is_na
     local check_value = I.check_value                     -- porteiro canônico (9.1)
-    local check_i64   = I.check_int64_lossless            -- degrau 10.3 (int64 > 2^53)
-    -- (o degrau check_int64_lossless e o trunc_to_int saíram no 10.7 Passo B:
-    --  astype migrou ao Anel 0 e não faz mais round-trip por get())
+    -- (o degrau `check_int64_lossless` foi APOSENTADO no 10.3: era importado
+    --  aqui para abs/round/clip, que desceram ao Anel 0 e passaram a fazer
+    --  aritmética inteira pura. Sem consumidor, saiu também do _core.lua.)
 
     -- =====================================================================
     -- astype: matriz de conversão src×dst delegada ao Anel 0 (10.7 Passo B).
@@ -436,42 +437,69 @@ return function(I)
     end
 
     -- =====================================================================
-    -- abs, round, clip
+    -- abs, round, clip → Anel 0 (10.3 fatia B)
     -- =====================================================================
-    -- Degrau 10.3: as três leem o valor via map → self:get(i), que passa por
-    -- tonumber(double). Em int64 > 2^53 isso PERDIA DÍGITOS EM SILÊNCIO
-    -- (abs(-9007199254740993) devolvia 9007199254740992). check_i64 troca a
-    -- corrupção calada por falha visível, mesmo padrão do 10.6/10.7 Passo A.
-    -- Paliativo até estas operações descerem ao Anel 0 (item 10.3).
-    -- map() fica de fora por decisão: é API genérica onde o caller escolhe o
-    -- dtype de saída e a closure — bloquear seria invasivo.
+    -- As três preservam o dtype, e é por isso que têm versão int64 em C. Antes
+    -- passavam por `map` → `get()` → double: acima de 2^53 perdiam dígito EM
+    -- SILÊNCIO (abs(-9007199254740993) devolvia 9007199254740992), e o degrau
+    -- `check_i64` trocava a corrupção calada por falha visível. Com a descida,
+    -- a aritmética é inteira pura e o suporte virou real — o degrau saiu.
+    --
+    -- Três casos ganharam resposta explícita, todos via smaug_status_t:
+    --   abs(INT64_MIN)  — não tem contrapartida positiva em int64
+    --   clip(lo > hi)   — faixa contraditória (antes devolvia algo fora de
+    --                     qualquer faixa: {1,5,9}:clip(8,2) dava {8,8,2})
+    --   round(int64)    — |ndigits| >= 19, ou resultado fora da faixa
+    local function check_status(st, op, extra)
+        if st[0] ~= C.SMG_OK then
+            error("smaug: " .. op .. "() " .. extra, 3)
+        end
+    end
 
     function methods.abs(self)
         if self._dtype ~= "float64" and self._dtype ~= "int64" then
             error("smaug: abs() requer dtype numérico, não '"..self._dtype.."'", 2)
         end
-        return self:map(function(v, i)
-            if v == nil then return nil end
-            check_i64(self, i, "abs()")
-            return math.abs(v)
-        end, self._dtype, self._name)
+        if self._dtype == "float64" then
+            local r = C.smaug_f64_abs(self._c)
+            if r == nil then error("smaug: abs() falhou", 2) end
+            return wrap(r, "float64", self._name)
+        end
+        local st = ffi.new("smaug_status_t[1]")
+        local r  = C.smaug_i64_abs(self._c, st)
+        if r == nil then
+            check_status(st, "abs",
+                "não tem resposta para INT64_MIN (-9223372036854775808): "
+                .. "o valor não tem contrapartida positiva em int64")
+            error("smaug: abs() falhou", 2)
+        end
+        return wrap(r, "int64", self._name)
     end
 
+    -- round: em int64 com ndigits >= 0 a operação é IDENTIDADE — inteiro não
+    -- tem casas decimais. Isso preserva o dtype (antes devolvia float64, o que
+    -- degradava > 2^53 justamente na operação que este item conserta). Com
+    -- ndigits < 0 arredonda casas antes da vírgula: round(1234, -2) = 1200.
     function methods.round(self, ndigits)
         if self._dtype ~= "float64" and self._dtype ~= "int64" then
             error("smaug: round() requer dtype numérico, não '"..self._dtype.."'", 2)
         end
         ndigits = ndigits or 0
-        local factor = 10 ^ ndigits
-        return self:map(function(v, i)
-            if v == nil then return nil end
-            check_i64(self, i, "round()")
-            if v >= 0 then
-                return math.floor(v * factor + 0.5) / factor
-            else
-                return math.ceil(v * factor - 0.5) / factor
-            end
-        end, "float64", self._name)
+        if self._dtype == "float64" then
+            local r = C.smaug_f64_round(self._c, ndigits)
+            if r == nil then error("smaug: round() falhou", 2) end
+            return wrap(r, "float64", self._name)
+        end
+        local st = ffi.new("smaug_status_t[1]")
+        local r  = C.smaug_i64_round(self._c, ndigits, st)
+        if r == nil then
+            check_status(st, "round",
+                "não conseguiu arredondar em int64 com ndigits=" .. ndigits
+                .. ": o fator 10^" .. math.abs(ndigits) .. " ou o resultado "
+                .. "excede a faixa de int64")
+            error("smaug: round() falhou", 2)
+        end
+        return wrap(r, "int64", self._name)
     end
 
     function methods.clip(self, lo, hi)
@@ -479,12 +507,26 @@ return function(I)
             error("smaug: clip() requer dtype numérico, não '"..self._dtype.."'", 2)
         end
         if lo == nil and hi == nil then return self:clone() end
-        return self:map(function(v, i)
-            if v == nil then return nil end
-            check_i64(self, i, "clip()")
-            if lo ~= nil and v < lo then return lo end
-            if hi ~= nil and v > hi then return hi end
-            return v
-        end, self._dtype, self._name)
+        local has_lo, has_hi = lo ~= nil, hi ~= nil
+        local st = ffi.new("smaug_status_t[1]")
+        local r
+        if self._dtype == "float64" then
+            r = C.smaug_f64_clip(self._c, has_lo and lo or 0, has_lo,
+                                          has_hi and hi or 0, has_hi, st)
+        else
+            -- limites int64 pela fronteira do escalar (9.3): cdata exato
+            -- aceito, number >= 2^53 recusado por origem — senão o valor da
+            -- série ficaria exato e o limite viria degradado.
+            local clo = has_lo and int_scalar.check_operation(lo, "clip (limite inferior)", 4) or 0
+            local chi = has_hi and int_scalar.check_operation(hi, "clip (limite superior)", 4) or 0
+            r = C.smaug_i64_clip(self._c, clo, has_lo, chi, has_hi, st)
+        end
+        if r == nil then
+            check_status(st, "clip",
+                "recebeu faixa contraditória (lo > hi): não existe valor que "
+                .. "satisfaça os dois limites")
+            error("smaug: clip() falhou", 2)
+        end
+        return wrap(r, self._dtype, self._name)
     end
 end

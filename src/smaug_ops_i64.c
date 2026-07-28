@@ -153,6 +153,132 @@ smaug_series_i64_t *smaug_i64_div_scalar(const smaug_series_i64_t *a, int64_t sc
    Serve fillna. Reusa smaug_i64_clone (cópia data+mask via memcpy — fonte
    única da cópia); o loop só preenche os buracos. Sem double no caminho:
    value chega int64_t nativo e a cópia é byte a byte → int64 > 2^53 exato. */
+/* ===================================================================
+   ELEMENT-WISE QUE PRESERVAM int64 (10.3 fatia B)
+   ===================================================================
+   As três existem em versão int64 -- e não só f64 -- porque preservam o dtype.
+   Isso é o ponto do item: antes elas passavam por `map` -> `get()` -> double, e
+   acima de 2^53 perdiam dígito EM SILÊNCIO (abs(-9007199254740993) devolvia
+   9007199254740992). Aqui a aritmética é int64 pura, sem ponto flutuante em
+   lugar nenhum -- é isso que torna o suporte real em vez de paliativo. */
+
+/* abs: |v|. INT64_MIN não tem contrapartida positiva em int64
+   (-9223372036854775808; o máximo positivo é ...807), então abs(INT64_MIN) NÃO
+   TEM RESPOSTA. Erro na operação, não nulo no elemento: transformar valor em
+   ausência seria inventar um dado que o usuário não tem (Contrato 9 trata
+   ausência como coisa distinta de valor). Antes, o degrau `check_i64` barrava
+   este caso -- mas pelo motivo errado (magnitude > 2^53), mascarando o real. */
+smaug_series_i64_t *smaug_i64_abs(const smaug_series_i64_t *a,
+                                  smaug_status_t *status) {
+    if (status) *status = SMG_OK;
+    if (!a) { if (status) *status = SMG_ERR_ARGUMENT; return NULL; }
+    for (size_t i = 0; i < a->size; i++) {
+        if (SMAUG_VALID(a->null_mask, i) && a->data[i] == INT64_MIN) {
+            if (status) *status = SMG_ERR_ARGUMENT;
+            return NULL;
+        }
+    }
+    smaug_series_i64_t *r = alloc_result(a->size);
+    if (!r) return NULL;
+    for (size_t i = 0; i < a->size; i++) {
+        if (SMAUG_VALID(a->null_mask, i)) {
+            int64_t v = a->data[i];
+            r->data[i]      = (v < 0) ? -v : v;
+            r->null_mask[i] = SMAUG_MASK_VALID;
+        }
+    }
+    return r;
+}
+
+/* clip: ver a nota da versão f64 sobre lo > hi ser erro. */
+smaug_series_i64_t *smaug_i64_clip(const smaug_series_i64_t *a,
+                                   int64_t lo, bool has_lo,
+                                   int64_t hi, bool has_hi,
+                                   smaug_status_t *status) {
+    if (status) *status = SMG_OK;
+    if (!a) { if (status) *status = SMG_ERR_ARGUMENT; return NULL; }
+    if (has_lo && has_hi && lo > hi) {
+        if (status) *status = SMG_ERR_ARGUMENT;
+        return NULL;
+    }
+    smaug_series_i64_t *r = alloc_result(a->size);
+    if (!r) return NULL;
+    for (size_t i = 0; i < a->size; i++) {
+        if (SMAUG_VALID(a->null_mask, i)) {
+            int64_t v = a->data[i];
+            if (has_lo && v < lo) v = lo;
+            if (has_hi && v > hi) v = hi;
+            r->data[i]      = v;
+            r->null_mask[i] = SMAUG_MASK_VALID;
+        }
+    }
+    return r;
+}
+
+/* round em int64 -- e por que ele existe.
+   Um inteiro não tem casas decimais, então com ndigits >= 0 a operação é
+   IDENTIDADE: round(7) e round(7, 2) são 7. Isso não é defeito de API; é a
+   resposta matematicamente correta, do mesmo jeito que abs(5) devolve 5.
+   Com ndigits < 0 ela faz trabalho de verdade: arredonda casas ANTES da
+   vírgula -- round(1234, -2) = 1200.
+
+   A identidade é implementada como CÓPIA, sem nenhuma aritmética. Isso é
+   essencial: uma versão "genérica" que fizesse v * 10^n / 10^n passaria por
+   double e degradaria acima de 2^53 -- reintroduzindo exatamente o bug que
+   este item existe para matar.
+
+   Dois casos sem resposta, ambos via status:
+   (a) |ndigits| >= 19: o próprio fator 10^19 estoura int64 (máx ~9.22e18);
+   (b) overflow do resultado: perto do teto, arredondar para cima sai da faixa
+       -- INT64_MAX arredondado para milhares daria 9223372036854776000, que
+       não cabe. Verificado ANTES de multiplicar, não depois (depois seria UB). */
+smaug_series_i64_t *smaug_i64_round(const smaug_series_i64_t *a, int ndigits,
+                                    smaug_status_t *status) {
+    if (status) *status = SMG_OK;
+    if (!a) { if (status) *status = SMG_ERR_ARGUMENT; return NULL; }
+
+    smaug_series_i64_t *r = alloc_result(a->size);
+    if (!r) return NULL;
+
+    if (ndigits >= 0) {                      /* identidade: cópia exata */
+        for (size_t i = 0; i < a->size; i++) {
+            if (SMAUG_VALID(a->null_mask, i)) {
+                r->data[i]      = a->data[i];
+                r->null_mask[i] = SMAUG_MASK_VALID;
+            }
+        }
+        return r;
+    }
+
+    if (ndigits <= -19) {                    /* fator não cabe em int64 */
+        smaug_i64_free(r);
+        if (status) *status = SMG_ERR_ARGUMENT;
+        return NULL;
+    }
+
+    int64_t factor = 1;
+    for (int k = 0; k < -ndigits; k++) factor *= 10;
+    const int64_t half = factor / 2;
+
+    for (size_t i = 0; i < a->size; i++) {
+        if (!SMAUG_VALID(a->null_mask, i)) continue;
+        int64_t v = a->data[i];
+        int64_t q = v / factor;              /* trunca em direção a zero */
+        int64_t m = v % factor;              /* mesmo sinal de v em C99 */
+        if (m >= half)       q += 1;         /* half-away-from-zero */
+        else if (-m >= half) q -= 1;
+        /* checa ANTES de multiplicar: depois seria overflow (UB) */
+        if (q > INT64_MAX / factor || q < INT64_MIN / factor) {
+            smaug_i64_free(r);
+            if (status) *status = SMG_ERR_ARGUMENT;
+            return NULL;
+        }
+        r->data[i]      = q * factor;
+        r->null_mask[i] = SMAUG_MASK_VALID;
+    }
+    return r;
+}
+
 smaug_series_i64_t *smaug_i64_coalesce_scalar(const smaug_series_i64_t *self,
                                               int64_t value) {
     if (!self) return NULL;  /* COV-EXCL-BR: redundante — o clone(NULL) logo abaixo devolve NULL e o `if (!r)` barra; auditado 2026-07-14 (remover este guard NAO crasha). Defesa em profundidade, nao a unica protecao. */

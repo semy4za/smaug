@@ -51,6 +51,51 @@ categorical divergiria em silêncio. Vira teste de invariante.
 Nenhum C, nenhum Lua.
 
 ---
+## 2026-07-27 — 10.3 fatia B: abs/round/clip descem, e o degrau se aposenta
+
+As três preservam o dtype, e é por isso que ganharam versão int64 em C. O ponto
+não é performance: a aritmética passou a ser inteira pura, sem ponto flutuante em
+lugar nenhum. `abs(-9007199254740993)` devolve o valor exato — antes do degrau
+devolvia `...992` corrompido, e com o degrau errava visível. Falha visível virou
+resultado certo.
+
+**O degrau `check_int64_lossless` foi aposentado.** Ele nasceu em 23/07 como
+paliativo para as operações que liam int64 por `get()` → double. Uma a uma elas
+desceram: `fillna`/`astype` (10.6/10.7), `between` (10.2), e agora `abs`/`round`/
+`clip`. Com a última, ficou sem consumidor no projeto inteiro e foi removido do
+`_core.lua` em vez de virar código morto.
+
+`round(int64)` preserva int64, e a conversa sobre "o que isso arredonda?" teve
+efeito prático. Com `ndigits >= 0` é identidade — inteiro não tem casas decimais,
+e a resposta correta é o próprio valor, do mesmo jeito que `abs(5)` devolve 5. Mas
+identidade tinha de ser **cópia sem aritmética**: uma versão genérica que fizesse
+`v * 10^n / 10^n` passaria por double e degradaria acima de 2^53, reintroduzindo o
+bug que o item existe para matar. Com `ndigits < 0` quantiza por `10^|n|` em
+aritmética inteira, e aí faz trabalho de verdade: `round(1234, -2)` = 1200.
+
+As três decisões viraram erro com causa nomeada, não "falhou": `abs(INT64_MIN)`
+não tem contrapartida positiva; `clip(lo > hi)` é faixa contraditória (antes
+devolvia `{8,8,2}` — um resultado fora de qualquer faixa, porque o `return lo`
+curto-circuitava antes de checar `hi`); `round` erra se o fator ou o resultado não
+couberem, verificado **antes** de multiplicar, porque depois seria UB.
+
+Duas coisas que os testes ensinaram, e ambas por falharem primeiro.
+
+Uma mutação **escapou**: trocar `m >= half` por `m > half` no desempate passou por
+todos os testes, porque nenhum exercitava o ponto exato de meio caminho. É o tipo
+de caso que a leitura não pega — `round(1250, -2)` é 1300 ou 1200 dependendo de um
+único caractere. Virou teste, com os dois sinais.
+
+E a cobertura caiu para 94.20% ao entrar, pela terceira vez pelo mesmo motivo: os
+ramos `if (status)` e `if (!a)` **nunca são exercitados pelo frontend**, que sempre
+passa status e nunca passa série NULL. Já era assim no `out_mask` do `between` e no
+`str_between`. Está virando padrão reconhecível: toda função nova com parâmetro
+opcional ou guarda de entrada precisa de teste em C, porque o Lua só percorre o
+caminho feliz. Fechou em **94.94%**, acima do baseline.
+
+`test_access` 168→191, `test_ops_edge` 346→381, allocfail 1972→2032.
+
+---
 ## 2026-07-27 — 10.2 fechado, e a edição não testada do build_win.ps1 se provou
 
 Uma rodada no Windows fechou três pendências. A fatia 2 do 10.2 atravessou a ABI

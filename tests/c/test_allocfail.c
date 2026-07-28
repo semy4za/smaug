@@ -298,6 +298,34 @@ static void af_f64_le(void) {
 /* 10.3 fatia A: as seis matematicas. Uma varredura por funcao -- sao corpos
    distintos apos a expansao da macro, entao cada uma tem seus proprios pontos
    de alocacao. Tabela em vez de seis funcoes iguais. */
+/* 10.3 fatia B: abs/round/clip. As i64 podem liberar o resultado a meio caminho
+   (INT64_MIN em abs, overflow em round) -- caminho que so aparece sob OOM se o
+   alloc passar e a validacao falhar depois. */
+static void af_math_dtype_preserving(void) {
+    double  fa[3] = {-1.5, 2.5, 3.0};
+    int64_t ia[3] = {-15, 25, 30};
+    reset(-1);
+    smaug_series_f64_t *xf = smaug_f64_create_from_array(fa, 3);
+    smaug_series_i64_t *xi = smaug_i64_create_from_array(ia, 3);
+    assert(xf && xi);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_status_t st;
+        smaug_series_f64_t *r1 = smaug_f64_abs(xf);
+        if (r1) { OK(r1->size == 3, "f64 abs ok"); smaug_f64_free(r1); }
+        smaug_series_f64_t *r2 = smaug_f64_round(xf, 1);
+        if (r2) { OK(r2->size == 3, "f64 round ok"); smaug_f64_free(r2); }
+        smaug_series_f64_t *r3 = smaug_f64_clip(xf, -1, true, 1, true, &st);
+        if (r3) { OK(r3->size == 3, "f64 clip ok"); smaug_f64_free(r3); }
+        smaug_series_i64_t *r4 = smaug_i64_abs(xi, &st);
+        if (r4) { OK(r4->size == 3, "i64 abs ok"); smaug_i64_free(r4); }
+        smaug_series_i64_t *r5 = smaug_i64_round(xi, -1, &st);
+        if (r5) { OK(r5->size == 3, "i64 round ok"); smaug_i64_free(r5); }
+        smaug_series_i64_t *r6 = smaug_i64_clip(xi, -10, true, 10, true, &st);
+        if (r6) { OK(r6->size == 3, "i64 clip ok"); smaug_i64_free(r6); }
+    }
+    smaug_f64_free(xf); smaug_i64_free(xi);
+}
 static void af_f64_math(void) {
     typedef smaug_series_f64_t *(*mathfn)(const smaug_series_f64_t *);
     mathfn fns[] = { smaug_f64_sin, smaug_f64_cos, smaug_f64_tan,
@@ -2474,6 +2502,7 @@ int main(void) {
     af_f64_ne();
     af_f64_between();
     af_f64_math();
+    af_math_dtype_preserving();
     af_f64_argsort();
     af_f64_sort();
     af_f64_take();

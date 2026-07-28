@@ -11,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-07-28 13:23:22 UTC
+Gerado em: 2026-07-28 17:15:04 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -269,10 +269,11 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 **Fora de escopo por natureza (12.20 frente 4):** `smaug_convert.h` (`smaug_parse_i64/f64`, `smaug_fmt_i64/f64` e variantes _cstr — 6 funções) não entra nas tabelas acima. São infraestrutura interna de parsing/formatação usada entre arquivos C (astype.c, csv.c, json.c) — nunca expostas ao Lua via FFI (confirmado: zero ocorrências no cdef). Colocá-las aqui as marcaria 🟨 permanentemente — ruído, não achado, já que por design não devem ter caminho Lua direto.
 
 
-### f64 — 67 funções C
+### f64 — 70 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
+| `abs` | 🟩 |  |
 | `add` | 🟩 |  |
 | `add_scalar` | 🟩 |  |
 | `append` | 🟩 |  |
@@ -282,6 +283,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `argsort` | 🟩 |  |
 | `between` | 🟩 |  |
 | `bfill` | 🟩 |  |
+| `clip` | 🟩 |  |
 | `clone` | 🟩 |  |
 | `coalesce` | 🟩 |  |
 | `coalesce_scalar` | 🟩 |  |
@@ -324,6 +326,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `rolling_std` | 🟩 |  |
 | `rolling_sum` | 🟩 |  |
 | `rolling_var` | 🟩 |  |
+| `round` | 🟩 |  |
 | `select` | 🟩 |  |
 | `set` | 🟩 |  |
 | `set_null` | 🟩 |  |
@@ -342,10 +345,11 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `view` | 🟩 |  |
 
 
-### i64 — 60 funções C
+### i64 — 63 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
+| `abs` | 🟩 |  |
 | `add` | 🟩 |  |
 | `add_scalar` | 🟩 |  |
 | `append` | 🟩 |  |
@@ -355,6 +359,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `argsort` | 🟩 |  |
 | `between` | 🟩 |  |
 | `bfill` | 🟩 |  |
+| `clip` | 🟩 |  |
 | `clone` | 🟩 |  |
 | `coalesce` | 🟩 |  |
 | `coalesce_scalar` | 🟩 |  |
@@ -393,6 +398,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `rolling_std` | 🟩 |  |
 | `rolling_sum` | 🟩 |  |
 | `rolling_var` | 🟩 |  |
+| `round` | 🟩 |  |
 | `select` | 🟩 |  |
 | `set` | 🟩 |  |
 | `set_null` | 🟩 |  |
@@ -754,7 +760,7 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 231/231 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 236/236 erros com prefixo `smaug:` (100.0%)
 - `dataset.lua`: 94/94 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
@@ -793,7 +799,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | arquivo | checks | float64 | int64 | bool | string | datetime | categorical |
 | :--- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
 | `series/test_constructors` | 382 | 44 | 67 | 23 | 21 | 3 | 1 |
-| `series/test_access` | 162 | 21 | 18 | 1 | 13 | 3 | — |
+| `series/test_access` | 185 | 22 | 25 | 1 | 14 | 3 | — |
 | `series/test_reduce` | 57 | 7 | 2 | 3 | 4 | 2 | — |
 | `series/test_stat` | 70 | 6 | 12 | — | 9 | — | — |
 | `series/test_window` | 137 | 10 | 12 | 3 | 7 | 2 | — |
@@ -811,16 +817,16 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 88 | 23 | 3 | 2 | 5 | 1 | 1 |
 
-**Total de checks:** 2774
+**Total de checks:** 2797
 
 ### Menções totais por dtype (toda a suite)
 
 | dtype | menções |
 | :--- | :-: |
-| float64 | 211 |
-| int64 | 357 |
+| float64 | 212 |
+| int64 | 364 |
 | bool | 69 |
-| string | 235 |
+| string | 236 |
 | datetime | 96 |
 | categorical | 63 |
 
@@ -902,7 +908,7 @@ O `cdef` do `ffi_loader.lua` replica à mão o layout de cada struct dos headers
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 1073
+- 🟩 paridade: 1079
 - ⬜ exceção registrada: 215
 - 🟨 suspeita (revisar): 279
 - 🟥 inconsistência clara: 15

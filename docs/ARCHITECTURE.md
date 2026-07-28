@@ -83,6 +83,25 @@ externo. Não conhece Series, DataSet, CSV, SQL, modelos nem interfaces.
 
 **Não conhece:** Series, DataSet, CSV, SQL, modelos, interfaces.
 
+**Evolução prevista `[Concept]`** — o Núcleo fechou para o que a v1.0 precisa, não
+para sempre. A Trilha Analítica (Anéis 6–8) pressiona o runtime em quatro frentes,
+todas *dentro* do Anel 0 porque são mecanismo, não semântica:
+
+- **Alocação especializada** — arenas e pools. Hoje cada série aloca por conta
+  própria; um grafo de tensores com milhares de temporários intermediários torna
+  isso caro. Arena por escopo de execução resolve, e é a única frente que
+  provavelmente vira necessidade antes das outras.
+- **SIMD** — os laços element-wise do Anel 0 são vetorizáveis por natureza. Hoje
+  dependem do auto-vetorizador do compilador; intrínsecos explícitos são um passo
+  possível, com o custo de virar código por arquitetura.
+- **Paralelismo** — o Anel 0 já é reentrante por contrato (Contrato 11), o que é
+  pré-requisito. Falta o scheduler. Note que **o LuaJIT é single-thread**: o
+  paralelismo teria de viver inteiro no C, com o Lua orquestrando, nunca
+  participando.
+- **Abstração CPU/GPU** — a de maior custo e a que mais muda o modelo mental
+  (memória de host × device, assincronia, streams). Ver a nota sobre dependências
+  na seção *Princípios da Trilha Analítica*.
+
 ---
 
 ## Anel 1 — Abstrações de Dados `[Done]`
@@ -218,20 +237,42 @@ Trilha Analítica. Tipo matricial 2D denso, distinto do `DataSet` heterogêneo.
 
 **Responsabilidades:**
 - Layout 2D denso sobre buffer contíguo (a porta que o Bloco G mantém aberta)
-- Álgebra linear básica, reduções por eixo, normalização
+- Reduções por eixo, normalização
+- **Álgebra linear**: operações no estilo BLAS (produto matricial, produto
+  externo, triangulares), decomposições (LU, QR, Cholesky, SVD)
+- **FFT** e convoluções, quando houver caso de uso real que as justifique
+- **Esparso** como representação alternativa — decisão a tomar quando chegar:
+  formato próprio (CSR/CSC) ou fora de escopo
 
 **Regra arquitetural:** Matrix consome buffers do Núcleo. O DataSet não conhece
 Matrix.
+
+**Onde a decisão fica difícil:** produto matricial é a operação mais otimizada da
+história do software. Um `gemm` honesto escrito à mão roda ordens de magnitude
+abaixo de uma BLAS madura. Ver *Princípios da Trilha Analítica* — a regra é ser
+dono da estrutura, não da aritmética.
 
 ---
 
 ## Anel 7 — Tensor `[Concept]`
 
-Trilha Analítica. Generalização N-dimensional do Matrix.
+Trilha Analítica. Generalização N-dimensional do Matrix, e onde mora a máquina
+que torna a diferenciação automática possível.
 
 **Responsabilidades:**
 - Tensores N-dimensionais
 - Broadcasting axis-aware (pertence aqui, **não** ao Anel 1 — Fronteira encerrada)
+- **Motor de forma**: shape, strides, layout. É o que faz `view`, `reshape`,
+  `transpose` e slicing serem O(1) em vez de cópia — a mesma tese do COW do Anel
+  0, um nível acima
+- **Grafo computacional**: representação, execução, e — se houver ganho medido —
+  fusão de operações e execução preguiçosa
+- **Autograd**: reverse mode (o que serve treino), tape, operadores customizados.
+  Forward mode e checkpointing entram só se houver caso concreto
+
+**Ordem interna:** o motor de forma vem antes do grafo, e o grafo antes do
+autograd. Cada um é pré-requisito do seguinte, e cada um é útil sozinho — dá para
+parar em qualquer ponto com algo que funciona.
 
 ---
 
@@ -240,18 +281,52 @@ Trilha Analítica. Generalização N-dimensional do Matrix.
 Trilha Analítica. Transforma dados em modelos preditivos. **Ponto de encontro das
 duas trilhas:** consome o schema dos Models (Anel 5) e os buffers do Núcleo.
 
-**Responsabilidades:**
-- Pipelines de preparação (imputação, encoding, normalização) reusando primitivas
-  do Anel 0
-- Treinamento e inferência
-- Engenharia de atributos
-- Análise exploratória, profiling, estatísticas descritivas avançadas
-
 **Regra arquitetural:** ML consome DataSets e Models. DataSets e Models não
 conhecem ML.
 
 **Lazy evaluation:** vem junto com ou depois do SQL (Anel 3 v1.5), porque o maior
 ganho é o predicate pushdown sobre fontes externas.
+
+O anel se divide em três blocos com **viabilidade muito diferente entre si** —
+tratá-los como um só é o erro mais fácil de cometer aqui.
+
+**8a. Preparação e ML clássico** — o mais próximo do que o Smaug já é.
+- Pipelines de preparação (imputação, encoding, normalização) reusando primitivas
+  do Anel 0; engenharia de atributos; análise exploratória e profiling
+- `Dataset`/`DataLoader`, transforms, batching, métricas, avaliação
+- Regressão, árvores, SVM, k-means, PCA — precisam de **Matrix e otimização
+  simples**, não de autograd
+
+**8b. Treino de redes neurais** — depende do autograd (Anel 7) e é onde o custo
+salta.
+- Losses, callbacks, laço de treinamento
+- Otimizadores: SGD, momentum, Nesterov, RMSProp, Adagrad, Adam, AdamW; Adafactor
+  quando o tamanho do modelo justificar
+- Camadas: Dense, Conv1D/2D/3D, Embedding, BatchNorm, LayerNorm, RMSNorm, Dropout,
+  Pooling, Multi-Head Attention, Feed-Forward, Positional Encoding. Mixture of
+  Experts é etapa muito posterior, se houver
+- **Sem paralelismo e sem GPU (Anel 0), treinar deixa de ser lento e passa a ser
+  inviável** para qualquer modelo além do didático. Isso não é opinião sobre
+  ambição; é aritmética de tempo de parede.
+
+**8c. Inferência** — o bloco onde o Smaug tem vantagem real, e não derivada.
+- Carregamento e serialização de modelos, importação/exportação de pesos
+- Execução otimizada, quantização (INT8, INT4; FP8 no futuro), KV cache para
+  Transformers
+- Geração autoregressiva e estratégias de decodificação (greedy, top-k, top-p,
+  beam search); tokenizer, vocabulário, embeddings
+- LoRA e outros métodos de ajuste fino eficiente ficam na fronteira entre 8b e 8c
+
+**Por que 8c é diferente dos outros dois:** inferência não precisa de autograd,
+não precisa de treino distribuído e tolera muito melhor a ausência de GPU. Um
+runtime em C, sem dependências, com pegada pequena e verificação forte roda onde
+um stack Python não roda — dispositivo restrito, ambiente sem instalação
+possível, contexto auditável. É a única parte desta trilha em que "o Smaug faz
+melhor" é uma frase defensável em vez de aspiracional.
+
+**Visão computacional** entra como aplicação sobre 8a e 8c: processamento básico
+de imagem, transformações geométricas, filtros, augmentations, datasets — com
+interoperabilidade direta com Tensor, sem tipo de imagem paralelo.
 
 ---
 
@@ -264,6 +339,77 @@ consomem serviços — não definem lógica de negócio nem semântica de dados.
 - TUI, Studio (Smaug|Vialactea Studio)
 - Rich console: `describe`, `explain`, inspeção de schema; profiling; debug
 - Dashboards, integrações com notebooks, exploradores visuais
+- **Ferramental de engenharia**: profiler, suíte de benchmark, testes de
+  regressão de desempenho, documentação automática, sistema de plugins,
+  compatibilidade entre versões, testes diferenciais contra implementações de
+  referência
+
+**Nota sobre benchmark:** hoje a correção é medida à exaustão (MC/DC, Valgrind,
+falha de alocação, property-based, mutação) e **o desempenho não é medido**. Todo
+o item 10 do Roadmap se justifica por coerência arquitetural, não por número. Isso
+é sustentável enquanto o Smaug é uma biblioteca de dados; deixa de ser no momento
+em que a Trilha Analítica começa, porque ali as decisões (SIMD? BLAS externa?
+fusão de operações?) só podem ser tomadas contra medição.
+
+---
+
+## Princípios da Trilha Analítica
+
+Decisões tomadas **antes** de começar os Anéis 6–8, porque são caras de reverter
+depois e porque cada uma responde a uma tentação previsível.
+
+**1. "Zero dependências" é regra do Anel 0, não doutrina global.**
+A régua de versões abaixo já diz isto — a v1.5 introduz libsqlite3/zlib. O Núcleo
+não depende de nada porque é o que garante que o Smaug compile em qualquer lugar
+com um compilador C11. Anéis externos podem depender, desde que a dependência
+seja *opcional* e exista caminho de referência sem ela. GPU cai nesta regra.
+
+**2. Ser dono da estrutura, não da aritmética.**
+O núcleo é dono de tensor, forma, strides, layout, propriedade de memória e ciclo
+de vida — é isso que define o projeto e é onde o esforço próprio compensa. BLAS,
+CUDA e afins entram como **aceleradores plugáveis**, atrás de uma interface, com
+implementação de referência em C que sempre funciona.
+
+O critério que separa as duas: *reinventar para entender* é legítimo (autograd,
+camadas, o grafo — refazer é o mecanismo de aprender como funcionam);
+*reinventar o que já foi vencido* não é (um `gemm` competitivo é décadas de
+trabalho de gente que faz só isso). A pergunta prática é: se eu escrever isto à
+mão, aprendo algo que não aprenderia lendo a especificação?
+
+**3. Treino e inferência não têm a mesma viabilidade.**
+Ver Anel 8. Treinar exige paralelismo, GPU e escala; inferência compacta não
+exige nada disso e é onde a pegada pequena e a verificação forte viram vantagem.
+Tratar os dois como "ML" esconde essa diferença.
+
+**4. A ordem é comer antes de crescer.**
+Corpus e ETL antes de modelo. Digitalizar, limpar, normalizar e tokenizar é
+trabalho de Anéis 1–3 — que já existem. Um corpus bem construído é reutilizável
+em qualquer direção posterior; um modelo mal treinado sobre dado ruim não é
+reutilizável em nenhuma.
+
+**5. Ordem de dependência não é ordem de valor.**
+A trilha tem ordem técnica obrigatória (runtime → Matrix → Tensor → grafo →
+autograd → redes). Mas construir nessa ordem significa anos antes que qualquer
+coisa seja usável. Cada anel deve entregar algo utilizável sozinho: Matrix serve
+estatística e álgebra sem tensor; Tensor serve manipulação N-d sem autograd;
+8a serve ML clássico sem redes neurais.
+
+**Critério de verificação da trilha.** Um alvo concreto e falsificável vale mais
+que um inventário de capacidades: **resolver os exemplos e exercícios do *Mãos à
+Obra: Aprendizado de Máquina com Scikit-Learn, Keras & TensorFlow* usando apenas
+o Smaug**. O livro se divide onde a arquitetura também se divide — os capítulos
+de ML clássico exercitam 8a (Matrix, otimização simples, pipelines de dados) e os
+de redes neurais exercitam 8b (autograd, camadas, otimizadores). Chegar ao fim da
+primeira metade já é marco pleno, e é o ponto natural para reavaliar se a segunda
+compensa.
+
+**Sobre escala, honestamente.** O análogo mais próximo desta trilha em C com
+poucas dependências é o `ggml`: ~30 mil linhas, focado em inferência, sem autograd
+genérico. Os anéis 0–3 do Smaug somam ~18 mil linhas de implementação com
+~22 mil de teste. A trilha completa — treino, autograd, GPU, visão — é escala de
+framework consolidado, não de projeto solo. Isto não é argumento para não fazer;
+é argumento para fatiar, medir e manter cada fatia útil sozinha, que é a
+disciplina que o projeto já pratica nos anéis internos.
 
 ---
 

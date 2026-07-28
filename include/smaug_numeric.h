@@ -35,6 +35,30 @@ smaug_series_f64_t* smaug_f64_tan (const smaug_series_f64_t *a);
 smaug_series_f64_t* smaug_f64_exp (const smaug_series_f64_t *a);
 smaug_series_f64_t* smaug_f64_log (const smaug_series_f64_t *a);
 smaug_series_f64_t* smaug_f64_sqrt(const smaug_series_f64_t *a);
+smaug_series_f64_t* smaug_f64_abs (const smaug_series_f64_t *a);
+
+/* round: half-away-from-zero. ndigits < 0 arredonda casas ANTES da virgula.
+   clip: has_lo/has_hi expressam limite ausente. lo > hi e ERRO (faixa
+   contraditoria nao tem semantica valida), sinalizado por SMG_ERR_ARGUMENT. */
+smaug_series_f64_t* smaug_f64_round(const smaug_series_f64_t *a, int ndigits);
+smaug_series_f64_t* smaug_f64_clip (const smaug_series_f64_t *a,
+                                    double lo, bool has_lo,
+                                    double hi, bool has_hi,
+                                    smaug_status_t *status);
+
+/* Versoes int64: preservam o dtype, aritmetica inteira pura (sem double em
+   lugar nenhum) -- e o que torna o suporte a > 2^53 real.
+   abs: INT64_MIN nao tem contrapartida positiva -> SMG_ERR_ARGUMENT.
+   round: ndigits >= 0 e identidade (copia exata); ndigits < 0 quantiza por
+   10^|n|, com erro se |n| >= 19 ou se o resultado sair da faixa. */
+smaug_series_i64_t* smaug_i64_abs  (const smaug_series_i64_t *a,
+                                    smaug_status_t *status);
+smaug_series_i64_t* smaug_i64_round(const smaug_series_i64_t *a, int ndigits,
+                                    smaug_status_t *status);
+smaug_series_i64_t* smaug_i64_clip (const smaug_series_i64_t *a,
+                                    int64_t lo, bool has_lo,
+                                    int64_t hi, bool has_hi,
+                                    smaug_status_t *status);
 
 /* coalesce_scalar (null-mask): onde self[i] é nulo, entra value; senão self[i].
    NaN existente preservado (opera sobre máscara). Serve fillna. */
