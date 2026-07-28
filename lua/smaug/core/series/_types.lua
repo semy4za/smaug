@@ -196,6 +196,12 @@ return function(I)
             cmp_ge = function(c, t, om) if type(t)~="string" then error("smaug: comparação de string espera string",4) end return C.smaug_str_ge(c,t,#t,om) end,
             cmp_le = function(c, t, om) if type(t)~="string" then error("smaug: comparação de string espera string",4) end return C.smaug_str_le(c,t,#t,om) end,
             cmp_ne = function(c, t, om) if type(t)~="string" then error("smaug: comparação de string espera string",4) end return C.smaug_str_ne(c,t,#t,om) end,
+            cmp_between = function(c, lo, hi, inc_lo, inc_hi, om)
+                if type(lo)~="string" or type(hi)~="string" then
+                    error("smaug: between de string espera strings",5)
+                end
+                return C.smaug_str_between(c, lo, #lo, hi, #hi, inc_lo, inc_hi, om)
+            end,
             filter = C.smaug_str_filter,
             take   = C.smaug_str_take,
             view    = C.smaug_str_view,   -- 9.2: view + COW (offset-based, modelo A1)
@@ -279,6 +285,14 @@ return function(I)
             cmp_ge = function(c, t, om) return C.smaug_dt_ge(c, int_scalar.check_operation(t, "comparação de datetime (epoch_ms)", 5), om) end,
             cmp_le = function(c, t, om) return C.smaug_dt_le(c, int_scalar.check_operation(t, "comparação de datetime (epoch_ms)", 5), om) end,
             cmp_ne = function(c, t, om) return C.smaug_dt_ne(c, int_scalar.check_operation(t, "comparação de datetime (epoch_ms)", 5), om) end,
+            -- between: os dois limites passam pela fronteira do escalar (9.3).
+            -- epoch_ms e int64_t, entao a regra vale igual ao i64 -- latente na
+            -- pratica (2^53 ms = ano 287586), mas coerente com a familia.
+            cmp_between = function(c, lo, hi, inc_lo, inc_hi, om)
+                lo = int_scalar.check_operation(lo, "between de datetime (limite inferior, epoch_ms)", 5)
+                hi = int_scalar.check_operation(hi, "between de datetime (limite superior, epoch_ms)", 5)
+                return C.smaug_dt_between(c, lo, hi, inc_lo, inc_hi, om)
+            end,
             is_int_sentinel = function(v) return v == I64_MIN end,
         },
         bool = {

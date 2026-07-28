@@ -350,6 +350,10 @@ ffi.cdef([[
     uint8_t* smaug_str_ge(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
     uint8_t* smaug_str_le(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
     uint8_t* smaug_str_ne(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
+    uint8_t* smaug_str_between(const smaug_series_str_t *s,
+                               const char *lo, size_t lo_len,
+                               const char *hi, size_t hi_len,
+                               bool inc_lo, bool inc_hi, smaug_mask_t **out_mask);
 
     /* --- Seleção --- */
     smaug_series_str_t* smaug_str_filter(const smaug_series_str_t *s, const uint8_t *mask);
@@ -488,6 +492,8 @@ ffi.cdef([[
     uint8_t* smaug_dt_ge(const smaug_series_dt_t *s, int64_t threshold, uint8_t **out_mask);
     uint8_t* smaug_dt_le(const smaug_series_dt_t *s, int64_t threshold, uint8_t **out_mask);
     uint8_t* smaug_dt_ne(const smaug_series_dt_t *s, int64_t threshold, uint8_t **out_mask);
+    uint8_t* smaug_dt_between(const smaug_series_dt_t *s, int64_t lo, int64_t hi,
+                              bool inc_lo, bool inc_hi, uint8_t **out_mask);
 
     /* Seleção e ordenação */
     size_t             smaug_dt_count_nonnull(const smaug_series_dt_t *s);

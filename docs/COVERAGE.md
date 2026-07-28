@@ -3,9 +3,9 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `98720fd`  |  Data: 2026-07-27 17:37:54 -0300
+- Commit medido: `e45c0e1`  |  Data: 2026-07-27 21:23:58 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `4101/4455 = 92.05%` -- 128 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- **Branch-bruto** (todos os ramos): `4145/4499 = 92.13%` -- 128 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 | Arquivo | Linhas | Branch-alvo (taken) |
@@ -14,15 +14,15 @@
 | `smaug_convert.c` | `37/37 = 100.00%` `[██████████]` | `37/37 = 100.00%` `[██████████]` |
 | `smaug_core.c` | `402/402 = 100.00%` `[██████████]` | `290/290 = 100.00%` `[██████████]` |
 | `smaug_csv.c` | `298/306 = 97.39%` `[█████████░]` | `333/370 = 90.00%` `[█████████░]` |
-| `smaug_datetime.c` | `540/546 = 98.90%` `[█████████░]` | `575/620 = 92.74%` `[█████████░]` |
+| `smaug_datetime.c` | `559/565 = 98.94%` `[█████████░]` | `603/648 = 93.06%` `[█████████░]` |
 | `smaug_json.c` | `352/364 = 96.70%` `[█████████░]` | `417/463 = 90.06%` `[█████████░]` |
 | `smaug_ops_bool.c` | `314/320 = 98.12%` `[█████████░]` | `380/407 = 93.37%` `[█████████░]` |
 | `smaug_ops_f64.c` | `514/514 = 100.00%` `[██████████]` | `538/540 = 99.63%` `[██████████]` |
 | `smaug_ops_i64.c` | `496/499 = 99.40%` `[█████████░]` | `524/534 = 98.13%` `[█████████░]` |
-| `smaug_ops_str.c` | `270/277 = 97.47%` `[█████████░]` | `300/324 = 92.59%` `[█████████░]` |
-| `smaug_ops_window.c` | `329/334 = 98.50%` `[█████████░]` | `344/379 = 90.77%` `[█████████░]` |
+| `smaug_ops_str.c` | `278/285 = 97.54%` `[█████████░]` | `318/342 = 92.98%` `[█████████░]` |
+| `smaug_ops_window.c` | `326/331 = 98.49%` `[█████████░]` | `342/377 = 90.72%` `[█████████░]` |
 | `smaug_str.c` | `297/297 = 100.00%` `[██████████]` | `254/254 = 100.00%` `[██████████]` |
-| **TOTAL** | `3967/4014 = 98.83%` `[█████████░]` | `4101/4327 = 94.78%` `[█████████░]` |
+| **TOTAL** | `3991/4038 = 98.84%` `[█████████░]` | `4145/4371 = 94.83%` `[█████████░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
@@ -86,16 +86,16 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_datetime.c:717` — DT_CMP_IMPL(ge, >=)
 - `smaug_datetime.c:718` — DT_CMP_IMPL(le, <=)
 - `smaug_datetime.c:719` — DT_CMP_IMPL(ne, !=)
-- `smaug_datetime.c:746` — if (!entries) return NULL;
-- `smaug_datetime.c:757` — if (!indices) { free(entries); return NULL; }
-- `smaug_datetime.c:877` — if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
-- `smaug_datetime.c:906` — if (!s || s->size == 0) return SIZE_MAX;
-- `smaug_datetime.c:927` — if (!s || s->size == 0) return DT_SENTINEL;
-- `smaug_datetime.c:944` — if (!s || s->size == 0) return DT_SENTINEL;
-- `smaug_datetime.c:953` — } else if (!ignore_na) {
-- `smaug_datetime.c:957` — return found ? result : DT_SENTINEL;
-- `smaug_datetime.c:981` — if (m == 0) return result;
-- `smaug_datetime.c:1003` — switch (method) {
+- `smaug_datetime.c:787` — if (!entries) return NULL;
+- `smaug_datetime.c:798` — if (!indices) { free(entries); return NULL; }
+- `smaug_datetime.c:918` — if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
+- `smaug_datetime.c:947` — if (!s || s->size == 0) return SIZE_MAX;
+- `smaug_datetime.c:968` — if (!s || s->size == 0) return DT_SENTINEL;
+- `smaug_datetime.c:985` — if (!s || s->size == 0) return DT_SENTINEL;
+- `smaug_datetime.c:994` — } else if (!ignore_na) {
+- `smaug_datetime.c:998` — return found ? result : DT_SENTINEL;
+- `smaug_datetime.c:1022` — if (m == 0) return result;
+- `smaug_datetime.c:1044` — switch (method) {
 
 **`smaug_json.c`** — 37 linha(s) com ramo descoberto:
 - `smaug_json.c:44` — while (l->pos < l->len) {
@@ -174,54 +174,54 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_ops_i64.c:853` — switch (method) {
 
 **`smaug_ops_str.c`** — 19 linha(s) com ramo descoberto:
-- `smaug_ops_str.c:258` — while (lo < hi) {
-- `smaug_ops_str.c:271` — if (i <= j) { sort_swap(a, i, j); i++; if (j > 0) j--; }
-- `smaug_ops_str.c:274` — if (j > lo && (j - lo) < (hi - i)) { sort_idx(a, lo, j, s); lo = i; }
-- `smaug_ops_str.c:275` — else if (i < hi)                   { sort_idx(a, i, hi, s); hi = j; }
-- `smaug_ops_str.c:276` — else if (j > lo)                   { hi = j; }
-- `smaug_ops_str.c:375` — size_t *src = malloc((s->size ? s->size : 1) * sizeof(size_t));
-- `smaug_ops_str.c:406` — int all_null = (periods <= -(int64_t)n || periods >= (int64_t)n);
-- `smaug_ops_str.c:464` — if (!s || s->size == 0) return SIZE_MAX;
-- `smaug_ops_str.c:485` — if (out_len) *out_len = 0;
-- `smaug_ops_str.c:486` — if (!s || s->size == 0) return NULL;
-- `smaug_ops_str.c:488` — for (size_t i = 0; i < s->size; i++)
-- `smaug_ops_str.c:498` — if (out_len) *out_len = 0;
-- `smaug_ops_str.c:499` — if (!s || s->size == 0) return NULL;
-- `smaug_ops_str.c:500` — if (!ignore_na) {
-- `smaug_ops_str.c:501` — for (size_t i = 0; i < s->size; i++)
-- `smaug_ops_str.c:502` — if (SMAUG_NULL(s->null_mask, i)) return NULL;
-- `smaug_ops_str.c:505` — if (idx == SIZE_MAX) return NULL;
-- `smaug_ops_str.c:536` — if (m > 1) sort_idx(idx, 0, m - 1, s);
-- `smaug_ops_str.c:547` — switch (method) {
+- `smaug_ops_str.c:309` — while (lo < hi) {
+- `smaug_ops_str.c:322` — if (i <= j) { sort_swap(a, i, j); i++; if (j > 0) j--; }
+- `smaug_ops_str.c:325` — if (j > lo && (j - lo) < (hi - i)) { sort_idx(a, lo, j, s); lo = i; }
+- `smaug_ops_str.c:326` — else if (i < hi)                   { sort_idx(a, i, hi, s); hi = j; }
+- `smaug_ops_str.c:327` — else if (j > lo)                   { hi = j; }
+- `smaug_ops_str.c:426` — size_t *src = malloc((s->size ? s->size : 1) * sizeof(size_t));
+- `smaug_ops_str.c:457` — int all_null = (periods <= -(int64_t)n || periods >= (int64_t)n);
+- `smaug_ops_str.c:505` — if (!s || s->size == 0) return SIZE_MAX;
+- `smaug_ops_str.c:526` — if (out_len) *out_len = 0;
+- `smaug_ops_str.c:527` — if (!s || s->size == 0) return NULL;
+- `smaug_ops_str.c:529` — for (size_t i = 0; i < s->size; i++)
+- `smaug_ops_str.c:539` — if (out_len) *out_len = 0;
+- `smaug_ops_str.c:540` — if (!s || s->size == 0) return NULL;
+- `smaug_ops_str.c:541` — if (!ignore_na) {
+- `smaug_ops_str.c:542` — for (size_t i = 0; i < s->size; i++)
+- `smaug_ops_str.c:543` — if (SMAUG_NULL(s->null_mask, i)) return NULL;
+- `smaug_ops_str.c:546` — if (idx == SIZE_MAX) return NULL;
+- `smaug_ops_str.c:577` — if (m > 1) sort_idx(idx, 0, m - 1, s);
+- `smaug_ops_str.c:588` — switch (method) {
 
 **`smaug_ops_window.c`** — 27 linha(s) com ramo descoberto:
-- `smaug_ops_window.c:32` — switch (col->kind) {
-- `smaug_ops_window.c:133` — if (!ffi_cols || ncols == 0 || nrows == 0) return NULL;
-- `smaug_ops_window.c:214` — double *out = malloc((n ? n : 1) * sizeof(double));
-- `smaug_ops_window.c:239` — switch (kind) {
-- `smaug_ops_window.c:254` — if (num < 0.0) num = 0.0;   /* guarda contra erro numérico */
-- `smaug_ops_window.c:326` — if (!s || window == 0) return NULL;
-- `smaug_ops_window.c:333` — if (!s || window == 0) return NULL;
-- `smaug_ops_window.c:341` — if (!s || window == 0) return NULL;
-- `smaug_ops_window.c:375` — if (cnt == 0 || s->data[j] < best) best = s->data[j];
-- `smaug_ops_window.c:379` — if (cnt >= min_periods) {
-- `smaug_ops_window.c:392` — if (i + 1 >= window && !deque_empty(&dq) &&
-- `smaug_ops_window.c:435` — if (SMAUG_VALID(s->null_mask, j)) {
-- `smaug_ops_window.c:436` — if (cnt == 0 || s->data[j] > best) best = s->data[j];
-- `smaug_ops_window.c:440` — if (cnt >= min_periods) {
-- `smaug_ops_window.c:452` — if (i + 1 >= window && !deque_empty(&dq) &&
-- `smaug_ops_window.c:458` — while (!deque_empty(&dq) && deque_front(&dq) + window <= i)
-- `smaug_ops_window.c:511` — double *tmp = malloc((s->size ? s->size : 1) * sizeof(double));
-- `smaug_ops_window.c:528` — if (!s || window == 0) return NULL;
-- `smaug_ops_window.c:534` — if (!s || window == 0) return NULL;
-- `smaug_ops_window.c:540` — if (!s || window == 0) return NULL;
-- `smaug_ops_window.c:557` — if (!s || window == 0) return NULL;
-- `smaug_ops_window.c:571` — if (cnt >= min_periods) {
-- `smaug_ops_window.c:604` — if (!s || window == 0) return NULL;
-- `smaug_ops_window.c:613` — if (SMAUG_VALID(s->null_mask, j)) {
-- `smaug_ops_window.c:614` — if (cnt == 0 || s->data[j] > best) best = s->data[j];
-- `smaug_ops_window.c:618` — if (cnt >= min_periods) {
-- `smaug_ops_window.c:630` — while (!deque_empty(&dq) && deque_front(&dq) + window <= i)
+- `smaug_ops_window.c:33` — switch (col->kind) {
+- `smaug_ops_window.c:135` — if (!ffi_cols || ncols == 0 || nrows == 0) return NULL;
+- `smaug_ops_window.c:216` — double *out = malloc((n ? n : 1) * sizeof(double));
+- `smaug_ops_window.c:241` — switch (kind) {
+- `smaug_ops_window.c:256` — if (num < 0.0) num = 0.0;   /* guarda contra erro numérico */
+- `smaug_ops_window.c:328` — if (!s || window == 0) return NULL;
+- `smaug_ops_window.c:335` — if (!s || window == 0) return NULL;
+- `smaug_ops_window.c:343` — if (!s || window == 0) return NULL;
+- `smaug_ops_window.c:377` — if (cnt == 0 || s->data[j] < best) best = s->data[j];
+- `smaug_ops_window.c:381` — if (cnt >= min_periods) {
+- `smaug_ops_window.c:394` — if (i + 1 >= window && !deque_empty(&dq) &&
+- `smaug_ops_window.c:437` — if (SMAUG_VALID(s->null_mask, j)) {
+- `smaug_ops_window.c:438` — if (cnt == 0 || s->data[j] > best) best = s->data[j];
+- `smaug_ops_window.c:442` — if (cnt >= min_periods) {
+- `smaug_ops_window.c:454` — if (i + 1 >= window && !deque_empty(&dq) &&
+- `smaug_ops_window.c:460` — while (!deque_empty(&dq) && deque_front(&dq) + window <= i)
+- `smaug_ops_window.c:513` — double *tmp = malloc((s->size ? s->size : 1) * sizeof(double));
+- `smaug_ops_window.c:530` — if (!s || window == 0) return NULL;
+- `smaug_ops_window.c:536` — if (!s || window == 0) return NULL;
+- `smaug_ops_window.c:542` — if (!s || window == 0) return NULL;
+- `smaug_ops_window.c:559` — if (!s || window == 0) return NULL;
+- `smaug_ops_window.c:573` — if (cnt >= min_periods) {
+- `smaug_ops_window.c:606` — if (!s || window == 0) return NULL;
+- `smaug_ops_window.c:615` — if (SMAUG_VALID(s->null_mask, j)) {
+- `smaug_ops_window.c:616` — if (cnt == 0 || s->data[j] > best) best = s->data[j];
+- `smaug_ops_window.c:620` — if (cnt >= min_periods) {
+- `smaug_ops_window.c:632` — while (!deque_empty(&dq) && deque_front(&dq) + window <= i)
 
 ## Ramos excluidos (`COV-EXCL-BR` -- defensivos/inalcancaveis, documentados)
 
@@ -342,9 +342,9 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_ops_i64.c:161` — falha de alloc do clone; OOM sem injecao
 - `smaug_ops_i64.c:182` — falha de alloc do clone; OOM sem injecao
 - `smaug_ops_i64.c:204` — OOM sem injecao
-- `smaug_ops_str.c:81` — mode e enum interno (LT/GT/LE/GE aqui); case default inalcancavel
-- `smaug_ops_window.c:410` — loop-body inalcançável — a if em 258-260 já trata o único item stale possível; by invariante de 266, no máximo um item envelhece por passo de null
-- `smaug_ops_window.c:467` — loop-body inalcançável — mesma invariante que linha 276 (rolling_min)
+- `smaug_ops_str.c:85` — mode e enum interno (LT/GT/LE/GE aqui); case default inalcancavel
+- `smaug_ops_window.c:412` — loop-body inalcançável — a if em 258-260 já trata o único item stale possível; by invariante de 266, no máximo um item envelhece por passo de null
+- `smaug_ops_window.c:469` — loop-body inalcançável — mesma invariante que linha 276 (rolling_min)
 - `smaug_str.c:104` — offsets_owned=false nao existe na API atual; o campo separa a posse do offsets da do buffer (modelo A1, smaug_types.h) — sem ele o free inferiria posse por acoplamento external_alloc+is_view
 - `smaug_str.c:164` — total ~ SIZE_MAX; inalcancavel
 - `smaug_str.c:214` — falha de alloc; OOM sem injecao

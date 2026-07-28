@@ -10,6 +10,7 @@
 
 #include "../include/smaug_types.h"
 #include "../include/smaug_string.h"
+#include "../include/smaug_str_internal.h"   /* smaug_cmp_bytes: colacao unica (12.34) */
 #include "../include/smaug_ops_window.h"
 #include <stdlib.h>
 #include <string.h>
@@ -45,14 +46,15 @@ static int cmp_col_at(const smaug_sort_col_t *col, size_t ra, size_t rb) {
             return (int)a - (int)b;
         }
         case SMAUG_COL_STR: {
-            size_t la = col->str->offsets[ra+1] - col->str->offsets[ra];
-            size_t lb = col->str->offsets[rb+1] - col->str->offsets[rb];
-            const char *pa = col->str->buffer + col->str->offsets[ra];
-            const char *pb = col->str->buffer + col->str->offsets[rb];
-            size_t lmin = la < lb ? la : lb;
-            int c = memcmp(pa, pb, lmin);
-            if (c != 0) return c;
-            return (la > lb) - (la < lb);
+            /* 12.34: era memcmp inline SEM a guarda de tamanho zero -- a unica
+               das quatro sem ela. Com serie vazia, `buffer + offset` pode ser
+               NULL + 0, e memcmp exige ponteiro valido mesmo com n == 0. Agora
+               usa o nucleo unico, que trata o caso. */
+            size_t oa = col->str->offsets[ra], ob = col->str->offsets[rb];
+            return smaug_cmp_bytes(col->str->buffer + oa,
+                                   col->str->offsets[ra+1] - oa,
+                                   col->str->buffer + ob,
+                                   col->str->offsets[rb+1] - ob);
         }
     }
     return 0; /* nunca atingido */

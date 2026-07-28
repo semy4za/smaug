@@ -115,6 +115,12 @@ uint8_t* smaug_str_gt(const smaug_series_str_t *s, const char *target, size_t ta
 uint8_t* smaug_str_ge(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
 uint8_t* smaug_str_le(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
 uint8_t* smaug_str_ne(const smaug_series_str_t *s, const char *target, size_t target_len, smaug_mask_t **out_mask);
+/* between: lo..hi numa passada, mesma colacao dos comparadores (str_cmp_at:
+   lexicografica por bytes, prefixo igual desempata pela mais curta). */
+uint8_t* smaug_str_between(const smaug_series_str_t *s,
+                           const char *lo, size_t lo_len,
+                           const char *hi, size_t hi_len,
+                           bool inc_lo, bool inc_hi, smaug_mask_t **out_mask);
 
 /* ===================== Seleção ===================== */
 /* filter: nova série com os elementos onde mask[i] != 0 (mask tem s->size

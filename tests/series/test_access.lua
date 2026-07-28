@@ -547,11 +547,48 @@ do
     check(S.int64(0):between(1, 5):len() == 0, "10.2.6 série int64 vazia → len 0")
     check(S.float64(0):between(1, 5):len() == 0, "10.2.6 série f64 vazia → len 0")
 
-    -- 10.2.7 — string/datetime seguem no fallback Lua (fatia 2), intactos.
+    -- 10.2.7 (fatia 2) — string desceu ao Anel 0, reusando a MESMA colação dos
+    -- comparadores (str_cmp_at): lexicográfica por bytes, prefixo igual
+    -- desempata pela mais curta. Os quatro modos aqui também: cada dtype tem
+    -- sua própria implementação, e testar os modos num não prova nada sobre o
+    -- outro (lição do 10.2.5).
     local st = S.from_table({"a", "c", "e"}, "string", "s")
-    local rs = st:between("a", "c")
-    check(rs:get(1) and rs:get(2) and rs:get(3) == false,
-          "10.2.7 string ainda no fallback, correto")
+    local sb = st:between("a", "c")
+    check(sb:get(1) and sb:get(2) and sb:get(3) == false, "10.2.7 string both")
+    local sn = st:between("a", "e", "neither")
+    check(sn:get(1) == false and sn:get(2) == true and sn:get(3) == false,
+          "10.2.7 string neither")
+    local sl = st:between("a", "e", "left")
+    check(sl:get(1) == true and sl:get(3) == false, "10.2.7 string left")
+    local sr = st:between("a", "e", "right")
+    check(sr:get(1) == false and sr:get(3) == true, "10.2.7 string right")
+    -- desempate por prefixo: "ab" está entre "a" e "b" porque "a" < "ab" < "b"
+    check(S.from_table({"ab"}, "string"):between("a", "b"):get(1) == true,
+          "10.2.7 string prefixo mais curta vem antes")
+
+    -- 10.2.8 (fatia 2) — datetime, os quatro modos.
+    local d = S.from_table({0, 1000, 2000}, "datetime", "d")
+    check(d:between(0, 2000):get(1) and d:between(0, 2000):get(3),
+          "10.2.8 datetime both inclui as pontas")
+    local dn = d:between(0, 2000, "neither")
+    check(dn:get(1) == false and dn:get(2) == true and dn:get(3) == false,
+          "10.2.8 datetime neither")
+    local dl = d:between(0, 2000, "left")
+    check(dl:get(1) == true and dl:get(3) == false, "10.2.8 datetime left")
+    local dr = d:between(0, 2000, "right")
+    check(dr:get(1) == false and dr:get(3) == true, "10.2.8 datetime right")
+
+    -- 10.2.9 — nulo propaga nos QUATRO dtypes (não só nos numéricos).
+    check(S.from_table({"a", NA, "c"}, "string"):between("a", "z"):is_null(2),
+          "10.2.9 string propaga nulo")
+    check(S.from_table({0, NA, 2000}, "datetime"):between(0, 3000):is_null(2),
+          "10.2.9 datetime propaga nulo")
+    check(S.from_table({"a"}, "string"):between("a", "z"):len() == 1,
+          "10.2.9 string série de 1 elemento")
+
+    -- 10.2.10 — dtype sem ordem continua recusado (bool não tem cmp_between).
+    check(not pcall(function() return S.from_table({true}, "bool"):between(true, true) end),
+          "10.2.10 bool recusado (sem ordem)")
 end
 
 

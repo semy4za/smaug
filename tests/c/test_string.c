@@ -386,6 +386,52 @@ int main(void) {
         OK(smaug_str_lt(NULL, "x", 1, NULL) == NULL, "str lt(serie NULL) -> NULL");
         OK(smaug_str_gt(NULL, "x", 1, NULL) == NULL, "str gt(serie NULL) -> NULL");
 
+        /* between (10.2 fatia 2): guarda nos DOIS alvos, nao so num */
+        OK(smaug_str_between(NULL, "a", 1, "z", 1, true, true, NULL) == NULL,
+           "str between(serie NULL) -> NULL");
+        OK(smaug_str_between(gs, NULL, 5, "z", 1, true, true, NULL) == NULL,
+           "str between(lo NULL, len>0) -> NULL");
+        OK(smaug_str_between(gs, "a", 1, NULL, 5, true, true, NULL) == NULL,
+           "str between(hi NULL, len>0) -> NULL");
+
+        /* out_mask == NULL: o ramo que o frontend nunca exercita (ele sempre
+           pede a mascara), e que por isso escapa da cobertura se nao for
+           testado aqui. Mesma licao da fatia 1. */
+        uint8_t *bnm = smaug_str_between(gs, "A", 1, "z", 1, true, true, NULL);
+        OK(bnm != NULL, "str between sem out_mask");
+        free(bnm);
+
+        /* alvo NULL com len 0 e string VAZIA, nao chamada invalida: a guarda e
+           `!lo && lo_len > 0`, entao este caso passa e compara normalmente.
+           Sem ele, a segunda condicao da guarda nunca e avaliada (MC/DC). */
+        uint8_t *bz = smaug_str_between(gs, NULL, 0, "zzz", 3, true, true, NULL);
+        OK(bz != NULL, "str between(lo NULL, len 0) trata como vazia");
+        free(bz);
+        bz = smaug_str_between(gs, "", 0, NULL, 0, true, true, NULL);
+        OK(bz != NULL, "str between(hi NULL, len 0) trata como vazia");
+        free(bz);
+
+        /* serie vazia: exercita o ramo `size ? size : 1` do malloc -- e precisa
+           pedir a mascara, senao o malloc dela nao roda */
+        smaug_series_str_t *vazia = smaug_str_create(0);
+        OK(vazia != NULL, "str create(0) para between");
+        smaug_mask_t *mv = NULL;
+        uint8_t *bv = smaug_str_between(vazia, "a", 1, "z", 1, true, true, &mv);
+        OK(bv != NULL, "str between em serie vazia nao estoura");
+        free(bv); free(mv);
+        smaug_str_free(vazia);
+
+        /* elemento NULL com out_mask == NULL: exercita o `if (mask)` falso
+           dentro do ramo de nulo, que o frontend nunca alcanca */
+        smaug_series_str_t *cn = smaug_str_create(2);
+        OK(cn != NULL, "str create(2) para between com nulo");
+        smaug_str_set(cn, 0, "abc", 3);
+        smaug_str_set_null(cn, 1);
+        uint8_t *bn = smaug_str_between(cn, "a", 1, "z", 1, true, true, NULL);
+        OK(bn != NULL && bn[1] == 0, "str between nulo sem out_mask");
+        free(bn);
+        smaug_str_free(cn);
+
         OK(smaug_str_filter(NULL, gmask) == NULL,    "str filter(serie NULL) -> NULL");
         OK(smaug_str_filter(gs, NULL) == NULL,       "str filter(mask NULL) -> NULL");
         OK(smaug_str_take(NULL, gidx, 1) == NULL,    "str take(serie NULL) -> NULL");

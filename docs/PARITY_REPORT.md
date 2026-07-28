@@ -10,7 +10,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-07-28 00:19:31 UTC
+Gerado em: 2026-07-28 02:01:58 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -449,7 +449,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `xor` | 🟨 |  |
 
 
-### str — 34 funções C
+### str — 35 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -458,6 +458,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `argmax` | 🟩 |  |
 | `argmin` | 🟩 |  |
 | `argsort` | 🟩 |  |
+| `between` | 🟩 |  |
 | `bfill` | 🟩 |  |
 | `clone` | 🟩 |  |
 | `coalesce` | 🟩 |  |
@@ -489,7 +490,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `view` | 🟩 |  |
 
 
-### dt — 51 funções C
+### dt — 52 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -499,6 +500,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `argmax` | 🟩 |  |
 | `argmin` | 🟩 |  |
 | `argsort` | 🟩 |  |
+| `between` | 🟩 |  |
 | `bfill` | 🟩 |  |
 | `clone` | 🟩 |  |
 | `coalesce` | 🟩 |  |
@@ -745,7 +747,7 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 229/229 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 230/230 erros com prefixo `smaug:` (100.0%)
 - `dataset.lua`: 94/94 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
@@ -784,7 +786,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | arquivo | checks | float64 | int64 | bool | string | datetime | categorical |
 | :--- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
 | `series/test_constructors` | 382 | 44 | 67 | 23 | 21 | 3 | 1 |
-| `series/test_access` | 150 | 21 | 18 | — | 10 | 1 | — |
+| `series/test_access` | 162 | 21 | 18 | 1 | 13 | 3 | — |
 | `series/test_reduce` | 57 | 7 | 2 | 3 | 4 | 2 | — |
 | `series/test_stat` | 70 | 6 | 12 | — | 9 | — | — |
 | `series/test_window` | 137 | 10 | 12 | 3 | 7 | 2 | — |
@@ -802,7 +804,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 79 | 19 | 2 | 2 | 4 | 1 | 1 |
 
-**Total de checks:** 2753
+**Total de checks:** 2765
 
 ### Menções totais por dtype (toda a suite)
 
@@ -810,9 +812,9 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | :--- | :-: |
 | float64 | 207 |
 | int64 | 356 |
-| bool | 68 |
-| string | 231 |
-| datetime | 94 |
+| bool | 69 |
+| string | 234 |
+| datetime | 96 |
 | categorical | 63 |
 
 ## Eixo 12 — Sincronização docs ↔ código
@@ -893,7 +895,7 @@ O `cdef` do `ffi_loader.lua` replica à mão o layout de cada struct dos headers
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 1071
+- 🟩 paridade: 1073
 - ⬜ exceção registrada: 215
 - 🟨 suspeita (revisar): 273
 - 🟥 inconsistência clara: 15

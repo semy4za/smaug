@@ -495,6 +495,54 @@ static void test_comparisons(void) {
     /* NULL série */
     CHECK(smaug_dt_gt(NULL, ref, &mask) == NULL, "gt NULL série → NULL");
 
+    /* between (10.2 fatia 2): mesma matriz de ramos dos comparadores.
+       A série `s` deste bloco tem nulo — ver a montagem acima. */
+    CHECK(smaug_dt_between(NULL, 0, 10, true, true, NULL) == NULL,
+          "between NULL série → NULL");
+
+    uint8_t *bt = smaug_dt_between(s, INT64_MIN, INT64_MAX, true, true, NULL);
+    CHECK(bt != NULL, "between sem out_mask");            /* ramo out_mask==NULL */
+    smaug_free(bt);
+
+    mask = NULL;
+    bt = smaug_dt_between(s, INT64_MIN, INT64_MAX, true, true, &mask);
+    CHECK(bt != NULL && mask != NULL, "between com out_mask");
+    smaug_free(bt); smaug_free(mask);
+
+    /* os quatro modos, com os limites nas pontas: só o inc muda o resultado */
+    int64_t v0 = smaug_dt_get(s, 0, NULL);
+    uint8_t *m4;
+    m4 = smaug_dt_between(s, v0, v0, true,  true,  NULL);
+    CHECK(m4 && m4[0] == 1, "between both inclui a ponta");   smaug_free(m4);
+    m4 = smaug_dt_between(s, v0, v0, false, false, NULL);
+    CHECK(m4 && m4[0] == 0, "between neither exclui a ponta"); smaug_free(m4);
+    m4 = smaug_dt_between(s, v0, INT64_MAX, true,  true, NULL);
+    CHECK(m4 && m4[0] == 1, "between left inclui a inferior");  smaug_free(m4);
+    m4 = smaug_dt_between(s, v0, INT64_MAX, false, true, NULL);
+    CHECK(m4 && m4[0] == 0, "between left exclusivo exclui");   smaug_free(m4);
+
+    /* inc_hi no ramo FALSO precisa que a condicao de lo passe primeiro: em
+       `A && B`, se A e falso o B nem e avaliado (curto-circuito). Com lo bem
+       abaixo e hi exatamente no valor, inc_hi=false decide sozinho. */
+    m4 = smaug_dt_between(s, INT64_MIN, v0, true, false, NULL);
+    CHECK(m4 && m4[0] == 0, "between hi exclusivo avalia o ramo falso");
+    smaug_free(m4);
+
+    /* curto-circuito do &&: com lo acima de tudo, a condicao da esquerda e
+       falsa e a da direita NAO e avaliada. Sem este caso o ramo fica
+       descoberto, porque todo teste anterior passa pela esquerda. */
+    m4 = smaug_dt_between(s, INT64_MAX, INT64_MAX, true, true, NULL);
+    CHECK(m4 && m4[0] == 0, "between curto-circuita quando lo nao passa");
+    smaug_free(m4);
+
+    /* série vazia */
+    smaug_series_dt_t *vazia = smaug_dt_create(0);
+    CHECK(vazia != NULL, "dt create(0) para between");
+    uint8_t *bv = smaug_dt_between(vazia, 0, 10, true, true, NULL);
+    CHECK(bv != NULL, "between em série vazia não estoura");
+    smaug_free(bv);
+    smaug_dt_free(vazia);
+
     smaug_dt_free(s);
 }
 

@@ -15,7 +15,8 @@ return function(I)
     local Series  = I.Series
     local NA      = I.NA
     local wrap    = I.wrap
-    local check_i64 = I.check_int64_lossless   -- degrau 10.2 (int64 > 2^53)
+    -- (o degrau `check_int64_lossless` era importado aqui só para o `between`;
+    --  com ele no Anel 0 o degrau saiu, e o import morreu junto — 10.2)
     local bool_series_from_raw = I.bool_series_from_raw
 
     -- =====================================================================
@@ -24,20 +25,20 @@ return function(I)
 
     -- between(lo, hi, [inclusive]): máscara booleana lo ≤ x ≤ hi.
     --
-    -- 10.2 (fatia 1: f64+i64): quando o descritor tem `cmp_between`, delega ao
-    -- Anel 0 — uma passada em C, comparação no tipo nativo. Em int64 isso torna
-    -- o suporte a > 2^53 REAL (antes o loop lia por get()→double e a comparação
-    -- saía errada em silêncio; o degrau `check_i64` trocava isso por falha
-    -- visível). Os limites entram pela fronteira do escalar (9.3), que aceita
-    -- cdata exato e recusa number >= 2^53 — sem isso, o valor da série seria
-    -- exato mas o limite viria degradado.
+    -- 10.2 completo: os QUATRO dtypes ordenáveis (f64, i64, datetime, string)
+    -- delegam ao Anel 0 — uma passada em C, comparação no tipo nativo. Não
+    -- sobrou loop element-wise aqui: até a fatia 1 este método reimplementava
+    -- em Lua uma comparação que o Anel 0 já sabia fazer (violação de P3), e o
+    -- degrau `check_i64` existia só para tornar visível o erro que esse loop
+    -- produzia em int64 > 2^53. Com a descida, o degrau saiu e o suporte
+    -- passou a ser real em vez de "falha visível".
     --
-    -- `datetime` e `string` ainda não têm a primitiva (fatia 2) e seguem no loop
-    -- Lua com o degrau. Estado TRANSITÓRIO e consciente: o fallback sai quando a
-    -- fatia 2 entrar, e este ramo inteiro morre com ele.
+    -- Os limites entram pela fronteira do escalar (9.3) nos dtypes int-based:
+    -- cdata exato aceito, `number >= 2^53` recusado por origem. Sem isso o
+    -- valor da série seria exato e o limite viria degradado.
     function methods.between(self, lo, hi, inclusive)
-        if self._dtype ~= "float64" and self._dtype ~= "int64"
-           and self._dtype ~= "datetime" and self._dtype ~= "string" then
+        local cmp_between = self._d.cmp_between
+        if not cmp_between then
             error("smaug: between() requer dtype ordenável (numérico, datetime ou string), não '"
                   ..self._dtype.."'", 2)
         end
@@ -49,34 +50,10 @@ return function(I)
         local inc_lo = (inclusive == "both" or inclusive == "left")
         local inc_hi = (inclusive == "both" or inclusive == "right")
 
-        local cmp_between = self._d.cmp_between
-        if cmp_between then
-            local om   = ffi.new("smaug_mask_t*[1]")
-            local vals = cmp_between(self._c, lo, hi, inc_lo, inc_hi, om)
-            if vals == nil then error("smaug: between() falhou", 2) end
-            return bool_series_from_raw(vals, om[0], self:len(), self._name)
-        end
-
-        local n    = self:len()
-        local vals = {}
-        for i = 1, n do
-            local v = self:get(i)
-            if v == nil then
-                vals[i] = NA
-            else
-                -- Degrau 10.2: get() passa por tonumber(double); em int64 > 2^53
-                -- a comparação abaixo ficava ERRADA EM SILÊNCIO — between(x, x)
-                -- no próprio x devolvia false, porque o valor lido já vinha
-                -- degradado. Falha visível até between() descer ao Anel 0.
-                -- (Alcança só datetime/string agora; em datetime é latente —
-                -- epoch_ms > 2^53 é o ano 287586.)
-                check_i64(self, i, "between()")
-                local ge_lo = inc_lo and (v >= lo) or (v > lo)
-                local le_hi = inc_hi and (v <= hi) or (v < hi)
-                vals[i] = (ge_lo and le_hi)
-            end
-        end
-        return Series.from_table(vals, "bool", self._name)
+        local om   = ffi.new("smaug_mask_t*[1]")
+        local vals = cmp_between(self._c, lo, hi, inc_lo, inc_hi, om)
+        if vals == nil then error("smaug: between() falhou", 2) end
+        return bool_series_from_raw(vals, om[0], self:len(), self._name)
     end
 
     -- isin(values): máscara booleana — true onde o valor está em values.

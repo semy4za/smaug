@@ -143,6 +143,10 @@ uint8_t* smaug_dt_le(const smaug_series_dt_t *s, int64_t threshold,
                       smaug_mask_t **out_mask);
 uint8_t* smaug_dt_ne(const smaug_series_dt_t *s, int64_t threshold,
                       smaug_mask_t **out_mask);
+/* between: lo..hi numa passada; inc_lo/inc_hi dao os 4 modos de inclusividade.
+   epoch_ms e int64_t -> comparacao exata em toda a faixa. */
+uint8_t* smaug_dt_between(const smaug_series_dt_t *s, int64_t lo, int64_t hi,
+                          bool inc_lo, bool inc_hi, smaug_mask_t **out_mask);
 
 /* ===================== Ordenação ===================== */
 

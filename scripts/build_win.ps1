@@ -169,7 +169,8 @@ foreach ($t in $cTestsStress) {
 if ($luajit -and -not $SkipLua) {
     Write-Host ""
     Write-Host "== Testes em Lua ==" -ForegroundColor Cyan
-    $luaTests = @("series/test_constructors", "series/test_access", "series/test_reduce",
+    $luaTests = @("core/test_keys", "core/test_collation",
+                  "series/test_constructors", "series/test_access", "series/test_reduce",
                   "series/test_stat", "series/test_window", "series/test_predicates",
                   "series/test_selection", "series/test_str", "series/test_dt", "series/test_categorical",
                   "dataset/test_core", "dataset/test_relational", "dataset/test_stat", "dataset/test_io_support",

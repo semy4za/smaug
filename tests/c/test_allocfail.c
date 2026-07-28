@@ -814,6 +814,20 @@ static void af_str_ge(void) {
     }
     smaug_str_free(s);
 }
+static void af_str_between(void) {
+    const char *arr[] = {"SP", "RJ", "MG"};
+    reset(-1);
+    smaug_series_str_t *s = smaug_str_create_from_array(arr, 3);
+    assert(s);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *m = NULL;
+        uint8_t *r = smaug_str_between(s, "MG", 2, "SP", 2, true, true, &m);
+        /* aloca result E mask; se um falhar, ambos liberados e retorno NULL */
+        if (r) { OK(m != NULL, "str between mask junto"); free(r); free(m); }
+    }
+    smaug_str_free(s);
+}
 static void af_str_le(void) {
     const char *arr[] = {"SP", "RJ", "MG"};
     reset(-1);
@@ -2240,6 +2254,19 @@ static void af_dt_append_grow(void) {
         smaug_dt_free(s);
     }
 }
+static void af_dt_between(void) {
+    int64_t arr[3] = {0, 1000, 2000};
+    reset(-1);
+    smaug_series_dt_t *s = smaug_dt_create_from_array(arr, 3);
+    assert(s);
+    for (long k = 0; k < MAX_ALLOCS; k++) {
+        reset(k);
+        smaug_mask_t *m = NULL;
+        uint8_t *r = smaug_dt_between(s, 0, 2000, true, true, &m);
+        if (r) { OK(m != NULL, "dt between mask junto"); free(r); free(m); }
+    }
+    smaug_dt_free(s);
+}
 static void af_dt_argsort(void) {
     smaug_series_dt_t *base = mk_dt_gapped(); assert(base);
     for (long k = 0; k < MAX_ALLOCS; k++) {
@@ -2466,6 +2493,7 @@ int main(void) {
     af_str_compare();
     af_str_ge();
     af_str_le();
+    af_str_between();
     af_str_ne();
     af_str_filter();
     af_str_take();
@@ -2544,7 +2572,7 @@ int main(void) {
 
     /* Frente B fase 2 — datetime (lifecycle + argsort/sort/take/filter) */
     af_dt_create(); af_dt_create_from_array(); af_dt_clone(); af_dt_view();
-    af_dt_append_grow(); af_dt_argsort(); af_dt_sort(); af_dt_take(); af_dt_filter();
+    af_dt_append_grow(); af_dt_between(); af_dt_argsort(); af_dt_sort(); af_dt_take(); af_dt_filter();
     af_dt_ffill(); af_dt_bfill(); af_dt_shift(); af_dt_rank();
     af_dt_setters();
     af_dt_compare();

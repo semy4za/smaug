@@ -51,6 +51,92 @@ categorical divergiria em silêncio. Vira teste de invariante.
 Nenhum C, nenhum Lua.
 
 ---
+## 2026-07-27 — 12.34: uma colação só, e dois buracos de build que ela expôs
+
+A regra de ordenação de string estava escrita em quatro lugares do C. Agora está
+num núcleo `smaug_cmp_bytes` (`static inline` em header interno, no padrão do
+`smaug_io_internal.h`), e os quatro delegam. `sort_cmp_idx` virou `str_cmp_idx` +
+desempate por índice — porque estabilidade é preocupação de *sort*, não de
+colação, e misturar as duas era o que fazia parecer que eram funções diferentes.
+
+Não era só duplicação: **uma das quatro divergia**. A do `ops_window.c` chamava
+`memcmp(pa, pb, lmin)` sem a guarda `lmin > 0`, a única sem ela. `memcmp` exige
+ponteiro válido mesmo com `n == 0`, e em série vazia `buffer + offset` pode ser
+`NULL + 0` — UB pelo padrão, inofensivo na prática, mas é o tipo de coisa que só
+aparece quando alguém troca de compilador. Unificar eliminou o caso.
+
+Sobrou um `memcmp` e ele fica: o atalho de igualdade no `eq`/`ne`, que compara
+comprimento primeiro. Não é colação — não ordena nem desempata — e é equivalente
+ao núcleo.
+
+A invariante Lua↔C virou teste (`tests/core/test_collation.lua`, 59 checks). O
+`CategoricalSeries` compara com o `<` do Lua e está certo em fazer isso, mas só
+concorda com o resto da biblioteca porque o LuaJIT compara por `memcmp`; no Lua
+padrão seria `strcoll`, dependente de locale. Os pares do teste são escolhidos
+onde as duas semânticas realmente divergem: `"a"` × `"B"`, `"Z"` × `"a"`, acento
+multibyte, NUL embutido. Antes isso era suposição; agora falha alto.
+
+Dois achados colaterais, e o primeiro é constrangedor no melhor sentido.
+
+**O `Makefile` não declarava dependência de header.** `$(TARGET): $(SRCS)` — editar
+um `.h` não recompilava. Descobri na pele: o teste de mutação no núcleo novo
+"passou", e passou porque a `.so` era a antiga. Um teste de mutação que dá falso
+positivo é pior que nenhum, porque dá confiança falsa. Corrigido com
+`$(HDRS) = $(wildcard include/*.h)`, espelhando o glob do 12.19. O `build.sh` era
+imune porque recompila tudo num comando só — o que explica por que nunca apareceu:
+o selo sempre foi honesto, só o loop de desenvolvimento é que não era.
+
+**As três listas de teste Lua tinham divergido.** `core/test_keys` — que guarda a
+correção do int64 > 2^53 — estava só no `build.sh`. Não rodava no Windows nem na
+cobertura. Mesma família do `test_astype` (12 binários no Fedora, 11 no Windows).
+Alinhadas as três; a causa de fundo é lista mantida à mão, que é o que a metade
+aberta do 12.19 existe para resolver.
+
+Cobertura: descobertos 227 antes, 227 depois. A refatoração removeu 24 ramos que
+estavam totalmente cobertos e não criou nenhum descoberto — o percentual mexeu só
+porque o denominador encolheu.
+
+---
+## 2026-07-27 — 10.2 fatia 2: between fecha nos quatro dtypes, e o Anel 1 para de comparar
+
+`datetime` e `string` desceram ao Anel 0, e com isso o `between` deixou de existir
+em dois anéis. O ganho maior não é performance: até aqui o `_predicates.lua`
+reimplementava em Lua uma comparação que o Anel 0 já sabia fazer — violação de P3
+— e o degrau `check_i64` existia só para tornar visível o erro que esse loop
+produzia. Com o fallback removido, o degrau saiu junto e o import ficou órfão: o
+`between` era o único consumidor dele naquele arquivo.
+
+O `dt_between` nasceu **fora** da macro `DT_CMP_IMPL`. A macro assume um threshold
+e um operador; aqui são dois limites e dois flags. Forçar caberia só deformando a
+macro para todos os outros usos, o que é pior. O `str_between` reusa `str_cmp_at`
+em vez de escrever `memcmp` de novo — a colação já está implementada quatro vezes
+no C (12.34), e criar a quinta enquanto se discute unificá-las seria incoerente.
+
+O trabalho difícil foi cobertura, e a lição da fatia 1 se repetiu quase igual: a
+branch-alvo **caiu** de 94.78% para 94.66% ao adicionar as duas funções. Em vez de
+adivinhar, o mapa de ramos descobertos do próprio `COVERAGE.md` apontou os cinco
+pontos. Quatro eram previsíveis em retrospecto; um não era.
+
+O previsível: `malloc(size ? size : 1)` só exercita o `: 1` com série vazia **que
+peça a máscara**; o `if (mask)` falso dentro do ramo de nulo é inalcançável pelo
+frontend, que sempre pede a máscara; e a guarda `!lo && lo_len > 0` precisa de um
+caso com **len 0** — alvo nulo com comprimento zero é string vazia, não chamada
+inválida, e sem esse caso a segunda condição da guarda nunca é avaliada.
+
+O que não era previsível: no `dt`, o ramo descoberto era o **curto-circuito do
+`&&`**. Em `A && B`, se A é falso o B nem roda — e nenhum teste anterior falhava
+pela esquerda, porque todos usavam limites que o valor satisfazia. Precisou de um
+caso com `lo` acima de tudo. Esse tipo de ramo não aparece lendo o código; aparece
+medindo.
+
+Fechou em 94.84% branch-alvo e 98.84% linha, ambos acima do baseline. `test_string`
+132→142, `test_datetime_c` 462→473, `test_access` 156→168, allocfail 1898→1918.
+Mutação verificada nas duas implementações.
+
+Fica anotado que o `datetime` não tinha varredura OOM de comparador nenhum — a do
+`between` foi a primeira. Lacuna pré-existente, não expandida aqui.
+
+---
 ## 2026-07-27 — selo Fedora: fecha 10.2 fatia 1, 12.31 e 12.32
 
 Valgrind 0 erros nos 13 binários, incluindo os dois `between` novos e a varredura

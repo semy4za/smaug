@@ -15,6 +15,7 @@
  */
 
 #include "smaug_string.h"
+#include "smaug_str_internal.h"   /* smaug_cmp_bytes: colacao, fonte unica (12.34) */
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -24,14 +25,17 @@
 static int str_cmp_at(const smaug_series_str_t *s, size_t idx,
                       const char *target, size_t target_len) {
     size_t start = s->offsets[idx];
-    size_t len   = s->offsets[idx + 1] - start;
-    size_t min   = len < target_len ? len : target_len;
-    int c = (min > 0) ? memcmp(s->buffer + start, target, min) : 0;
-    if (c != 0) return c;
-    /* prefixo igual: a mais curta vem antes (lexicográfico padrão) */
-    if (len < target_len) return -1;
-    if (len > target_len) return  1;
-    return 0;
+    return smaug_cmp_bytes(s->buffer + start,
+                           s->offsets[idx + 1] - start,
+                           target, target_len);
+}
+
+/* Compara os elementos ia e ib da mesma serie. Mesma colacao do str_cmp_at --
+   as duas delegam ao nucleo unico; muda so de onde vem o segundo operando. */
+static int str_cmp_idx(const smaug_series_str_t *s, size_t ia, size_t ib) {
+    size_t sa = s->offsets[ia], sb = s->offsets[ib];
+    return smaug_cmp_bytes(s->buffer + sa, s->offsets[ia + 1] - sa,
+                           s->buffer + sb, s->offsets[ib + 1] - sb);
 }
 
 /* Modos de comparação para str_compare. */
@@ -120,6 +124,57 @@ uint8_t *smaug_str_le(const smaug_series_str_t *s, const char *target,
 uint8_t *smaug_str_ne(const smaug_series_str_t *s, const char *target,
                       size_t target_len, smaug_mask_t **out_mask) {
     return str_compare(s, target, target_len, out_mask, STR_CMP_NE);
+}
+
+/* between: lo <= v <= hi (inclusividade independente por lado) em UMA passada.
+
+   Reusa str_cmp_at -- a MESMA funcao que os seis comparadores usam -- em vez de
+   reimplementar memcmp aqui. Colacao e uma regra so: lexicografica por bytes,
+   com prefixo igual desempatando pela mais curta. Escreve-la de novo criaria
+   mais um lugar onde ela pode divergir (ja sao quatro no C; ver 12.34).
+
+   Tambem NAO compoe via str_compare duas vezes de proposito: seriam tres pares
+   de alocacao (result+mask) e tres varreduras para o que uma varredura e um par
+   fazem. Mesma razao das versoes f64/i64.
+
+   Os DOIS alvos passam pela guarda de ponteiro nulo do str_compare -- ponteiro
+   nulo com comprimento > 0 e chamada invalida, nao string vazia. */
+uint8_t *smaug_str_between(const smaug_series_str_t *s,
+                           const char *lo, size_t lo_len,
+                           const char *hi, size_t hi_len,
+                           bool inc_lo, bool inc_hi, smaug_mask_t **out_mask) {
+    if (!s) return NULL;
+    if (!lo && lo_len > 0) return NULL;
+    if (!hi && hi_len > 0) return NULL;
+
+    /* size ? size : 1 segue a convencao local deste arquivo (os comparadores de
+       string fazem o mesmo); f64/i64/dt usam malloc(size * sizeof(...)). A
+       divergencia entre dtypes esta registrada -- uniformizar aqui seria
+       misturar escopo. */
+    uint8_t *result = malloc(s->size ? s->size : 1);
+    if (!result) return NULL;
+
+    smaug_mask_t *mask = NULL;
+    if (out_mask) {
+        mask = malloc(s->size ? s->size : 1);
+        if (!mask) { free(result); return NULL; }
+        *out_mask = mask;
+    }
+
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_NULL(s->null_mask, i)) {
+            result[i] = 0;
+            if (mask) mask[i] = SMAUG_MASK_NULL;
+            continue;
+        }
+        int clo = str_cmp_at(s, i, lo, lo_len);
+        int chi = str_cmp_at(s, i, hi, hi_len);
+        bool ok = (inc_lo ? (clo >= 0) : (clo > 0))
+               && (inc_hi ? (chi <= 0) : (chi < 0));
+        result[i] = ok ? 1 : 0;
+        if (mask) mask[i] = SMAUG_MASK_VALID;
+    }
+    return result;
 }
 
 /* ===================================================================
@@ -227,16 +282,12 @@ smaug_series_str_t *smaug_str_take(const smaug_series_str_t *s,
 
 /* Compara duas posições da série. `ascending` é aplicado pelo caller ao
    final, não aqui: a ordenação interna é sempre ascendente. */
+/* Ordem do sort = colacao + desempate estavel por indice. A colacao vem de
+   str_cmp_idx (que delega ao nucleo unico); aqui fica so o que e preocupacao
+   de *sort*, nao de colacao: qsort nao e estavel, e o desempate torna a ordem
+   deterministica para elementos iguais em qualquer plataforma. */
 static int sort_cmp_idx(const smaug_series_str_t *s, size_t ia, size_t ib) {
-    size_t sa = s->offsets[ia], la = s->offsets[ia + 1] - sa;
-    size_t sb = s->offsets[ib], lb = s->offsets[ib + 1] - sb;
-    size_t min = la < lb ? la : lb;
-    int c = (min > 0) ? memcmp(s->buffer + sa, s->buffer + sb, min) : 0;
-    if (c == 0) {                       /* prefixo igual: mais curta antes */
-        c = (la < lb) ? -1 : (la > lb) ? 1 : 0;
-    }
-    /* desempate estável por índice: qsort não é estável; isto torna a ordem
-       determinística para elementos iguais, em qualquer plataforma */
+    int c = str_cmp_idx(s, ia, ib);
     if (c == 0) c = (ia < ib) ? -1 : (ia > ib) ? 1 : 0;  /* COV-EXCL-BR: ia==ib inalcancavel (indices sempre unicos no argsort) */
     return c;
 }
@@ -436,16 +487,6 @@ smaug_series_str_t *smaug_str_shift(const smaug_series_str_t *s, int64_t periods
 
 /* Compara as strings nas posições ia e ib (lexicográfico por bytes, mesma
    ordem de str_cmp_at/sort). <0 se ia<ib, >0 se ia>ib, 0 se iguais. */
-static int str_cmp_idx(const smaug_series_str_t *s, size_t ia, size_t ib) {
-    size_t sa = s->offsets[ia], la = s->offsets[ia + 1] - sa;
-    size_t sb = s->offsets[ib], lb = s->offsets[ib + 1] - sb;
-    size_t mn = la < lb ? la : lb;
-    int c = (mn > 0) ? memcmp(s->buffer + sa, s->buffer + sb, mn) : 0;
-    if (c != 0) return c;
-    if (la < lb) return -1;
-    if (la > lb) return  1;
-    return 0;
-}
 
 /* argmin/argmax(): índice 0-based da menor/maior string não-NA (lexicográfico
    por bytes). SIZE_MAX se vazia ou toda-NA. (Item 7.2a.) */

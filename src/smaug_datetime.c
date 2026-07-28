@@ -718,6 +718,47 @@ DT_CMP_IMPL(ge, >=)
 DT_CMP_IMPL(le, <=)
 DT_CMP_IMPL(ne, !=)
 
+/* between: lo <= v <= hi (inclusividade independente por lado) em UMA passada.
+   Fica FORA da DT_CMP_IMPL de proposito: a macro assume um threshold e um
+   operador, e aqui sao dois limites e dois flags -- forcar caberia so
+   deformando a macro para todos os outros usos.
+
+   Duas diferencas conscientes em relacao aos comparadores acima:
+   (a) a mascara e alocada SO quando pedida, como em smaug_{f64,i64}_between,
+       em vez de sempre-aloca-e-libera. Quem le vai comparar os quatro between
+       entre si, e evita malloc inutil. A divergencia dos comparadores esta
+       registrada para convergir neste sentido.
+   (b) a condicao usa SMAUG_VALID (positiva), igual aos outros between, em vez
+       do SMAUG_NULL da macro. Mesma semantica, forma alinhada com a familia.
+
+   epoch_ms e int64_t, entao a comparacao e exata em toda a faixa; o frontend
+   garante que um `number` Lua degradado nao chega ate aqui (int_scalar). */
+uint8_t *smaug_dt_between(const smaug_series_dt_t *s, int64_t lo, int64_t hi,
+                          bool inc_lo, bool inc_hi, smaug_mask_t **out_mask) {
+    if (!s) return NULL;
+    uint8_t      *result = malloc(s->size * sizeof(uint8_t));
+    smaug_mask_t *mask   = NULL;
+    if (!result) return NULL;
+    if (out_mask) {
+        mask = malloc(s->size * sizeof(smaug_mask_t));
+        if (!mask) { free(result); return NULL; }
+        *out_mask = mask;
+    }
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            int64_t v  = s->data[i];
+            bool    ok = (inc_lo ? (v >= lo) : (v > lo))
+                      && (inc_hi ? (v <= hi) : (v < hi));
+            result[i] = ok ? 1 : 0;
+            if (mask) mask[i] = SMAUG_MASK_VALID;
+        } else {
+            result[i] = 0;
+            if (mask) mask[i] = SMAUG_MASK_NULL;
+        }
+    }
+    return result;
+}
+
 /* ===================================================================
    Ordenação
    =================================================================== */

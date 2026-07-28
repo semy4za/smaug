@@ -6,6 +6,13 @@ LDFLAGS = -shared
 # um .c novo entra sem editar lista. Espelha o glob de build.sh e build_win.ps1.
 SRCS = $(wildcard src/*.c)
 
+# Headers entram como dependência do alvo (achado 2026-07-27). Sem isto,
+# `make` NÃO recompila ao editar um .h: a .so fica velha e a suíte passa sobre
+# código que não é o da árvore — falso verde silencioso. Foi como um teste de
+# mutação num header passou indevidamente. O build.sh é imune (recompila todos
+# os fontes num comando só); o make é o que se usa no dia a dia.
+HDRS = $(wildcard include/*.h)
+
 TARGET = build/libsmaug.so
 
 # Flags para os binários de teste (debug, sem -fPIC/-shared)
@@ -31,8 +38,8 @@ LUA_TESTS_PROPS   = props/test_props props/test_integration
 LUA_TESTS         = $(LUA_TESTS_SERIES) $(LUA_TESTS_DATASET) $(LUA_TESTS_IO) $(LUA_TESTS_PROPS)
 WRAP_FLAGS    = -Wl,--wrap=malloc -Wl,--wrap=realloc -Wl,--wrap=calloc -Wl,--wrap=strdup
 
-$(TARGET): $(SRCS) | build
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+$(TARGET): $(SRCS) $(HDRS) | build
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(SRCS)
 	@echo "Compilado: $@	-- OK"
 
 build:

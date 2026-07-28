@@ -230,42 +230,43 @@ correto — delegar ao descritor → C — já existe. Subitens 10.5 a 10.9 fech
       os testes acima; a métrica voltou a 94.76%.
     - **FFI/ABI** (cdefs novos) → Windows obrigatório e Fedora com Valgrind:
       ambos feitos. Selo completo.
-  - **Fatia 2 — `datetime` + `string`** (**desbloqueada** — o selo da fatia 1
-    fechou; desenho aprovado 2026-07-27,
-    execução liberada após o selo Fedora da fatia 1).
-    - **Não é só completude de vetorização — fecha uma violação de P3.** Enquanto
-      um dtype seguir no fallback, o loop de comparação element-wise continua
-      existindo no Anel 1, duplicando um conceito que já vive no Anel 0. Com os
-      quatro delegando, o fallback e o import do `check_i64` **somem do
-      `_predicates.lua`** e o `between` fica com ~15 linhas. Por isso os dois
+  - **Fatia 2 — `datetime` + `string`: [implementada 2026-07-27 · selos
+    PENDENTES]** Falta `build.sh --all` (Fedora/Valgrind) e `build_win.ps1`
+    (FFI/ABI). Com ela o **10.2 fecha inteiro**.
+    - **Não era só completude de vetorização — fechou uma violação de P3.** O
+      fallback em Lua e o import órfão do `check_i64` **saíram** do
+      `_predicates.lua` (o `between` era o único consumidor do degrau ali): a
+      comparação element-wise deixou de existir em dois anéis. Por isso os dois
       dtypes juntos, não um agora e outro depois.
-    - **`datetime`:** gesto igual ao i64 (epoch_ms é `int64_t`), mas **fora** da
-      macro `DT_CMP_IMPL` — `between` tem dois limites e dois flags, não cabe na
-      forma dela. Nasce função normal ao lado. Os dois limites passam por
-      `int_scalar.check_operation` (latente: 2^53 ms é o ano 287586).
-    - **`string`:** **deve reusar `str_cmp_at`** (`smaug_ops_str.c:24`), que é a
-      fonte única da colação — lexicográfico por byte, prefixo igual desempata
-      pela mais curta. Reimplementar `memcmp` duplicaria semântica de ordenação
-      entre funções. E **não** compor via `str_compare` duas vezes: três pares de
-      alocação de novo. Uma passada chamando `str_cmp_at` duas vezes por elemento.
-    - **D1 (decidida) — alocação da máscara: condicional**, como f64/i64, não
-      "sempre aloca e libera" como o `DT_CMP_IMPL`. Quem lê vai comparar os quatro
-      `between` entre si, não `dt_between` com `dt_gt`; evita malloc inútil; e a
-      divergência registrada aponta para convergir nesse sentido. Aposta baixa:
-      ambos os padrões são corretos, a diferença é superfície de teste OOM.
-    - **D2 (decidida) — série vazia: convenção local de cada arquivo.** `str` usa
-      `malloc(size ? size : 1)`, f64/i64/dt usam `malloc(size * sizeof(...))`.
-      É outra divergência entre dtypes (registrada), mas uniformizar no meio do
-      10.2 seria misturar escopo.
-    - **D3 (decidida) — guarda de alvo nulo em string** vale para os **dois**
-      limites (`str_compare` já tem `if (!target && target_len > 0) return NULL`).
-    - Assinaturas: `smaug_dt_between(s, lo, hi, inc_lo, inc_hi, out_mask)` e
-      `smaug_str_between(s, lo, lo_len, hi, hi_len, inc_lo, inc_hi, out_mask)`.
-    - **Lição da fatia 1 a repetir:** os quatro modos de `inclusive` têm de ser
-      exercitados **em cada dtype**, mais `out_mask == NULL` e série NULL — senão
-      a branch-alvo cai (aconteceu: 94.73% → 94.39%). Mais `af_dt_between` e
-      `af_str_between` no harness OOM. **FFI/ABI** → Windows obrigatório.
-  - **Degrau paliativo (2026-07-23) — saiu de `between` na fatia 1.** Era
+    - **`datetime`:** função normal **ao lado** da `DT_CMP_IMPL` — a macro assume
+      um threshold e um operador, e aqui são dois limites e dois flags; forçar
+      caberia só deformando a macro para todos os outros usos. Os dois limites
+      passam por `int_scalar.check_operation` (latente: 2^53 ms é o ano 287586).
+    - **`string`:** reusa `str_cmp_at` (`ops_str.c:24`), a fonte única da colação
+      — lexicográfica por bytes, prefixo igual desempata pela mais curta.
+      Reimplementar `memcmp` criaria a quinta cópia da regra (ver 12.34). Também
+      não compõe via `str_compare` duas vezes: seriam três pares de alocação.
+    - **D1/D2/D3 aplicadas** conforme decidido: máscara alocada só quando pedida
+      (como f64/i64, não "sempre aloca e libera" da macro dt); `malloc` na
+      convenção local de cada arquivo; guarda de ponteiro nulo nos **dois** alvos.
+    - **O trabalho de cobertura foi a parte difícil, e a lição da fatia 1 se
+      repetiu.** A branch-alvo **caiu** primeiro (94.78% → 94.66%). Em vez de
+      adivinhar, o mapa de ramos descobertos do próprio `COVERAGE.md` apontou
+      cinco pontos precisos: (a) a guarda `!lo && lo_len > 0` com **len 0** —
+      alvo nulo com comprimento zero é string vazia, não chamada inválida, e sem
+      esse caso a segunda condição nunca é avaliada; (b) `malloc(size ? size : 1)`
+      exigia série vazia **pedindo a máscara**; (c) o `if (mask)` falso dentro do
+      ramo de nulo, que o frontend nunca alcança porque sempre pede a máscara;
+      (d) no `dt`, o **curto-circuito do `&&`** — com `lo` acima de tudo o lado
+      direito nem é avaliado, e nenhum teste anterior falhava pela esquerda.
+      Fechado em **94.84% branch-alvo e 98.84% linha**, ambos acima do baseline.
+    - Testes: `test_access` 10.2.7-10.2.10 (os quatro modos **em cada** dtype,
+      desempate por prefixo, nulo nos quatro, bool recusado), bordas em C
+      (`test_string` 132→142, `test_datetime_c` 462→473) e varreduras OOM
+      `af_str_between` / `af_dt_between` (allocfail 1898→1918). **Mutação
+      verificada nas duas** — inverter a inclusividade superior aborta o teste.
+    - **Lacuna pré-existente anotada:** o `datetime` não tem varredura OOM de
+      comparador nenhum; a do `between` foi a primeira. Não expandido aqui.
     **defeito de correção**, não performance: o loop lia via `get()` (double) e a
     comparação ficava errada em silêncio. `check_int64_lossless` trocou o
     resultado errado por falha visível; a vetorização trocou a falha visível por
@@ -516,39 +517,58 @@ Vinte e quatro subitens já fecharam (ver índice acima). Restam:
      nulo talvez caiba como parágrafo no Contrato 9).
    - **Vínculo:** 10.2 fatia 2 (que tornou as duas visíveis); Contrato 6, 9;
      item 12.34 (a colação está implementada cinco vezes).
- - 12.34 **Colação de string implementada cinco vezes** — [Fedora]
-   (quatro em C + uma invariante Lua↔C). Achado ao analisar o 12.33 (2026-07-27).
-   O **comportamento é uniforme** — verificado em maiúscula/minúscula, prefixo,
-   NUL embutido e UTF-8 multibyte, e entre `CategoricalSeries` e `Series` —, mas a
-   regra está escrita em cinco lugares, que é onde divergência nasce.
-   - **As quatro em C são duplicação injustificada.** `sort_cmp_idx`
-     (`ops_str.c:230`, quicksort) e `str_cmp_idx` (`:439`, argmin/argmax/rank) têm
-     o mesmo núcleo, no mesmo arquivo, 200 linhas de distância — a única diferença
-     é o desempate por índice para estabilidade, que é preocupação de *sort*, não
-     de colação. O comentário da segunda já admite: *"mesma ordem de
-     str_cmp_at/sort"*. Somadas a `str_cmp_at` (`:24`, elemento × alvo externo) e
-     ao `memcmp` inline de `ops_window.c:53`, as quatro diferem só em **de onde
-     vêm os ponteiros**.
-   - **Correção:** um núcleo folha `cmp_bytes(pa, la, pb, lb)` e três invólucros
-     finos; `sort_cmp_idx` passa a ser `str_cmp_idx` + desempate. Compartilhar
-     entre arquivos tem precedente (`smaug_io_internal.h`).
-   - **A quinta é legítima, mas é uma invariante não escrita.** O
-     `CategoricalSeries` compara com o `<` do **Lua** (`_categorical.lua:351`),
-     e está certo: ele é dtype Tier 2 (Lua puro, sem backend C), e fazê-lo chamar
-     o C por elemento seria o antipadrão de loop sobre FFI que o item 10 combate.
-     O problema é que ele só concorda com o resto da biblioteca porque **o LuaJIT
-     ordena string por `memcmp`** — no Lua padrão seria `strcoll`, dependente de
-     locale, e o categorical divergiria em silêncio. Hoje isso é suposição
-     implícita sobre a implementação do interpretador.
-   - **Correção:** transformar a invariante em **teste** — asseverar que o `<` do
-     LuaJIT concorda com a colação do C num conjunto de pares difíceis
-     (maiúscula/minúscula, prefixo, NUL embutido, multibyte). Converte suposição
-     em verificação, no estilo dos eixos de paridade, e é barato.
-   - **Vínculo:** 12.33 (o contrato que promete a ordem passa a ser sustentado por
-     um núcleo único + teste de invariante, em vez de cinco cópias que por acaso
-     concordam); 10.2 fatia 2 (`str_between` deve consumir o núcleo, não criar a
-     sexta).
-
+ - 12.34 **Colação de string implementada cinco vezes** — **[implementada
+   2026-07-27 · selo Fedora PENDENTE]** (refatoração interna do C: nenhuma função
+   pública nova, nenhum `cdef` — **não muda ABI**, fecha só com Fedora).
+   - **Resolvido:** núcleo único `smaug_cmp_bytes(pa, la, pb, lb)` em
+     `include/smaug_str_internal.h` (`static inline`, no padrão do
+     `smaug_io_internal.h` — não exporta símbolo). As quatro implementações
+     passaram a delegar: `str_cmp_at` e `str_cmp_idx` viraram invólucros de duas
+     linhas; `sort_cmp_idx` virou `str_cmp_idx` + desempate por índice (que é
+     preocupação de *sort*, não de colação); o `memcmp` inline do
+     `ops_window.c` passou a chamar o núcleo. `str_cmp_idx` foi movida para
+     antes de `sort_cmp_idx` — ordem lógica, colação antes de ordenação.
+   - **Não era só duplicação: uma das quatro divergia.** A do `ops_window.c`
+     chamava `memcmp(pa, pb, lmin)` **sem a guarda `lmin > 0`** — a única das
+     quatro sem ela. `memcmp` exige ponteiro válido mesmo com `n == 0`, e em
+     série vazia `buffer + offset` pode ser `NULL + 0`: UB pelo padrão C, ainda
+     que inofensivo na prática. Unificar eliminou o caso.
+   - **Sobrou um `memcmp` e ele é legítimo:** o atalho de *igualdade* em
+     `str_compare` (eq/ne), que compara comprimento primeiro (rejeição O(1)) e
+     só então compara bytes. Não é colação — não ordena nem desempata — e é
+     semanticamente equivalente ao núcleo (`cmp_bytes(...) == 0` ⟺ mesmo
+     comprimento e bytes iguais).
+   - **A invariante Lua↔C virou teste:** `tests/core/test_collation.lua` (59
+     checks) assevera que o `<`/`>`/`==` do LuaJIT concordam com o C em pares
+     onde `memcmp` e colação de locale **divergem de fato** — maiúscula ×
+     minúscula, `"Z"` × `"a"`, acento multibyte, NUL embutido, prefixo, vazia —,
+     que `CategoricalSeries` (compara em Lua) dá o mesmo que `Series<string>`
+     (compara no C), e que `sort` ordena por byte. Se o interpretador mudar, ou
+     alguém rodar sob outro runtime com `strcoll`, isto falha alto em vez de
+     divergir em silêncio. **Mutação verificada:** inverter o desempate de
+     prefixo no núcleo aborta o teste.
+   - **Cobertura:** descobertos **227 antes e 227 depois** — a refatoração
+     removeu 24 ramos que estavam totalmente cobertos (a lógica duplicada) e não
+     introduziu nenhum descoberto. O percentual mexeu só porque o denominador
+     encolheu (4397→4373): efeito de tirar redundância, não regressão.
+   - **Dois achados colaterais, ambos corrigidos aqui:**
+     - **O `Makefile` não declarava dependência de header.** `$(TARGET): $(SRCS)`
+       — editar um `.h` **não** recompilava, então a `.so` ficava velha e a suíte
+       passava sobre código que não é o da árvore. Falso verde silencioso.
+       Descoberto na pele: um teste de mutação num header "passou" indevidamente.
+       Agora `$(TARGET): $(SRCS) $(HDRS)`, com `$(HDRS) = $(wildcard include/*.h)`
+       espelhando o glob do 12.19. O `build.sh` era imune (recompila todos os
+       fontes num comando só); o `make` é o que se usa no dia a dia.
+     - **As três listas de teste Lua tinham divergido.** `core/test_keys` — que
+       guarda a correção L2 do int64 > 2^53 — estava só no `build.sh`: **não**
+       rodava no Windows nem na cobertura. Mesma família do `test_astype`
+       (12 binários no Fedora, 11 no Windows). As três listas foram alinhadas.
+       A causa de fundo é manutenção manual de lista, que é o que o 12.19
+       (metade C_TESTS, aberta) existe para resolver.
+   - **Vínculo:** 12.33 (o contrato de colação passa a ser sustentado por um
+     núcleo único + teste de invariante, em vez de cinco cópias que por acaso
+     concordam); 10.2 fatia 2 (`str_between` já consome o núcleo); 12.19
+     (listas mantidas à mão).
 ## 13. Reescrita de exemplos + docstrings  [Windows]
 
 Doc reflete a API depois que ela para de mudar (itens 1–12).
