@@ -361,6 +361,45 @@ passa, o Valgrind acusa 0 erros e o branch-alvo não se move — enquanto a API
 pública passa a segfaultar. Testar e excluir produzem **o mesmo percentual**; só
 o teste produz proteção.
 
+---
+
+> **Nota — calibragem do rigor (decidida em 2026-07-28, aplicável a partir da
+> v1.0).**
+>
+> O padrão de verificação do projeto (MC/DC de ramo, Valgrind, varredura de falha
+> de alocação, teste de mutação) é **uniforme** hoje. A partir da v1.0 ele passa a
+> ser **proporcional ao que o código protege** — e o critério é a *natureza* do
+> código, não o número da versão nem o calendário.
+>
+> **O máximo permanece onde o erro é silencioso e caro:** buffers, ciclo de vida,
+> propriedade de memória, aritmética exata, fronteiras de tipo — o Anel 0 e tudo
+> que decide correção de dado. É onde uma falha não aparece na hora e é cara de
+> descobrir tarde. Este contrato inteiro trata desse território, e ele **não**
+> afrouxa.
+>
+> **Camadas externas calibram por risco.** Ergonomia, açúcar sintático, exibição,
+> conveniência de API: falham alto e barato, e o custo do rigor máximo ali não se
+> paga. Afrouxar é decisão consciente e registrada, não omissão.
+>
+> **A calibragem só é legítima porque o núcleo já está selado.** Afrouxar acima de
+> um Anel 0 verificado é gerenciar risco; afrouxar sobre um núcleo incerto seria
+> apenas correr risco. O direito vem do núcleo — e ele continua no padrão alto.
+>
+> **Duas regras de operação, para o portão continuar passável:**
+>
+> 1. **Medir continua contínuo.** O `build.sh --all` já roda cobertura em todo
+>    selo; o custo nunca foi medir, foi consertar. Deixar de medir cega, e cego
+>    não se calibra.
+> 2. **Consertar pode adiar; o desvio, não.** Se a cobertura cai e a decisão é não
+>    mexer agora, registra-se **onde e por quê**, no momento em que acontece. Sem
+>    isso, o portão de fim de etapa deixa de ser "resolver uma lista com contexto"
+>    e vira arqueologia — e portão caro é portão que se pula.
+>
+> A razão de (2) não é burocracia. Ramos descobertos costumam ser não-óbvios:
+> guardas que o frontend nunca alcança porque sempre passa os parâmetros
+> opcionais, e curto-circuito de `&&` onde nenhum teste falha pelo lado esquerdo.
+> Achá-los é barato com a implementação fresca e caro semanas depois.
+
 ### Contrato 11 — o Anel 0 é thread-safe (reentrante)
 
 **O Smaug é thread-safe.** Toda função do backend C recebe o que precisa por
