@@ -51,6 +51,102 @@ categorical divergiria em silêncio. Vira teste de invariante.
 Nenhum C, nenhum Lua.
 
 ---
+## 2026-07-28 — quanto custa um dtype novo, e por que a resposta ingênua não serve
+
+Começou como um achado de duplicação — a mesma guarda de dtype escrita 25 vezes —
+e virou outra coisa quando ficou claro que o problema não é repetição, é **custo
+marginal de dtype**. E dtypes novos deixaram de ser hipotéticos ontem: a Trilha
+Analítica que registramos no `ARCHITECTURE` tem quantização INT8/INT4 explícita, e
+float32 é o padrão de ML.
+
+Medido: adicionar `float32` hoje toca **oito frentes**. O arquivo `ops_f32.c` novo
+(~1.042 linhas em 39 funções), ~10 conversões de `astype`, 52 campos no descritor,
+as 25 guardas, ~39 `cdef`, a inferência de CSV, o eixo de paridade e a suíte de
+testes.
+
+Boa parte disso é **inerente** e não tem conserto: C não tem genéricos, despacho
+por dtype é a arquitetura, e a matriz `astype` é N² por natureza. numpy e pandas
+enfrentam o mesmo e resolvem com macro e geração de código — não eliminando o
+custo. O objetivo, então, não é dtype de graça; é que o custo seja proporcional ao
+que é genuinamente novo, e que esquecer um passo falhe alto.
+
+A distinção que orienta o trabalho é entre **perigo e trabalho**. As 25 guardas são
+perigo: esquecer uma edição faz a operação recusar um dtype válido, e nenhum teste
+existente pega porque o dtype é novo. Os 16 corpos de aritmética repetidos em C são
+só trabalho: esquecer não dá bug, dá função faltando, que quebra alto na primeira
+chamada.
+
+**A proposta ingênua morreu na medição.** Trocar as 25 guardas por uma consulta ao
+descritor parecia óbvio — até aparecer que o eixo de paridade `01_dtypes`
+**depende** dessas guardas: ele varre o corpo de cada método procurando
+`self._dtype ~= "X"` literal para deduzir quais dtypes cada método suporta.
+Substituir as guardas cegaria a auditoria. A migração tem de mover o eixo para ler
+capacidade declarada, o que é melhor — declarativo em vez de regex sobre fonte —
+mas não é opcional nem separável do resto.
+
+Também apareceram **três noções de dtype convivendo**, todas incompletas: o
+`DTYPES` do descritor (5), o `DTYPE_FAMILY` que o 12.31 criou no `_factories.lua`
+(4 — falta datetime, porque a inferência nunca o produz) e o enum `DT_*` do
+`smaug_io_internal.h` (4, para CSV).
+
+E um desvio meu, de ontem: o 10.3 fez `abs`/`round`/`clip` com despacho **manual**
+(`if self._dtype == "float64" then ... else ...`) em vez de `self._d.abs`, que é
+exatamente o que o descritor existe para evitar. O `between` do 10.2 seguiu o
+padrão; o 10.3 não. O motivo foi assinatura divergente — `f64_abs` sem `status`,
+`i64_abs` com — então uniformizá-las é pré-requisito de corrigir.
+
+Registrado como 12.35, com bloco de design obrigatório. Nenhum código tocado.
+
+---
+## 2026-07-28 — 10.5-B: a primeira medição de desempenho do projeto muda o item
+
+Bloco de design do único item restante com retrabalho em aberto. Ele estava
+registrado como "hash de chave no Anel 0", e a análise mostrou que hash é uma
+implementação possível, não o problema — o item foi renomeado para "chave de
+igualdade sem alocar string por linha".
+
+Como o item é essencialmente desempenho, e o projeto **nunca mediu desempenho**
+(correção é medida à exaustão; velocidade, nunca), a primeira coisa foi medir. 1M
+linhas de int64, ~100k grupos: `get_raw` sozinho custa 0,079 s, com `keys.encode`
+sobe para 1,171 s, e com a tabela Lua chega a 1,250 s. **O gargalo é construir a
+string `"int64:12345"` por linha** — 93% do custo. Nem a travessia de FFI nem a
+tabela Lua importam.
+
+A premissa do item estava certa, então. Mas a solução registrada não era a única,
+e nem a melhor. Ordenar torna os grupos contíguos, e o `smaug_multi_argsort` — que
+recebe N colunas de qualquer dtype, devolve índices em ordem lexicográfica e é
+sort estável — **já existe, está testado e selado**. Medido: 0,147 s para ordenar
+1M linhas mais 0,012 s para varrer as fronteiras. **0,159 s contra 1,250 s: 7,9×,
+com zero estrutura de dados nova em C.**
+
+Isso reformula a decisão. Não é mais "chave string com call-sites intactos contra
+valores crus com 26 call-sites mudando" — é **tabela hash do zero contra ordenação
+sobre o que já existe**. A segunda dispensa o `smaug_hash_table_t` (declarado e
+nunca implementado), não cria superfície de OOM nova, não inventa gerência de tempo
+de vida, e deixa o trabalho quase todo em Lua.
+
+Dois obstáculos ficaram registrados por serem reais: o `multi_argsort` exige
+colunas de chave sem nulos, e `unique()` promete ordem de primeira aparição
+enquanto ordenar dá ordem lexicográfica. Ambos têm saída que não toca C — separar
+as linhas nulas antes (elas formam um grupo só) e guardar o menor índice original
+de cada grupo para reordenar.
+
+Duas correções de entendimento que a leitura produziu. O `keys.value` **sobrevive
+a qualquer abordagem**: ele não codifica chave, devolve o valor exato para
+reconstruir a coluna do resultado. Só o `encode` está em questão — a formulação
+anterior tratava os dois como uma coisa só. E a hash **nunca foi separável da
+operação**: uma primitiva `hash_series(s, row) -> uint64` custaria uma travessia
+barata de FFI, mas `uint64` como cdata não serve de chave de tabela Lua e como
+number degrada — mover a hash exigiria mover o armazenamento, isto é, a operação
+inteira.
+
+De quebra, o `join` compõe N colunas concatenando chaves com `\1`. O
+`multi_argsort` aceita N colunas nativamente, então a via da ordenação **elimina**
+a concatenação em vez de reimplementá-la.
+
+Nenhum código tocado.
+
+---
 ## 2026-07-28 — auditoria de retrabalho do item 10, antes de reimplementar
 
 Levantamento do que resta no bloco 10 procurando **onde reimplementar criaria

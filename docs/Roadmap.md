@@ -255,25 +255,69 @@ correto — delegar ao descritor → C — já existe. Subitens 10.5 a 10.9 fech
     distintos — CSV **parseia** (texto→número) e já delega ao `smaug_parse_*`
     (10.9); `.str` **transforma** (texto→texto).
 
-- 10.5 Passo B **hash de chave no Anel 0** (resto do 10.5) — **EXIGE BLOCO DE
-  DESIGN ANTES DE CÓDIGO.** É o único item restante com retrabalho genuíno em
-  aberto, e a formulação anterior escondia isso.
-  - **O que o registro anterior dizia, e por que não se sustenta.** Dizia que "o
-    `keys.lua` já é o ponto de plugue" e que "o Lua delega sem tocar call-site".
-    Verificado em 2026-07-28: o `keys.lua` devolve **string Lua**
-    (`"int64:12345"`), consumida em **26 call-sites** de 4 arquivos (`_stat`,
-    `_predicates`, `_relational`, `dataset/_stat`). O ganho de uma tabela hash em
-    C é justamente **não alocar string por linha**. Então: se o C devolver string,
-    os call-sites não mudam e o ganho some; se o C trabalhar sobre valores crus, o
-    ganho existe mas os 26 call-sites mudam e o papel do `keys.lua` encolhe.
-    **Não dá para ter os dois** — é a decisão que o bloco de design precisa tomar.
-  - **`smaug_hash_table_t` está declarado e NÃO implementado** (`smaug_types.h`,
-    "uso futuro: GroupBy/joins"). É do zero, não é religar.
-  - **O 10.5-A não foi desperdício** — corrigiu bug real (int64 > 2^53 na chave) e
-    unificou seis implementações divergentes. Mas a abstração dele seria
-    **substituída**, não estendida. Registrar isso evita a surpresa no meio.
-  - Trabalho maior: hash de string e datetime em C. Vínculo: 12.4.
-
+- 10.5 Passo B **chave de igualdade sem alocar string por linha** —
+  **[BLOCO DE DESIGN CONCLUÍDO 2026-07-28 · execução pendente]** Renomeado: o
+  item chamava-se "hash de chave no Anel 0", e a análise mostrou que hash é uma
+  *implementação possível*, não o problema.
+  - **O gargalo foi MEDIDO** (primeira medição de desempenho do projeto; até
+    aqui só correção era medida). Coluna int64 de 1M linhas, ~100k grupos:
+    | etapa | tempo |
+    |---|---|
+    | só `get_raw` (travessia FFI) | 0,079 s |
+    | + `keys.encode` (monta a string) | **1,171 s** |
+    | + tabela Lua | 1,250 s |
+    O custo é **construir a string** `"int64:12345"` por linha — 93% do total.
+    Nem o FFI (0,079 s) nem a tabela Lua (0,079 s) são o problema. A premissa do
+    item está certa; o alvo é a alocação de string, não a estrutura de dados.
+  - **A alternativa foi medida, e usa C que JÁ EXISTE.** `smaug_multi_argsort`
+    (+ wrapper FFI) está implementado, testado e selado: recebe N colunas de
+    qualquer dtype e devolve índices na ordem lexicográfica, com sort estável.
+    Ordenar torna os grupos **contíguos**, e uma varredura acha as fronteiras.
+    | abordagem | 1M linhas |
+    |---|---|
+    | atual (`encode` + tabela Lua) | 1,250 s |
+    | `multi_argsort` + varredura | **0,159 s** (0,147 + 0,012) |
+    **7,9× mais rápido, com zero estrutura de dados nova em C.**
+  - **Consequência: a decisão mudou.** Não é mais "chave string com call-sites
+    intactos × valores crus com 26 call-sites mudando". É **tabela hash do zero
+    × ordenação sobre o que já existe**. A segunda não precisa de
+    `smaug_hash_table_t` (que está declarado e não implementado), não cria
+    superfície de OOM nova, não inventa gerência de tempo de vida — e o trabalho
+    fica quase todo em **Lua**, o que pode tornar o item Lua-puro.
+  - **Dois obstáculos reais, a resolver na execução:**
+    1. **Nulos.** O contrato do `multi_argsort` exige que todas as posições das
+       colunas de chave sejam válidas. `unique`/`groupby`/`value_counts` aceitam
+       nulos. Ou se separam as linhas nulas antes (elas formam um grupo só, e o
+       `NULL_KEY` já existe no `keys.lua`), ou o `multi_argsort` ganha tratamento
+       — a primeira opção não toca C.
+    2. **Ordem de saída.** `unique()` promete "ordem de primeira aparição";
+       ordenar dá ordem lexicográfica. Resolve-se guardando o menor índice
+       original de cada grupo e reordenando por ele — passada extra em O(g), com
+       g = número de grupos.
+  - **O `keys.value` sobrevive de qualquer forma.** Ele não codifica chave: ele
+    devolve o valor **exato** para reconstruir a coluna do resultado (int64 via
+    `get_raw`). Nenhuma abordagem de agrupamento o dispensa. Só o `encode` está
+    em questão — a formulação anterior ("o `keys.lua` é o ponto de plugue")
+    tratava os dois como uma coisa só.
+  - **Por que a hash não era separável da operação.** Uma primitiva
+    `hash_series(s, row) -> uint64` chamada do Lua custaria uma travessia de FFI
+    por linha (0,079 s medidos — barato), mas o resultado precisaria ser
+    armazenado: `uint64` como cdata não serve de chave de tabela Lua, e como
+    number degrada. Ou seja, mover só a hash exigiria mover também o
+    armazenamento — isto é, a operação inteira. O item nunca foi "adicionar uma
+    função de hash".
+  - **Consumidores (26 call-sites, 4 arquivos):** `unique`, `nunique`,
+    `value_counts`, `mode` (`series/stats/_stat`), `isin`, `duplicated`
+    (`series/selection/_predicates`), `join`, `groupby` (`dataset/_relational`,
+    `dataset/_stat`). O `join` compõe N colunas concatenando chaves com `\1` —
+    o `multi_argsort` já aceita N colunas nativamente, o que **elimina** a
+    concatenação em vez de reimplementá-la.
+  - **Recomendação:** executar pela via da ordenação, começando por `unique`/
+    `nunique`/`value_counts` (dtype único, sem composição), e só depois `join`/
+    `groupby` (N colunas). Manter `keys.encode` enquanto houver consumidor —
+    remover só quando o último sair, como foi feito com o degrau no 10.3.
+  - Vínculo: 12.4; 10.5 Passo A (o `keys.value` permanece; o `encode` é que
+    tende a sair).
 ## 12. Achados menores + débitos antigos  [Windows+Fedora]
 
 Vinte e quatro subitens já fecharam (ver índice acima). Restam:
@@ -438,6 +482,80 @@ Vinte e quatro subitens já fecharam (ver índice acima). Restam:
      nulo talvez caiba como parágrafo no Contrato 9).
    - **Vínculo:** 10.2 fatia 2 (que tornou as duas visíveis); Contrato 6, 9;
      item 12.34 (a colação está implementada cinco vezes).
+ - 12.35 **Custo de adicionar um dtype** — [Fedora] (Anel 0 + Anel 1).
+   **EXIGE BLOCO DE DESIGN.** Levantado em 2026-07-28. O objetivo não é dtype de
+   graça — em C sem genéricos isso não existe, e despacho por dtype **é** a
+   arquitetura (P2). O objetivo é que o custo seja **proporcional ao que é
+   genuinamente novo** (a semântica do tipo) e que **esquecer um passo falhe
+   alto**, não em silêncio.
+   - **Por que agora:** a Trilha Analítica registrada no `ARCHITECTURE` exige
+     dtypes novos — quantização INT8/INT4 está explícita no Anel 8, e float32 é o
+     padrão de ML. Não é "se", é "quando". E `float32`/`int32` já estavam nas
+     frentes diferidas.
+   - **Medido: adicionar `float32` hoje toca oito frentes.**
+     | frente | custo | natureza |
+     |---|---|---|
+     | `smaug_ops_f32.c` | ~1.042 linhas, 39 funções | parte acidental |
+     | conversões `astype` | ~10 pares novos (é N²) | **inerente** |
+     | entrada no descritor | 52 campos | **inerente** (é o design) |
+     | guardas de dtype em Lua | **25 edições coordenadas** | acidental e **perigosa** |
+     | `cdef` no `ffi_loader` | ~39 declarações | acidental |
+     | inferência CSV/JSON | enum `DT_*` próprio | acidental |
+     | eixo de paridade `01_dtypes` | lista fixa de dtypes | acidental |
+     | testes | suíte por dtype | inerente |
+   - **A distinção que orienta o trabalho: perigo × trabalho.** As 25 guardas são
+     **perigo** — esquecer uma edição faz a operação recusar um dtype válido, e
+     nenhum teste existente pega, porque o dtype é novo. Os 16 corpos de
+     aritmética repetidos em C são só **trabalho** — esquecer não dá bug, dá
+     função faltando, que quebra alto na primeira chamada. Atacar o perigo antes
+     do trabalho.
+   - **Três noções de dtype convivem hoje, todas incompletas:** `DTYPES` no
+     `_types.lua` (5 dtypes, é o descritor), `DTYPE_FAMILY` no `_factories.lua`
+     (4 dtypes — **falta datetime**, porque a inferência nunca o produz) e o enum
+     `DT_*` no `smaug_io_internal.h` (4, para inferência de CSV). Consolidar é
+     parte do item.
+   - **ARMADILHA — o eixo `01_dtypes` DEPENDE das guardas.** Ele varre o corpo de
+     cada método procurando `self._dtype ~= "X"` (`gmatch` literal) para deduzir
+     quais dtypes cada método suporta. Trocar as guardas por consulta ao descritor
+     **cegaria a auditoria**. A migração tem de mover o eixo para ler a
+     capacidade declarada — o que é melhor (declarativo em vez de regex sobre
+     fonte), mas **não é opcional e não é separável**. Isto invalida a proposta
+     ingênua de "só trocar as 25 guardas".
+   - **Desvio a corrigir, introduzido em 2026-07-27 (10.3):** `abs`/`round`/`clip`
+     fazem despacho **manual** (`if self._dtype == "float64" then C.smaug_f64_abs
+     else C.smaug_i64_abs`) em vez de `self._d.abs` — exatamente o que o descritor
+     existe para evitar. O `between` (10.2) seguiu o padrão; o 10.3 não. Alinhar
+     reduz a barreira: com `self._d.abs`, um dtype novo é uma linha no descritor
+     em vez de editar um `if/else`. Motivo do desvio: as assinaturas divergem
+     (`f64_abs` sem `status`, `i64_abs` com) — uniformizá-las é pré-requisito.
+   - **Frentes candidatas (a decidir no bloco de design):**
+     1. **Capacidade declarada no descritor** (elimina as 25 guardas). O descritor
+        é o único lugar que um dtype novo **não consegue evitar tocar** — sem
+        entrada lá, nada funciona. Uma tabela paralela pode ficar desatualizada em
+        silêncio, que foi o que aconteceu com o `DTYPE_FAMILY`. E se alguém
+        esquecer a flag, o campo é `nil` e a operação **recusa**: falha visível.
+        Ressalva: dos ~52 campos do descritor, só o `name` não é função — isto
+        **estende** o padrão, não o instancia. Cinco guardas são "numérico ou
+        datetime" e três são "ordenável", então é capacidade, não família única.
+     2. **Macro para os 16 corpos de aritmética** (`add`/`sub`/`mul`/`div`, escalar
+        e série×série, f64 e i64), no padrão do `F64_MATH_IMPL` já selado. Medido:
+        o esqueleto "aloca + itera + `SMAUG_VALID`" aparece **34 vezes** em 39
+        funções do `ops_f64.c`; com as 7 já macro-geradas do 10.3, ~60% do arquivo
+        vira gerado e o `.c` de um dtype novo encolhe perto de 40%.
+        **Fazer como incremento próprio, antes do dtype novo** — é
+        comportamento-preservante (critério de aceite: suíte com números
+        idênticos), e misturar refatoração com feature impede saber de onde veio
+        uma falha.
+     3. **Alinhar o despacho ao descritor** (o desvio do 10.3, e varrer se há
+        outros).
+     4. **Migrar o eixo `01_dtypes`** para ler capacidade declarada.
+   - **Fora de escopo (inerente, não é defeito):** a matriz `astype` é N² por
+     natureza; o descritor de 52 campos é o design de despacho; a suíte por dtype
+     é o preço de verificar cada um. numpy e pandas resolvem o mesmo problema com
+     macros e geração de código — não eliminando o custo.
+   - **Vínculo:** 12.31 (criou o `DTYPE_FAMILY` local); 10.3 (introduziu o
+     desvio de despacho e a macro que serve de precedente); `ARCHITECTURE`,
+     Princípios da Trilha Analítica (que torna os dtypes novos inevitáveis).
  - 12.34 **Colação de string implementada cinco vezes** — **[Done — Fedora
    2026-07-27]** (refatoração interna do C: nenhuma função pública nova, nenhum
    `cdef` — **não muda ABI**). Valgrind 0 erros; cobertura confirmou a previsão
