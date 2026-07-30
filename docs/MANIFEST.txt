@@ -1,6 +1,6 @@
 # Smaug -- MANIFEST de integridade
 # Gerado por scripts/make_manifest.sh (o .ps1 delega a este)
-# Arvore: 3f93951 + alteracoes nao commitadas
+# Arvore: 554b3df + alteracoes nao commitadas
 # Formato: <sha256>  <linhas>  <caminho>
 #
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
@@ -9,16 +9,16 @@ ed7d63f5177cc7d7fbfee9c7c18ebeb4d6fd7da02680ec7778cfe23be1d15b03      31  ./.git
 4fefc1e12267c0f405c8f11906fca563e29954f8671ed8a7bf5320803f6d6167     102  ./Makefile
 a0c76e9e9d254d33ff7bf92374e48f644e20c35ec98753dc9d7236761e10b02a     593  ./docs/API_INDEX.md
 169580ce180057b12b223529ce84767b6ff0920a8773e7432fd6c6d91befaeb1     636  ./docs/API_Reference.md
-a37edff0d236868dc25e53c68009ce0c79a959614d361f93016fb2eab56ecd41     335  ./docs/ARCHITECTURE.md
+f33e15a9714d57c233b804221fd789b8e62269c6639aa398efd831a0f02112cd     481  ./docs/ARCHITECTURE.md
 ef144b541b3c17465380a9dc7ec802faedee9fe48a229b85c7a69454bd2a981d     185  ./docs/Build_and_Testing.md
-e3b7d11854918663a5960a9a52fa6d4b21e773c894b9570c61e6f82c72cb8d90    4282  ./docs/CHANGELOG.md
+74bdc31d71bb82b924a32eb6401fc136ff2ee8bbf5a5bd58033f4fb47f0b89ed    4337  ./docs/CHANGELOG.md
 9a5745e0953b96ecc14c62e02951b104b7e2575938630a0bde0a5cecafee14ee      98  ./docs/CODE_REVIEW.md
-8f887abe5c1091ab800a7d159c850176533227d59bec66cedbee3c750aaa90c4     476  ./docs/CONTRACT.md
+f26d5211d1726c8a28f08979ada97bb01e38b2709a921f388d626260c17ca9a7     515  ./docs/CONTRACT.md
 85cf1d25e501abf5128daacd424f250c25f83ebc5f8d4f60ce3826c922cb533d     357  ./docs/COVERAGE.md
 9f89a9d98d9531648723af2b8aff51121dc75c71fb7bd0620ffb6b71938cbae3     173  ./docs/COW.md
-e13cc440a080350cfb3650a99f7d96fadf0cb9f7f40b79d89e1202848a934c11     921  ./docs/PARITY_REPORT.md
+47ef6f111b45c53be4b4f125c7f088e1ed44cd51f6c6bde8cc06c39a84dcebc4     921  ./docs/PARITY_REPORT.md
 d1610547b58bad5ee0d6e3d11482b0fec99165594529e30acb9c68c8d813e49a     532  ./docs/README.md
-96468ae99358e3c011cb3e8f5f1a693e2a100cbea9af5f966c3d6c0ca7d497d7     685  ./docs/Roadmap.md
+fae9bb368a696878a5edecd13052f704d201e4d087b81f92e0ed8e32edd39614     628  ./docs/Roadmap.md
 1722e1a5806e185b2f934f2a66ec5193cc6ab8dc5a03837be43be80628c8fb86      39  ./include/smaug.h
 6ece9315732efddf7180f7e867ec09888b8f87dfb83e5efeab2ee85752003114      59  ./include/smaug_astype.h
 963e21a0d5b9b1857da7bbe7310a4a9340057fcf7560272f062e4e83727c5da3      40  ./include/smaug_bool.h

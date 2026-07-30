@@ -196,146 +196,83 @@ Operações que fazem o loop em Lua cruzando FFI por elemento, quando o padrão
 correto — delegar ao descritor → C — já existe. Subitens 10.5 a 10.9 fechados
 (ver índice acima); 10.5 Passo B segue aberto.
 
-- 10.1 **`prod()` → Ring 0** (E3). Única redução escalar fora do C — sum/mean/min/
-  max/std/var todas têm primitiva; existe `cumprod`, falta `prod`. Assimetria por
-  omissão (passou batido no item 5). Criar `smaug_f64_prod`/`smaug_i64_prod`.
-- 10.3 **Família matemática element-wise → Anel 0** (E5).
-  **[A e B: Windows OK 2026-07-27 · selo Fedora PENDENTE]** As nove operações
-  estão no Anel 0. Falta Valgrind e cobertura, que só rodam no Fedora. Fatiado por concern e
-  por arquivo Lua: **A** = as seis matemáticas (`_selection.lua`), mecânicas e
-  sem decisão semântica; **B** = `abs`/`round`/`clip` (`_transform.lua`), a
-  família que preserva dtype, onde vivem as três decisões e o degrau que sai.
-  - **Fatia A — `sin`/`cos`/`tan`/`exp`/`log`/`sqrt`: [Windows OK · Fedora
-    PENDENTE]** Uma **macro** (`F64_MATH_IMPL`) gera os seis
-    corpos, que diferiam apenas pela função de libm — seis corpos à mão seriam
-    seis lugares para repetir cada correção, e cinco para esquecê-la. Padrão que
-    a casa já usa (`DT_CMP_IMPL`). Entrada int64 não tem versão própria (Opção
-    1): o frontend encadeia `astype("float64")` — já vetorizado (10.7) — e chama
-    a versão f64; converter antes não perde nada porque a saída é f64 de todo
-    jeito. Testes guiados por **tabela** pelo mesmo motivo da macro: cada
-    instanciação tem os próprios ramos, então cobrir uma não cobre as outras
-    cinco (lição do 10.2 fatia 1). `test_ops_edge` 307→346, `test_integration`
-    78→92, allocfail 1918→**1972**; Windows MSYS2-UCRT64 confirmado 2026-07-27
-    (falta o Fedora: Valgrind e cobertura não rodam lá).
-    Cobertura **subiu** (94.81→94.87% branch-alvo)
-    com descobertos **iguais em 227** — as seis entraram 100% cobertas. Mutação
-    verificada em dois eixos: tirar a propagação de nulo e trocar `sqrt` por
-    `fabs` abortam o teste. `tan` não era exercitada antes.
-  - **Fatia B — `abs`/`round`/`clip`: [Windows OK · Fedora PENDENTE]** As três preservam dtype, então têm versão int64 — e é aí que
-    está o ponto: a aritmética passou a ser inteira pura, sem ponto flutuante
-    em lugar nenhum. `abs(-9007199254740993)` devolve o valor **exato**; antes
-    do degrau devolvia `...992` corrompido, e com o degrau errava.
-    `f64_abs` entrou na macro (`fabs`), não como corpo próprio.
-    - **O degrau `check_int64_lossless` foi APOSENTADO.** Com `abs`/`round`/
-      `clip` no Anel 0, ele ficou sem consumidor no projeto inteiro — os
-      anteriores (fillna/astype no 10.6/10.7, `between` no 10.2) já haviam
-      saído. Removido do `_core.lua` em vez de virar código morto. É o fim do
-      paliativo de 2026-07-23.
-    - **As três decisões implementadas**, todas via `smaug_status_t` com
-      mensagem que explica a causa: `abs(INT64_MIN)` não tem contrapartida
-      positiva; `clip(lo > hi)` é faixa contraditória (antes devolvia `{8,8,2}`,
-      fora de qualquer faixa); `round` em int64 erra se `|ndigits| >= 19` (o
-      fator não cabe) ou se o resultado sair da faixa — verificado **antes** de
-      multiplicar, porque depois seria UB.
-    - **`round(int64)` preserva int64.** Com `ndigits >= 0` é identidade,
-      implementada como **cópia sem aritmética**: uma versão genérica que
-      fizesse `v * 10^n / 10^n` passaria por double e degradaria acima de 2^53,
-      reintroduzindo o bug que o item existe para matar. Com `ndigits < 0`
-      quantiza por `10^|n|` em aritmética inteira.
-    - **Uma mutação escapou e virou teste.** Trocar `m >= half` por `m > half`
-      no desempate passou pelos testes — eles não exercitavam o **ponto exato**
-      de meio caminho. Corrigido com `round(1250,-2)=1300`, `round(-1250,-2)=
-      -1300` e vizinhos; a mutação passou a ser detectada.
-    - **Cobertura, terceira vez a mesma lição.** Caiu para 94.20% ao entrar,
-      porque os ramos `if (status)` e `if (!a)` **nunca são exercitados pelo
-      frontend** (ele sempre passa status e nunca passa série NULL). Testes em C
-      com série NULL × status NULL/não-NULL, overflow nos dois sentidos e séries
-      vazias fecharam em **94.94%**, acima do baseline.
-    - `test_access` 168→191, `test_ops_edge` 346→381, allocfail 1972→**2032**.
-  **Correção ao desenho original (2026-07-27):** são **12** funções em C, não 11
-  — a decisão "`round(int64)` preserva int64" tornou `round` uma operação que
-  preserva dtype, exigindo versão i64; o número anterior assumia saída f64. E a
-  macro cobre **7**, não 6: `abs` de f64 tem a mesma forma das seis (unária,
-  f64→f64, só troca a função de libm — `fabs`). Resultado: 1 macro + 5 corpos à
-  mão para 12 funções.
-  Confirmado no fonte: **não existe nenhuma** dessas primitivas no Anel 0 — nem
-  para f64. "Delegar" aqui é criar as primitivas, não religar.
-  - **Escopo real: nove operações, não três.** O item nasceu como
-    `abs`/`round`/`clip` (as que tinham degrau, porque são as que preservam
-    valor), mas elas são 3 de uma família que vive inteira no Anel 1 via `map`.
-    As outras seis (`sin`/`cos`/`tan`/`exp`/`log`/`sqrt`, `_selection.lua:272`)
-    não têm degrau só porque a saída é `float64` e não há int64 a preservar —
-    mas o loop sobre FFI é o mesmo. Fechar só três deixaria seis irmãs esperando
-    a mesma encanação: retrabalho garantido.
-  - **Quatro formas:** (A) unária pura, saída sempre f64 — as seis matemáticas;
-    (B) unária + param, saída f64 — `round(ndigits)`; (C) unária, preserva dtype
-    — `abs`; (D) dois escalares opcionais, preserva dtype — `clip(lo, hi)`.
-  - **Superfície em C — Opção 1 (decidida).** Nas formas A e B a saída é `float64`
-    **independente da entrada**, então só as versões f64 nascem em C; para entrada
-    int64 o Anel 1 encadeia `astype("float64")` (já vetorizado, 10.7) e chama a
-    versão f64. Não é reimplementação — é sequenciar duas chamadas do Anel 0, e
-    converter antes não perde nada que a operação não fosse perder (a saída é f64
-    de todo jeito). **11 funções** em vez de 18. O custo é uma passada e uma
-    alocação extras para entrada int64; o benefício é metade da superfície de
-    varredura OOM, que é o custo que mais pesa neste projeto.
-  - **Macro para a forma A**, no padrão do `DT_CMP_IMPL`: as seis são idênticas
-    exceto pela função de libm. O Lua já as gera por laço (`_selection.lua:276`),
-    ou seja, a casa já as trata como família.
-  - **Três decisões semânticas que a implementação em C força** (hoje implícitas
-    ou erradas; todas decididas em 2026-07-27):
-    - **`abs(INT64_MIN)` → erro.** `-9223372036854775808` não tem contrapartida
-      positiva em int64. Hoje "funciona" porque o degrau barra por outro motivo
-      (excede 2^53); removido o degrau, vira caso genuíno. Erro na operação, não
-      nulo no elemento — nulo seria converter valor em ausência, que o Contrato 9
-      trata como coisa distinta.
-    - **`clip(lo, hi)` com `lo > hi` → erro.** Bug de lógica **existente hoje**,
-      em qualquer dtype, sem relação com 2^53: provado que `{1,5,9}:clip(8,2)`
-      devolve `{8,8,2}`. O `return lo` curto-circuita antes de checar `hi`, então
-      valor abaixo de `lo` vira `lo` e nunca é limitado por `hi` — o resultado não
-      está dentro de faixa nenhuma. Faixa contraditória não tem semântica válida.
-    - **`round` em int64 preserva int64.** Hoje devolve `float64`
-      (`_transform.lua:474`), o que **degrada acima de 2^53** justamente na
-      operação que estamos consertando por precisão. Com `ndigits >= 0` é
-      identidade; com `ndigits < 0` arredonda dezenas e continua inteiro. Fica
-      coerente com `abs` e `clip`, que preservam dtype. Verificado que **nada
-      depende** do comportamento atual: nenhum teste assevera o dtype, o
-      `API_INDEX` não promete dtype, e o `round` do DataSet delega via
-      `map_frame` (o teste dele checa coluna float). Borda a definir na execução:
-      `ndigits <= -19` estoura o fator `10^n` em int64.
-  - **Confirmado sem decisão:** `sqrt(-4)` e `log(-4)` → **NaN**, não erro nem
-    nulo — coerente com o Contrato 9 (NaN é valor; ausência é `null_mask`), e é o
-    que o C faz nativamente. Nulos preservados nas nove.
-  - **Degrau paliativo aplicado (2026-07-23).** Também **defeito de correção**:
-    `abs(-9007199254740993)` devolvia `9007199254740992` — perda silenciosa de
-    dígito, e `clip` idem. As três (`abs`/`round`/`clip`) passam pelo `map`, que
-    lê via `get()`; o degrau roda dentro da closure (o `map` já passa `(v, i)`,
-    então é uma passada só, sem custo extra). **`map()` reclassificado sob o
-    Contrato 1 (2026-07-24):** hoje `map(fn, "int64")` sobre int64 > 2^53 entrega
-    o valor **degradado** à closure (`v = get(i)` → double) e grava sem aviso —
-    provado: entra `...993`, sai `...992`. Isso é **narrowing silencioso**, o
-    único que o Contrato 1 reescrito proíbe; a justificativa antiga ("API
-    genérica, o caller escolhe dtype e closure, bloquear seria invasivo") não
-    sobrevive ao princípio — "o caller escolheu" não autoriza degradar em
-    silêncio. Decisão a tomar (**preservar-ou-recusar**, nunca degradar): (a) com
-    dtype de saída int64, passar o valor **cru** (cdata `get_raw`) à closure —
-    preserva, mas muda o que a closure recebe (cdata int64_t, não `number`: a
-    aritmética Lua difere, pode quebrar closures que assumem number); ou (b)
-    recusar int64 > 2^53 na entrada do `map`, como as demais (falha visível, mesma
-    fronteira do degrau). Item próprio — não é mais "fora por decisão".
-  - **Lacuna de teste que escondeu isto:** `Series:abs()`, `:round()` e `:clip()`
-    não tinham **nenhum** teste direto (só via DataFrame, e nunca com int64 > 2^53).
-    Guards adicionados em `test_access` (+13, 127→140): recusa acima de 2^53,
-    mensagem nomeando a operação e mostrando o valor exato, fronteira 2^53 exato
-    ainda aceita, caminho normal (int64 pequeno, float64, nulos) intacto.
-- 10.4 **família `.dt` e `.str` vetorizadas** (E6). `dt_component` chama
-  `C.smaug_dt_year(v)` **por elemento** num loop Lua — a lógica escalar está no C,
-  falta a versão de série (`smaug_dt_year_series(s) → série`). Mesmo padrão em
-  `.str` (upper/lower/len/...). Criar as primitivas de série; a Lua delega.
+- 10.1 **`prod()` → Ring 0** (E3) — **RECLASSIFICADO 2026-07-28: é defeito de
+  correção, não assimetria.** Única redução escalar fora do C; sum/mean/min/max/
+  std/var já têm primitiva. Criar `smaug_f64_prod`/`smaug_i64_prod`, espelhando a
+  assinatura do `sum` (`double smaug_f64_sum(s, bool ignore_na)`).
+  - **Bug provado (2026-07-28), nunca registrado.** O laço faz `p = p * v` com `v`
+    vindo de `get(i)` — **double**. Em int64 o produto degrada em silêncio:
+    `prod` de `{3037000500, 3037000499}` devolve `9223372033963249664` quando o
+    exato é `9223372033963249500`. Erra por 164, e o resultado **cabe** em int64 —
+    não é limite de faixa, é round-trip por double. Mesma família de 10.2/10.3.
+  - **Decisão a tomar antes de implementar:** produto de int64 que **estoura**
+    int64 — erro (como `abs(INT64_MIN)`) ou promoção a float64? Não é o mesmo caso
+    do bug acima: ali o resultado cabia. Aqui não cabe, e a operação não tem
+    resposta em int64. Implementar sem decidir produziria uma função em C que
+    preserva o defeito ou inventa semântica.
+  - **Sem retrabalho:** a assinatura do `sum` é o padrão a espelhar, e a decisão
+    de overflow tem precedente no 10.3 (`smaug_status_t` + `SMG_ERR_ARGUMENT`).
+- 10.3 **Família matemática element-wise → Anel 0** (E5) — **[Windows OK
+  2026-07-27 · selo Fedora PENDENTE]** As nove operações desceram: as seis
+  matemáticas por macro (`F64_MATH_IMPL`, fatia A) e `abs`/`round`/`clip` com
+  versão int64 (fatia B). **O degrau `check_int64_lossless` foi aposentado** —
+  com estas três no Anel 0 ficou sem consumidor no projeto inteiro e saiu do
+  `_core.lua`. Três decisões implementadas via `smaug_status_t`:
+  `abs(INT64_MIN)`, `clip(lo > hi)` e `round` fora de faixa erram com causa
+  nomeada. `round(int64)` preserva int64 (identidade como cópia sem aritmética,
+  para não degradar acima de 2^53). `test_access` 168→191, `test_ops_edge`
+  346→381, allocfail 1918→2032; cobertura 94.94%.
+  **Falta só rodar `build.sh --all` no Fedora.** Raciocínio, decisões e as duas
+  lições de cobertura estão no `CHANGELOG` (fatias A e B).
+- 10.4 **família `.dt` e `.str` vetorizadas** (E6). **Duas metades com custos
+  opostos** — dimensionado em 2026-07-28; tratá-las como um item só esconde isso.
+  - **`.dt` é barato, e por um motivo que o registro anterior não capturava:** a
+    matemática de calendário **já existe em C e está testada** (473 checks) —
+    `smaug_dt_year`, `month`, `day`, `hour`, `minute`, `second`, `ms`, `quarter`,
+    `week`, `weekday`, `yearday`, `format`, `truncate`, `diff_ms`. São **escalares**
+    (`int smaug_dt_year(int64_t epoch_ms)`), e o Lua faz o laço chamando `get(i)` e
+    depois a escalar: **duas travessias de FFI por elemento**. Faltam só as versões
+    de série, que são ~11 invólucros idênticos sobre o que já existe — **é a macro
+    do 10.3 de novo**, não matemática nova. Sobram 6 laços (`dt_component`,
+    `dt_map`, `format`, `diff`).
+  - **`.str` é o grande, e nada existe em C.** 28 métodos, **todos** por
+    `str_map`/`bool_map`, que iteram em Lua com `get(i)`/`set(i)` por elemento.
+    - **Dimensionamento (boa notícia): nenhum padrão Lua é exposto.** O `replace`
+      **escapa** os metacaracteres antes do `gsub`, e o `API_INDEX` promete
+      "substituição literal". Sem motor de padrões — é território de `memcmp`/
+      `memchr`. É a diferença entre tratável e projeto próprio.
+    - **Risco 1 — não usar `smaug_str_set` em laço.** Ele resolve comprimento
+      variável com `memmove` do rabo: O(n) por chamada, **O(n²) no laço**. O
+      caminho é `create_with_capacity` + `append` (amortizado, já existe).
+    - **Risco 2 — busca de substring não existe em C**, e `memmem` é GNU, não C11
+      portável (o Windows é MSYS2-UCRT64). Cinco métodos precisam (`contains`,
+      `find`, `count`, `replace`, `split`): **um** helper compartilhado, no
+      `smaug_str_internal.h` que o 12.34 criou — não cinco cópias.
+    - **Risco 3 — `str_map`/`bool_map` viram código morto.** Mesmo padrão do
+      `boolseries.lua` (10.8) e do `check_int64_lossless` (10.3): planejar a
+      remoção junto, não deixar para depois.
+  - **Sem sobreposição (verificado):** `.str` × inferência do CSV são concerns
+    distintos — CSV **parseia** (texto→número) e já delega ao `smaug_parse_*`
+    (10.9); `.str` **transforma** (texto→texto).
 
-- 10.5 Passo B **hash de chave no Anel 0** (resto do 10.5). O `keys.lua` já é o
-  ponto de plugue: a canonicalização de chave vira primitiva do Núcleo
-  (`smaug_hash_table_t`, ao lado do `multi_argsort`) e o Lua delega sem tocar
-  call-site. Trabalho maior: hash de string e datetime em C. Vínculo: 12.4.
+- 10.5 Passo B **hash de chave no Anel 0** (resto do 10.5) — **EXIGE BLOCO DE
+  DESIGN ANTES DE CÓDIGO.** É o único item restante com retrabalho genuíno em
+  aberto, e a formulação anterior escondia isso.
+  - **O que o registro anterior dizia, e por que não se sustenta.** Dizia que "o
+    `keys.lua` já é o ponto de plugue" e que "o Lua delega sem tocar call-site".
+    Verificado em 2026-07-28: o `keys.lua` devolve **string Lua**
+    (`"int64:12345"`), consumida em **26 call-sites** de 4 arquivos (`_stat`,
+    `_predicates`, `_relational`, `dataset/_stat`). O ganho de uma tabela hash em
+    C é justamente **não alocar string por linha**. Então: se o C devolver string,
+    os call-sites não mudam e o ganho some; se o C trabalhar sobre valores crus, o
+    ganho existe mas os 26 call-sites mudam e o papel do `keys.lua` encolhe.
+    **Não dá para ter os dois** — é a decisão que o bloco de design precisa tomar.
+  - **`smaug_hash_table_t` está declarado e NÃO implementado** (`smaug_types.h`,
+    "uso futuro: GroupBy/joins"). É do zero, não é religar.
+  - **O 10.5-A não foi desperdício** — corrigiu bug real (int64 > 2^53 na chave) e
+    unificou seis implementações divergentes. Mas a abstração dele seria
+    **substituída**, não estendida. Registrar isso evita a surpresa no meio.
+  - Trabalho maior: hash de string e datetime em C. Vínculo: 12.4.
 
 ## 12. Achados menores + débitos antigos  [Windows+Fedora]
 

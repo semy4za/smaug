@@ -51,6 +51,61 @@ categorical divergiria em silêncio. Vira teste de invariante.
 Nenhum C, nenhum Lua.
 
 ---
+## 2026-07-28 — auditoria de retrabalho do item 10, antes de reimplementar
+
+Levantamento do que resta no bloco 10 procurando **onde reimplementar criaria
+retrabalho**, feito lendo o código em vez de confiar no que o roadmap dizia. Cinco
+achados, e dois mudam o plano.
+
+**O `10.1` estava classificado errado.** O registro dizia "assimetria por omissão:
+todas as reduções têm primitiva, falta `prod`". É defeito de correção. O laço faz
+`p = p * v` com `v` vindo de `get(i)`, que em int64 é double: `prod` de
+`{3037000500, 3037000499}` devolve `9223372033963249664` quando o exato é
+`...500`. Erra por 164 — e o resultado **cabe** em int64, então não é limite de
+faixa, é round-trip. Mesma família de 10.2/10.3, nunca registrada. E traz uma
+decisão nova: produto que de fato estoura int64 erra ou promove?
+
+**O `10.4` tem duas metades com custos opostos**, e tratá-las como um item
+escondia isso. A parte `.dt` é barata por um motivo que o registro não capturava:
+a matemática de calendário **já existe em C e está testada** — `smaug_dt_year`,
+`month`, `quarter`, `weekday` e mais dez. São escalares, e o Lua faz o laço
+chamando `get(i)` e depois a escalar, duas travessias de FFI por elemento. Faltam
+só versões de série, que são invólucros idênticos sobre o que já existe: a macro do
+10.3 de novo, não matemática nova.
+
+A parte `.str` é o oposto — 28 métodos e nada em C. Mas o dimensionamento trouxe
+uma boa notícia: **nenhum padrão Lua é exposto**. O `replace` escapa os
+metacaracteres antes do `gsub` e a doc promete "substituição literal". Sem motor de
+padrões, é território de `memcmp`/`memchr` — a diferença entre tratável e projeto
+próprio. Três riscos ficaram mapeados: não usar `smaug_str_set` em laço (resolve
+comprimento variável com `memmove` do rabo, O(n²) no laço); busca de substring não
+existe e `memmem` é GNU, não C11 portável, então é um helper compartilhado por
+cinco métodos no `smaug_str_internal.h` do 12.34; e `str_map`/`bool_map` viram
+código morto, mesmo padrão do `boolseries.lua` e do degrau.
+
+**O `10.5-B` é o único com retrabalho genuíno, e a formulação anterior o
+escondia.** O registro dizia que "o `keys.lua` já é o ponto de plugue" e que "o Lua
+delega sem tocar call-site". O `keys.lua` devolve **string Lua**, consumida em 26
+call-sites de 4 arquivos — e o ganho de uma hash em C é exatamente não alocar
+string por linha. Se o C devolver string, os call-sites não mudam e o ganho some;
+se trabalhar sobre valores crus, o ganho existe mas os call-sites mudam e o papel
+do `keys.lua` encolhe. Não dá para ter os dois. O `smaug_hash_table_t` está
+declarado e não implementado, então é do zero. O item passou a exigir bloco de
+design antes de código, como o 10.8 exigiu.
+
+Duas frentes foram verificadas e **não** têm sobreposição: `.str` × inferência do
+CSV são concerns distintos (o CSV parseia e já delega ao `smaug_parse_*` do 10.9;
+`.str` transforma), e `.str` × hash também não (a hash lê o buffer, não usa as
+operações).
+
+O `10.3` foi comprimido de 128 para 12 linhas no roadmap — está implementado e
+confirmado no Windows, faltando só o selo Fedora, e o raciocínio já vive aqui.
+**Não** foi movido para o índice do concluído: item sem selo na seção de concluídos
+seria contabilidade desonesta.
+
+Nenhum código tocado.
+
+---
 ## 2026-07-27 — 10.3 fatia B: abs/round/clip descem, e o degrau se aposenta
 
 As três preservam o dtype, e é por isso que ganharam versão int64 em C. O ponto
