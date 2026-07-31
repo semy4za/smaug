@@ -33,20 +33,17 @@ return function(I)
     end
     I.SeriesDT = SeriesDT
 
-    -- Helper: aplica fn(epoch_ms) por elemento → Series<dtype>. Nulos propagam.
-    local function dt_component(s, fn)
-        local n    = s:len()
-        local vals = {}
-        for i = 1, n do
-            local v = s:get(i)
-            if v == nil then
-                vals[i] = NA
-            else
-                local r = fn(v)
-                vals[i] = r >= 0 and r or NA
-            end
-        end
-        return Series.from_table(vals, "int64", s._name)
+    -- Componentes → Anel 0 (10.4 fatia A).
+    -- Antes: laço em Lua chamando `get(i)` e depois a escalar do C — duas
+    -- travessias de FFI por elemento, mais uma tabela Lua intermediária. Agora
+    -- uma chamada para a série inteira. A matemática de calendário não mudou:
+    -- as funções de série apenas envolvem as escalares que já existiam.
+    -- A convenção de erro (-1 da escalar vira nulo, não vira -1 como valor)
+    -- migrou para dentro do C junto com a operação.
+    local function dt_component(s, cfn)
+        local r = cfn(s._c)
+        if r == nil then error("smaug: componente de datetime falhou", 3) end
+        return wrap(r, "int64", s._name)
     end
 
     local function dt_map(self, fn, out_dtype)
@@ -66,17 +63,17 @@ return function(I)
     end
 
     -- Componentes base (11)
-    function SeriesDT:year()    return dt_component(self._s, C.smaug_dt_year)    end
-    function SeriesDT:month()   return dt_component(self._s, C.smaug_dt_month)   end
-    function SeriesDT:day()     return dt_component(self._s, C.smaug_dt_day)     end
-    function SeriesDT:hour()    return dt_component(self._s, C.smaug_dt_hour)    end
-    function SeriesDT:minute()  return dt_component(self._s, C.smaug_dt_minute)  end
-    function SeriesDT:second()  return dt_component(self._s, C.smaug_dt_second)  end
-    function SeriesDT:ms()      return dt_component(self._s, C.smaug_dt_ms)      end
-    function SeriesDT:weekday() return dt_component(self._s, C.smaug_dt_weekday) end
-    function SeriesDT:yearday() return dt_component(self._s, C.smaug_dt_yearday) end
-    function SeriesDT:quarter() return dt_component(self._s, C.smaug_dt_quarter) end
-    function SeriesDT:week()    return dt_component(self._s, C.smaug_dt_week)    end
+    function SeriesDT:year()    return dt_component(self._s, C.smaug_dt_year_series)    end
+    function SeriesDT:month()   return dt_component(self._s, C.smaug_dt_month_series)   end
+    function SeriesDT:day()     return dt_component(self._s, C.smaug_dt_day_series)     end
+    function SeriesDT:hour()    return dt_component(self._s, C.smaug_dt_hour_series)    end
+    function SeriesDT:minute()  return dt_component(self._s, C.smaug_dt_minute_series)  end
+    function SeriesDT:second()  return dt_component(self._s, C.smaug_dt_second_series)  end
+    function SeriesDT:ms()      return dt_component(self._s, C.smaug_dt_ms_series)      end
+    function SeriesDT:weekday() return dt_component(self._s, C.smaug_dt_weekday_series) end
+    function SeriesDT:yearday() return dt_component(self._s, C.smaug_dt_yearday_series) end
+    function SeriesDT:quarter() return dt_component(self._s, C.smaug_dt_quarter_series) end
+    function SeriesDT:week()    return dt_component(self._s, C.smaug_dt_week_series)    end
 
     -- format(): epoch_ms → ISO 8601 → Series<string>
     function SeriesDT:format()

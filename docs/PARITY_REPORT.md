@@ -1,8 +1,7 @@
 # Smaug — Relatório de Paridade
 
-> Arquivo gerado por `bash scripts/parity/parity.sh` ou `powershell scripts/parity/parity.ps1`.
-> **Não editar à mão.** Decisões conscientes de não-paridade ficam em
-> `scripts/parity/exceptions.txt`.
+> Arquivo gerado por `bash scripts/parity/parity.sh`. **Não editar à mão.**
+> Decisões conscientes de não-paridade ficam em `scripts/parity/exceptions.txt`.
 
 Convenção de status:
 
@@ -11,7 +10,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-07-30 20:49:27 UTC
+Gerado em: 2026-07-31 00:41:50 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -503,7 +502,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `view` | 🟩 |  |
 
 
-### dt — 52 funções C
+### dt — 63 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -523,6 +522,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `create_from_array` | 🟨 |  |
 | `create_with_capacity` | 🟨 |  |
 | `day` | 🟩 |  |
+| `day_series` | 🟩 |  |
 | `diff_ms` | 🟩 |  |
 | `eq` | 🟩 |  |
 | `ffill` | 🟩 |  |
@@ -534,19 +534,25 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `get` | 🟩 |  |
 | `gt` | 🟩 |  |
 | `hour` | 🟩 |  |
+| `hour_series` | 🟩 |  |
 | `is_null` | 🟩 |  |
 | `le` | 🟩 |  |
 | `lt` | 🟩 |  |
 | `max` | 🟩 |  |
 | `min` | 🟩 |  |
 | `minute` | 🟩 |  |
+| `minute_series` | 🟩 |  |
 | `month` | 🟩 |  |
+| `month_series` | 🟩 |  |
 | `ms` | 🟩 |  |
+| `ms_series` | 🟩 |  |
 | `ne` | 🟩 |  |
 | `parse` | 🟩 |  |
 | `quarter` | 🟩 |  |
+| `quarter_series` | 🟩 |  |
 | `rank` | 🟩 |  |
 | `second` | 🟩 |  |
+| `second_series` | 🟩 |  |
 | `select` | 🟩 |  |
 | `set` | 🟩 |  |
 | `set_null` | 🟩 |  |
@@ -556,9 +562,13 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `truncate` | 🟩 |  |
 | `view` | 🟩 |  |
 | `week` | 🟩 |  |
+| `week_series` | 🟩 |  |
 | `weekday` | 🟩 |  |
+| `weekday_series` | 🟩 |  |
 | `year` | 🟩 |  |
+| `year_series` | 🟩 |  |
 | `yearday` | 🟩 |  |
+| `yearday_series` | 🟩 |  |
 
 
 ### astype — conversão cross-dtype (12 funções C)
@@ -760,7 +770,7 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 236/236 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 237/237 erros com prefixo `smaug:` (100.0%)
 - `dataset.lua`: 94/94 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
@@ -908,7 +918,7 @@ O `cdef` do `ffi_loader.lua` replica à mão o layout de cada struct dos headers
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 1079
+- 🟩 paridade: 1090
 - ⬜ exceção registrada: 215
 - 🟨 suspeita (revisar): 279
 - 🟥 inconsistência clara: 15

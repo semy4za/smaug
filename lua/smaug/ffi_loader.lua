@@ -512,6 +512,17 @@ ffi.cdef([[
     uint8_t* smaug_dt_ge(const smaug_series_dt_t *s, int64_t threshold, uint8_t **out_mask);
     uint8_t* smaug_dt_le(const smaug_series_dt_t *s, int64_t threshold, uint8_t **out_mask);
     uint8_t* smaug_dt_ne(const smaug_series_dt_t *s, int64_t threshold, uint8_t **out_mask);
+    smaug_series_i64_t* smaug_dt_year_series   (const smaug_series_dt_t *s);
+    smaug_series_i64_t* smaug_dt_month_series  (const smaug_series_dt_t *s);
+    smaug_series_i64_t* smaug_dt_day_series    (const smaug_series_dt_t *s);
+    smaug_series_i64_t* smaug_dt_hour_series   (const smaug_series_dt_t *s);
+    smaug_series_i64_t* smaug_dt_minute_series (const smaug_series_dt_t *s);
+    smaug_series_i64_t* smaug_dt_second_series (const smaug_series_dt_t *s);
+    smaug_series_i64_t* smaug_dt_ms_series     (const smaug_series_dt_t *s);
+    smaug_series_i64_t* smaug_dt_weekday_series(const smaug_series_dt_t *s);
+    smaug_series_i64_t* smaug_dt_yearday_series(const smaug_series_dt_t *s);
+    smaug_series_i64_t* smaug_dt_quarter_series(const smaug_series_dt_t *s);
+    smaug_series_i64_t* smaug_dt_week_series   (const smaug_series_dt_t *s);
     uint8_t* smaug_dt_between(const smaug_series_dt_t *s, int64_t lo, int64_t hi,
                               bool inc_lo, bool inc_hi, uint8_t **out_mask);
 

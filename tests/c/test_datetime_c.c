@@ -535,6 +535,51 @@ static void test_comparisons(void) {
     CHECK(m4 && m4[0] == 0, "between curto-circuita quando lo nao passa");
     smaug_free(m4);
 
+    /* --- 10.4 fatia A: componentes em versao de SERIE -------------------
+       Sao 11 funcoes geradas por macro, mas cada instanciacao tem corpo
+       proprio: cobrir uma NAO cobre as outras dez. Tabela em vez de 11
+       blocos iguais -- mesmo motivo de a implementacao ser macro. */
+    {
+        typedef smaug_series_i64_t *(*compfn)(const smaug_series_dt_t *);
+        struct { const char *nome; compfn fn; } comps[] = {
+            {"year", smaug_dt_year_series},   {"month", smaug_dt_month_series},
+            {"day", smaug_dt_day_series},     {"hour", smaug_dt_hour_series},
+            {"minute", smaug_dt_minute_series},{"second", smaug_dt_second_series},
+            {"ms", smaug_dt_ms_series},       {"weekday", smaug_dt_weekday_series},
+            {"yearday", smaug_dt_yearday_series},{"quarter", smaug_dt_quarter_series},
+            {"week", smaug_dt_week_series},
+        };
+        /* serie com um nulo no meio: exercita os dois ramos de SMAUG_VALID */
+        smaug_series_dt_t *cs = smaug_dt_create(3);
+        smaug_dt_set(cs, 0, 0);            /* 1970-01-01 */
+        smaug_dt_set_null(cs, 1);
+        smaug_dt_set(cs, 2, 1735689600000LL); /* 2025-01-01 */
+
+        for (size_t k = 0; k < sizeof(comps)/sizeof(comps[0]); k++) {
+            CHECK(comps[k].fn(NULL) == NULL, "componente NULL série → NULL");
+
+            smaug_series_i64_t *r = comps[k].fn(cs);
+            CHECK(r != NULL, "componente devolve série");
+            CHECK(SMAUG_VALID(r->null_mask, 0), "componente preserva válido");
+            CHECK(SMAUG_NULL(r->null_mask, 1),  "componente propaga nulo");
+            smaug_i64_free(r);
+
+            /* serie vazia nao estoura */
+            smaug_series_dt_t *v0 = smaug_dt_create(0);
+            smaug_series_i64_t *rv = comps[k].fn(v0);
+            CHECK(rv != NULL, "componente em série vazia");
+            smaug_i64_free(rv); smaug_dt_free(v0);
+        }
+        /* valores conferidos contra a escalar, que ja e testada acima */
+        smaug_series_i64_t *ry = smaug_dt_year_series(cs);
+        CHECK(ry->data[0] == 1970 && ry->data[2] == 2025, "year_series confere");
+        smaug_i64_free(ry);
+        smaug_series_i64_t *rq = smaug_dt_quarter_series(cs);
+        CHECK(rq->data[2] == 1, "quarter_series confere");
+        smaug_i64_free(rq);
+        smaug_dt_free(cs);
+    }
+
     /* série vazia */
     smaug_series_dt_t *vazia = smaug_dt_create(0);
     CHECK(vazia != NULL, "dt create(0) para between");

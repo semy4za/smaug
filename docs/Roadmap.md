@@ -127,6 +127,15 @@ projeto. Aqui fica só o suficiente para resolver uma referência.
   Em int64 o suporte a > 2^53 virou real — os limites entram exatos pela fronteira
   do escalar (9.3). Fatiado em f64+i64 e depois dt+str; a lição de cobertura das
   duas fatias está no `CHANGELOG` (testar os modos num dtype não cobre os outros).
+- 10.3 — família matemática element-wise → Anel 0: as nove operações
+  (`sin`/`cos`/`tan`/`exp`/`log`/`sqrt` por macro `F64_MATH_IMPL`, mais
+  `abs`/`round`/`clip` com versão int64). **Aposentou o degrau
+  `check_int64_lossless`** — com estas três no Anel 0 ele ficou sem consumidor no
+  projeto inteiro. Três casos sem resposta passaram a errar com causa nomeada via
+  `smaug_status_t`: `abs(INT64_MIN)`, `clip(lo > hi)` e `round` fora de faixa.
+  `round(int64)` preserva int64 (identidade como cópia, sem aritmética, para não
+  degradar acima de 2^53). Entrada int64 nas seis matemáticas encadeia `astype`
+  em vez de ter versão própria (Opção 1).
 - 10.5 — chave de igualdade/cardinalidade → int64 exato (L2). Passo A: `core/keys.lua`
   como fonte única de codificação de chave. Passo B (hash no Anel 0) segue aberto → ver 10.5-B abaixo.
 - 10.6 — família seleção/preenchimento por máscara (`fillna`/`combine_first`/`where`/`select`/`ffill`) → Anel 0.
@@ -212,21 +221,33 @@ correto — delegar ao descritor → C — já existe. Subitens 10.5 a 10.9 fech
     preserva o defeito ou inventa semântica.
   - **Sem retrabalho:** a assinatura do `sum` é o padrão a espelhar, e a decisão
     de overflow tem precedente no 10.3 (`smaug_status_t` + `SMG_ERR_ARGUMENT`).
-- 10.3 **Família matemática element-wise → Anel 0** (E5) — **[Windows OK
-  2026-07-27 · selo Fedora PENDENTE]** As nove operações desceram: as seis
-  matemáticas por macro (`F64_MATH_IMPL`, fatia A) e `abs`/`round`/`clip` com
-  versão int64 (fatia B). **O degrau `check_int64_lossless` foi aposentado** —
-  com estas três no Anel 0 ficou sem consumidor no projeto inteiro e saiu do
-  `_core.lua`. Três decisões implementadas via `smaug_status_t`:
-  `abs(INT64_MIN)`, `clip(lo > hi)` e `round` fora de faixa erram com causa
-  nomeada. `round(int64)` preserva int64 (identidade como cópia sem aritmética,
-  para não degradar acima de 2^53). `test_access` 168→191, `test_ops_edge`
-  346→381, allocfail 1918→2032; cobertura 94.94%.
-  **Falta só rodar `build.sh --all` no Fedora.** Raciocínio, decisões e as duas
-  lições de cobertura estão no `CHANGELOG` (fatias A e B).
 - 10.4 **família `.dt` e `.str` vetorizadas** (E6). **Duas metades com custos
   opostos** — dimensionado em 2026-07-28; tratá-las como um item só esconde isso.
-  - **`.dt` é barato, e por um motivo que o registro anterior não capturava:** a
+  - **Fatia A — os 11 componentes base: [Fedora OK 2026-07-28 · Windows
+    PENDENTE]** Valgrind 0 erros nos 13 binários; cobertura **95,07% branch-alvo
+    e 98,87% linha**, com 139 exclusões (as 11 novas justificadas). Falta o
+    `build_win.ps1`: são 11 `cdef` novos, superfície FFI. Macro `DT_COMPONENT_SERIES_IMPL` gera as onze versões de série
+    sobre as escalares que já existiam e já eram testadas — nenhuma matemática de
+    calendário nova. Ganho **medido: 1,5×** (0,082 s → 0,053 s em 1M linhas).
+    Modesto de propósito: o gargalo aqui nunca foi o FFI (0,079 s por 1M
+    travessias), era a construção da série via tabela Lua + `from_table`.
+    - **Erro de medição registrado:** a primeira medição deu **0,7× (mais
+      lento)** porque eu havia comparado com metade do caminho antigo — sem o
+      `Series.from_table`, que era parte dele. Quase reportei que a vetorização
+      tinha piorado.
+    - **Achado que virou item (12.36):** a mutação `v >= 0` → `v >= -1` **passou**
+      por todos os testes, o que levou à descoberta de que as escalares nunca
+      devolvem -1, apesar de o header prometer — e que o overflow acontece em
+      silêncio (`year(INT64_MIN)` = +292278994). O guard foi mantido como defesa
+      em profundidade e as 11 instanciações marcadas `COV-EXCL-BR`.
+    - `test_datetime_c` 473→530, allocfail 2032→**2131**, cobertura **95,07%**
+      branch-alvo no Fedora (acima do 94,96% que o 10.3 deixou).
+  - **`.dt` derivadas (fatia B, a fazer):** os 14 usuários do `dt_map` são
+    composições (`is_month_start` = `day(v)==1`, `month_name` = tabela indexada).
+    Com as bases vetorizadas, **várias viram composição de operações já
+    vetorizadas** — `is_month_start` seria `self:day():eq(1)`, sem C novo.
+    Reavaliar quantas sobram antes de escrever qualquer coisa.
+  - **Contexto do dimensionamento original:** a
     matemática de calendário **já existe em C e está testada** (473 checks) —
     `smaug_dt_year`, `month`, `day`, `hour`, `minute`, `second`, `ms`, `quarter`,
     `week`, `weekday`, `yearday`, `format`, `truncate`, `diff_ms`. São **escalares**
@@ -482,6 +503,38 @@ Vinte e quatro subitens já fecharam (ver índice acima). Restam:
      nulo talvez caiba como parágrafo no Contrato 9).
    - **Vínculo:** 10.2 fatia 2 (que tornou as duas visíveis); Contrato 6, 9;
      item 12.34 (a colação está implementada cinco vezes).
+ - 12.36 **Componentes de datetime prometem `-1` em overflow e não cumprem** —
+   [Fedora] (Anel 0). Achado ao vetorizar os componentes (10.4 fatia A,
+   2026-07-28), medindo em vez de ler.
+   - **O header promete**, em `smaug_datetime.h`: *"Retornam -1 em caso de
+     overflow ou valor inválido"*. As onze funções (`year`, `month`, `day`,
+     `hour`, `minute`, `second`, `ms`, `weekday`, `yearday`, `quarter`, `week`)
+     **nunca retornam -1** — não há um único `return -1` no corpo delas.
+   - **E o overflow acontece, em silêncio.** Medido: `smaug_dt_year(INT64_MIN)`
+     devolve **+292278994**. `INT64_MIN` em epoch_ms corresponde a cerca do ano
+     **-292.277.024**; devolver +292 milhões é o cálculo transbordando e
+     produzindo um valor errado sem sinalizar. Mesma classe do que os itens
+     10.2/10.3 corrigiram: resultado errado que parece válido.
+   - **O projeto já conhece o limite** — `smaug_datetime.c:64` tem
+     `COV-EXCL-BR: ramo z<0 no algoritmo de Hinnant — datas antes de ~292Mi a.C.`
+     O limite está documentado no algoritmo; o que falta é a fronteira pública
+     sinalizá-lo.
+   - **Consequência já materializada:** o frontend fazia `r >= 0 and r or NA` —
+     um guard para um caso que nunca ocorre — e a versão vetorizada herdou o
+     mesmo `if (v >= 0)`. Nas onze instanciações da macro o ramo falso é
+     inalcançável, marcado `COV-EXCL-BR` apontando para este item. O guard foi
+     **mantido** de propósito: quando a promessa do header for cumprida, ele já
+     está correto e no lugar.
+   - **Descoberto por mutação, não por leitura.** Trocar `v >= 0` por `v >= -1`
+     passou por todos os testes — o que levantou a pergunta "então quando é que
+     dá -1?" e revelou que nunca dá. Mutação que escapa é sinal, não ruído.
+   - **A decidir:** as componentes passam a sinalizar overflow (e aí o guard vira
+     alcançável e testável), ou o header é corrigido para dizer que não sinalizam
+     e o limite vira contrato explícito? A primeira é mais coerente com
+     "falha visível"; a segunda é mais barata. Em ambos os casos, a divergência
+     entre o que o header promete e o que o código faz precisa acabar.
+   - **Vínculo:** 10.4 fatia A (que expôs); Contrato 9 (ausência × valor);
+     Contrato 10 (guard excluído precisa de justificativa).
  - 12.35 **Custo de adicionar um dtype** — [Fedora] (Anel 0 + Anel 1).
    **EXIGE BLOCO DE DESIGN.** Levantado em 2026-07-28. O objetivo não é dtype de
    graça — em C sem genéricos isso não existe, e despacho por dtype **é** a

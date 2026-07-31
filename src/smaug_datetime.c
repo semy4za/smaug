@@ -612,6 +612,61 @@ int smaug_dt_week(int64_t epoch_ms) {
 }
 
 /* ===================================================================
+   COMPONENTES — versão de SÉRIE (10.4 fatia A)
+   ===================================================================
+   As onze acima são ESCALARES: recebem um epoch_ms e devolvem um int. O
+   frontend fazia o laço em Lua chamando `get(i)` e depois a escalar, ou seja
+   DUAS travessias de FFI por elemento, e montava uma tabela Lua para entregar
+   ao from_table. Aqui a travessia é uma só, para a série inteira.
+
+   Não há matemática de calendário nova: cada função de série apenas envolve a
+   escalar correspondente, que já existe e já está testada. Por isso é macro —
+   os onze corpos seriam idênticos exceto pela escalar chamada, e escrevê-los à
+   mão seria onze lugares para repetir cada correção futura. Mesmo padrão do
+   DT_CMP_IMPL logo abaixo e do F64_MATH_IMPL em smaug_ops_f64.c.
+
+   Duas convenções preservadas do frontend, e ambas importam:
+   (a) nulo de entrada -> nulo de saída;
+   (b) a escalar devolve -1 em overflow ou valor inválido, e isso vira NULO no
+       resultado, não -1. Um -1 escapando como valor seria um ano/mês/dia
+       inventado -- o Contrato 9 trata ausência como coisa distinta de valor.
+
+   Sobre o `v >= 0`: o header promete que as escalares devolvem -1 em overflow,
+   mas HOJE elas nunca devolvem (medido 2026-07-28: INT64_MIN produz
+   year=+292278994, um valor errado sem sinalização). O guard é defesa em
+   profundidade -- fica correto e no lugar para quando a promessa do header for
+   cumprida. Ver o item que registra essa divergência.
+   Saída é int64 (não int) porque o dtype do resultado é int64 no frontend. */
+#define DT_COMPONENT_SERIES_IMPL(name)                                        \
+smaug_series_i64_t *smaug_dt_##name##_series(const smaug_series_dt_t *s) {     \
+    if (!s) return NULL;                                                       \
+    smaug_series_i64_t *r = smaug_i64_create(s->size);                         \
+    if (!r) return NULL;                                                       \
+    for (size_t i = 0; i < s->size; i++) {                                     \
+        if (SMAUG_VALID(s->null_mask, i)) {                                    \
+            int v = smaug_dt_##name(s->data[i]);                               \
+            if (v >= 0) {  /* COV-EXCL-BR: ramo falso inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer; defesa em profundidade, ver item registrado */ \
+                r->data[i]      = (int64_t)v;                                  \
+                r->null_mask[i] = SMAUG_MASK_VALID;                            \
+            }                                                                  \
+        }                                                                      \
+    }                                                                          \
+    return r;                                                                  \
+}
+
+DT_COMPONENT_SERIES_IMPL(year)   /* COV-EXCL-BR: o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade */
+DT_COMPONENT_SERIES_IMPL(month)   /* COV-EXCL-BR: o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade */
+DT_COMPONENT_SERIES_IMPL(day)   /* COV-EXCL-BR: o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade */
+DT_COMPONENT_SERIES_IMPL(hour)   /* COV-EXCL-BR: o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade */
+DT_COMPONENT_SERIES_IMPL(minute)   /* COV-EXCL-BR: o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade */
+DT_COMPONENT_SERIES_IMPL(second)   /* COV-EXCL-BR: o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade */
+DT_COMPONENT_SERIES_IMPL(ms)   /* COV-EXCL-BR: o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade */
+DT_COMPONENT_SERIES_IMPL(weekday)   /* COV-EXCL-BR: o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade */
+DT_COMPONENT_SERIES_IMPL(yearday)   /* COV-EXCL-BR: o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade */
+DT_COMPONENT_SERIES_IMPL(quarter)   /* COV-EXCL-BR: o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade */
+DT_COMPONENT_SERIES_IMPL(week)   /* COV-EXCL-BR: o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade */
+
+/* ===================================================================
    Construção a partir de componentes
    =================================================================== */
 

@@ -2302,6 +2302,29 @@ static void af_dt_append_grow(void) {
         smaug_dt_free(s);
     }
 }
+/* 10.4 fatia A: os 11 componentes em versao de serie. Uma varredura por
+   funcao -- sao corpos distintos apos a macro. */
+static void af_dt_components(void) {
+    typedef smaug_series_i64_t *(*compfn)(const smaug_series_dt_t *);
+    compfn fns[] = { smaug_dt_year_series, smaug_dt_month_series,
+                     smaug_dt_day_series, smaug_dt_hour_series,
+                     smaug_dt_minute_series, smaug_dt_second_series,
+                     smaug_dt_ms_series, smaug_dt_weekday_series,
+                     smaug_dt_yearday_series, smaug_dt_quarter_series,
+                     smaug_dt_week_series };
+    int64_t arr[3] = {0, 86400000, 1735689600000LL};
+    reset(-1);
+    smaug_series_dt_t *x = smaug_dt_create_from_array(arr, 3);
+    assert(x);
+    for (size_t f = 0; f < sizeof(fns)/sizeof(fns[0]); f++) {
+        for (long k = 0; k < MAX_ALLOCS; k++) {
+            reset(k);
+            smaug_series_i64_t *r = fns[f](x);
+            if (r) { OK(r->size == 3, "dt componente size ok"); smaug_i64_free(r); }
+        }
+    }
+    smaug_dt_free(x);
+}
 static void af_dt_between(void) {
     int64_t arr[3] = {0, 1000, 2000};
     reset(-1);
@@ -2622,7 +2645,7 @@ int main(void) {
 
     /* Frente B fase 2 — datetime (lifecycle + argsort/sort/take/filter) */
     af_dt_create(); af_dt_create_from_array(); af_dt_clone(); af_dt_view();
-    af_dt_append_grow(); af_dt_between(); af_dt_argsort(); af_dt_sort(); af_dt_take(); af_dt_filter();
+    af_dt_append_grow(); af_dt_between(); af_dt_components(); af_dt_argsort(); af_dt_sort(); af_dt_take(); af_dt_filter();
     af_dt_ffill(); af_dt_bfill(); af_dt_shift(); af_dt_rank();
     af_dt_setters();
     af_dt_compare();

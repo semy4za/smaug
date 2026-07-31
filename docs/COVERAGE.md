@@ -3,9 +3,9 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `e45c0e1`  |  Data: 2026-07-27 21:23:58 -0300
+- Commit medido: `72dd10b`  |  Data: 2026-07-30 17:53:40 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `4145/4499 = 92.13%` -- 128 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- **Branch-bruto** (todos os ramos): `4417/4785 = 92.31%` -- 139 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 | Arquivo | Linhas | Branch-alvo (taken) |
@@ -14,15 +14,15 @@
 | `smaug_convert.c` | `37/37 = 100.00%` `[██████████]` | `37/37 = 100.00%` `[██████████]` |
 | `smaug_core.c` | `402/402 = 100.00%` `[██████████]` | `290/290 = 100.00%` `[██████████]` |
 | `smaug_csv.c` | `298/306 = 97.39%` `[█████████░]` | `333/370 = 90.00%` `[█████████░]` |
-| `smaug_datetime.c` | `559/565 = 98.94%` `[█████████░]` | `603/648 = 93.06%` `[█████████░]` |
+| `smaug_datetime.c` | `570/576 = 98.96%` `[█████████░]` | `702/747 = 93.98%` `[█████████░]` |
 | `smaug_json.c` | `352/364 = 96.70%` `[█████████░]` | `417/463 = 90.06%` `[█████████░]` |
 | `smaug_ops_bool.c` | `314/320 = 98.12%` `[█████████░]` | `380/407 = 93.37%` `[█████████░]` |
-| `smaug_ops_f64.c` | `514/514 = 100.00%` `[██████████]` | `538/540 = 99.63%` `[██████████]` |
-| `smaug_ops_i64.c` | `496/499 = 99.40%` `[█████████░]` | `524/534 = 98.13%` `[█████████░]` |
+| `smaug_ops_f64.c` | `549/549 = 100.00%` `[██████████]` | `632/634 = 99.68%` `[██████████]` |
+| `smaug_ops_i64.c` | `557/560 = 99.46%` `[█████████░]` | `603/616 = 97.89%` `[█████████░]` |
 | `smaug_ops_str.c` | `278/285 = 97.54%` `[█████████░]` | `318/342 = 92.98%` `[█████████░]` |
 | `smaug_ops_window.c` | `326/331 = 98.49%` `[█████████░]` | `342/377 = 90.72%` `[█████████░]` |
 | `smaug_str.c` | `297/297 = 100.00%` `[██████████]` | `254/254 = 100.00%` `[██████████]` |
-| **TOTAL** | `3991/4038 = 98.84%` `[█████████░]` | `4145/4371 = 94.83%` `[█████████░]` |
+| **TOTAL** | `4098/4145 = 98.87%` `[█████████░]` | `4417/4646 = 95.07%` `[█████████░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
@@ -79,23 +79,23 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_datetime.c:469` — if (p < end && *p == ':') p++;
 - `smaug_datetime.c:470` — if (!(p = parse_digits(p, end, 2, &tz_m))) return -1;
 - `smaug_datetime.c:515` — return (written > 0 && (size_t)written < buf_size) ? 0 : -1;
-- `smaug_datetime.c:653` — - (epoch_ms < 0 && epoch_ms % MS_PER_SECOND != 0 ? MS_PER_SECOND : 0);
-- `smaug_datetime.c:659` — - (epoch_ms < 0 && epoch_ms % MS_PER_HOUR != 0 ? MS_PER_HOUR : 0);
-- `smaug_datetime.c:715` — DT_CMP_IMPL(lt, < )
-- `smaug_datetime.c:716` — DT_CMP_IMPL(eq, ==)
-- `smaug_datetime.c:717` — DT_CMP_IMPL(ge, >=)
-- `smaug_datetime.c:718` — DT_CMP_IMPL(le, <=)
-- `smaug_datetime.c:719` — DT_CMP_IMPL(ne, !=)
-- `smaug_datetime.c:787` — if (!entries) return NULL;
-- `smaug_datetime.c:798` — if (!indices) { free(entries); return NULL; }
-- `smaug_datetime.c:918` — if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
-- `smaug_datetime.c:947` — if (!s || s->size == 0) return SIZE_MAX;
-- `smaug_datetime.c:968` — if (!s || s->size == 0) return DT_SENTINEL;
-- `smaug_datetime.c:985` — if (!s || s->size == 0) return DT_SENTINEL;
-- `smaug_datetime.c:994` — } else if (!ignore_na) {
-- `smaug_datetime.c:998` — return found ? result : DT_SENTINEL;
-- `smaug_datetime.c:1022` — if (m == 0) return result;
-- `smaug_datetime.c:1044` — switch (method) {
+- `smaug_datetime.c:708` — - (epoch_ms < 0 && epoch_ms % MS_PER_SECOND != 0 ? MS_PER_SECOND : 0);
+- `smaug_datetime.c:714` — - (epoch_ms < 0 && epoch_ms % MS_PER_HOUR != 0 ? MS_PER_HOUR : 0);
+- `smaug_datetime.c:770` — DT_CMP_IMPL(lt, < )
+- `smaug_datetime.c:771` — DT_CMP_IMPL(eq, ==)
+- `smaug_datetime.c:772` — DT_CMP_IMPL(ge, >=)
+- `smaug_datetime.c:773` — DT_CMP_IMPL(le, <=)
+- `smaug_datetime.c:774` — DT_CMP_IMPL(ne, !=)
+- `smaug_datetime.c:842` — if (!entries) return NULL;
+- `smaug_datetime.c:853` — if (!indices) { free(entries); return NULL; }
+- `smaug_datetime.c:973` — if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
+- `smaug_datetime.c:1002` — if (!s || s->size == 0) return SIZE_MAX;
+- `smaug_datetime.c:1023` — if (!s || s->size == 0) return DT_SENTINEL;
+- `smaug_datetime.c:1040` — if (!s || s->size == 0) return DT_SENTINEL;
+- `smaug_datetime.c:1049` — } else if (!ignore_na) {
+- `smaug_datetime.c:1053` — return found ? result : DT_SENTINEL;
+- `smaug_datetime.c:1077` — if (m == 0) return result;
+- `smaug_datetime.c:1099` — switch (method) {
 
 **`smaug_json.c`** — 37 linha(s) com ramo descoberto:
 - `smaug_json.c:44` — while (l->pos < l->len) {
@@ -161,17 +161,20 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_ops_bool.c:526` — switch (method) {
 
 **`smaug_ops_f64.c`** — 2 linha(s) com ramo descoberto:
-- `smaug_ops_f64.c:495` — && (inc_hi ? (v <= hi) : (v < hi));
-- `smaug_ops_f64.c:832` — if (!s || !out_n) return NULL;
+- `smaug_ops_f64.c:597` — && (inc_hi ? (v <= hi) : (v < hi));
+- `smaug_ops_f64.c:934` — if (!s || !out_n) return NULL;
 
-**`smaug_ops_i64.c`** — 7 linha(s) com ramo descoberto:
-- `smaug_ops_i64.c:684` — if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
-- `smaug_ops_i64.c:722` — if (!s || s->size == 0) return SIZE_MAX;
-- `smaug_ops_i64.c:736` — if (!s || s->size == 0) return SIZE_MAX;
-- `smaug_ops_i64.c:784` — if (!s || !out_n) return NULL;
-- `smaug_ops_i64.c:790` — if (n == 0) return NULL;
-- `smaug_ops_i64.c:827` — if (m == 0) return result;
-- `smaug_ops_i64.c:853` — switch (method) {
+**`smaug_ops_i64.c`** — 10 linha(s) com ramo descoberto:
+- `smaug_ops_i64.c:205` — if (!r) return NULL;
+- `smaug_ops_i64.c:241` — if (!r) return NULL;
+- `smaug_ops_i64.c:273` — if (status) *status = SMG_ERR_ARGUMENT;
+- `smaug_ops_i64.c:810` — if (periods <= -(int64_t)s->size || periods >= (int64_t)s->size) return r;
+- `smaug_ops_i64.c:848` — if (!s || s->size == 0) return SIZE_MAX;
+- `smaug_ops_i64.c:862` — if (!s || s->size == 0) return SIZE_MAX;
+- `smaug_ops_i64.c:910` — if (!s || !out_n) return NULL;
+- `smaug_ops_i64.c:916` — if (n == 0) return NULL;
+- `smaug_ops_i64.c:953` — if (m == 0) return result;
+- `smaug_ops_i64.c:979` — switch (method) {
 
 **`smaug_ops_str.c`** — 19 linha(s) com ramo descoberto:
 - `smaug_ops_str.c:309` — while (lo < hi) {
@@ -284,6 +287,17 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_datetime.c:242` — falha de alloc do clone; OOM sem injecao
 - `smaug_datetime.c:263` — OOM sem injecao
 - `smaug_datetime.c:277` — args inválidos — start > size ou len > size-start
+- `smaug_datetime.c:657` — o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade
+- `smaug_datetime.c:658` — o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade
+- `smaug_datetime.c:659` — o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade
+- `smaug_datetime.c:660` — o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade
+- `smaug_datetime.c:661` — o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade
+- `smaug_datetime.c:662` — o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade
+- `smaug_datetime.c:663` — o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade
+- `smaug_datetime.c:664` — o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade
+- `smaug_datetime.c:665` — o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade
+- `smaug_datetime.c:666` — o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade
+- `smaug_datetime.c:667` — o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade
 - `smaug_json.c:114` — string não fechada — break inalcançável em JSON bem-formado
 - `smaug_json.c:149` — OOM de realloc em string JSON
 - `smaug_json.c:433` — dtype=int64 implica que toda linha não-null tinha jt==1 durante a inferência (dtype_upgrade força float64 se qualquer linha fosse jt==2) — mesmo argumento de pureza do csv.c
@@ -334,14 +348,14 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_ops_bool.c:48` — at&&bt sempre true aqui (linhas 45/47 ja garantiram ambos validos-nao-false)
 - `smaug_ops_bool.c:158` — m sempre fornecido pelas Kleene raw (out_mask != NULL); ramo :SMAUG_MASK_VALID defensivo, uso interno controlado
 - `smaug_ops_bool.c:267` — falha de alloc do clone; OOM sem injecao
-- `smaug_ops_f64.c:164` — redundante — o clone(NULL) logo abaixo devolve NULL e o `if (!r)` barra; auditado 2026-07-14 (remover este guard NAO crasha). Defesa em profundidade, nao a unica protecao.
-- `smaug_ops_f64.c:167` — falha de alloc do clone; OOM sem injecao
-- `smaug_ops_f64.c:188` — falha de alloc do clone; OOM sem injecao
-- `smaug_ops_f64.c:209` — OOM sem injecao
-- `smaug_ops_i64.c:158` — redundante — o clone(NULL) logo abaixo devolve NULL e o `if (!r)` barra; auditado 2026-07-14 (remover este guard NAO crasha). Defesa em profundidade, nao a unica protecao.
-- `smaug_ops_i64.c:161` — falha de alloc do clone; OOM sem injecao
-- `smaug_ops_i64.c:182` — falha de alloc do clone; OOM sem injecao
-- `smaug_ops_i64.c:204` — OOM sem injecao
+- `smaug_ops_f64.c:266` — redundante — o clone(NULL) logo abaixo devolve NULL e o `if (!r)` barra; auditado 2026-07-14 (remover este guard NAO crasha). Defesa em profundidade, nao a unica protecao.
+- `smaug_ops_f64.c:269` — falha de alloc do clone; OOM sem injecao
+- `smaug_ops_f64.c:290` — falha de alloc do clone; OOM sem injecao
+- `smaug_ops_f64.c:311` — OOM sem injecao
+- `smaug_ops_i64.c:284` — redundante — o clone(NULL) logo abaixo devolve NULL e o `if (!r)` barra; auditado 2026-07-14 (remover este guard NAO crasha). Defesa em profundidade, nao a unica protecao.
+- `smaug_ops_i64.c:287` — falha de alloc do clone; OOM sem injecao
+- `smaug_ops_i64.c:308` — falha de alloc do clone; OOM sem injecao
+- `smaug_ops_i64.c:330` — OOM sem injecao
 - `smaug_ops_str.c:85` — mode e enum interno (LT/GT/LE/GE aqui); case default inalcancavel
 - `smaug_ops_window.c:412` — loop-body inalcançável — a if em 258-260 já trata o único item stale possível; by invariante de 266, no máximo um item envelhece por passo de null
 - `smaug_ops_window.c:469` — loop-body inalcançável — mesma invariante que linha 276 (rolling_min)

@@ -51,6 +51,78 @@ categorical divergiria em silêncio. Vira teste de invariante.
 Nenhum C, nenhum Lua.
 
 ---
+## 2026-07-28 — 10.4 fatia A: componentes de datetime, e uma promessa que o header não cumpre
+
+Os onze componentes (`year`, `month`, `day`, `hour`, `minute`, `second`, `ms`,
+`weekday`, `yearday`, `quarter`, `week`) desceram ao Anel 0 por macro. Não houve
+matemática de calendário nova: as escalares já existiam e já eram testadas, e o que
+faltava era a versão de série. O Lua fazia o laço chamando `get(i)` e depois a
+escalar — duas travessias de FFI por elemento — e montava uma tabela intermediária.
+
+Ganho medido: **1,5×**, de 0,082 s para 0,053 s em 1M linhas. Modesto, e é honesto
+dizer por quê: o gargalo aqui nunca foi o FFI (0,079 s para 1M travessias, medido
+antes), era a construção da série via tabela Lua mais `from_table`.
+
+**Registro de um erro meu de medição.** A primeira comparação deu **0,7× — ou seja,
+mais lento** — e por um instante pareceu que a vetorização tinha piorado as coisas.
+O erro: comparei com metade do caminho antigo, sem o `Series.from_table` que fazia
+parte dele. É exatamente o tipo de comparação enviesada que a gente vem caçando no
+código, cometida na medição.
+
+**E a mutação escapou, o que virou o achado mais importante do dia.** Trocar
+`v >= 0` por `v >= -1` no guard passou por todos os testes. A pergunta óbvia —
+"então quando é que dá -1?" — revelou que **nunca dá**: o header promete que as
+componentes retornam -1 em overflow, e não há um único `return -1` no corpo delas.
+
+Pior: o overflow acontece e não é sinalizado. `smaug_dt_year(INT64_MIN)` devolve
+**+292278994**, quando `INT64_MIN` em epoch_ms corresponde a cerca do ano
+-292.277.024. O cálculo transborda e produz um valor errado que parece válido —
+mesma classe do que os itens 10.2 e 10.3 corrigiram.
+
+O projeto já conhecia o limite: `smaug_datetime.c:64` tem um `COV-EXCL-BR` citando
+"datas antes de ~292Mi a.C." no algoritmo de Hinnant. O que falta é a fronteira
+pública sinalizar. Registrado como 12.36, com a decisão em aberto: as componentes
+passam a sinalizar (e o guard vira testável) ou o header é corrigido e o limite
+vira contrato explícito.
+
+O guard `v >= 0` foi **mantido** de propósito — defesa em profundidade, correto e
+no lugar para quando a promessa for cumprida — com as onze instanciações marcadas
+`COV-EXCL-BR` apontando para o item. Detalhe mecânico que custou uma iteração: a
+marca não funciona na definição da macro, porque o gcov atribui os ramos às linhas
+de instanciação; teve de ir nas onze.
+
+`test_datetime_c` 473→530, allocfail 2032→2131, cobertura **95,05%** de branch-alvo
+— acima do 94,96% que o 10.3 deixou.
+
+Falta o selo: Valgrind e Windows.
+
+---
+## 2026-07-28 — selo Fedora fecha o 10.3: as nove operações no Anel 0
+
+Valgrind 0 erros nos 13 binários. Cobertura em **94.96% de branch-alvo e 98.86% de
+linha** — o maior da campanha, e acima de todos os selos anteriores (94.86% depois
+do 10.2, 94.83% depois do 12.34). Contagens idênticas às do Windows.
+
+Com isso o 10.3 fecha inteiro e sai da timeline: as nove operações element-wise
+estão no Anel 0. O item saiu de 128 linhas para um stub de 10 no índice do
+concluído — o raciocínio das duas fatias já vive aqui.
+
+O que esse item deixa para trás, além das funções: **o degrau
+`check_int64_lossless` foi aposentado**. Ele nasceu em 23/07 como paliativo para as
+operações que liam int64 por `get()` → double e corrompiam em silêncio acima de
+2^53. Uma a uma elas desceram — `fillna` e `astype` (10.6/10.7), `between` (10.2),
+`abs`/`round`/`clip` (10.3) — e com a última ele ficou sem consumidor no projeto
+inteiro. Cinco semanas entre criar o paliativo e poder removê-lo, com cada remoção
+justificada por uma operação que passou a fazer aritmética no tipo nativo.
+
+Restam três itens no bloco 10, todos com o caminho já mapeado pela auditoria de
+retrabalho: `10.1` (reclassificado como defeito de correção, com a decisão de
+overflow pendente), `10.4` (duas metades dimensionadas — `.dt` é macro sobre
+escalares que já existem, `.str` são 28 operações novas mas sem motor de padrões) e
+`10.5-B` (desenho concluído: via ordenação sobre o `multi_argsort` existente, 7,9×
+medido, sem estrutura de dados nova).
+
+---
 ## 2026-07-28 — quanto custa um dtype novo, e por que a resposta ingênua não serve
 
 Começou como um achado de duplicação — a mesma guarda de dtype escrita 25 vezes —

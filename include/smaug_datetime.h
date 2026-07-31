@@ -104,6 +104,21 @@ int smaug_dt_yearday(int64_t epoch_ms);   /* 1–366                      */
 int smaug_dt_quarter(int64_t epoch_ms);   /* 1–4                        */
 int smaug_dt_week   (int64_t epoch_ms);   /* 1–53 (ISO 8601, segunda-fair) */
 
+/* Versao de SERIE dos componentes (10.4 fatia A). Uma travessia de FFI para a
+   serie inteira, em vez de duas por elemento. Nulo propaga; -1 da escalar
+   (overflow ou valor invalido) vira NULO no resultado, nunca -1 como valor. */
+smaug_series_i64_t* smaug_dt_year_series   (const smaug_series_dt_t *s);
+smaug_series_i64_t* smaug_dt_month_series  (const smaug_series_dt_t *s);
+smaug_series_i64_t* smaug_dt_day_series    (const smaug_series_dt_t *s);
+smaug_series_i64_t* smaug_dt_hour_series   (const smaug_series_dt_t *s);
+smaug_series_i64_t* smaug_dt_minute_series (const smaug_series_dt_t *s);
+smaug_series_i64_t* smaug_dt_second_series (const smaug_series_dt_t *s);
+smaug_series_i64_t* smaug_dt_ms_series     (const smaug_series_dt_t *s);
+smaug_series_i64_t* smaug_dt_weekday_series(const smaug_series_dt_t *s);
+smaug_series_i64_t* smaug_dt_yearday_series(const smaug_series_dt_t *s);
+smaug_series_i64_t* smaug_dt_quarter_series(const smaug_series_dt_t *s);
+smaug_series_i64_t* smaug_dt_week_series   (const smaug_series_dt_t *s);
+
 /* ===================== Construção de epoch_ms ===================== */
 
 /* Constrói epoch_ms a partir de componentes UTC.
