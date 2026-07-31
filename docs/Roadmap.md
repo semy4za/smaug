@@ -277,7 +277,16 @@ correto — delegar ao descritor → C — já existe. Subitens 10.5 a 10.9 fech
     (10.9); `.str` **transforma** (texto→texto).
 
 - 10.5 Passo B **chave de igualdade sem alocar string por linha** —
-  **[BLOCO DE DESIGN CONCLUÍDO 2026-07-28 · execução pendente]** Renomeado: o
+  **[BLOQUEADO pelo 12.38 · desenho concluído, protótipo validado]**
+  A execução foi iniciada em 2026-07-28 e **revertida**: o caminho por ordenação
+  herda o bug do comparador com NaN (12.38). Em float64 com NaN, `unique`/
+  `nunique` passariam a dar resultado errado, enquanto o caminho atual por
+  `keys.encode` acerta (`"float64:nan"` agrupa os NaN). Contornar agora — fazer
+  float64 recair no caminho antigo — seria trabalho jogado fora quando o 12.38
+  fechar, porque o conserto dele (comparador total) **desbloqueia este item
+  inteiro**. O protótipo ficou validado: correto em nulos misturados com zeros
+  reais, série vazia, só-nula e int64 > 2^53, com ganho de 3× a 11× conforme
+  haja nulos. Renomeado: o
   item chamava-se "hash de chave no Anel 0", e a análise mostrou que hash é uma
   *implementação possível*, não o problema.
   - **O gargalo foi MEDIDO** (primeira medição de desempenho do projeto; até
@@ -296,9 +305,15 @@ correto — delegar ao descritor → C — já existe. Subitens 10.5 a 10.9 fech
     Ordenar torna os grupos **contíguos**, e uma varredura acha as fronteiras.
     | abordagem | 1M linhas |
     |---|---|
-    | atual (`encode` + tabela Lua) | 1,250 s |
-    | `multi_argsort` + varredura | **0,159 s** (0,147 + 0,012) |
-    **7,9× mais rápido, com zero estrutura de dados nova em C.**
+    | atual (`encode` + tabela Lua) | 1,355 s |
+    | `multi_argsort` + varredura | **0,152 s** (0,138 + 0,014) |
+    **8,9× mais rápido, com zero estrutura de dados nova em C.**
+    **Correção (2026-07-28):** a primeira medição usou `kind = 0`, que é
+    `SMAUG_COL_F64`, sobre uma série int64 — o C reinterpretou os bits e ordenou
+    lixo. O número publicado antes (7,9×) media a coisa errada. Refeito com
+    `kind = 1` (`SMAUG_COL_I64`): 8,9×. A conclusão sobrevive e fica mais forte,
+    mas o erro fica registrado — passar o `kind` errado **não falha**, produz
+    resultado silenciosamente sem sentido.
   - **Consequência: a decisão mudou.** Não é mais "chave string com call-sites
     intactos × valores crus com 26 call-sites mudando". É **tabela hash do zero
     × ordenação sobre o que já existe**. A segunda não precisa de
@@ -306,11 +321,17 @@ correto — delegar ao descritor → C — já existe. Subitens 10.5 a 10.9 fech
     superfície de OOM nova, não inventa gerência de tempo de vida — e o trabalho
     fica quase todo em **Lua**, o que pode tornar o item Lua-puro.
   - **Dois obstáculos reais, a resolver na execução:**
-    1. **Nulos.** O contrato do `multi_argsort` exige que todas as posições das
-       colunas de chave sejam válidas. `unique`/`groupby`/`value_counts` aceitam
-       nulos. Ou se separam as linhas nulas antes (elas formam um grupo só, e o
-       `NULL_KEY` já existe no `keys.lua`), ou o `multi_argsort` ganha tratamento
-       — a primeira opção não toca C.
+    1. **Nulos — medido, e pior do que o header sugere.** O comparador
+       (`cmp_col_at`) **não consulta `null_mask` em lugar nenhum**: um elemento
+       nulo é ordenado pelo valor cru do buffer (0 em int64), então nulos se
+       **intercalam** com dados reais. Provado: `{-5, NA, 10, NA, -20}` sai como
+       `-20, -5, NA, NA, 10`. Não é "nulos primeiro" nem "nulos por último" — é
+       "nulos onde o lixo do buffer cair".
+       Saída sem tocar C: **filtrar as linhas nulas antes de ordenar** (elas
+       formam um grupo só, e o `NULL_KEY` já existe no `keys.lua`), ordenar só as
+       válidas e recompor. Alternativa que toca C: o comparador passar a
+       consultar a máscara — mais correto em geral, mas muda o comportamento de
+       `sort_values`, que hoje depende dele. **Decidir antes de implementar.**
     2. **Ordem de saída.** `unique()` promete "ordem de primeira aparição";
        ordenar dá ordem lexicográfica. Resolve-se guardando o menor índice
        original de cada grupo e reordenando por ele — passada extra em O(g), com
@@ -503,6 +524,69 @@ Vinte e quatro subitens já fecharam (ver índice acima). Restam:
      nulo talvez caiba como parágrafo no Contrato 9).
    - **Vínculo:** 10.2 fatia 2 (que tornou as duas visíveis); Contrato 6, 9;
      item 12.34 (a colação está implementada cinco vezes).
+ - 12.38 **Objeto do Smaug onde se espera tabela Lua** — **[Fedora OK 2026-07-28 ·
+   Windows PENDENTE]** Valgrind 0 erros; cobertura 95,10%.
+   (Anel 1, Lua puro). Achado 2026-07-28, na sequência da auditoria do 12.37 —
+   mesma família (fronteira que não comunica), do lado do Lua.
+   - **Causa:** guards escritos como `type(v) ~= "table"` **não distinguem** um
+     array de uma Series/DataSet — os dois são `table`. E como esses objetos não
+     têm parte array, `#v` dá 0 e `ipairs(v)` não itera nada: a chamada devolve
+     resultado **vazio ou errado em silêncio**, em vez de falhar.
+   - **Medido antes da correção** (5 de 8 casos testados quebravam):
+     `s:take(serie)` → 0 elementos; `s:isin(serie)` → tudo `false`;
+     `ds:select(serie)` → 0 colunas; `cat:take(serie)` → 0 elementos;
+     `ds:drop_duplicates(serie)` → contagem errada. Os que **erram** corretamente
+     (`rename`, `from_dict`, `rename_levels`) só se salvam porque iteram o
+     conteúdo e falham nele — sorte, não desenho.
+   - **Correção:** `Err.check_plain_array` no `errors.lua`, que já é a fonte
+     única de concerns de erro. Discriminador: objeto do Smaug tem **metatable**,
+     tabela Lua simples não. A mensagem **nomeia a saída** — "use `:to_table()`
+     para converter" — porque o erro típico é passar a Series achando que serve
+     de lista, e dizer só "espera uma tabela" não ajudaria (ela É uma tabela).
+   - Testes `12.38.1-4` em `test_selection` (+9, 66→75): os cinco casos, o
+     conteúdo da mensagem, o caminho legítimo intacto e o `:to_table()`
+     funcionando. **Mutação verificada:** remover o discriminador de metatable
+     aborta o teste.
+   - **Escopo restante:** há ~25 guards com esse padrão no projeto; **cinco**
+     foram corrigidos por serem os medidos como quebrados. Os demais ou checam
+     `_dtype` logo em seguida (seguros por construção) ou iteram conteúdo. Vale
+     varrer o resto quando houver ocasião — mas sem urgência, já que os
+     perigosos foram os que aceitavam em silêncio.
+   - **Vínculo:** 12.37 (mesma auditoria); 12.9 (`errors.lua` como fonte única).
+ - 12.37 **Fronteiras públicas que não validavam** — **[Done — Fedora
+   2026-07-28]** (Anel 0). Valgrind 0 erros; cobertura 95,10%. **Não exige
+   Windows:** adiciona guardas dentro de funções existentes, sem símbolo novo
+   nem `cdef` — não é mudança de ABI. Auditoria das 305 funções exportadas, 2026-07-28, disparada pela
+   descoberta de que o `multi_argsort` assume pré-condição em vez de validá-la.
+   - **Método:** varredura das exportadas que recebem ponteiro, procurando
+     guarda nas primeiras linhas. 17 candidatas; a maioria falso positivo (os
+     `*_create` recebem `size_t`, não ponteiro; os `str_*` delegam ao
+     `str_compare`, que guarda um nível abaixo; `std` delega a `var`). Os reais
+     foram confirmados **executando**, não lendo.
+   - **Corrigido: `smaug_read_csv_mem` e `smaug_read_json_mem` SEGFALTAVAM** com
+     `buf = NULL` e `len > 0`. Assimetria dentro do próprio módulo de I/O: a
+     contraparte de **escrita** (`write_csv_mem`/`write_json_mem`) já validava e
+     **já tinha teste** de fronteira; a leitura não tinha nem uma coisa nem
+     outra. Guarda adicionada (`if (!buf && len > 0) return NULL`) com teste
+     espelhando o da escrita — e mutação verificada: sem a guarda, o teste
+     segfalta.
+   - **Detalhe que a guarda precisa respeitar:** `buf = NULL` com `len == 0` é
+     entrada **vazia legítima**, não erro. Uma guarda `if (!buf)` quebraria esse
+     caso — está coberto por teste.
+   - **Anotado, não corrigido:** o `smaug_multi_argsort` tem pré-condição
+     documentada no header ("todas as posições nas colunas de chave são
+     válidas") e **não a valida** — com nulos, ordena pelo valor cru do buffer.
+     Não é violação de contrato: o Contrato 8 (`NA` em chave relacional é erro)
+     é aplicado pelo Anel 1 via `validate_keys_no_na` antes da chamada, e
+     `groupby`/`join` são o único caminho até ele. Mas é **inconsistência de
+     defensividade entre irmãos**: `smaug_i64_argsort` valida e devolve NULL com
+     nulos, conforme o `API_INDEX` promete; o multi assume. Um consumidor C do
+     header pode violar a pré-condição e receber lixo em vez de NULL.
+     Consequência prática para o **10.5-B**: `unique`/`nunique`/`value_counts`
+     aceitam nulos e **não** são operações relacionais, então usar o
+     `multi_argsort` neles exige filtrar os nulos antes — obrigatório, não
+     opcional.
+   - `test_io_c` 315→319; cobertura 95,08% branch-alvo.
  - 12.36 **Componentes de datetime prometem `-1` em overflow e não cumprem** —
    [Fedora] (Anel 0). Achado ao vetorizar os componentes (10.4 fatia A,
    2026-07-28), medindo em vez de ler.
@@ -535,6 +619,45 @@ Vinte e quatro subitens já fecharam (ver índice acima). Restam:
      entre o que o header promete e o que o código faz precisa acabar.
    - **Vínculo:** 10.4 fatia A (que expôs); Contrato 9 (ausência × valor);
      Contrato 10 (guard excluído precisa de justificativa).
+ - 12.38 **`groupby` em coluna float com NaN produz agrupamento errado** —
+   [Fedora] **PRIORIDADE: resultado errado em silêncio pela API pública.**
+   Achado 2026-07-28 ao implementar o 10.5-B.
+   - **Provado.** `groupby` sobre `{1.0, NaN, 1.0, NaN, 2.0}` somando `v`:
+     resultado `1=10, NaN=20, 1=30, NaN=40, 2=50` — **cinco grupos para três
+     valores distintos**, e o valor `1.0` aparece **duas vezes como grupos
+     separados**. Sem NaN na coluna, o mesmo groupby funciona certo.
+     **Um único NaN corrompe o agrupamento das OUTRAS chaves também**, não só
+     das linhas com NaN.
+   - **Causa.** O comparador do `multi_argsort` (`cmp_col_at`, f64) é
+     `(a > b) - (a < b)`. Com NaN as duas comparações são falsas, então NaN
+     compara **igual a tudo**. Isso viola a ordem fraca estrita que o `qsort`
+     exige: o comparador fica **inconsistente**, e o comportamento passa a ser
+     indefinido pelo padrão C — não é só "ordem esquisita", é UB.
+   - **Por que escapa das guardas existentes.** O Contrato 8 rejeita `NA` em
+     chave relacional, e o Anel 1 aplica isso via `validate_keys_no_na`. Mas
+     **NaN não é NA** neste projeto (Contrato 9: não-finito é VALOR, ausência é
+     `null_mask`). Então NaN passa pela validação e chega ao comparador. É a
+     interação entre dois contratos corretos produzindo um buraco.
+   - **Assimetria que confirma o diagnóstico:** o `API_INDEX` promete que
+     `sort`/`argsort` de coluna única **recusam NaN e null** — e eles recusam. O
+     `multi_argsort` não recusa nem trata. Mesma família do 12.37.
+   - **Decisão a tomar (semântica, não só técnica):** (a) tornar o comparador
+     **total** — NaN ordena num extremo e `NaN == NaN` para fins de ordenação,
+     como o `totalOrder` do IEEE-754 e como numpy/pandas fazem; NaN vira um
+     grupo. Corrige o UB e dá semântica útil. (b) **recusar** NaN em chave,
+     como o sort de coluna única faz — coerente com o já documentado, mas
+     quebra `groupby` em coluna float com NaN, que hoje "funciona".
+     Recomendo (a): (b) troca resultado errado por erro, o que é melhor, mas (a)
+     troca por resultado **certo**.
+   - **Alcance da correção:** `cmp_col_at` é usado por `groupby`, `join` e
+     `sort_by` — os três mudam de comportamento com NaN. Hoje os três dão
+     resultado indefinido; qualquer das opções é melhora.
+   - **Consequência para o 10.5-B:** `unique`/`nunique` por ordenação herdam o
+     mesmo problema em float64 com NaN. Enquanto o 12.38 não fechar, esse
+     caminho precisa de tratamento próprio de NaN ou de recair no caminho
+     antigo para f64 com NaN.
+   - **Vínculo:** 12.37 (mesma família de fronteira que assume em vez de
+     validar); Contrato 8; Contrato 9; 10.5-B.
  - 12.35 **Custo de adicionar um dtype** — [Fedora] (Anel 0 + Anel 1).
    **EXIGE BLOCO DE DESIGN.** Levantado em 2026-07-28. O objetivo não é dtype de
    graça — em C sem genéricos isso não existe, e despacho por dtype **é** a

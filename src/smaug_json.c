@@ -307,6 +307,10 @@ static int parse_record(json_lex_t *l, json_record_t *rec) {
 }
 
 smaug_table_t *smaug_read_json_mem(const char *buf, size_t len) {
+    /* Ver a nota em smaug_read_csv_mem: fronteira publica valida. buf NULL com
+       len > 0 fazia o lexer dereferenciar e segfaltar. */
+    if (!buf && len > 0) return NULL;
+
     json_lex_t l = {buf, len, 0, NULL, 0, 0, 0};
     json_tok_t t;
     /* alocações visíveis em oom_recs (NULL = não-alocado ou já liberado) */

@@ -3,9 +3,9 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `72dd10b`  |  Data: 2026-07-30 17:53:40 -0300
+- Commit medido: `c28304f`  |  Data: 2026-07-30 21:44:46 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `4417/4785 = 92.31%` -- 139 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- **Branch-bruto** (todos os ramos): `4426/4793 = 92.34%` -- 139 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 | Arquivo | Linhas | Branch-alvo (taken) |
@@ -13,49 +13,50 @@
 | `smaug_astype.c` | `118/118 = 100.00%` `[██████████]` | `109/109 = 100.00%` `[██████████]` |
 | `smaug_convert.c` | `37/37 = 100.00%` `[██████████]` | `37/37 = 100.00%` `[██████████]` |
 | `smaug_core.c` | `402/402 = 100.00%` `[██████████]` | `290/290 = 100.00%` `[██████████]` |
-| `smaug_csv.c` | `298/306 = 97.39%` `[█████████░]` | `333/370 = 90.00%` `[█████████░]` |
+| `smaug_csv.c` | `299/307 = 97.39%` `[█████████░]` | `336/374 = 89.84%` `[█████████░]` |
 | `smaug_datetime.c` | `570/576 = 98.96%` `[█████████░]` | `702/747 = 93.98%` `[█████████░]` |
-| `smaug_json.c` | `352/364 = 96.70%` `[█████████░]` | `417/463 = 90.06%` `[█████████░]` |
+| `smaug_json.c` | `354/366 = 96.72%` `[█████████░]` | `423/467 = 90.58%` `[█████████░]` |
 | `smaug_ops_bool.c` | `314/320 = 98.12%` `[█████████░]` | `380/407 = 93.37%` `[█████████░]` |
 | `smaug_ops_f64.c` | `549/549 = 100.00%` `[██████████]` | `632/634 = 99.68%` `[██████████]` |
 | `smaug_ops_i64.c` | `557/560 = 99.46%` `[█████████░]` | `603/616 = 97.89%` `[█████████░]` |
 | `smaug_ops_str.c` | `278/285 = 97.54%` `[█████████░]` | `318/342 = 92.98%` `[█████████░]` |
 | `smaug_ops_window.c` | `326/331 = 98.49%` `[█████████░]` | `342/377 = 90.72%` `[█████████░]` |
 | `smaug_str.c` | `297/297 = 100.00%` `[██████████]` | `254/254 = 100.00%` `[██████████]` |
-| **TOTAL** | `4098/4145 = 98.87%` `[█████████░]` | `4417/4646 = 95.07%` `[█████████░]` |
+| **TOTAL** | `4101/4148 = 98.87%` `[█████████░]` | `4426/4654 = 95.10%` `[█████████░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
 Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 
-**`smaug_csv.c`** — 27 linha(s) com ramo descoberto:
+**`smaug_csv.c`** — 28 linha(s) com ramo descoberto:
 - `smaug_csv.c:154` — if (i+1 < len && buf[i+1] == quote) { PUSH(quote); i += 2; }
 - `smaug_csv.c:157` — PUSH(buf[i]); i++;
 - `smaug_csv.c:168` — else if (i < len && buf[i] == '\n') { i++; *eol=1; }
-- `smaug_csv.c:187` — char decimal = opts->decimal ? opts->decimal : '.';  /* fallback defensivo: campo zerado → '.' */
-- `smaug_csv.c:210` — if (buf[pos] == '\n' || (buf[pos] == '\r' && (pos+1>=len || buf[pos+1]=='\n'))) {
-- `smaug_csv.c:211` — if (buf[pos] == '\r') pos++;
-- `smaug_csv.c:345` — const char *v = (c < rsz) ? row[c] : "";
-- `smaug_csv.c:359` — const char *v = (c < rsz) ? row[c] : "";
-- `smaug_csv.c:361` — if (is_na(v,nav,nc)) smaug_bool_set_null(s,r);
-- `smaug_csv.c:372` — const char *v = (c < rsz) ? row[c] : "";
-- `smaug_csv.c:383` — if (col_names) {
-- `smaug_csv.c:407` — if (rows[r]) { for(size_t c=0;c<row_sizes[r];c++) free(rows[r][c]); free(rows[r]); }
-- `smaug_csv.c:444` — if (s[i]==sep||s[i]=='\n'||s[i]=='\r'||s[i]==quote) { needs_quote=1; break; }
-- `smaug_csv.c:446` — if (wbuf_pushc(b, quote)) return -1;
-- `smaug_csv.c:448` — if (s[i] == quote && wbuf_pushc(b, quote)) return -1;
-- `smaug_csv.c:449` — if (wbuf_pushc(b, s[i])) return -1;
-- `smaug_csv.c:466` — char decimal = opts->decimal ? opts->decimal : '.'; /* fallback defensivo: campo zerado → '.' */
-- `smaug_csv.c:476` — if (c > 0 && wbuf_pushc(&b, sep)) goto oom;
-- `smaug_csv.c:480` — if (wbuf_pushc(&b, '\n')) goto oom;
-- `smaug_csv.c:485` — if (c > 0 && wbuf_pushc(&b, sep)) goto oom;
-- `smaug_csv.c:503` — for (size_t k = 0; k < n; k++)
-- `smaug_csv.c:512` — } else if (col->str) {
-- `smaug_csv.c:516` — if (write_field(&b, s, n, sep, quote)) goto oom;
-- `smaug_csv.c:518` — if (wbuf_pushc(&b, '\n')) goto oom;
-- `smaug_csv.c:521` — if (wbuf_pushc(&b, '\0')) goto oom;
-- `smaug_csv.c:533` — if (!buf) return -1;
-- `smaug_csv.c:537` — return (w==len) ? 0 : -1;
+- `smaug_csv.c:188` — if (!buf && len > 0) return NULL;
+- `smaug_csv.c:194` — char decimal = opts->decimal ? opts->decimal : '.';  /* fallback defensivo: campo zerado → '.' */
+- `smaug_csv.c:217` — if (buf[pos] == '\n' || (buf[pos] == '\r' && (pos+1>=len || buf[pos+1]=='\n'))) {
+- `smaug_csv.c:218` — if (buf[pos] == '\r') pos++;
+- `smaug_csv.c:352` — const char *v = (c < rsz) ? row[c] : "";
+- `smaug_csv.c:366` — const char *v = (c < rsz) ? row[c] : "";
+- `smaug_csv.c:368` — if (is_na(v,nav,nc)) smaug_bool_set_null(s,r);
+- `smaug_csv.c:379` — const char *v = (c < rsz) ? row[c] : "";
+- `smaug_csv.c:390` — if (col_names) {
+- `smaug_csv.c:414` — if (rows[r]) { for(size_t c=0;c<row_sizes[r];c++) free(rows[r][c]); free(rows[r]); }
+- `smaug_csv.c:451` — if (s[i]==sep||s[i]=='\n'||s[i]=='\r'||s[i]==quote) { needs_quote=1; break; }
+- `smaug_csv.c:453` — if (wbuf_pushc(b, quote)) return -1;
+- `smaug_csv.c:455` — if (s[i] == quote && wbuf_pushc(b, quote)) return -1;
+- `smaug_csv.c:456` — if (wbuf_pushc(b, s[i])) return -1;
+- `smaug_csv.c:473` — char decimal = opts->decimal ? opts->decimal : '.'; /* fallback defensivo: campo zerado → '.' */
+- `smaug_csv.c:483` — if (c > 0 && wbuf_pushc(&b, sep)) goto oom;
+- `smaug_csv.c:487` — if (wbuf_pushc(&b, '\n')) goto oom;
+- `smaug_csv.c:492` — if (c > 0 && wbuf_pushc(&b, sep)) goto oom;
+- `smaug_csv.c:510` — for (size_t k = 0; k < n; k++)
+- `smaug_csv.c:519` — } else if (col->str) {
+- `smaug_csv.c:523` — if (write_field(&b, s, n, sep, quote)) goto oom;
+- `smaug_csv.c:525` — if (wbuf_pushc(&b, '\n')) goto oom;
+- `smaug_csv.c:528` — if (wbuf_pushc(&b, '\0')) goto oom;
+- `smaug_csv.c:540` — if (!buf) return -1;
+- `smaug_csv.c:544` — return (w==len) ? 0 : -1;
 
 **`smaug_datetime.c`** — 38 linha(s) com ramo descoberto:
 - `smaug_datetime.c:340` — if (dt_cow_detach(s) != 0) return -1;
@@ -97,8 +98,7 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_datetime.c:1077` — if (m == 0) return result;
 - `smaug_datetime.c:1099` — switch (method) {
 
-**`smaug_json.c`** — 37 linha(s) com ramo descoberto:
-- `smaug_json.c:44` — while (l->pos < l->len) {
+**`smaug_json.c`** — 35 linha(s) com ramo descoberto:
 - `smaug_json.c:46` — if (c == ' ' || c == '\t' || c == '\n' || c == '\r') l->pos++;
 - `smaug_json.c:54` — if (l->pos + 4 > l->len) return -1;
 - `smaug_json.c:60` — else if (h >= 'a' && h <= 'f') digit = h - 'a' + 10;
@@ -110,7 +110,6 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_json.c:137` — } else if (ucp >= 0xDC00 && ucp <= 0xDFFF) {
 - `smaug_json.c:143` — if (bytes == 0) { free(out); return NULL; }
 - `smaug_json.c:157` — switch (esc) {
-- `smaug_json.c:181` — if (l->pos >= l->len) return TOK_EOF;
 - `smaug_json.c:195` — if (l->pos + 4 <= l->len && strncmp(l->buf+l->pos,"true",4)==0)
 - `smaug_json.c:199` — if (l->pos + 5 <= l->len && strncmp(l->buf+l->pos,"false",5)==0)
 - `smaug_json.c:203` — if (l->pos + 4 <= l->len && strncmp(l->buf+l->pos,"null",4)==0)
@@ -122,19 +121,19 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_json.c:217` — if (l->is_int) { char *e; errno=0; l->int_val=strtoll(tmp,&e,10); if (*e) l->is_int=0; }
 - `smaug_json.c:218` — if (!l->is_int) { char *e; errno=0; l->num_val=strtod(tmp,&e); if (*e||errno) return TOK_ERROR; }
 - `smaug_json.c:296` — if (!nk || !nv) { free(key); if (val.type==4) free(val.s); return 0; }
-- `smaug_json.c:328` — while (t != TOK_RBRACKET && t != TOK_EOF && t != TOK_ERROR) {
-- `smaug_json.c:330` — for (size_t i = 0; i < n_recs; i++) free_record(&recs[i]);
-- `smaug_json.c:337` — if (!tmp) {
-- `smaug_json.c:338` — for (size_t i = 0; i < n_recs; i++) free_record(&recs[i]);
-- `smaug_json.c:359` — return empty ? empty : make_error("OOM");
-- `smaug_json.c:432` — else if (v->type == 1)  smaug_i64_set(s, r, v->i);
-- `smaug_json.c:471` — else if (v->type==3) { strcpy(tmp,v->b?"true":"false"); n=strlen(tmp); }
-- `smaug_json.c:499` — if (sz < 0) { fclose(f); return NULL; }
-- `smaug_json.c:501` — if (!buf) { fclose(f); return NULL; }
-- `smaug_json.c:526` — while (ncap <= b->len + n) ncap *= 2;
-- `smaug_json.c:537` — if (wbj_pushc(b, '"')) return -1;
-- `smaug_json.c:639` — if (!buf) return -1;
-- `smaug_json.c:643` — return (w == len) ? 0 : -1;
+- `smaug_json.c:332` — while (t != TOK_RBRACKET && t != TOK_EOF && t != TOK_ERROR) {
+- `smaug_json.c:334` — for (size_t i = 0; i < n_recs; i++) free_record(&recs[i]);
+- `smaug_json.c:341` — if (!tmp) {
+- `smaug_json.c:342` — for (size_t i = 0; i < n_recs; i++) free_record(&recs[i]);
+- `smaug_json.c:363` — return empty ? empty : make_error("OOM");
+- `smaug_json.c:436` — else if (v->type == 1)  smaug_i64_set(s, r, v->i);
+- `smaug_json.c:475` — else if (v->type==3) { strcpy(tmp,v->b?"true":"false"); n=strlen(tmp); }
+- `smaug_json.c:503` — if (sz < 0) { fclose(f); return NULL; }
+- `smaug_json.c:505` — if (!buf) { fclose(f); return NULL; }
+- `smaug_json.c:530` — while (ncap <= b->len + n) ncap *= 2;
+- `smaug_json.c:541` — if (wbj_pushc(b, '"')) return -1;
+- `smaug_json.c:643` — if (!buf) return -1;
+- `smaug_json.c:647` — return (w == len) ? 0 : -1;
 
 **`smaug_ops_bool.c`** — 22 linha(s) com ramo descoberto:
 - `smaug_ops_bool.c:204` — if (out_mask) {
@@ -260,22 +259,22 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_csv.c:106` — s nunca é NULL — origem é row[c] ou "" literal
 - `smaug_csv.c:135` — loop externo garante pos < len antes de chamar
 - `smaug_csv.c:172` — só falha se PUSH falhou por OOM
-- `smaug_csv.c:227` — OOM de realloc de fields — coberto pelo allocfail
-- `smaug_csv.c:227` — OOM de realloc de fields — coberto pelo allocfail
-- `smaug_csv.c:227` — OOM de realloc de fields — coberto pelo allocfail
-- `smaug_csv.c:236` — OOM de realloc de rows — coberto pelo allocfail
-- `smaug_csv.c:236` — OOM de realloc de rows — coberto pelo allocfail
-- `smaug_csv.c:236` — OOM de realloc de rows — coberto pelo allocfail
-- `smaug_csv.c:236` — OOM de realloc de rows — coberto pelo allocfail
-- `smaug_csv.c:250` — rows[0] nunca NULL — n_rows>0 garante alocação
-- `smaug_csv.c:251` — next_field sempre produz >=1 campo por linha
-- `smaug_csv.c:261` — c<n_cols<=row_sizes[0] por construção
-- `smaug_csv.c:335` — dtype=int64 implica que todo valor não-NA já passou em try_i64 durante a inferência (mesma string, mesma is_na, função pura e determinística) — confirmado por auditoria adversarial (overflow/inf/nan/zeros à esquerda) e 400k+ checks da suíte, nunca quebrou
-- `smaug_csv.c:348` — dtype=float64 implica try_f64=1 pelo mesmo argumento de pureza da inferência (ver linha 303)
-- `smaug_csv.c:349` — duplamente inalcançável — além da pureza da inferência, try_i64(v) bem-sucedido implica try_f64(v) também bem-sucedido (strtod aceita toda a gramática de strtoll), então o try_f64 da linha acima já teria capturado este valor
-- `smaug_csv.c:349` — duplamente inalcançável — além da pureza da inferência, try_i64(v) bem-sucedido implica try_f64(v) também bem-sucedido (strtod aceita toda a gramática de strtoll), então o try_f64 da linha acima já teria capturado este valor
-- `smaug_csv.c:362` — dtype=bool implica try_bool=1 pelo mesmo argumento de pureza da inferência (ver linha 303)
-- `smaug_csv.c:477` — name sempre não-NULL após construção
+- `smaug_csv.c:234` — OOM de realloc de fields — coberto pelo allocfail
+- `smaug_csv.c:234` — OOM de realloc de fields — coberto pelo allocfail
+- `smaug_csv.c:234` — OOM de realloc de fields — coberto pelo allocfail
+- `smaug_csv.c:243` — OOM de realloc de rows — coberto pelo allocfail
+- `smaug_csv.c:243` — OOM de realloc de rows — coberto pelo allocfail
+- `smaug_csv.c:243` — OOM de realloc de rows — coberto pelo allocfail
+- `smaug_csv.c:243` — OOM de realloc de rows — coberto pelo allocfail
+- `smaug_csv.c:257` — rows[0] nunca NULL — n_rows>0 garante alocação
+- `smaug_csv.c:258` — next_field sempre produz >=1 campo por linha
+- `smaug_csv.c:268` — c<n_cols<=row_sizes[0] por construção
+- `smaug_csv.c:342` — dtype=int64 implica que todo valor não-NA já passou em try_i64 durante a inferência (mesma string, mesma is_na, função pura e determinística) — confirmado por auditoria adversarial (overflow/inf/nan/zeros à esquerda) e 400k+ checks da suíte, nunca quebrou
+- `smaug_csv.c:355` — dtype=float64 implica try_f64=1 pelo mesmo argumento de pureza da inferência (ver linha 303)
+- `smaug_csv.c:356` — duplamente inalcançável — além da pureza da inferência, try_i64(v) bem-sucedido implica try_f64(v) também bem-sucedido (strtod aceita toda a gramática de strtoll), então o try_f64 da linha acima já teria capturado este valor
+- `smaug_csv.c:356` — duplamente inalcançável — além da pureza da inferência, try_i64(v) bem-sucedido implica try_f64(v) também bem-sucedido (strtod aceita toda a gramática de strtoll), então o try_f64 da linha acima já teria capturado este valor
+- `smaug_csv.c:369` — dtype=bool implica try_bool=1 pelo mesmo argumento de pureza da inferência (ver linha 303)
+- `smaug_csv.c:484` — name sempre não-NULL após construção
 - `smaug_datetime.c:64` — ramo z<0 no algoritmo de Hinnant — datas antes de ~292Mi a.C.
 - `smaug_datetime.c:82` — ramo Y<0 no algoritmo de Hinnant — datas antes de ~292Mi a.C.
 - `smaug_datetime.c:119` — realloc de shrink
@@ -300,50 +299,50 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_datetime.c:667` — o ramo falso do `v >= 0` e inalcancavel -- as escalares nunca devolvem -1 hoje, apesar de o header prometer (ver item registrado); guard mantido como defesa em profundidade
 - `smaug_json.c:114` — string não fechada — break inalcançável em JSON bem-formado
 - `smaug_json.c:149` — OOM de realloc em string JSON
-- `smaug_json.c:433` — dtype=int64 implica que toda linha não-null tinha jt==1 durante a inferência (dtype_upgrade força float64 se qualquer linha fosse jt==2) — mesmo argumento de pureza do csv.c
-- `smaug_json.c:433` — dtype=int64 implica que toda linha não-null tinha jt==1 durante a inferência (dtype_upgrade força float64 se qualquer linha fosse jt==2) — mesmo argumento de pureza do csv.c
-- `smaug_json.c:445` — ramo falso inalcançável — se chegou aqui, type já não é 0 nem 2; pureza garante que só resta 1
-- `smaug_json.c:456` — ramo falso inalcançável — pureza garante type==3 sempre que não-null numa coluna bool
-- `smaug_json.c:540` — OOM de wbuf sem injeção
-- `smaug_json.c:541` — OOM de wbuf sem injeção
-- `smaug_json.c:542` — OOM de wbuf sem injeção
-- `smaug_json.c:543` — OOM de wbuf sem injeção
-- `smaug_json.c:543` — OOM de wbuf sem injeção
-- `smaug_json.c:543` — OOM de wbuf sem injeção
+- `smaug_json.c:437` — dtype=int64 implica que toda linha não-null tinha jt==1 durante a inferência (dtype_upgrade força float64 se qualquer linha fosse jt==2) — mesmo argumento de pureza do csv.c
+- `smaug_json.c:437` — dtype=int64 implica que toda linha não-null tinha jt==1 durante a inferência (dtype_upgrade força float64 se qualquer linha fosse jt==2) — mesmo argumento de pureza do csv.c
+- `smaug_json.c:449` — ramo falso inalcançável — se chegou aqui, type já não é 0 nem 2; pureza garante que só resta 1
+- `smaug_json.c:460` — ramo falso inalcançável — pureza garante type==3 sempre que não-null numa coluna bool
 - `smaug_json.c:544` — OOM de wbuf sem injeção
 - `smaug_json.c:545` — OOM de wbuf sem injeção
 - `smaug_json.c:546` — OOM de wbuf sem injeção
-- `smaug_json.c:559` — NULL opts usa default 0; opts não-NULL cobre ambos
-- `smaug_json.c:566` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
-- `smaug_json.c:569` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
+- `smaug_json.c:547` — OOM de wbuf sem injeção
+- `smaug_json.c:547` — OOM de wbuf sem injeção
+- `smaug_json.c:547` — OOM de wbuf sem injeção
+- `smaug_json.c:548` — OOM de wbuf sem injeção
+- `smaug_json.c:549` — OOM de wbuf sem injeção
+- `smaug_json.c:550` — OOM de wbuf sem injeção
+- `smaug_json.c:563` — NULL opts usa default 0; opts não-NULL cobre ambos
 - `smaug_json.c:570` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
-- `smaug_json.c:571` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
+- `smaug_json.c:573` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
 - `smaug_json.c:574` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
-- `smaug_json.c:576` — name sempre não-NULL após construção
-- `smaug_json.c:577` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
+- `smaug_json.c:575` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
 - `smaug_json.c:578` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
-- `smaug_json.c:579` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
-- `smaug_json.c:587` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
-- `smaug_json.c:588` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
+- `smaug_json.c:580` — name sempre não-NULL após construção
+- `smaug_json.c:581` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
+- `smaug_json.c:582` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
+- `smaug_json.c:583` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
+- `smaug_json.c:591` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
 - `smaug_json.c:592` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
-- `smaug_json.c:599` — OOM de wbuf + nao-finito→null: ramo oom inalcançável sem injeção
-- `smaug_json.c:600` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
+- `smaug_json.c:596` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
+- `smaug_json.c:603` — OOM de wbuf + nao-finito→null: ramo oom inalcançável sem injeção
 - `smaug_json.c:604` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
-- `smaug_json.c:605` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
-- `smaug_json.c:606` — dtype inferido garante exatamente um ponteiro não-NULL
+- `smaug_json.c:608` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
 - `smaug_json.c:609` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
-- `smaug_json.c:610` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
-- `smaug_json.c:611` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
-- `smaug_json.c:611` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
+- `smaug_json.c:610` — dtype inferido garante exatamente um ponteiro não-NULL
 - `smaug_json.c:613` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
 - `smaug_json.c:614` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
+- `smaug_json.c:615` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
+- `smaug_json.c:615` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
 - `smaug_json.c:617` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
 - `smaug_json.c:618` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
-- `smaug_json.c:619` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
-- `smaug_json.c:620` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
+- `smaug_json.c:621` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
+- `smaug_json.c:622` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
 - `smaug_json.c:623` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
 - `smaug_json.c:624` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
-- `smaug_json.c:625` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
+- `smaug_json.c:627` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
+- `smaug_json.c:628` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
+- `smaug_json.c:629` — ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541)
 - `smaug_ops_bool.c:48` — at&&bt sempre true aqui (linhas 45/47 ja garantiram ambos validos-nao-false)
 - `smaug_ops_bool.c:48` — at&&bt sempre true aqui (linhas 45/47 ja garantiram ambos validos-nao-false)
 - `smaug_ops_bool.c:158` — m sempre fornecido pelas Kleene raw (out_mask != NULL); ramo :SMAUG_MASK_VALID defensivo, uso interno controlado

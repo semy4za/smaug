@@ -1041,6 +1041,30 @@ static void test_csv_float_overflow(void) {
     smaug_table_free(t);
 }
 
+/* Contraparte de LEITURA do teste de fronteira abaixo. Achado 2026-07-28: a
+   escrita validava e era testada; a leitura nao fazia nem uma coisa nem outra,
+   e read_csv_mem(NULL, 10) / read_json_mem(NULL, 10) SEGFALTAVAM. Assimetria
+   dentro do mesmo modulo. */
+static void test_read_mem_null_args(void) {
+    /* buf NULL com len > 0 e chamada invalida -> NULL, nao crash */
+    CHECK(smaug_read_csv_mem(NULL, 10, NULL) == NULL,
+          "read_csv_mem: buf=NULL com len>0 retorna NULL");
+    CHECK(smaug_read_json_mem(NULL, 10) == NULL,
+          "read_json_mem: buf=NULL com len>0 retorna NULL");
+
+    /* buf NULL com len == 0 e entrada VAZIA legitima, nao erro -- a guarda nao
+       pode ser `if (!buf)`, senao quebraria este caso */
+    smaug_table_t *t = smaug_read_json_mem(NULL, 0);
+    CHECK(t != NULL, "read_json_mem: buf=NULL com len=0 e entrada vazia valida");
+    if (t) smaug_table_free(t);
+
+    /* caminho normal segue funcionando */
+    const char *csv = "a,b\n1,2\n";
+    smaug_table_t *tc = smaug_read_csv_mem(csv, strlen(csv), NULL);
+    CHECK(tc != NULL && tc->ncols == 2, "read_csv_mem: caminho normal intacto");
+    if (tc) smaug_table_free(tc);
+}
+
 static void test_csv_write_null_args(void) {
     /* smaug_write_csv_mem(NULL,...) e (t, NULL, ...) — guards de fronteira
      * pública (linhas 424/426), nunca testados com argumento NULL real. */
@@ -1472,6 +1496,7 @@ int main(void) {
     test_csv_write_nan();
     test_csv_write_opts_zero_sep_quote();
     test_csv_write_large_field();
+    test_read_mem_null_args();
     test_csv_write_null_args();
     test_csv_write_field_with_sep();
     test_csv_write_field_with_quote();

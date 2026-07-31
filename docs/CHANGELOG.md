@@ -51,6 +51,162 @@ categorical divergiria em silêncio. Vira teste de invariante.
 Nenhum C, nenhum Lua.
 
 ---
+## 2026-07-28 — um NaN na chave quebra o groupby inteiro
+
+Tentativa de implementar o 10.5-B que virou a descoberta de um bug sério, e
+terminou com o código revertido.
+
+O protótipo por ordenação funcionou: correto com nulos misturados a zeros reais,
+série vazia, só-nula e int64 acima de 2^53, com ganho entre 3× e 11× conforme a
+série tenha nulos ou não. O caminho de nulos ficou claro — filtrar antes de
+ordenar é obrigatório, porque `set_null` zera o dado e nulos cairiam no mesmo
+trecho que zeros reais.
+
+Foi ao verificar NaN que apareceu o problema. Em `unique`, o antigo dava
+`{NaN, 1, NaN}` → 2 grupos (o `keys.encode` produz `"float64:nan"` para ambos); o
+novo dava 3, porque `NaN ~= NaN`. Investigando a origem: o comparador do
+`multi_argsort` é `(a > b) - (a < b)`, e com NaN as duas comparações são falsas —
+**NaN compara igual a tudo**. Isso viola a ordem fraca estrita que o `qsort` exige;
+o comparador fica inconsistente e o comportamento passa a ser indefinido pelo
+padrão C.
+
+E isso é alcançável pela API pública, porque **NaN não é NA** neste projeto
+(Contrato 9: não-finito é valor, ausência é `null_mask`). O Contrato 8 rejeita NA
+em chave relacional e o Anel 1 aplica isso — mas NaN passa. Dois contratos
+corretos deixando um buraco entre eles.
+
+Medido: `groupby` sobre `{1.0, NaN, 1.0, NaN, 2.0}` somando devolve
+`1=10, NaN=20, 1=30, NaN=40, 2=50`. Cinco grupos para três valores, e o valor
+`1.0` aparece **duas vezes como grupos separados**. Sem NaN, o mesmo groupby
+acerta. Ou seja: **um único NaN corrompe o agrupamento das outras chaves também**,
+e quem fizer `groupby("preco"):sum()` com um NaN perdido recebe somas erradas em
+silêncio.
+
+Registrado como 12.38 com prioridade, e com a decisão semântica em aberto: tornar
+o comparador total (NaN num extremo, `NaN == NaN` para ordenação, como o
+`totalOrder` do IEEE e como numpy/pandas) ou recusar NaN em chave, como o sort de
+coluna única já faz. A primeira troca resultado errado por resultado certo; a
+segunda, por erro.
+
+O 10.5-B foi **revertido** e marcado como bloqueado. Contornar agora — fazer
+float64 recair no caminho antigo — seria trabalho jogado fora, porque o conserto do
+12.38 desbloqueia o item inteiro. O protótipo fica registrado como validado.
+
+---
+## 2026-07-28 — o mesmo buraco do lado do Lua: objeto do Smaug onde se espera lista
+
+Continuação natural da auditoria do 12.37, e apareceu por acidente. Ao avaliar
+quais operações derivadas de `.dt` poderiam virar composição das já vetorizadas,
+testei se `take` aceitava uma Series de índices. Aceitou — e devolveu **zero
+elementos**, em silêncio.
+
+A causa é uma armadilha de Lua: guards escritos como `type(v) ~= "table"` não
+distinguem um array de uma Series ou DataSet, porque os três são `table`. E como
+os objetos do Smaug não têm parte array, `#v` dá 0 e `ipairs(v)` não itera nada.
+O guard passa, a operação roda sobre o nada, e o resultado é vazio ou errado sem
+uma palavra.
+
+Medidos cinco casos quebrados de oito testados: `take` devolvia 0 elementos,
+`isin` devolvia tudo `false`, `select` devolvia 0 colunas, `categorical:take`
+devolvia 0, `drop_duplicates` devolvia contagem errada. Os três que erram
+corretamente — `rename`, `from_dict`, `rename_levels` — só se salvam porque
+iteram o conteúdo e falham nele. Sorte, não desenho.
+
+A correção foi um `check_plain_array` no `errors.lua`, que já é a fonte única de
+concerns de erro. O discriminador é simples e confiável: objeto do Smaug tem
+metatable, tabela Lua simples não.
+
+A mensagem merece nota. Dizer "espera uma tabela" seria inútil aqui — a Series
+**é** uma tabela, e o usuário ficaria sem saber o que fazer. Ela diz "não um
+objeto do Smaug — use `:to_table()` para converter", que nomeia a causa e a saída.
+Um teste verifica o conteúdo da mensagem, não só que houve erro.
+
+Restam ~25 guards com o mesmo padrão no projeto. Cinco foram corrigidos por serem
+os medidos como quebrados; os demais checam `_dtype` em seguida (seguros por
+construção) ou iteram conteúdo. Vale varrer o resto sem urgência — os perigosos
+eram justamente os que aceitavam calados.
+
++9 checks em test_selection (66→75), com mutação verificada: remover o
+discriminador de metatable aborta o teste.
+
+---
+## 2026-07-28 — auditoria de fronteiras públicas: dois segfaults achados e corrigidos
+
+A pergunta "isso bate com nosso contrato?" sobre o `multi_argsort` levou a uma
+resposta tranquilizadora e a uma varredura que não era.
+
+**A resposta:** bate. O `multi_argsort` tem pré-condição documentada (colunas de
+chave sem nulos), e o Contrato 8 — `NA` em chave relacional é erro — é aplicado
+pelo Anel 1 via `validate_keys_no_na` antes da chamada. `groupby` e `join` são o
+único caminho até ele. Não é violação; é pré-condição honrada pelo caller.
+
+Mas expôs uma **inconsistência de defensividade entre irmãos**: o
+`smaug_i64_argsort` valida e devolve NULL com nulos, exatamente como o `API_INDEX`
+promete; o `multi_argsort` assume. Ambos são fronteira pública exportada, e o
+princípio do Anel 0 diz que toda fronteira pública valida e comunica o resultado.
+
+Isso motivou varrer as **305 funções exportadas** procurando quem recebe ponteiro e
+não guarda. Dezessete candidatas, a maioria falso positivo — os `*_create` recebem
+`size_t` e o `*` é do retorno; os comparadores de string delegam ao `str_compare`,
+que guarda um nível abaixo; `std` delega a `var`. As restantes foram testadas
+**executando**, não lendo.
+
+**Dois segfaults reais.** `smaug_read_csv_mem(NULL, 10, NULL)` e
+`smaug_read_json_mem(NULL, 10)` derrubam o processo. E a assimetria é dentro do
+próprio módulo: a contraparte de **escrita** já validava **e já tinha teste** de
+fronteira, com o comentário "guards de fronteira pública, nunca testados com
+argumento NULL real". A leitura não tinha nem guarda nem teste.
+
+Corrigido com `if (!buf && len > 0) return NULL`. A forma da guarda importa:
+`buf = NULL` com `len == 0` é entrada **vazia legítima**, e um `if (!buf)` simples
+quebraria esse caso — está coberto por teste. Mutação verificada: removendo as
+guardas, o teste novo segfalta.
+
+Registrado como 12.37, com a pré-condição do `multi_argsort` anotada — não
+corrigida, porque hoje é inalcançável pelo caminho real. Mas com consequência
+prática para o 10.5-B: `unique`/`nunique`/`value_counts` aceitam nulos e não são
+operações relacionais, então usá-lo ali exige filtrar os nulos antes.
+Obrigatório, não opcional.
+
+`test_io_c` 315→319. Cobertura 95,08% de branch-alvo.
+
+---
+## 2026-07-28 — correção: o benchmark do 10.5-B media a coisa errada
+
+Ao começar a implementar o 10.5-B, o primeiro passo foi verificar como o
+`multi_argsort` trata nulos. O teste sugeriu que ele coloca os nulos primeiro,
+agrupados — o que resolveria de graça um dos dois obstáculos registrados no bloco
+de design. Bom demais para não conferir.
+
+Não era verdade, e a investigação achou duas coisas.
+
+**O comparador não consulta a máscara de nulos em lugar nenhum.** Um elemento nulo
+é ordenado pelo valor cru do buffer — 0, em int64. Os nulos aparecerem primeiro no
+primeiro teste foi acidente: os outros valores eram 10, 20 e 30. Com negativos, o
+resultado é `{-5, NA, 10, NA, -20}` → `-20, -5, NA, NA, 10`: nulos no meio. Não é
+"nulos primeiro" nem "nulos por último", é "nulos onde o lixo do buffer cair". O
+obstáculo dos nulos é real e continua de pé.
+
+**E o benchmark de ontem media a coisa errada.** Eu havia varrido `kind` de 0 a 5
+pegando o primeiro que não devolvesse NULL, sem verificar qual era o correto.
+`kind = 0` é `SMAUG_COL_F64`; passei uma série int64. O C reinterpretou os bits e
+ordenou lixo — e **não falhou**, devolveu um resultado silenciosamente sem sentido.
+Foi o mesmo tipo de erro que passei o dia caçando no código, cometido na medição, e
+pela mesma causa: aceitar o primeiro resultado que não reclama.
+
+Refeito com `kind = 1`: **8,9×** (1,355 s → 0,152 s), contra os 7,9× publicados. A
+conclusão do bloco de design sobrevive e fica mais forte, mas o registro foi
+corrigido — e o erro fica anotado, porque a lição é sobre a API: `kind` errado não
+falha, corrompe em silêncio.
+
+A decisão sobre nulos voltou para o bloco de design com uma opção nova: filtrar as
+linhas nulas antes de ordenar (não toca C, e elas formam um grupo só), ou fazer o
+comparador consultar a máscara — mais correto em geral, mas muda o comportamento do
+`sort_values`, que hoje depende dele.
+
+Nenhum código de produção tocado.
+
+---
 ## 2026-07-28 — 10.4 fatia A: componentes de datetime, e uma promessa que o header não cumpre
 
 Os onze componentes (`year`, `month`, `day`, `hour`, `minute`, `second`, `ms`,

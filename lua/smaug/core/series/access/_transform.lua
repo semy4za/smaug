@@ -94,7 +94,7 @@ return function(I)
 
     -- take: nova série (cópia independente) com os elementos nas posições idx.
     function methods.take(self, idx)
-        if type(idx) ~= "table" then error("smaug: take espera uma tabela de índices", 2) end
+        Err.check_plain_array(idx, "take", "uma tabela de índices", 2)
         local n   = self:len()
         local len = #idx
         local cidx = ffi.new("size_t[?]", len)

@@ -180,6 +180,13 @@ static char *next_field(const char *buf, size_t len, size_t *pos,
    =================================================================== */
 smaug_table_t *smaug_read_csv_mem(const char *buf, size_t len,
                                     const smaug_csv_opts_t *opts) {
+    /* Fronteira publica valida (principio do Anel 0). buf NULL com len > 0 e
+       chamada invalida -- antes disto o parser dereferenciava e segfaltava.
+       len == 0 com buf NULL e legitimo (entrada vazia), e continua valendo.
+       A contraparte de escrita (smaug_write_csv_mem) ja validava; a leitura
+       nao. Achado 2026-07-28 na auditoria de fronteiras. */
+    if (!buf && len > 0) return NULL;
+
     smaug_csv_opts_t def = smaug_csv_default_opts();
     if (!opts) opts = &def;
     char sep   = opts->sep   ? opts->sep   : ',';   /* fallback defensivo: caller pode zerar o campo (ver test_csv_opts_zero_sep_quote) */

@@ -278,8 +278,9 @@ return function(I)
             subset = self._col_names
         elseif type(subset) == "string" then
             subset = { subset }
-        elseif type(subset) ~= "table" then
-            error("smaug: duplicated() subset deve ser nome, lista de nomes ou nil", 2)
+        else
+            Err.check_plain_array(subset, "duplicated()",
+                                  "nome, lista de nomes ou nil", 2)
         end
         for _, name in ipairs(subset) do
             if self._columns[name] == nil then

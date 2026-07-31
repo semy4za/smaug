@@ -9,6 +9,7 @@
 
 local keys = require("smaug.core.keys")
 local ffi  = require("ffi")
+local Err  = require("smaug.core.errors")
 
 return function(I)
     local methods = I.methods
@@ -58,9 +59,7 @@ return function(I)
 
     -- isin(values): máscara booleana — true onde o valor está em values.
     function methods.isin(self, values)
-        if type(values) ~= "table" then
-            error("smaug: isin() espera uma tabela de valores", 2)
-        end
+        Err.check_plain_array(values, "isin()", "uma tabela de valores", 2)
         -- Chave canônica em ambos os lados (fonte única keys), com o dtype da
         -- série como referência: assim o int64 100 da série (cdata via get_raw)
         -- e o 100 da lista (number) batem. Antes, tostring cru nos dois lados

@@ -133,6 +133,31 @@ end
 -- unknown_key(kind, name, candidates, extra): mensagem canônica de chave
 -- desconhecida, com sugestão quando houver. `extra` é um complemento opcional
 -- (ex.: mencionar que em DataSet a chave também poderia ser uma coluna).
+-- check_plain_array(v, op, esperado, level): recusa objeto do Smaug onde se
+-- espera uma tabela Lua simples.
+--
+-- Problema que resolve (12.38): guards escritos como `type(v) ~= "table"` não
+-- distinguem um array de uma Series/DataSet — os dois são `table`. Como esses
+-- objetos não têm parte array, `#v` dá 0 e `ipairs(v)` não itera nada, então a
+-- chamada devolve resultado VAZIO ou ERRADO em silêncio, em vez de falhar.
+-- Medido em 2026-07-28: `s:take(serie)` devolvia 0 elementos, `s:isin(serie)`
+-- devolvia tudo false, `ds:select(serie)` devolvia 0 colunas.
+--
+-- Discriminador: objeto do Smaug tem metatable; tabela Lua simples não. A
+-- mensagem nomeia a saída (`:to_table()`), porque o erro comum é justamente
+-- passar a Series achando que ela serve de lista.
+function M.check_plain_array(v, op, esperado, level)
+    if type(v) ~= "table" then
+        error("smaug: " .. op .. " espera " .. esperado
+              .. "; recebido " .. M.describe(v), (level or 2) + 1)
+    end
+    if getmetatable(v) ~= nil then
+        error("smaug: " .. op .. " espera " .. esperado
+              .. " (tabela Lua), não um objeto do Smaug — "
+              .. "use :to_table() para converter", (level or 2) + 1)
+    end
+end
+
 function M.unknown_key(kind, name, candidates, extra)
     local msg = "smaug: " .. kind .. " '" .. tostring(name) .. "' não existe"
     local s = M.suggest(name, candidates)

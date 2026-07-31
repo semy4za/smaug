@@ -193,7 +193,7 @@ return function(I)
     I.map_columns = map_columns   -- exporta para _relational e _stat usarem
 
     function methods.select(self, names)
-        if type(names) ~= "table" then error("smaug: select espera uma tabela de nomes", 2) end
+        Err.check_plain_array(names, "select", "uma tabela de nomes", 2)
         local df = DataSet.new(self._name)
         for _, n in ipairs(names) do
             df:add_column(n, self:_raw_column(n):clone())

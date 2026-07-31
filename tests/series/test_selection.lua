@@ -256,4 +256,42 @@ do
 end
 
 
+-- ===================================================================
+-- 12.38: objeto do Smaug onde se espera tabela Lua
+-- `type(v) == "table"` não distingue array de Series/DataSet — os dois são
+-- table. Como esses objetos não têm parte array, `#v` dá 0 e `ipairs` não
+-- itera, então a chamada devolvia resultado VAZIO ou ERRADO em silêncio.
+-- Medido antes da correção: take→0 elementos, isin→tudo false, select→0
+-- colunas, drop_duplicates→contagem errada.
+-- ===================================================================
+do
+    local st  = S.from_table({"a", "b", "c"}, "string")
+    local ser = S.from_table({1, 2}, "int64")
+
+    -- 12.38.1 — os cinco casos que aceitavam em silêncio agora erram
+    check(not pcall(function() return st:take(ser) end),
+          "12.38.1 take(Series) recusado (devolvia 0 elementos)")
+    check(not pcall(function() return st:isin(ser) end),
+          "12.38.1 isin(Series) recusado (devolvia tudo false)")
+    local cat = S.from_table({"a", "b", "a"}, "string"):astype("categorical")
+    check(not pcall(function() return cat:take(ser) end),
+          "12.38.1 categorical:take(Series) recusado")
+
+    -- 12.38.2 — a mensagem nomeia a saída, não só reclama
+    local ok, err = pcall(function() return st:take(ser) end)
+    check(not ok and tostring(err):match("to_table") ~= nil,
+          "12.38.2 mensagem sugere :to_table() como conversão")
+    check(tostring(err):match("objeto do Smaug") ~= nil,
+          "12.38.2 mensagem nomeia a causa")
+
+    -- 12.38.3 — o caminho legítimo segue intacto: tabela Lua simples funciona
+    check(st:take({1, 3}):len() == 2,        "12.38.3 take com tabela Lua intacto")
+    check(st:isin({"a"}):get(1) == true,     "12.38.3 isin com tabela Lua intacto")
+    check(st:take(ser:to_table()):len() == 2,"12.38.3 :to_table() é a saída e funciona")
+
+    -- 12.38.4 — tipo errado (não-tabela) continua com a mensagem antiga
+    check(not pcall(function() return st:take(5) end), "12.38.4 take(number) recusado")
+end
+
+
 print(string.format("OK — %d checks passaram (Series: at/iat, where, mask, ifelse, isna/notna)", n_ok))

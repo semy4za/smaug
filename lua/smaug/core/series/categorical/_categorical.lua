@@ -220,9 +220,7 @@ return function(I)
     end
 
     function CategoricalSeries:take(idx)
-        if type(idx) ~= "table" then
-            error("smaug: take espera uma tabela de índices", 2)
-        end
+        Err.check_plain_array(idx, "take", "uma tabela de índices", 2)
         local codes = {}
         for j, i in ipairs(idx) do
             if type(i) ~= "number" or i < 1 or i > self._size then
