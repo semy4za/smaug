@@ -1,6 +1,6 @@
 # Smaug -- MANIFEST de integridade
 # Gerado por scripts/make_manifest.sh (o .ps1 delega a este)
-# Arvore: c28304f + alteracoes nao commitadas
+# Arvore: fd7e800 + alteracoes nao commitadas
 # Formato: <sha256>  <linhas>  <caminho>
 #
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
@@ -16,7 +16,7 @@ b07b78e8393b9ba0f63af76ba6023e6728f0e245eb4630d2d89b8baeb3d93884    4661  ./docs
 f26d5211d1726c8a28f08979ada97bb01e38b2709a921f388d626260c17ca9a7     515  ./docs/CONTRACT.md
 24774b5016eb6147b223f5597e224cb1b37797db634076782ec3e56a5268b90a     370  ./docs/COVERAGE.md
 9f89a9d98d9531648723af2b8aff51121dc75c71fb7bd0620ffb6b71938cbae3     173  ./docs/COW.md
-550521409f32a04f471470aa5861919b4a5ef1b8780a39474041ef91f36a2a9f     932  ./docs/PARITY_REPORT.md
+30418d4e4bf914f5d1578fb957391e38c510333c1ec13e572723b2b0fe24e34c     932  ./docs/PARITY_REPORT.md
 d1610547b58bad5ee0d6e3d11482b0fec99165594529e30acb9c68c8d813e49a     532  ./docs/README.md
 0dfd54ba43a5a48c8f6b56831a2100191b804cce8261860f05cf2c0d11cbc169     922  ./docs/Roadmap.md
 1722e1a5806e185b2f934f2a66ec5193cc6ab8dc5a03837be43be80628c8fb86      39  ./include/smaug.h
