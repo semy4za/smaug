@@ -145,6 +145,16 @@ projeto. Aqui fica só o suficiente para resolver uma referência.
 
 **Subitens fechados do bloco 12** (achados menores)
 
+- 12.37 — fronteiras públicas que não validavam: `read_csv_mem`/`read_json_mem`
+  **segfaltavam** com `buf = NULL` e `len > 0`, enquanto a contraparte de escrita
+  já validava e já tinha teste. Guarda é `!buf && len > 0` (buf NULL com len 0 é
+  entrada vazia legítima). Auditoria das 305 funções exportadas.
+- 12.38 — objeto do Smaug onde se espera tabela Lua: `type(v) ~= "table"` não
+  distingue array de Series/DataSet, e como esses não têm parte array, `#v` dá 0
+  — `take`, `isin`, `select`, `categorical:take` e `drop_duplicates` devolviam
+  vazio ou errado **em silêncio**. `Err.check_plain_array` discrimina por
+  metatable e a mensagem nomeia a saída (`:to_table()`).
+
 12.1 a 12.7, 12.9, 12.10, 12.12, 12.15, 12.17, 12.18, 12.20 a 12.24, 12.27,
 12.28, 12.29, 12.31, 12.32 — correções pontuais de robustez, cobertura, paridade
 e contratos. Cada um narrado no `CHANGELOG` na data em que fechou. Dois merecem
@@ -223,8 +233,7 @@ correto — delegar ao descritor → C — já existe. Subitens 10.5 a 10.9 fech
     de overflow tem precedente no 10.3 (`smaug_status_t` + `SMG_ERR_ARGUMENT`).
 - 10.4 **família `.dt` e `.str` vetorizadas** (E6). **Duas metades com custos
   opostos** — dimensionado em 2026-07-28; tratá-las como um item só esconde isso.
-  - **Fatia A — os 11 componentes base: [Fedora OK 2026-07-28 · Windows
-    PENDENTE]** Valgrind 0 erros nos 13 binários; cobertura **95,07% branch-alvo
+  - **Fatia A — os 11 componentes base: [Done — Fedora + Windows 2026-07-28]** Valgrind 0 erros nos 13 binários; cobertura **95,07% branch-alvo
     e 98,87% linha**, com 139 exclusões (as 11 novas justificadas). Falta o
     `build_win.ps1`: são 11 `cdef` novos, superfície FFI. Macro `DT_COMPONENT_SERIES_IMPL` gera as onze versões de série
     sobre as escalares que já existiam e já eram testadas — nenhuma matemática de
@@ -524,69 +533,6 @@ Vinte e quatro subitens já fecharam (ver índice acima). Restam:
      nulo talvez caiba como parágrafo no Contrato 9).
    - **Vínculo:** 10.2 fatia 2 (que tornou as duas visíveis); Contrato 6, 9;
      item 12.34 (a colação está implementada cinco vezes).
- - 12.38 **Objeto do Smaug onde se espera tabela Lua** — **[Fedora OK 2026-07-28 ·
-   Windows PENDENTE]** Valgrind 0 erros; cobertura 95,10%.
-   (Anel 1, Lua puro). Achado 2026-07-28, na sequência da auditoria do 12.37 —
-   mesma família (fronteira que não comunica), do lado do Lua.
-   - **Causa:** guards escritos como `type(v) ~= "table"` **não distinguem** um
-     array de uma Series/DataSet — os dois são `table`. E como esses objetos não
-     têm parte array, `#v` dá 0 e `ipairs(v)` não itera nada: a chamada devolve
-     resultado **vazio ou errado em silêncio**, em vez de falhar.
-   - **Medido antes da correção** (5 de 8 casos testados quebravam):
-     `s:take(serie)` → 0 elementos; `s:isin(serie)` → tudo `false`;
-     `ds:select(serie)` → 0 colunas; `cat:take(serie)` → 0 elementos;
-     `ds:drop_duplicates(serie)` → contagem errada. Os que **erram** corretamente
-     (`rename`, `from_dict`, `rename_levels`) só se salvam porque iteram o
-     conteúdo e falham nele — sorte, não desenho.
-   - **Correção:** `Err.check_plain_array` no `errors.lua`, que já é a fonte
-     única de concerns de erro. Discriminador: objeto do Smaug tem **metatable**,
-     tabela Lua simples não. A mensagem **nomeia a saída** — "use `:to_table()`
-     para converter" — porque o erro típico é passar a Series achando que serve
-     de lista, e dizer só "espera uma tabela" não ajudaria (ela É uma tabela).
-   - Testes `12.38.1-4` em `test_selection` (+9, 66→75): os cinco casos, o
-     conteúdo da mensagem, o caminho legítimo intacto e o `:to_table()`
-     funcionando. **Mutação verificada:** remover o discriminador de metatable
-     aborta o teste.
-   - **Escopo restante:** há ~25 guards com esse padrão no projeto; **cinco**
-     foram corrigidos por serem os medidos como quebrados. Os demais ou checam
-     `_dtype` logo em seguida (seguros por construção) ou iteram conteúdo. Vale
-     varrer o resto quando houver ocasião — mas sem urgência, já que os
-     perigosos foram os que aceitavam em silêncio.
-   - **Vínculo:** 12.37 (mesma auditoria); 12.9 (`errors.lua` como fonte única).
- - 12.37 **Fronteiras públicas que não validavam** — **[Done — Fedora
-   2026-07-28]** (Anel 0). Valgrind 0 erros; cobertura 95,10%. **Não exige
-   Windows:** adiciona guardas dentro de funções existentes, sem símbolo novo
-   nem `cdef` — não é mudança de ABI. Auditoria das 305 funções exportadas, 2026-07-28, disparada pela
-   descoberta de que o `multi_argsort` assume pré-condição em vez de validá-la.
-   - **Método:** varredura das exportadas que recebem ponteiro, procurando
-     guarda nas primeiras linhas. 17 candidatas; a maioria falso positivo (os
-     `*_create` recebem `size_t`, não ponteiro; os `str_*` delegam ao
-     `str_compare`, que guarda um nível abaixo; `std` delega a `var`). Os reais
-     foram confirmados **executando**, não lendo.
-   - **Corrigido: `smaug_read_csv_mem` e `smaug_read_json_mem` SEGFALTAVAM** com
-     `buf = NULL` e `len > 0`. Assimetria dentro do próprio módulo de I/O: a
-     contraparte de **escrita** (`write_csv_mem`/`write_json_mem`) já validava e
-     **já tinha teste** de fronteira; a leitura não tinha nem uma coisa nem
-     outra. Guarda adicionada (`if (!buf && len > 0) return NULL`) com teste
-     espelhando o da escrita — e mutação verificada: sem a guarda, o teste
-     segfalta.
-   - **Detalhe que a guarda precisa respeitar:** `buf = NULL` com `len == 0` é
-     entrada **vazia legítima**, não erro. Uma guarda `if (!buf)` quebraria esse
-     caso — está coberto por teste.
-   - **Anotado, não corrigido:** o `smaug_multi_argsort` tem pré-condição
-     documentada no header ("todas as posições nas colunas de chave são
-     válidas") e **não a valida** — com nulos, ordena pelo valor cru do buffer.
-     Não é violação de contrato: o Contrato 8 (`NA` em chave relacional é erro)
-     é aplicado pelo Anel 1 via `validate_keys_no_na` antes da chamada, e
-     `groupby`/`join` são o único caminho até ele. Mas é **inconsistência de
-     defensividade entre irmãos**: `smaug_i64_argsort` valida e devolve NULL com
-     nulos, conforme o `API_INDEX` promete; o multi assume. Um consumidor C do
-     header pode violar a pré-condição e receber lixo em vez de NULL.
-     Consequência prática para o **10.5-B**: `unique`/`nunique`/`value_counts`
-     aceitam nulos e **não** são operações relacionais, então usar o
-     `multi_argsort` neles exige filtrar os nulos antes — obrigatório, não
-     opcional.
-   - `test_io_c` 315→319; cobertura 95,08% branch-alvo.
  - 12.36 **Componentes de datetime prometem `-1` em overflow e não cumprem** —
    [Fedora] (Anel 0). Achado ao vetorizar os componentes (10.4 fatia A,
    2026-07-28), medindo em vez de ler.
@@ -619,9 +565,12 @@ Vinte e quatro subitens já fecharam (ver índice acima). Restam:
      entre o que o header promete e o que o código faz precisa acabar.
    - **Vínculo:** 10.4 fatia A (que expôs); Contrato 9 (ausência × valor);
      Contrato 10 (guard excluído precisa de justificativa).
- - 12.38 **`groupby` em coluna float com NaN produz agrupamento errado** —
-   [Fedora] **PRIORIDADE: resultado errado em silêncio pela API pública.**
-   Achado 2026-07-28 ao implementar o 10.5-B.
+ - 12.39 **`groupby` em coluna float com NaN produz agrupamento errado** —
+   **[implementado 2026-07-29 · selos PENDENTES]** Era resultado errado em
+   silêncio pela API pública. Achado 2026-07-28 ao implementar o 10.5-B.
+   **Renumerado de 12.38** (colisão: dois itens receberam o mesmo número no
+   mesmo dia, em trabalho paralelo; o outro já tinha 16 referências em código,
+   este nenhuma).
    - **Provado.** `groupby` sobre `{1.0, NaN, 1.0, NaN, 2.0}` somando `v`:
      resultado `1=10, NaN=20, 1=30, NaN=40, 2=50` — **cinco grupos para três
      valores distintos**, e o valor `1.0` aparece **duas vezes como grupos
@@ -649,13 +598,29 @@ Vinte e quatro subitens já fecharam (ver índice acima). Restam:
      quebra `groupby` em coluna float com NaN, que hoje "funciona".
      Recomendo (a): (b) troca resultado errado por erro, o que é melhor, mas (a)
      troca por resultado **certo**.
-   - **Alcance da correção:** `cmp_col_at` é usado por `groupby`, `join` e
-     `sort_by` — os três mudam de comportamento com NaN. Hoje os três dão
-     resultado indefinido; qualquer das opções é melhora.
-   - **Consequência para o 10.5-B:** `unique`/`nunique` por ordenação herdam o
-     mesmo problema em float64 com NaN. Enquanto o 12.38 não fechar, esse
-     caminho precisa de tratamento próprio de NaN ou de recair no caminho
-     antigo para f64 com NaN.
+   - **Alcance da correção — corrigido na implementação (2026-07-29):** o
+     `cmp_col_at` é usado por `groupby` e `join`, **não** por `sort_by`. Este
+     último chama o `argsort` de **coluna única**, que recusa NaN conforme o
+     `API_INDEX` promete — então já era seguro e não muda. Verificado
+     executando.
+   - **Resolvido pela opção (a), ordem total** (`smaug_ops_window.c`,
+     `cmp_col_at`, caso f64): `if (na || nb) return na - nb` antes da comparação
+     normal. NaN vai para o fim e compara igual a NaN, como o `totalOrder` do
+     IEEE-754. Resultado medido: `groupby` de `{1.0, NaN, 1.0, NaN, 2.0}` passou
+     de **5 grupos** para 3, com as somas certas (1.0 → 40, NaN → 60, 2.0 → 50).
+     `join` passou a casar NaN com NaN.
+   - Testes `12.39.1-5` em `test_relational` (+10, 173→183): o caso medido com
+     verificação das **somas** (não só da contagem), prova de que NaN não
+     contamina as outras chaves, ordem total determinística, `join` e o caminho
+     int64 intacto. **Mutação verificada:** remover a linha da ordem total
+     aborta o teste.
+   - **Achado lateral:** a mensagem do `sort_by` diz "não suporta **nulos**"
+     quando a causa pode ser **NaN** — que o Contrato 9 trata como coisa
+     distinta de ausência. Impreciso, não incorreto. Anotado, não corrigido.
+   - **Consequência para o 10.5-B — resolvida:** `unique`/`nunique` por
+     ordenação herdariam o problema em float64 com NaN. Com a ordem total, o
+     caminho por `multi_argsort` passa a ser seguro para f64 também, sem
+     tratamento próprio nem fallback.
    - **Vínculo:** 12.37 (mesma família de fronteira que assume em vez de
      validar); Contrato 8; Contrato 9; 10.5-B.
  - 12.35 **Custo de adicionar um dtype** — [Fedora] (Anel 0 + Anel 1).

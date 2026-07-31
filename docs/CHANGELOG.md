@@ -51,6 +51,56 @@ categorical divergiria em silêncio. Vira teste de invariante.
 Nenhum C, nenhum Lua.
 
 ---
+## 2026-07-29 — 12.39 corrigido: ordem total no comparador, e a colisão de números
+
+Correção do bug registrado na entrada abaixo. O diagnóstico já estava pronto e
+correto — a implementação só confirmou e resolveu.
+
+Resolvido pela opção (a), ordem **total**: `if (na || nb) return na - nb` antes da
+comparação normal, em `cmp_col_at`. NaN vai para o fim e compara igual a NaN, como
+o `totalOrder` do IEEE-754. `groupby` de `{1.0, NaN, 1.0, NaN, 2.0}` passou de
+**cinco grupos para três**, com as somas certas (1.0 → 40, NaN → 60, 2.0 → 50);
+`join` passou a casar NaN com NaN.
+
+A escolha entre as duas opções registradas se sustentou na implementação: recusar
+NaN trocaria resultado errado por erro, o que já seria melhor, mas a ordem total
+troca por resultado **certo** — e NaN é valor legítimo neste projeto, então
+agrupar por ele faz sentido.
+
+**Duas correções ao registro original**, ambas achadas ao implementar. O alcance
+dizia que `groupby`, `join` **e `sort_by`** mudariam; verificado executando, o
+`sort_by` usa o `argsort` de coluna única, que recusa NaN conforme o `API_INDEX`
+promete — já era seguro e não muda. E a consequência anotada para o 10.5-B deixou
+de existir: com a ordem total, o caminho por ordenação fica seguro para f64
+também, sem tratamento próprio nem fallback.
+
+Achado lateral: a mensagem do `sort_by` diz "não suporta **nulos**" quando a causa
+pode ser NaN — impreciso, já que o Contrato 9 os distingue. Anotado, não corrigido.
+
+**Colisão de numeração resolvida.** Dois itens receberam 12.38 no mesmo dia, em
+trabalho paralelo — este e o da guarda de array simples. Este virou 12.39, por ter
+zero referências em código contra dezesseis do outro. A causa foi minha: registrei
+o meu ancorando no 12.36, sem listar os itens para achar o próximo número livre.
+
++10 checks em test_relational (173→183), com as **somas** verificadas e não só a
+contagem de grupos — a contagem sozinha não provaria que o agrupamento é o certo.
+Mutação verificada: remover a linha da ordem total aborta o teste.
+
+Falta o selo: Valgrind e Windows.
+
+---
+## 2026-07-28 — selos: 10.4 fatia A, 12.37 e 12.38 fechados nas duas plataformas
+
+Registro dos selos que já haviam passado nos builds mas ficaram sem entrada. Uma
+rodada no MSYS2-UCRT64 fechou os três, com contagens **idênticas** às do Fedora em
+todos os binários: `test_ops_edge` 381, `test_io_c` 319, `test_datetime_c` 530,
+`allocfail` 2131, `test_selection` 75, `test_integration` 92.
+
+A rodada foi numa segunda máquina Windows, com o LuaJIT fora do MSYS2
+(`C:\lua\luajit.exe`). O build encontrou a toolchain e passou igual — sinal de
+portabilidade que ninguém tinha testado de propósito.
+
+---
 ## 2026-07-28 — um NaN na chave quebra o groupby inteiro
 
 Tentativa de implementar o 10.5-B que virou a descoberta de um bug sério, e

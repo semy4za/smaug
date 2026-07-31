@@ -33,6 +33,26 @@ static int cmp_col_at(const smaug_sort_col_t *col, size_t ra, size_t rb) {
     switch (col->kind) {
         case SMAUG_COL_F64: {
             double a = col->f64->data[ra], b = col->f64->data[rb];
+            /* 12.39: `(a > b) - (a < b)` devolve 0 quando qualquer operando e
+               NaN -- as duas comparacoes sao falsas. Isso faz NaN comparar
+               IGUAL A TUDO, o que quebra a ordem fraca estrita que o qsort
+               exige: o comparador fica inconsistente e o comportamento passa a
+               ser INDEFINIDO pelo padrao C. Nao era "ordem esquisita": era UB,
+               e o efeito medido foi um unico NaN corromper o agrupamento das
+               OUTRAS chaves tambem (groupby de {1.0, NaN, 1.0, NaN, 2.0} dava
+               cinco grupos para tres valores, com 1.0 aparecendo duas vezes).
+
+               A correcao torna a ordem TOTAL: NaN vai para um extremo (o fim) e
+               NaN compara igual a NaN. E o que o totalOrder do IEEE-754 define e
+               o que numpy/pandas fazem, e da semantica util em vez de so evitar
+               o UB -- todas as linhas com NaN formam UM grupo.
+
+               Por que nao recusar NaN (como o sort de coluna unica faz): recusar
+               troca resultado errado por erro, o que ja seria melhor; a ordem
+               total troca por resultado CERTO. E NaN e VALOR neste projeto
+               (Contrato 9), entao agrupar por ele e legitimo. */
+            int na = (a != a), nb = (b != b);   /* NaN != NaN e a deteccao */
+            if (na || nb) return na - nb;       /* ambos NaN -> 0 (iguais) */
             return (a > b) - (a < b);
         }
         case SMAUG_COL_I64:

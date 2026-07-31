@@ -667,4 +667,63 @@ do
 end
 
 
+-- ===================================================================
+-- 12.39: NaN em chave de agrupamento quebrava a ordem fraca estrita
+-- `(a > b) - (a < b)` devolve 0 quando qualquer operando é NaN, então NaN
+-- comparava IGUAL A TUDO. Isso torna o comparador inconsistente e o
+-- comportamento do qsort INDEFINIDO — não era ordem esquisita, era UB. Um
+-- único NaN corrompia o agrupamento das OUTRAS chaves também.
+-- Corrigido com ordem TOTAL: NaN ao fim, e NaN igual a NaN (todas as linhas
+-- com NaN formam um grupo). NaN é VALOR neste projeto (Contrato 9), então
+-- agrupar por ele é legítimo — recusar trocaria erro por erro, a ordem total
+-- troca por resultado certo.
+-- ===================================================================
+do
+    local nan = 0/0
+
+    -- 12.39.1 — o caso medido: 5 grupos para 3 valores, com 1.0 duplicado
+    local ds = smaug.DataSet({ {"k", {1.0, nan, 1.0, nan, 2.0}, "float64"},
+                               {"v", {10, 20, 30, 40, 50}, "int64"} })
+    local g = ds:groupby("k"):sum("v")
+    check(g:nrows() == 3, "12.39.1 três valores distintos → três grupos")
+
+    -- as somas provam que o agrupamento é o certo, não só a contagem
+    local k, v = g:column("k"), g:column("v")
+    local soma = {}
+    for i = 1, g:nrows() do
+        local key = k:get(i)
+        soma[key ~= key and "nan" or tostring(key)] = v:get(i)
+    end
+    check(soma["1"] == 40,   "12.39.1 grupo 1.0 soma 10+30 (não ficou partido)")
+    check(soma["2"] == 50,   "12.39.1 grupo 2.0 intacto")
+    check(soma["nan"] == 60, "12.39.1 linhas com NaN formam UM grupo (20+40)")
+
+    -- 12.39.2 — NaN não contamina as outras chaves: sem NaN o resultado é o
+    -- mesmo para elas, o que prova que o bug era do comparador e não do dado
+    local limpo = smaug.DataSet({ {"k", {1.0, 1.0, 2.0}, "float64"},
+                                  {"v", {10, 30, 50}, "int64"} })
+    local gl = limpo:groupby("k"):sum("v")
+    check(gl:nrows() == 2 and gl:column("v"):get(1) == 40,
+          "12.39.2 mesmo resultado para 1.0 com e sem NaN na coluna")
+
+    -- 12.39.3 — ordem total: NaN vai para o fim, de forma determinística
+    local m = smaug.DataSet({ {"k", {3.0, nan, 1.0, nan, 2.0}, "float64"},
+                              {"v", {1, 1, 1, 1, 1}, "int64"} })
+    local gm = m:groupby("k"):sum("v")
+    local km = gm:column("k")
+    check(gm:nrows() == 4, "12.39.3 quatro grupos (1, 2, 3, NaN)")
+    check(km:get(4) ~= km:get(4), "12.39.3 NaN ordena por último")
+    check(gm:column("v"):get(4) == 2, "12.39.3 os dois NaN no mesmo grupo")
+
+    -- 12.39.4 — join também usa o comparador e passou a casar NaN com NaN
+    local ja = smaug.DataSet({ {"k", {1.0, nan, 2.0}, "float64"}, {"x", {1,2,3}, "int64"} })
+    local jb = smaug.DataSet({ {"k", {1.0, nan}, "float64"},      {"y", {10,20}, "int64"} })
+    check(ja:join(jb, "k"):nrows() == 2, "12.39.4 join casa 1.0 e NaN")
+
+    -- 12.39.5 — int64 não tem NaN; o caminho não-float segue idêntico
+    local di = smaug.DataSet({ {"k", {1, 1, 2}, "int64"}, {"v", {10, 30, 50}, "int64"} })
+    check(di:groupby("k"):sum("v"):nrows() == 2, "12.39.5 int64 intacto")
+end
+
+
 print(string.format("OK — %d checks passaram (DataSet: groupby, concat, join)", n_ok))
