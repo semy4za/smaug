@@ -81,15 +81,14 @@ está em [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 | | |
 |---|---|
-| [docs/README.md](docs/README.md) | referência de uso — todos os módulos, com exemplos |
-| [Roadmap](docs/Roadmap.md) | o que falta antes do 1.0, sem maquiagem |
-| [Architecture](docs/ARCHITECTURE.md) | modelo de anéis, princípios de design |
-| [API Index](docs/API_INDEX.md) | catálogo rápido de métodos |
-| [API Reference](docs/API_Reference.md) | referência do backend C |
-| [Contract](docs/CONTRACT.md) | contratos defensivos do backend |
-| [COW](docs/COW.md) | especificação Copy-on-Write |
-| [Build and Testing](docs/Build_and_Testing.md) | compilação, testes, cobertura |
-| [Changelog](docs/CHANGELOG.md) | histórico de decisões e achados |
+| [Roadmap](Roadmap.md) | o que falta antes do 1.0, sem maquiagem |
+| [Architecture](ARCHITECTURE.md) | modelo de anéis, princípios de design |
+| [API Index](API_INDEX.md) | catálogo rápido de métodos |
+| [API Reference](API_Reference.md) | referência do backend C |
+| [Contract](CONTRACT.md) | contratos defensivos do backend |
+| [COW](COW.md) | especificação Copy-on-Write |
+| [Build and Testing](Build_and_Testing.md) | compilação, testes, cobertura |
+| [Changelog](CHANGELOG.md) | histórico de decisões e achados |
 
 ## Build
 
