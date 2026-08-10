@@ -192,22 +192,30 @@ return function(I)
 
     -- prod([ignore_na]): produto de todos os valores.
     function methods.prod(self, ignore_na, min_count)
-        if self._dtype ~= "float64" and self._dtype ~= "int64" then
-            error("smaug: prod() requer dtype numérico, não '"..self._dtype.."'", 2)
+      if self._dtype ~= "float64" and self._dtype ~= "int64" then
+        error("smaug: prod() requer dtype numérico, não '"..self._dtype.."'", 2)
+      end
+      -- 5.5: min_count opt-in. Default (0) preserva o comportamento atual.
+      if min_count and min_count > 0 and self:count_nonnull() < min_count then return nil end
+
+      ignore_na = (ignore_na == nil) and true or ignore_na
+      if self._dtype == "float64" then
+        local result = C.smaug_f64_prod(self._c, ignore_na)
+        return is_nan(result) and nil or result
+      elseif self._dtype == "int64" then
+        local out = ffi.new("int64_t[1]")
+        local status = C.smaug_i64_prod(self._c, ignore_na, out)
+        if status ~= smaug_ok then
+          if status == C.SMG_ERR_ARGUMENT then
+            error("Series:prod() called with ignore_na=false on a series containing NA")
+          elseif status == C.SMG_ERR_OVERFLOW then
+            error("Series:prod() overflow in int64 product")
+          else
+            error("Series:prod() failed with status: " .. tostring(status))
+          end
         end
-        -- 5.5: min_count opt-in. Default (0) preserva o comportamento atual.
-        if min_count and min_count > 0 and self:count_nonnull() < min_count then return nil end
-        ignore_na = (ignore_na == nil) and true or ignore_na
-        local p, n = 1, 0
-        for i = 1, self:len() do
-            local v = self:get(i)
-            if v == nil then
-                if not ignore_na then return nil end
-            else
-                p = p * v; n = n + 1
-            end
-        end
-        return n > 0 and p or nil
+        return tonumber(out[0])
+      end
     end
 
     -- median([ignore_na]): mediana (ignora nulos por padrão). float64.

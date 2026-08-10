@@ -443,6 +443,65 @@ double smaug_i64_std(const smaug_series_i64_t *s, bool ignore_na) {
     return sqrt(smaug_i64_var(s, ignore_na));
 }
 
+static bool mul_overflow_i64(int64_t a, int64_t b, int64_t *res) {
+#ifdef __has_builtin
+    if (__has_builtin(__builtin_mul_overflow)) {
+        return __builtin_mul_overflow(a, b, res);
+    }
+#endif
+    if (a == 0 || b == 0) {
+        *res = 0;
+        return false;
+    }
+    if ((a > 0 && b > INT64_MAX / a) ||
+        (a < 0 && b > 0 && a < INT64_MIN / b) ||
+        (a > 0 && b < 0 && b < INT64_MIN / a) ||
+        (a < 0 && b < 0 && a != 0 && b < INT64_MAX / a)) {
+        return true;
+    }
+    *res = a * b;
+    return false;
+}
+
+int64_t smaug_i64_prod(const smaug_series_i64_t *s, bool ignore_na, smaug_status_t *status) {
+    if (status) *status = SMG_OK;
+    if (!s) {
+        if (status) *status = SMG_ERR_ARGUMENT;
+        return 0;
+    }
+
+    if (!ignore_na) {
+        for (size_t i = 0; i < s->size; i++) {
+            if (SMAUG_NULL(s->null_mask, i)) {
+                if (status) *status = SMG_ERR_ARGUMENT;
+                return 0;
+            }
+        }
+    }
+
+    int64_t prod = 1;
+    bool found_valid = false;
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            if (mul_overflow_i64(prod, s->data[i], &prod)) {
+                if (status) *status = SMG_ERR_OOB;
+                return 0;
+            }
+            found_valid = true;
+        }
+    }
+
+    if (!found_valid) {
+        // Série vazia ou tudo NA com ignore_na=true → produto neutro é 1? Mas sum vazio = 0.
+        // Para consistência com sum/min/max (que retornam sentinela em vazio),
+        // e porque não há valor representável para "produto de nada" em int64,
+        // retornamos 0 (neutro aditivo) como convenção, igual ao sum.
+        return 0;
+    }
+
+    return prod;
+}
+
 /* ===================================================================
    COMPARAÇÕES → uint8_t* (bool array)
    =================================================================== */

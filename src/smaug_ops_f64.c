@@ -417,6 +417,21 @@ double smaug_f64_std(const smaug_series_f64_t *s, bool ignore_na) {
     return sqrt(smaug_f64_var(s, ignore_na));
 }
 
+double smaug_f64_prod(const smaug_series_f64_t *s, bool ignore_na) {
+    if (!s) return NAN;
+    double prod = 1.0;
+    bool found_valid = false;
+    for (size_t i = 0; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i)) {
+            prod *= s->data[i];
+            found_valid = true;
+        } else if (!ignore_na) {
+            return NAN;
+        }
+    }
+    return found_valid ? prod : NAN;
+}
+
 /* ===================================================================
    COMPARAÇÕES → uint8_t* (bool array)
    out_mask: ponteiro de saída para a null_mask do resultado (pode ser NULL).

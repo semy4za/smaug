@@ -81,6 +81,7 @@ double smaug_f64_min (const smaug_series_f64_t *s, bool ignore_na);
 double smaug_f64_max (const smaug_series_f64_t *s, bool ignore_na);
 double smaug_f64_var (const smaug_series_f64_t *s, bool ignore_na);
 double smaug_f64_std (const smaug_series_f64_t *s, bool ignore_na);
+double smaug_f64_prod(const smaug_series_f64_t *s, bool ignore_na);
 
 /* Comparações → uint8_t* (bool array; caller libera com smaug_free) */
 uint8_t* smaug_f64_gt(const smaug_series_f64_t *s, double threshold, smaug_mask_t **out_mask);
@@ -159,6 +160,7 @@ int64_t smaug_i64_max(const smaug_series_i64_t *s, bool ignore_na);
 double  smaug_i64_mean(const smaug_series_i64_t *s, bool ignore_na);
 double  smaug_i64_var (const smaug_series_i64_t *s, bool ignore_na);
 double  smaug_i64_std (const smaug_series_i64_t *s, bool ignore_na);
+int64_t smaug_i64_prod(const smaug_series_i64_t *s, bool ignore_na, smaug_status_t *status);
 
 /* Comparações → uint8_t* (caller libera com smaug_free) */
 uint8_t* smaug_i64_gt(const smaug_series_i64_t *s, int64_t threshold, smaug_mask_t **out_mask);
