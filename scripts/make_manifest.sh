@@ -65,7 +65,7 @@ trap 'rm -f "$tmp"' EXIT
             \( -name '*.c' -o -name '*.h' -o -name '*.lua' -o -name '*.md' \
                -o -name 'Makefile' -o -name '*.ps1' -o -name '*.sh' \
                -o -name '.gitattributes' -o -name '.gitignore' \
-               -o -name '.env.example' \) \
+               -o -name '.env.example' -o -name 'LICENSE' \) \
             -not -path './build/*' -not -path './.git/*' | LC_ALL=C sort)
   echo "#"
   echo "# total de arquivos: $total"

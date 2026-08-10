@@ -1,11 +1,12 @@
 # Smaug -- MANIFEST de integridade
 # Gerado por scripts/make_manifest.sh (o .ps1 delega a este)
-# Arvore: 0b48709 + alteracoes nao commitadas
+# Arvore: 45c0335 + alteracoes nao commitadas
 # Formato: <sha256>  <linhas>  <caminho>
 #
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
 ed7d63f5177cc7d7fbfee9c7c18ebeb4d6fd7da02680ec7778cfe23be1d15b03      31  ./.gitattributes
 1639453637a28077c77ef9609cfed9a815feaad1a77d63f4d981d20ef72e077e       7  ./.gitignore
+d66b9d6d1b2bb00272d0e347f966d34ccdf8e7d58e40c8d94e2aa63a2e09fce3      21  ./LICENSE
 4fefc1e12267c0f405c8f11906fca563e29954f8671ed8a7bf5320803f6d6167     102  ./Makefile
 a0c76e9e9d254d33ff7bf92374e48f644e20c35ec98753dc9d7236761e10b02a     593  ./docs/API_INDEX.md
 169580ce180057b12b223529ce84767b6ff0920a8773e7432fd6c6d91befaeb1     636  ./docs/API_Reference.md
@@ -16,7 +17,7 @@ ef144b541b3c17465380a9dc7ec802faedee9fe48a229b85c7a69454bd2a981d     185  ./docs
 f26d5211d1726c8a28f08979ada97bb01e38b2709a921f388d626260c17ca9a7     515  ./docs/CONTRACT.md
 24774b5016eb6147b223f5597e224cb1b37797db634076782ec3e56a5268b90a     370  ./docs/COVERAGE.md
 9f89a9d98d9531648723af2b8aff51121dc75c71fb7bd0620ffb6b71938cbae3     173  ./docs/COW.md
-a14a39b1e0981dff6c7b1e7c94e873bf858a96d9411d44aa80bec8cd60ab6a1d     932  ./docs/PARITY_REPORT.md
+96026482ada0b3ece7c09b49e2218915568caef6f732e64088ab8d2e99307a83     932  ./docs/PARITY_REPORT.md
 93362be378bf59aa3e2547647a0050fbe9109d3c9bc9e3e9588277647e99877c     108  ./docs/README.md
 948906034797201a44a4fc9ebf633e1685490fab8e30c9e643e57bcf1fe61952     887  ./docs/Roadmap.md
 1722e1a5806e185b2f934f2a66ec5193cc6ab8dc5a03837be43be80628c8fb86      39  ./include/smaug.h
@@ -67,7 +68,7 @@ d7d2a22dfe0b5fb67aeab2865b86472677cb7538e12525140e6757262ade6b47     309  ./scri
 615e96d2ad4435e301a64553327b8355e29f242eaa87bc72d27d30cd171b3f1b     243  ./scripts/build_win.ps1
 fc290b98fb8eee43c53b91c9ca00086e1087372bb5eea95db7b62cf9b01034dc     225  ./scripts/make_coverage.sh
 673c365699638d5d3553728d917bdc636cf21b6d7a6a3e1c5da9d30212cb8b15      65  ./scripts/make_manifest.ps1
-85d5f7ddc40d00d36eecb0d38616020201b12f4c7faaaa452a3d01e91b26845a      76  ./scripts/make_manifest.sh
+d421657b2eb8b14a8bd0ed0c1e442f1c3d328b7f3015d07275266d87406fa217      76  ./scripts/make_manifest.sh
 8289de5f0b60a6c61e76e88bfdac4fee3ce795a543654e3fd476d04a43413f28     224  ./scripts/parity/01_dtypes.lua
 44609732fe76a5ca14ccfb48f5bb724b95970be502a4454f121a05602f77670d      79  ./scripts/parity/02_series_dataset.lua
 aad779127e3ef36a90cfdcf5e56556c61e5a7458d79d3d80e9b09316a7d2e221     107  ./scripts/parity/03_c_lua_mirror.lua
@@ -132,4 +133,4 @@ b542ddaa48de92016d0a70c88e44bf30640e1dd7c860dd38f98bd6b2feecaa87     297  ./test
 7e12debca85305c55cd7cb76676c0c6b8d178b468e28ad7f8cddfc2fdaa6f245     775  ./tests/series/test_str.lua
 07f0d83d06daa0ffc97f154d21b7c3c0d1263f3b582d4df67e24fe86fd942346     368  ./tests/series/test_window.lua
 #
-# total de arquivos: 128
+# total de arquivos: 129
