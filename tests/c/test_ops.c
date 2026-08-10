@@ -77,29 +77,32 @@ static void test_prod(void) {
     smaug_f64_free(s_f64);
 
     // Teste i64 normal
+    // Contrato real (smaug_numeric.h): o produto é o RETORNO (int64_t);
+    // status é out-param por ponteiro. Estava invertido (retorno em
+    // smaug_status_t, &out onde se esperava smaug_status_t*) — corrigido.
     smaug_series_i64_t *s_i64 = smaug_i64_create(3);
     smaug_i64_set(s_i64, 0, 2);
     smaug_i64_set(s_i64, 1, 3);
     smaug_i64_set(s_i64, 2, 4);
-    int64_t out;
-    smaug_status_t status = smaug_i64_prod(s_i64, true, &out);
+    smaug_status_t status;
+    int64_t out = smaug_i64_prod(s_i64, true, &status);
     OK(status == SMG_OK && out == 24, "i64 prod=24");
     smaug_i64_set_null(s_i64, 1);
-    status = smaug_i64_prod(s_i64, false, &out);
+    out = smaug_i64_prod(s_i64, false, &status);
     OK(status == SMG_ERR_ARGUMENT, "i64 prod with NA and ignore_na=false -> SMG_ERR_ARGUMENT");
-    status = smaug_i64_prod(s_i64, true, &out);
+    out = smaug_i64_prod(s_i64, true, &status);
     OK(status == SMG_OK && out == 8, "i64 prod with NA and ignore_na=true -> 8");
 
     // Teste i64 overflow
     smaug_i64_set(s_i64, 0, INT64_MAX);
     smaug_i64_set(s_i64, 1, 2);
     smaug_i64_set_null(s_i64, 2); // para não falhar no ignore_na=false
-    status = smaug_i64_prod(s_i64, true, &out);
+    out = smaug_i64_prod(s_i64, true, &status);
     OK(status == SMG_ERR_OOB, "i64 prod overflow -> SMG_ERR_OOB");
 
     // Teste i64 vazio
     smaug_series_i64_t *s_empty = smaug_i64_create(0);
-    status = smaug_i64_prod(s_empty, true, &out);
+    out = smaug_i64_prod(s_empty, true, &status);
     OK(status == SMG_OK && out == 0, "i64 prod empty -> 0");
     smaug_i64_free(s_empty);
 

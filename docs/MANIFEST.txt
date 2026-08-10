@@ -1,6 +1,6 @@
 # Smaug -- MANIFEST de integridade
 # Gerado por scripts/make_manifest.sh (o .ps1 delega a este)
-# Arvore: 45c0335 + alteracoes nao commitadas
+# Arvore: 3fb09f9 + alteracoes nao commitadas
 # Formato: <sha256>  <linhas>  <caminho>
 #
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
@@ -17,7 +17,7 @@ ef144b541b3c17465380a9dc7ec802faedee9fe48a229b85c7a69454bd2a981d     185  ./docs
 f26d5211d1726c8a28f08979ada97bb01e38b2709a921f388d626260c17ca9a7     515  ./docs/CONTRACT.md
 24774b5016eb6147b223f5597e224cb1b37797db634076782ec3e56a5268b90a     370  ./docs/COVERAGE.md
 9f89a9d98d9531648723af2b8aff51121dc75c71fb7bd0620ffb6b71938cbae3     173  ./docs/COW.md
-96026482ada0b3ece7c09b49e2218915568caef6f732e64088ab8d2e99307a83     932  ./docs/PARITY_REPORT.md
+ffa38ebd600507318f613461ad0653f31448c50dc4ba07d08eb53162b9750ef9     934  ./docs/PARITY_REPORT.md
 93362be378bf59aa3e2547647a0050fbe9109d3c9bc9e3e9588277647e99877c     108  ./docs/README.md
 948906034797201a44a4fc9ebf633e1685490fab8e30c9e643e57bcf1fe61952     887  ./docs/Roadmap.md
 1722e1a5806e185b2f934f2a66ec5193cc6ab8dc5a03837be43be80628c8fb86      39  ./include/smaug.h
@@ -28,7 +28,7 @@ ec2125dbb4777f4282cf2503f5475594e13ea465a97c80b252db287965e8152f      22  ./incl
 eb6ca00dfe5f1ca7ba2bf2ab97913adcc1582859979428d8e86c9d637fe9ecee     203  ./include/smaug_datetime.h
 a53a0b63c217282c8a8be0ae3bccf54061f5da6e124e139cb74b4ab280138143     109  ./include/smaug_io.h
 95ff46eda2479b084196d612a31c57bd42e1c29cba3abe2babefa42ea4e06d46      72  ./include/smaug_io_internal.h
-d859ae62385d1532af8ee0ba70f7e7b1b6a0268a42b6102262b844246c62df05     261  ./include/smaug_numeric.h
+9ce3a1677726d17b004063916a9897a40377bae3a1d4c71a29b7cb6499bd6fe3     263  ./include/smaug_numeric.h
 a0dc909c3e010e58da79b19c31bdc1930eb4aa4b1fdfaa3a67cdeda55fe129de      81  ./include/smaug_ops_window.h
 02e233a2493a972b4a6a43bb3ae7107abffa919615e33def0510e3624737c4cb      44  ./include/smaug_str_internal.h
 8e6d22b6e038275b3ebb4d47fbbb0bd4590a043269724aad33999d9989466e7c     173  ./include/smaug_string.h
@@ -53,14 +53,14 @@ be9516d3729802616e7afa39dca77d72b1bd56094accc6b9789de0b095266079     100  ./lua/
 8f7df72a425d69447ffdbd46d605f47fbb9bcae06e421fd09bbdebb7dd355cae     364  ./lua/smaug/core/series/selection/_predicates.lua
 d1ba531efd1345fbd73b1a95dd9e0983d2c8421a260a0b15b0f427ec25a0a5c5     300  ./lua/smaug/core/series/selection/_selection.lua
 2e16a5832d9c6a895b517b8206f1b8b1f6f2cb00e902952f7f7501cf086b0a61      35  ./lua/smaug/core/series/stats/_reduce.lua
-593528bacc8a25506b382f438c32f5c2f1a022f3f590583d3179eb13d1fee417     372  ./lua/smaug/core/series/stats/_stat.lua
+392fd77a41f5608d95aae91a5f92a07573254d6b94a08aa252cb6278fee7e5e4     382  ./lua/smaug/core/series/stats/_stat.lua
 649f2bcee95192d68bf2f7be8312c0f9c6a9f17a4443850fea6fb4f1522ee553     262  ./lua/smaug/core/series/stats/_stat_adv.lua
 5c54967170ffe7544d198d86ac158db36ef1d45f06598470f7480f3e64bc2743     397  ./lua/smaug/core/series/temporal/_dt.lua
 3235614efef15b539f22529d278bd0391a50e1fac30ffe41d87988dae9c1d822     402  ./lua/smaug/core/series/text/_str.lua
 5233e7a50b817147af77554e6e117dc4760add27eefa608437c1881e9b62ea5b     183  ./lua/smaug/core/series/window/_cumulative.lua
 52037d509bf01b95207ca47d8c6d20a33bad8fb60407e7b9aa737d72d6c9d0f5     207  ./lua/smaug/core/series/window/_rolling.lua
 b8145c718e020c60ea4b8ed6387eb40635cdae59e7d757f1516d86b388dcb681      19  ./lua/smaug/core/warn.lua
-e8709946ca8ab1b8bbc60ffd59d093e7f2c08439264c8a11f6366a6712e485a9     640  ./lua/smaug/ffi_loader.lua
+e26fc858c7f7f424f2442c238ba0eb2dadb101c85d4c62c41716ad3e049fdc18     642  ./lua/smaug/ffi_loader.lua
 2da93e9e4c23527f17a6817c1ecc84ca07333db8a63a6b7b32c27a642edb8371      58  ./lua/smaug/init.lua
 d3ceeed50376fa2fe08c3c5bffc7b1ded8d752f53dec120608296ac59316d459     388  ./lua/smaug/io/csv.lua
 35162240dbb9fa72e97b7fae1b0634cb013148ee0b825731a4b80e4399ef002d      91  ./lua/smaug/io/json.lua
@@ -94,8 +94,8 @@ d676ccc0dc77c1cf844898abb8a1a4eb135b500479e3e9a8463916bf96852099     298  ./src/
 fb1ab8fcf08f3d6c6e16b7fd7b6298a2dd4b4dfbda1a5623eb7a87e52b124db8    1111  ./src/smaug_datetime.c
 29b2256d36e59ad5af3bb205c9f8c7d51ac845aec1d1b10072695247aba213c8     648  ./src/smaug_json.c
 1e0588ea77fec6b7cf3bef042e8f77910ea1d1573d82d763f134dc54124e9586     545  ./src/smaug_ops_bool.c
-55ee328a8c65a082efddd56f17db5c9140b032ed2c756b378c2ec7126d17e32c    1042  ./src/smaug_ops_f64.c
-a410c6221247d0732e0c6c326998bcbf54d6ec9ddb5021c0e1cc5d1d33d273df     993  ./src/smaug_ops_i64.c
+70fa29844957d42a93e733e60a6cd620c60eb57ac7d8640fc068c7f62c526141    1057  ./src/smaug_ops_f64.c
+fab213f180364ff2f15482fd971d0333991bd3052f8f6b2871f0ba219be8a7f7    1052  ./src/smaug_ops_i64.c
 f1168db74ec5120a6e98875d219b8a6cb0cb5ead1549bcf4f2c897ea97471101     600  ./src/smaug_ops_str.c
 b839630e47bb37fb569eae42f90c8841f8b38be13035600ab23a1e0ad59afa97     669  ./src/smaug_ops_window.c
 a654b4374b8abedcab6fe0de460051002d704361b575726392a23e47b98c818e     576  ./src/smaug_str.c
@@ -107,7 +107,7 @@ fb307f1c88f60b4ca7f545b9db54587cadded87ef7fa0dba73999b17b86bf1fd     225  ./test
 2ae3455c9e3b539c08b705a354d41efcf5df95e58329dd9b63c13aa52eedf6c0     673  ./tests/c/test_cow.c
 30937567885015c6470ed04beaf90ef7adba72cc9df1606e5061ba46bdd7e830    1115  ./tests/c/test_datetime_c.c
 3e9100a375f4412334cf9683f308dd6ccf7a90233aaff7cd457f913170cd1b8f    1555  ./tests/c/test_io_c.c
-ebb5889bc350865f52a993534798ad827d62183b9c8ae8b43863557cf646de7b      82  ./tests/c/test_ops.c
+8f02a8f7e09567c32aa4e049761b730b4d22f8f7d42d7f05a0450d530a4c20e0     128  ./tests/c/test_ops.c
 c01f2af208b3d95ac33d02833dca8738554af234325735ff8966c9af06a3084d    1313  ./tests/c/test_ops_edge.c
 79764552d9719c37bb72390b5315e9705ad946d4cb872f273c79de3b63302c67    1567  ./tests/c/test_ops_window.c
 9fc6e5b03679d4092f7142137b9129ecd4ae4f297c8cdada7e44129db67d694e     345  ./tests/c/test_stress.c

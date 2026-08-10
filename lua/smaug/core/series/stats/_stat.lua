@@ -203,18 +203,21 @@ return function(I)
         local result = C.smaug_f64_prod(self._c, ignore_na)
         return is_nan(result) and nil or result
       elseif self._dtype == "int64" then
-        local out = ffi.new("int64_t[1]")
-        local status = C.smaug_i64_prod(self._c, ignore_na, out)
-        if status ~= smaug_ok then
-          if status == C.SMG_ERR_ARGUMENT then
+        -- Contrato real (smaug_numeric.h): o produto é o RETORNO (int64_t);
+        -- status é out-param por smaug_status_t*. Overflow sinaliza via
+        -- SMG_ERR_OOB (reaproveitado — não existe SMG_ERR_OVERFLOW no enum).
+        local status = ffi.new("smaug_status_t[1]")
+        local result = C.smaug_i64_prod(self._c, ignore_na, status)
+        if status[0] ~= C.SMG_OK then
+          if status[0] == C.SMG_ERR_ARGUMENT then
             error("Series:prod() called with ignore_na=false on a series containing NA")
-          elseif status == C.SMG_ERR_OVERFLOW then
+          elseif status[0] == C.SMG_ERR_OOB then
             error("Series:prod() overflow in int64 product")
           else
-            error("Series:prod() failed with status: " .. tostring(status))
+            error("Series:prod() failed with status: " .. tostring(status[0]))
           end
         end
-        return tonumber(out[0])
+        return tonumber(result)
       end
     end
 

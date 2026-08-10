@@ -11,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-08-10 15:21:01 UTC
+Gerado em: 2026-08-10 19:03:38 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -269,7 +269,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 **Fora de escopo por natureza (12.20 frente 4):** `smaug_convert.h` (`smaug_parse_i64/f64`, `smaug_fmt_i64/f64` e variantes _cstr — 6 funções) não entra nas tabelas acima. São infraestrutura interna de parsing/formatação usada entre arquivos C (astype.c, csv.c, json.c) — nunca expostas ao Lua via FFI (confirmado: zero ocorrências no cdef). Colocá-las aqui as marcaria 🟨 permanentemente — ruído, não achado, já que por design não devem ter caminho Lua direto.
 
 
-### f64 — 70 funções C
+### f64 — 71 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -318,6 +318,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `mul` | 🟩 |  |
 | `mul_scalar` | 🟩 |  |
 | `ne` | 🟩 |  |
+| `prod` | 🟩 |  |
 | `rank` | 🟩 |  |
 | `rolling_count` | 🟩 |  |
 | `rolling_max` | 🟩 |  |
@@ -345,7 +346,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `view` | 🟩 |  |
 
 
-### i64 — 63 funções C
+### i64 — 64 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -390,6 +391,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `mul` | 🟩 |  |
 | `mul_scalar` | 🟩 |  |
 | `ne` | 🟩 |  |
+| `prod` | 🟩 |  |
 | `rank` | 🟩 |  |
 | `rolling_count` | 🟩 |  |
 | `rolling_max` | 🟩 |  |
@@ -771,7 +773,7 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 234/234 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 234/237 erros com prefixo `smaug:` (98.7%)
 - `dataset.lua`: 92/92 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
@@ -919,7 +921,7 @@ O `cdef` do `ffi_loader.lua` replica à mão o layout de cada struct dos headers
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 1090
+- 🟩 paridade: 1092
 - ⬜ exceção registrada: 215
 - 🟨 suspeita (revisar): 279
 - 🟥 inconsistência clara: 15
