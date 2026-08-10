@@ -1,7 +1,10 @@
--- tests/dataset/test_stat.lua
--- DataSet: corr/cov (matriz N×N), equals, compare, duplicated, drop_duplicates.
--- Consolida: seções DataSet de test_stats.lua + test_predicates.lua + test_duplicates.lua
--- Rode da raiz: luajit tests/dataset/test_stat.lua
+-- tests/series/test_stat.lua
+-- Series: estatísticas descritivas (F.1), análise de distintos e
+-- transformações element-wise standalone.
+-- Testa métodos de lua/smaug/core/series/stats/_stat.lua e _stat_adv.lua.
+-- Todo valor de referência abaixo foi conferido rodando contra o código
+-- real (não deduzido de memória) — ver notas onde o comportamento não é óbvio.
+-- Rode da raiz: luajit tests/series/test_stat.lua
 
 package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 
@@ -16,236 +19,173 @@ local function check(cond, msg)
     n_ok = n_ok + 1
 end
 
--- 9. DataSet:corr — matriz N×N
--- ================================================================
-
-local ds = smaug.DataSet({
-    {"a",    {1, 2, 3, 4, 5},   "float64"},
-    {"b",    {2, 4, 6, 8, 10},  "float64"},   -- corr(a,b) = 1
-    {"c",    {5, 4, 3, 2, 1},   "float64"},   -- corr(a,c) = -1
-    {"nome", {"x","y","z","w","v"}, "string"}, -- ignorada
-})
-
-local cm = ds:corr()
--- estrutura: __index__ + a,b,c = 4 colunas; 3 linhas (variáveis numéricas)
-check(cm:ncols() == 4,                "corr matriz: 4 colunas (__index__ + 3 num)")
-check(cm:nrows() == 3,                "corr matriz: 3 linhas")
-check(cm:has_column("__index__"),     "corr matriz: tem coluna __index__")
-check(not cm:has_column("nome"),      "corr matriz: coluna string ignorada")
-
--- identificador de linhas
-check(cm:column("__index__"):get(1) == "a", "corr __index__[1] = a")
-check(cm:column("__index__"):get(2) == "b", "corr __index__[2] = b")
-check(cm:column("__index__"):get(3) == "c", "corr __index__[3] = c")
-
--- diagonal = 1
-check(approx(cm:column("a"):get(1), 1.0), "corr[a,a] = 1")
-check(approx(cm:column("b"):get(2), 1.0), "corr[b,b] = 1")
-check(approx(cm:column("c"):get(3), 1.0), "corr[c,c] = 1")
-
--- correlações conhecidas
-check(approx(cm:column("b"):get(1), 1.0),  "corr[a,b] = 1")
-check(approx(cm:column("c"):get(1), -1.0), "corr[a,c] = -1")
-
--- simetria da matriz
-check(approx(cm:column("b"):get(1), cm:column("a"):get(2)), "corr matriz simétrica [a,b]=[b,a]")
-
--- ================================================================
--- 10. DataSet:cov — matriz N×N
--- ================================================================
-
-local cov = ds:cov()
-check(cov:ncols() == 4,               "cov matriz: 4 colunas")
-check(cov:nrows() == 3,               "cov matriz: 3 linhas")
-
--- diagonal = variância amostral de cada coluna
--- var amostral de {1,2,3,4,5} = 10/4 = 2.5
-check(approx(cov:column("a"):get(1), 2.5), "cov[a,a] = var amostral a = 2.5")
--- var de {2,4,6,8,10} = 40/4 = 10
-check(approx(cov:column("b"):get(2), 10.0), "cov[b,b] = var amostral b = 10")
-
--- simetria
-check(approx(cov:column("b"):get(1), cov:column("a"):get(2)), "cov matriz simétrica")
-
--- ================================================================
--- 11. DataSet corr/cov — sem coluna numérica → erro
--- ================================================================
-
-local ds_str = smaug.DataSet({
-    {"nome", {"x", "y"}, "string"},
-})
-local ok_nonum = pcall(function() ds_str:corr() end)
-check(not ok_nonum,                   "corr sem coluna numérica = erro")
-
--- ================================================================
--- Resultado
--- ================================================================
-
-
 -- =====================================================================
--- DataSet equals/compare (de test_predicates.lua)
+-- F.1 — Pacote estatístico (corr, cov, autocorr, dot, pct_change)
 -- =====================================================================
-
--- 9. DataSet:equals
--- ================================================================
-
-local d1 = smaug.DataSet({{"a", {1,2,3}, "int64"}, {"b", {"x","y","z"}, "string"}})
-local d2 = smaug.DataSet({{"a", {1,2,3}, "int64"}, {"b", {"x","y","z"}, "string"}})
-local d3 = smaug.DataSet({{"a", {1,2,9}, "int64"}, {"b", {"x","y","z"}, "string"}})
-
-check(d1:equals(d2) == true,          "DataSet equals idênticos")
-check(d1:equals(d3) == false,         "DataSet equals difere")
-
--- colunas em ordem diferente → false
-local d4 = smaug.DataSet({{"b", {"x","y","z"}, "string"}, {"a", {1,2,3}, "int64"}})
-check(d1:equals(d4) == false,         "DataSet equals ordem diferente = false")
-
--- ncols diferente
-local d5 = smaug.DataSet({{"a", {1,2,3}, "int64"}})
-check(d1:equals(d5) == false,         "DataSet equals ncols diferente")
-
--- não-DataSet
-check(d1:equals(42) == false,         "DataSet equals não-DataSet = false")
-
--- ================================================================
--- 10. DataSet:compare
--- ================================================================
-
-local dcmp = d1:compare(d3)
-check(dcmp:nrows() == 1,              "DataSet compare: 1 diferença")
-check(dcmp:column("linha"):get(1) == 3,   "DataSet compare linha = 3")
-check(dcmp:column("coluna"):get(1) == "a", "DataSet compare coluna = a")
-check(dcmp:column("self"):get(1) == "3",   "DataSet compare self = 3")
-check(dcmp:column("other"):get(1) == "9",  "DataSet compare other = 9")
-
--- idênticos → vazio
-check(d1:compare(d2):nrows() == 0,    "DataSet compare idênticos = vazio")
-
--- formas diferentes → erro
-local ok_dcmp = pcall(function() d1:compare(d5) end)
-check(not ok_dcmp,                    "DataSet compare formas diferentes = erro")
-
--- ================================================================
--- Resultado
--- ================================================================
-
-
--- =====================================================================
--- DataSet duplicated/drop_duplicates (de test_duplicates.lua)
--- =====================================================================
-
--- 6. DataSet:duplicated
--- ================================================================
-
-local ds = smaug.DataSet({
-    {"a", {1, 1, 2, 2, 3},          "int64"},
-    {"b", {"x", "x", "y", "z", "w"}, "string"},
-})
-
--- por todas as colunas: linha 2 (1,x) == linha 1
-local dsd = ds:duplicated()
-check(dsd:get(1) == false,          "DataSet dup all [1] → false")
-check(dsd:get(2) == true,           "DataSet dup all [2] = (1,x) repetida → true")
-check(dsd:get(4) == false,          "DataSet dup all [4] = (2,z) único → false")
-
--- por subset "a"
-local dsa = ds:duplicated("a")
-check(dsa:get(2) == true,           "DataSet dup subset a [2]=1 → true")
-check(dsa:get(4) == true,           "DataSet dup subset a [4]=2 → true")
-check(dsa:get(5) == false,          "DataSet dup subset a [5]=3 → false")
-
--- subset como lista
-local dsl = ds:duplicated({"a", "b"})
-check(dsl:get(2) == true,           "DataSet dup [a,b] [2] → true")
-check(dsl:get(3) == false,          "DataSet dup [a,b] [3] → false")
-
--- keep none por "a"
-local dsn = ds:duplicated("a", "none")
-check(dsn:get(1) == true,           "DataSet dup a none [1] → true (tem cópia)")
-check(dsn:get(5) == false,          "DataSet dup a none [5]=3 único → false")
-
--- coluna inexistente → erro
-check(not pcall(function() ds:duplicated("zzz") end), "DataSet dup coluna inexistente = erro")
-
--- ================================================================
--- 7. DataSet:drop_duplicates
--- ================================================================
-
--- por todas: remove linha 2
-local ddall = ds:drop_duplicates()
-check(ddall:nrows() == 4,           "DataSet drop all: 4 linhas")
-
--- por subset a: mantém a=1,2,3 (primeiras)
-local dda = ds:drop_duplicates("a")
-check(dda:nrows() == 3,             "DataSet drop subset a: 3 linhas")
-check(dda:at(1, "a") == 1,          "DataSet drop a: primeira a=1")
-check(dda:at(2, "a") == 2,          "DataSet drop a: primeira a=2")
-check(dda:at(3, "a") == 3,          "DataSet drop a: a=3")
-
--- keep last por a
-local ddl = ds:drop_duplicates("a", "last")
-check(ddl:nrows() == 3,             "DataSet drop a last: 3 linhas")
-check(ddl:at(1, "b") == "x",        "DataSet drop a last: última a=1 tem b=x")
-
--- ================================================================
--- Resultado
--- ================================================================
-
-
--- ================================================================
--- 5.1 — reduções por coluna → DataSet 1-linha
--- ================================================================
 do
-    local df = smaug.DataSet({
-        {"a", {10, 20, 30}, "int64"},
-        {"b", {1.0, 2.0, 3.0}, "float64"},
-        {"nome", {"x", "y", "z"}, "string"},
-    })
+    local x = Series.from_table({1.0, 2.0, 3.0, 4.0}, "float64")
+    local y = Series.from_table({2.0, 4.0, 6.0, 8.0}, "float64") -- perfeito linear (y=2x)
 
-    -- forma: 1 linha, só colunas numéricas, string excluída
-    local r = df:sum()
-    check(r:nrows() == 1, "5.1 sum: 1 linha")
-    check(#r._col_names == 2 and r:has_column("a") and r:has_column("b"), "5.1 sum: só numéricas")
-    check(not r:has_column("nome"), "5.1 sum: string excluída")
+    -- corr: correlação de Pearson ∈ [-1, 1]
+    check(approx(x:corr(y), 1.0), "corr: correlação perfeita = 1.0")
+    check(approx(x:corr(x), 1.0), "corr: auto-correlação = 1.0")
 
-    -- sum preserva dtype (i64→i64, f64→f64); valores
-    check(r:column("a"):get(1) == 60 and r:column("a")._dtype == "int64", "5.1 sum a=60 int64")
-    check(approx(r:column("b"):get(1), 6.0) and r:column("b")._dtype == "float64", "5.1 sum b=6 float64")
+    -- cov: covariância amostral (divide por n-1).
+    -- mean_x=2.5, mean_y=5.0; Σ(dx*dy) = 4.5+0.5+0.5+4.5 = 10.0; cov = 10/3.
+    check(approx(x:cov(y), 10.0 / 3.0), "cov: covariância amostral = 10/3")
 
-    -- mean/std/var amostrais → float64
-    check(approx(df:mean():column("a"):get(1), 20.0), "5.1 mean a=20")
-    check(approx(df:std():column("a"):get(1), 10.0), "5.1 std a=10 (amostral)")
-    check(approx(df:var():column("a"):get(1), 100.0), "5.1 var a=100 (amostral)")
-    check(df:mean():column("a")._dtype == "float64", "5.1 mean dtype float64")
+    -- autocorr: default lag=1. Verificado com valor independente (não só
+    -- comparado à própria fórmula): z={1..5} é linear, então
+    -- corr(z[2..5], z[1..4]) = 1.0 exatamente.
+    local z = Series.from_table({1.0, 2.0, 3.0, 4.0, 5.0}, "float64")
+    check(approx(z:autocorr(), 1.0), "autocorr(lag=1) de série linear = 1.0")
+    check(approx(z:autocorr(), z:corr(z:shift(1))), "autocorr(lag) == corr(self, shift(lag))")
 
-    -- min/max preservam dtype; median/quantile
-    check(df:min():column("a"):get(1) == 10 and df:max():column("a"):get(1) == 30, "5.1 min/max")
-    check(approx(df:median():column("b"):get(1), 2.0), "5.1 median b=2")
-    check(approx(df:quantile(0.5):column("a"):get(1), 20.0), "5.1 quantile 0.5 a=20")
+    -- dot: produto interno Σxᵢyᵢ. x·y = 1*2+2*4+3*6+4*8 = 60.
+    check(x:dot(y) == 60.0, "dot: produto interno = 60")
 
-    -- count_nonnull → int64
-    local cnn = df:count_nonnull()
-    check(cnn:column("a"):get(1) == 3 and cnn:column("a")._dtype == "int64", "5.1 count_nonnull=3 int64")
+    -- dot propaga null — qualquer par com null → nil. Mesmo tamanho de y,
+    -- senão o erro de tamanho mascara o que este caso quer provar.
+    local xn = Series.from_table({1.0, NA, 3.0, 4.0}, "float64")
+    check(xn:dot(y) == nil, "dot: propaga null")
 
-    -- prod
-    check(df:prod():column("a"):get(1) == 6000, "5.1 prod a=6000")
+    -- pct_change: variação percentual = (cur - prev) / prev, prev = valor
+    -- em i-periods. O DIVISOR é prev, não cur — o zero em p[3] afeta o
+    -- cálculo em i=4 (onde prev=p[3]=0), não em i=3.
+    local p = Series.from_table({10.0, 20.0, 0.0, 40.0}, "float64")
+    local pc = p:pct_change()
+    check(pc._dtype == "float64", "pct_change: dtype float64")
+    check(pc:is_null(1), "pct_change[1] = NA (sem período anterior)")
+    check(approx(pc:get(2), 1.0), "pct_change[2] = (20-10)/10 = 1.0")
+    check(approx(pc:get(3), -1.0), "pct_change[3] = (0-20)/20 = -1.0")
+    check(pc:is_null(4), "pct_change[4]: prev=p[3]=0 (divisor zero) → NA, não Inf")
 
-    -- NA quando a coluna não tem dados suficientes (var de 1 não-nulo = NA amostral)
-    local dfsmall = smaug.DataSet({{"a", {5, NA}, "int64"}})
-    check(dfsmall:var():column("a"):is_null(1), "5.1 var de 1 não-nulo = NA (amostral)")
-    check(dfsmall:sum():column("a"):get(1) == 5, "5.1 sum ignora NA")
-
-    -- erro: nenhuma coluna numérica
-    local oknn = pcall(function() return smaug.DataSet({{"x", {"a"}, "string"}}):sum() end)
-    check(not oknn, "5.1 erro sem coluna numérica")
-
-    -- 5.5: min_count opt-in em sum (DataSet)
-    local dfmc = smaug.DataSet({{"a", {10, NA, NA}, "int64"}, {"b", {1, 2, 3}, "int64"}})
-    check(dfmc:sum():column("a"):get(1) == 10, "5.5 sum default: NA ignorado (a=10)")
-    local mc = dfmc:sum(2)
-    check(mc:column("a"):is_null(1), "5.5 sum(min_count=2): a tem 1 não-nulo → NA")
-    check(mc:column("b"):get(1) == 6, "5.5 sum(min_count=2): b tem 3 não-nulos → 6")
+    -- Erros: tamanho diferente, other não é Series, self não numérico.
+    local ok1 = pcall(function() return x:corr(Series.from_table({1.0, 2.0}, "float64")) end)
+    check(not ok1, "corr: tamanho diferente → erro")
+    local ok2 = pcall(function() return x:corr(42) end)
+    check(not ok2, "corr: other não é Series → erro")
+    local sb = Series.from_table({true, false, true, false}, "bool")
+    local ok3 = pcall(function() return sb:corr(x) end)
+    check(not ok3, "corr: self dtype não numérico (bool) → erro")
+    local ok4 = pcall(function() return xn:dot(Series.from_table({1.0, 2.0}, "float64")) end)
+    check(not ok4, "dot: tamanho diferente → erro")
 end
 
+-- =====================================================================
+-- Análise de distintos (unique, nunique, value_counts, mode)
+-- =====================================================================
+do
+    local s = Series.from_table({"a", "b", "a", NA, "c", "b"}, "string")
 
-print(string.format("OK — %d checks passaram (DataSet: corr/cov, equals, compare, duplicated, drop_duplicates)", n_ok))
+    -- unique: ordem de primeira aparição. IMPORTANTE — ao contrário de
+    -- nunique/value_counts, unique() NÃO exclui null: o null conta como
+    -- uma chave distinta e entra no resultado (verificado por execução:
+    -- {"a","b",NA,"c"}, 4 elementos, não 3).
+    local u = s:unique()
+    check(u:len() == 4, "unique: 4 valores distintos (NA inclusa)")
+    check(u:get(1) == "a" and u:get(2) == "b", "unique: ordem correta (a,b,...)")
+    check(u:is_null(3), "unique: NA aparece como valor distinto na posição 3")
+    check(u:get(4) == "c", "unique: 'c' após a NA")
+
+    -- nunique: conta não-nulos distintos (aqui SIM exclui null).
+    check(s:nunique() == 3, "nunique: 3 valores distintos (null excluído)")
+
+    -- value_counts: DataSet com "value" e "count", ordenado por count desc,
+    -- nulos excluídos, empate resolvido por ordem de aparição.
+    local vc = s:value_counts()
+    check(vc:nrows() == 3, "value_counts: 3 linhas (null excluído)")
+    check(vc:column("count"):get(1) == 2, "value_counts: 'a' tem count=2")
+    check(vc:column("value"):get(1) == "a", "value_counts: 'a' antes de 'b' em empate (1ª aparição)")
+
+    -- mode: mais frequente, primeiro em empate, ignora NA.
+    check(s:mode() == "a", "mode: 'a' é o primeiro com frequência máxima")
+
+    -- mode: bool não suportado
+    local b = Series.from_table({true, false}, "bool")
+    local ok = pcall(function() return b:mode() end)
+    check(not ok, "mode: bool não suportado")
+end
+
+-- =====================================================================
+-- Estatísticas (prod, median, quantile, describe)
+-- =====================================================================
+do
+    -- prod
+    local p = Series.from_table({2, 3, 4}, "int64")
+    check(p:prod() == 24, "prod: int64 = 24")
+
+    local pf = Series.from_table({2.0, 3.0, NA}, "float64")
+    check(approx(pf:prod(true), 6.0), "prod: f64 com NA ignorado (default) = 6")
+    -- Regressão: prod(false) com NA presente DEVE ser nil, não NaN. O bug
+    -- original vinha do idioma `is_nan(result) and nil or result`, que
+    -- devolvia o NaN em vez de nil quando is_nan(result) era true — corrigido
+    -- para if/then explícito. Este check trava a correção.
+    check(pf:prod(false) == nil, "prod: f64 com NA e ignore_na=false → nil (regressão)")
+
+    -- median
+    local m = Series.from_table({1, 2, 3, 4}, "int64")
+    check(m:median() == 2.5, "median: int64 par → float64 2.5")
+    local mn = Series.from_table({1, NA, 3}, "int64")
+    check(mn:median() == 2.0, "median: ignora NA por padrão")
+    check(mn:median(false) == nil, "median: com NA e ignore_na=false → nil")
+
+    -- quantile
+    local q = Series.from_table({1, 2, 3, 4, 5}, "int64")
+    check(q:quantile(0.0) == 1, "quantile(0): mínimo")
+    check(q:quantile(1.0) == 5, "quantile(1): máximo")
+    check(q:quantile(0.5) == 3, "quantile(0.5): mediana ímpar")
+    local qe = Series.from_table({1, 2, 3, 4}, "int64")
+    check(qe:quantile(0.5) == 2.5, "quantile(0.5): mediana par")
+    local ok = pcall(function() return q:quantile(1.5) end)
+    check(not ok, "quantile: q>1 → erro")
+
+    -- describe: numérico
+    local d = Series.from_table({1, 2, 3, NA}, "int64"):describe()
+    check(d.count == 3, "describe: count não-nulos")
+    check(d.nulls == 1, "describe: nulls")
+    check(d.mean == 2.0, "describe: mean")
+    check(d["50%"] == 2.0, "describe: mediana")
+    check(d.min == 1, "describe: min")
+    check(d.max == 3, "describe: max")
+end
+
+-- =====================================================================
+-- Transformações element-wise (standalone, não rolling — ver
+-- series/test_window.lua para o angulo de janela sobre cum*/diff/shift)
+-- =====================================================================
+do
+    local s = Series.from_table({-2.5, 3.7, NA}, "float64")
+
+    -- abs
+    local a = s:abs()
+    check(a:get(1) == 2.5, "abs: valor absoluto")
+    check(a:is_null(3), "abs: preserva NA")
+
+    -- round: half-away-from-zero (C: ceil(v*f-0.5) p/ v<0, floor(v*f+0.5) p/
+    -- v>=0). -2.5 vai PARA LONGE de zero → -3, não -2 (conferido por execução).
+    local r = s:round()
+    check(r:get(1) == -3, "round: half-away-from-zero (-2.5 -> -3)")
+    check(r:get(2) == 4, "round: 3.7 -> 4")
+
+    -- clip
+    local c = s:clip(0, 3)
+    check(c:get(1) == 0, "clip: abaixo do limite -> lo")
+    check(c:get(2) == 3, "clip: acima do limite -> hi")
+    check(c:is_null(3), "clip: preserva NA")
+    local ok = pcall(function() return s:clip(5, 0) end)
+    check(not ok, "clip: lo>hi → erro")
+
+    -- isna / notna (por índice — assinatura escalar, não retorna Series)
+    check(s:isna(3) == true, "isna: NA → true")
+    check(s:notna(1) == true, "notna: não-NA → true")
+
+    -- astype: trunca em direção a zero (não arredonda; -2.5 -> -2, não -3 —
+    -- diferente de round(), conferido por execução)
+    local i = s:astype("int64")
+    check(i:get(1) == -2, "astype f64->i64: trunca em direção a zero")
+    check(i:get(2) == 3, "astype f64->i64: 3.7 -> 3")
+    check(i:is_null(3), "astype: preserva NA")
+end
+
+print(string.format("OK — %d checks passaram (Series: estatísticas F.1, análise de distintos, transformações)", n_ok))
