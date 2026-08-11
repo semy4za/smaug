@@ -177,8 +177,8 @@ return function(I)
     function methods.pct_rank(self)
         local r = self:rank("average")
         local n = tonumber(self._d.count_nonnull and self._d.count_nonnull(self._c) or self:count_nonnull())
-        if n == 0 then return r end
-        return r:map(function(v) return v ~= nil and (v / n) or nil end, "float64", self._name)
+        if n <= 1 then return r end
+        return r:map(function(v) return v ~= nil and (v - 1) / (n - 1) or nil end, "float64", self._name)
     end
 
     -- =====================================================================
@@ -226,7 +226,8 @@ return function(I)
         end
         m2 = m2 / n; m4 = m4 / n
         if m2 == 0 then return 0 end
-        local kurt = (n*(n+1) / ((n-1)*(n-2)*(n-3))) * (m4/(m2*m2)) - 3*(n-1)^2/((n-2)*(n-3))
+        local g2 = m4 / (m2 * m2) - 3  -- excess kurtosis populacional
+        local kurt = ((n-1) / ((n-2)*(n-3))) * ((n+1)*g2 + 6)
         return kurt
     end
 

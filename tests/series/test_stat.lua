@@ -237,9 +237,9 @@ do
     local a = Series.from_table({1.0, 2.0, 3.0, 4.0, 5.0}, "float64")
     local b = Series.from_table({2.0, 4.0, 6.0, 8.0, 10.0}, "float64")
 
-    -- cov: 10.0 amostral (n-1)
+    -- cov: 5.0 amostral (n-1)
     local c = a:cov(b)
-    check(approx(c, 10.0), "cov(a,b) = 10.0 amostral")
+    check(approx(c, 5.0), "cov(a,b) = 5.0 amostral")
 
     -- corr: 1.0 (correlação perfeita)
     local r = a:corr(b)
@@ -350,10 +350,10 @@ end
 -- 12 — skew() assimetria (n >= 3)
 -- =====================================================================
 do
-    -- skew de {2,4,4,4,5,5,7,9} = 0.931... (valor conferido)
+    -- skew de {2,4,4,4,5,5,7,9} = 0.818... (valor conferido com scipy bias=False)
     local s = Series.from_table({2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0}, "float64")
     local sk = s:skew()
-    check(approx(sk, 0.931, 0.001), "skew {2,4,4,4,5,5,7,9} = 0.931")
+    check(approx(sk, 0.818, 0.001), "skew {2,4,4,4,5,5,7,9} = 0.818")
 
     -- skew n=3 (mínimo)
     local s3 = Series.from_table({1.0, 2.0, 3.0}, "float64")
@@ -395,10 +395,10 @@ end
 -- 13 — kurtosis() curtose (n >= 4)
 -- =====================================================================
 do
-    -- kurtosis de {2,4,4,4,5,5,7,9} = -0.19... (excess kurtosis)
+    -- kurtosis de {2,4,4,4,5,5,7,9} = 0.94... (excess kurtosis, bias=False como scipy)
     local s = Series.from_table({2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0}, "float64")
     local ku = s:kurtosis()
-    check(approx(ku, -0.19, 0.01), "kurtosis {2,4,4,4,5,5,7,9} = -0.19")
+    check(approx(ku, 0.94, 0.01), "kurtosis {2,4,4,4,5,5,7,9} = 0.94")
 
     -- kurtosis n=4 (mínimo)
     local s4 = Series.from_table({1.0, 2.0, 3.0, 4.0}, "float64")
@@ -498,7 +498,7 @@ do
     -- sem com nulls (ignora)
     local sn = Series.from_table({1.0, NA, 3.0, 4.0, 5.0}, "float64")
     local sen = sn:sem()
-    check(approx(sen, 0.707, 0.001), "sem com nulls ignora NA")
+    check(approx(sen, 0.854, 0.001), "sem com nulls ignora NA")
 
     -- sem int64
     local si = Series.from_table({1, 2, 3, 4, 5}, "int64")
