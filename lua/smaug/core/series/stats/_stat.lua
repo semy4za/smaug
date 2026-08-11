@@ -207,16 +207,18 @@ return function(I)
         -- Contrato real (smaug_numeric.h): o produto é o RETORNO (int64_t);
         -- status é out-param por smaug_status_t*. Overflow sinaliza via
         -- SMG_ERR_OOB (reaproveitado — não existe SMG_ERR_OVERFLOW no enum).
-        local status = ffi.new("smaug_status_t[1]")
+        local status = ffi.new("smaug_status_t[1]")   
         local result = C.smaug_i64_prod(self._c, ignore_na, status)
         if status[0] ~= C.SMG_OK then
-          if status[0] == C.SMG_ERR_ARGUMENT then
-            error("Series:prod() called with ignore_na=false on a series containing NA")
-          elseif status[0] == C.SMG_ERR_OOB then
-            error("Series:prod() overflow in int64 product")
-          else
-            error("Series:prod() failed with status: " .. tostring(status[0]))
-          end
+            if status[0] == C.SMG_ERR_ARGUMENT then
+                -- ignore_na=false com NA presente → nil (sentinela de ausência), não erro
+                -- coerente com float64 (NaN→nil) e com outras reduções (sum, mean, etc.)
+                return nil
+            elseif status[0] == C.SMG_ERR_OOB then
+                error("smaug: prod() overflow in int64 product")
+            else
+                error("smaug: prod() failed with status " .. tostring(status[0]))
+            end
         end
         return tonumber(result)
       end
@@ -314,11 +316,11 @@ return function(I)
                     if max_ep == nil or v > max_ep then max_ep = v end
                 end
             end
-            local buf = ffi.new("char[26]")
             local function fmt(ep)
                 if ep == nil then return nil end
+                local buf = ffi.new("char[26]")  -- ← Buffer novo por chamada
                 C.smaug_dt_format(ep, buf, 26)
-                return ffi.string(buf)
+                return ffi.string(buf, 25)  -- ← Length explícito (25 chars + \0)
             end
             return {
                 dtype = "datetime",

@@ -1,6 +1,6 @@
 # Smaug -- MANIFEST de integridade
 # Gerado por scripts/make_manifest.sh (o .ps1 delega a este)
-# Arvore: f1e3b40 + alteracoes nao commitadas
+# Arvore: 9a37ea2 + alteracoes nao commitadas
 # Formato: <sha256>  <linhas>  <caminho>
 #
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
@@ -17,7 +17,7 @@ ef144b541b3c17465380a9dc7ec802faedee9fe48a229b85c7a69454bd2a981d     185  ./docs
 f26d5211d1726c8a28f08979ada97bb01e38b2709a921f388d626260c17ca9a7     515  ./docs/CONTRACT.md
 24774b5016eb6147b223f5597e224cb1b37797db634076782ec3e56a5268b90a     370  ./docs/COVERAGE.md
 9f89a9d98d9531648723af2b8aff51121dc75c71fb7bd0620ffb6b71938cbae3     173  ./docs/COW.md
-d4fe68a0c0abbdec3b0c7f6a6436b32fbccb35b54deb84c567bb5d8116a0b1fa     934  ./docs/PARITY_REPORT.md
+9dc89fcbc19d9af338057df3a0074c48bbacc2450b426471987b1cf294525759     934  ./docs/PARITY_REPORT.md
 93362be378bf59aa3e2547647a0050fbe9109d3c9bc9e3e9588277647e99877c     108  ./docs/README.md
 948906034797201a44a4fc9ebf633e1685490fab8e30c9e643e57bcf1fe61952     887  ./docs/Roadmap.md
 1722e1a5806e185b2f934f2a66ec5193cc6ab8dc5a03837be43be80628c8fb86      39  ./include/smaug.h
@@ -129,7 +129,7 @@ bbb6b5e74977e8dba46c6a1c612920fa85f31689a0c5441920449b8f281a6122     809  ./test
 27a0f9842f5266a9de880ca3049e3bbf20e8f9841f2b34dd2307e4a01327b6d2     572  ./tests/series/test_predicates.lua
 e94ccf03fafe4d476a43a3a834c3930486576728589301bb4a426406b9b23335     207  ./tests/series/test_reduce.lua
 b542ddaa48de92016d0a70c88e44bf30640e1dd7c860dd38f98bd6b2feecaa87     297  ./tests/series/test_selection.lua
-4b9b4c413a8848ea5e0eaa3654a56a6f81d9dd099e91cce957788c71ba72b0ea     191  ./tests/series/test_stat.lua
+6c3d5a6a776862884d0e211cf0a91db3cf069b20a6460e98a77bf4c729866286     546  ./tests/series/test_stat.lua
 7e12debca85305c55cd7cb76676c0c6b8d178b468e28ad7f8cddfc2fdaa6f245     775  ./tests/series/test_str.lua
 07f0d83d06daa0ffc97f154d21b7c3c0d1263f3b582d4df67e24fe86fd942346     368  ./tests/series/test_window.lua
 #
