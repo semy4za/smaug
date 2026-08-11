@@ -201,7 +201,8 @@ return function(I)
       ignore_na = (ignore_na == nil) and true or ignore_na
       if self._dtype == "float64" then
         local result = C.smaug_f64_prod(self._c, ignore_na)
-        return is_nan(result) and nil or result
+        if is_nan(result) then return nil end
+        return result
       elseif self._dtype == "int64" then
         -- Contrato real (smaug_numeric.h): o produto é o RETORNO (int64_t);
         -- status é out-param por smaug_status_t*. Overflow sinaliza via

@@ -1,6 +1,8 @@
 -- tests/dataset/test_stat.lua
--- DataSet: corr/cov (matriz N×N), equals, compare, duplicated, drop_duplicates.
+-- DataSet: corr/cov (matriz N×N), equals, compare, duplicated, drop_duplicates,
+-- reduções 5.1 (sum..sem), element-wise/transforms 5.2/5.3.
 -- Consolida: seções DataSet de test_stats.lua + test_predicates.lua + test_duplicates.lua
+-- Todo valor de referência abaixo foi conferido rodando contra o código real.
 -- Rode da raiz: luajit tests/dataset/test_stat.lua
 
 package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
@@ -16,185 +18,149 @@ local function check(cond, msg)
     n_ok = n_ok + 1
 end
 
--- 9. DataSet:corr — matriz N×N
--- ================================================================
+-- =====================================================================
+-- F.1 — DataSet:corr / DataSet:cov — matriz N×N
+-- =====================================================================
+do
+    local ds = smaug.DataSet({
+        {"a",    {1, 2, 3, 4, 5},   "float64"},
+        {"b",    {2, 4, 6, 8, 10},  "float64"},   -- corr(a,b) = 1
+        {"c",    {5, 4, 3, 2, 1},   "float64"},   -- corr(a,c) = -1
+        {"nome", {"x","y","z","w","v"}, "string"}, -- ignorada
+    })
 
-local ds = smaug.DataSet({
-    {"a",    {1, 2, 3, 4, 5},   "float64"},
-    {"b",    {2, 4, 6, 8, 10},  "float64"},   -- corr(a,b) = 1
-    {"c",    {5, 4, 3, 2, 1},   "float64"},   -- corr(a,c) = -1
-    {"nome", {"x","y","z","w","v"}, "string"}, -- ignorada
-})
+    local cm = ds:corr()
+    -- estrutura: __index__ + a,b,c = 4 colunas; 3 linhas (variáveis numéricas)
+    check(cm:ncols() == 4,                "corr matriz: 4 colunas (__index__ + 3 num)")
+    check(cm:nrows() == 3,                "corr matriz: 3 linhas")
+    check(cm:has_column("__index__"),     "corr matriz: tem coluna __index__")
+    check(not cm:has_column("nome"),      "corr matriz: coluna string ignorada")
 
-local cm = ds:corr()
--- estrutura: __index__ + a,b,c = 4 colunas; 3 linhas (variáveis numéricas)
-check(cm:ncols() == 4,                "corr matriz: 4 colunas (__index__ + 3 num)")
-check(cm:nrows() == 3,                "corr matriz: 3 linhas")
-check(cm:has_column("__index__"),     "corr matriz: tem coluna __index__")
-check(not cm:has_column("nome"),      "corr matriz: coluna string ignorada")
+    -- identificador de linhas
+    check(cm:column("__index__"):get(1) == "a", "corr __index__[1] = a")
+    check(cm:column("__index__"):get(2) == "b", "corr __index__[2] = b")
+    check(cm:column("__index__"):get(3) == "c", "corr __index__[3] = c")
 
--- identificador de linhas
-check(cm:column("__index__"):get(1) == "a", "corr __index__[1] = a")
-check(cm:column("__index__"):get(2) == "b", "corr __index__[2] = b")
-check(cm:column("__index__"):get(3) == "c", "corr __index__[3] = c")
+    -- diagonal = 1
+    check(approx(cm:column("a"):get(1), 1.0), "corr[a,a] = 1")
+    check(approx(cm:column("b"):get(2), 1.0), "corr[b,b] = 1")
+    check(approx(cm:column("c"):get(3), 1.0), "corr[c,c] = 1")
 
--- diagonal = 1
-check(approx(cm:column("a"):get(1), 1.0), "corr[a,a] = 1")
-check(approx(cm:column("b"):get(2), 1.0), "corr[b,b] = 1")
-check(approx(cm:column("c"):get(3), 1.0), "corr[c,c] = 1")
+    -- correlações conhecidas
+    check(approx(cm:column("b"):get(1), 1.0),  "corr[a,b] = 1")
+    check(approx(cm:column("c"):get(1), -1.0), "corr[a,c] = -1")
 
--- correlações conhecidas
-check(approx(cm:column("b"):get(1), 1.0),  "corr[a,b] = 1")
-check(approx(cm:column("c"):get(1), -1.0), "corr[a,c] = -1")
+    -- simetria da matriz
+    check(approx(cm:column("b"):get(1), cm:column("a"):get(2)), "corr matriz simétrica [a,b]=[b,a]")
 
--- simetria da matriz
-check(approx(cm:column("b"):get(1), cm:column("a"):get(2)), "corr matriz simétrica [a,b]=[b,a]")
+    local cov = ds:cov()
+    check(cov:ncols() == 4,               "cov matriz: 4 colunas")
+    check(cov:nrows() == 3,               "cov matriz: 3 linhas")
 
--- ================================================================
--- 10. DataSet:cov — matriz N×N
--- ================================================================
+    -- diagonal = variância amostral de cada coluna
+    -- var amostral de {1,2,3,4,5} = 10/4 = 2.5
+    check(approx(cov:column("a"):get(1), 2.5), "cov[a,a] = var amostral a = 2.5")
+    -- var de {2,4,6,8,10} = 40/4 = 10
+    check(approx(cov:column("b"):get(2), 10.0), "cov[b,b] = var amostral b = 10")
 
-local cov = ds:cov()
-check(cov:ncols() == 4,               "cov matriz: 4 colunas")
-check(cov:nrows() == 3,               "cov matriz: 3 linhas")
+    -- simetria
+    check(approx(cov:column("b"):get(1), cov:column("a"):get(2)), "cov matriz simétrica")
 
--- diagonal = variância amostral de cada coluna
--- var amostral de {1,2,3,4,5} = 10/4 = 2.5
-check(approx(cov:column("a"):get(1), 2.5), "cov[a,a] = var amostral a = 2.5")
--- var de {2,4,6,8,10} = 40/4 = 10
-check(approx(cov:column("b"):get(2), 10.0), "cov[b,b] = var amostral b = 10")
-
--- simetria
-check(approx(cov:column("b"):get(1), cov:column("a"):get(2)), "cov matriz simétrica")
-
--- ================================================================
--- 11. DataSet corr/cov — sem coluna numérica → erro
--- ================================================================
-
-local ds_str = smaug.DataSet({
-    {"nome", {"x", "y"}, "string"},
-})
-local ok_nonum = pcall(function() ds_str:corr() end)
-check(not ok_nonum,                   "corr sem coluna numérica = erro")
-
--- ================================================================
--- Resultado
--- ================================================================
-
+    -- sem coluna numérica → erro
+    local ds_str = smaug.DataSet({{"nome", {"x", "y"}, "string"}})
+    check(not pcall(function() return ds_str:corr() end), "corr sem coluna numérica = erro")
+end
 
 -- =====================================================================
--- DataSet equals/compare (de test_predicates.lua)
+-- F.2 — DataSet:equals / DataSet:compare
 -- =====================================================================
+do
+    local d1 = smaug.DataSet({{"a", {1,2,3}, "int64"}, {"b", {"x","y","z"}, "string"}})
+    local d2 = smaug.DataSet({{"a", {1,2,3}, "int64"}, {"b", {"x","y","z"}, "string"}})
+    local d3 = smaug.DataSet({{"a", {1,2,9}, "int64"}, {"b", {"x","y","z"}, "string"}})
 
--- 9. DataSet:equals
--- ================================================================
+    check(d1:equals(d2) == true,          "DataSet equals idênticos")
+    check(d1:equals(d3) == false,         "DataSet equals difere")
 
-local d1 = smaug.DataSet({{"a", {1,2,3}, "int64"}, {"b", {"x","y","z"}, "string"}})
-local d2 = smaug.DataSet({{"a", {1,2,3}, "int64"}, {"b", {"x","y","z"}, "string"}})
-local d3 = smaug.DataSet({{"a", {1,2,9}, "int64"}, {"b", {"x","y","z"}, "string"}})
+    -- colunas em ordem diferente → false
+    local d4 = smaug.DataSet({{"b", {"x","y","z"}, "string"}, {"a", {1,2,3}, "int64"}})
+    check(d1:equals(d4) == false,         "DataSet equals ordem diferente = false")
 
-check(d1:equals(d2) == true,          "DataSet equals idênticos")
-check(d1:equals(d3) == false,         "DataSet equals difere")
+    -- ncols diferente
+    local d5 = smaug.DataSet({{"a", {1,2,3}, "int64"}})
+    check(d1:equals(d5) == false,         "DataSet equals ncols diferente")
 
--- colunas em ordem diferente → false
-local d4 = smaug.DataSet({{"b", {"x","y","z"}, "string"}, {"a", {1,2,3}, "int64"}})
-check(d1:equals(d4) == false,         "DataSet equals ordem diferente = false")
+    -- não-DataSet
+    check(d1:equals(42) == false,         "DataSet equals não-DataSet = false")
 
--- ncols diferente
-local d5 = smaug.DataSet({{"a", {1,2,3}, "int64"}})
-check(d1:equals(d5) == false,         "DataSet equals ncols diferente")
+    local dcmp = d1:compare(d3)
+    check(dcmp:nrows() == 1,              "DataSet compare: 1 diferença")
+    check(dcmp:column("linha"):get(1) == 3,   "DataSet compare linha = 3")
+    check(dcmp:column("coluna"):get(1) == "a", "DataSet compare coluna = a")
+    check(dcmp:column("self"):get(1) == "3",   "DataSet compare self = 3")
+    check(dcmp:column("other"):get(1) == "9",  "DataSet compare other = 9")
 
--- não-DataSet
-check(d1:equals(42) == false,         "DataSet equals não-DataSet = false")
+    -- idênticos → vazio
+    check(d1:compare(d2):nrows() == 0,    "DataSet compare idênticos = vazio")
 
--- ================================================================
--- 10. DataSet:compare
--- ================================================================
-
-local dcmp = d1:compare(d3)
-check(dcmp:nrows() == 1,              "DataSet compare: 1 diferença")
-check(dcmp:column("linha"):get(1) == 3,   "DataSet compare linha = 3")
-check(dcmp:column("coluna"):get(1) == "a", "DataSet compare coluna = a")
-check(dcmp:column("self"):get(1) == "3",   "DataSet compare self = 3")
-check(dcmp:column("other"):get(1) == "9",  "DataSet compare other = 9")
-
--- idênticos → vazio
-check(d1:compare(d2):nrows() == 0,    "DataSet compare idênticos = vazio")
-
--- formas diferentes → erro
-local ok_dcmp = pcall(function() d1:compare(d5) end)
-check(not ok_dcmp,                    "DataSet compare formas diferentes = erro")
-
--- ================================================================
--- Resultado
--- ================================================================
-
+    -- formas diferentes → erro
+    check(not pcall(function() return d1:compare(d5) end), "DataSet compare formas diferentes = erro")
+end
 
 -- =====================================================================
--- DataSet duplicated/drop_duplicates (de test_duplicates.lua)
+-- F.6 — DataSet:duplicated / DataSet:drop_duplicates
 -- =====================================================================
+do
+    local ds = smaug.DataSet({
+        {"a", {1, 1, 2, 2, 3},          "int64"},
+        {"b", {"x", "x", "y", "z", "w"}, "string"},
+    })
 
--- 6. DataSet:duplicated
--- ================================================================
+    -- por todas as colunas: linha 2 (1,x) == linha 1
+    local dsd = ds:duplicated()
+    check(dsd:get(1) == false,          "DataSet dup all [1] → false")
+    check(dsd:get(2) == true,           "DataSet dup all [2] = (1,x) repetida → true")
+    check(dsd:get(4) == false,          "DataSet dup all [4] = (2,z) único → false")
 
-local ds = smaug.DataSet({
-    {"a", {1, 1, 2, 2, 3},          "int64"},
-    {"b", {"x", "x", "y", "z", "w"}, "string"},
-})
+    -- por subset "a"
+    local dsa = ds:duplicated("a")
+    check(dsa:get(2) == true,           "DataSet dup subset a [2]=1 → true")
+    check(dsa:get(4) == true,           "DataSet dup subset a [4]=2 → true")
+    check(dsa:get(5) == false,          "DataSet dup subset a [5]=3 → false")
 
--- por todas as colunas: linha 2 (1,x) == linha 1
-local dsd = ds:duplicated()
-check(dsd:get(1) == false,          "DataSet dup all [1] → false")
-check(dsd:get(2) == true,           "DataSet dup all [2] = (1,x) repetida → true")
-check(dsd:get(4) == false,          "DataSet dup all [4] = (2,z) único → false")
+    -- subset como lista
+    local dsl = ds:duplicated({"a", "b"})
+    check(dsl:get(2) == true,           "DataSet dup [a,b] [2] → true")
+    check(dsl:get(3) == false,          "DataSet dup [a,b] [3] → false")
 
--- por subset "a"
-local dsa = ds:duplicated("a")
-check(dsa:get(2) == true,           "DataSet dup subset a [2]=1 → true")
-check(dsa:get(4) == true,           "DataSet dup subset a [4]=2 → true")
-check(dsa:get(5) == false,          "DataSet dup subset a [5]=3 → false")
+    -- keep none por "a"
+    local dsn = ds:duplicated("a", "none")
+    check(dsn:get(1) == true,           "DataSet dup a none [1] → true (tem cópia)")
+    check(dsn:get(5) == false,          "DataSet dup a none [5]=3 único → false")
 
--- subset como lista
-local dsl = ds:duplicated({"a", "b"})
-check(dsl:get(2) == true,           "DataSet dup [a,b] [2] → true")
-check(dsl:get(3) == false,          "DataSet dup [a,b] [3] → false")
+    -- coluna inexistente → erro
+    check(not pcall(function() return ds:duplicated("zzz") end), "DataSet dup coluna inexistente = erro")
 
--- keep none por "a"
-local dsn = ds:duplicated("a", "none")
-check(dsn:get(1) == true,           "DataSet dup a none [1] → true (tem cópia)")
-check(dsn:get(5) == false,          "DataSet dup a none [5]=3 único → false")
+    -- por todas: remove linha 2
+    local ddall = ds:drop_duplicates()
+    check(ddall:nrows() == 4,           "DataSet drop all: 4 linhas")
 
--- coluna inexistente → erro
-check(not pcall(function() ds:duplicated("zzz") end), "DataSet dup coluna inexistente = erro")
+    -- por subset a: mantém a=1,2,3 (primeiras)
+    local dda = ds:drop_duplicates("a")
+    check(dda:nrows() == 3,             "DataSet drop subset a: 3 linhas")
+    check(dda:at(1, "a") == 1,          "DataSet drop a: primeira a=1")
+    check(dda:at(2, "a") == 2,          "DataSet drop a: primeira a=2")
+    check(dda:at(3, "a") == 3,          "DataSet drop a: a=3")
 
--- ================================================================
--- 7. DataSet:drop_duplicates
--- ================================================================
+    -- keep last por a
+    local ddl = ds:drop_duplicates("a", "last")
+    check(ddl:nrows() == 3,             "DataSet drop a last: 3 linhas")
+    check(ddl:at(1, "b") == "x",        "DataSet drop a last: última a=1 tem b=x")
+end
 
--- por todas: remove linha 2
-local ddall = ds:drop_duplicates()
-check(ddall:nrows() == 4,           "DataSet drop all: 4 linhas")
-
--- por subset a: mantém a=1,2,3 (primeiras)
-local dda = ds:drop_duplicates("a")
-check(dda:nrows() == 3,             "DataSet drop subset a: 3 linhas")
-check(dda:at(1, "a") == 1,          "DataSet drop a: primeira a=1")
-check(dda:at(2, "a") == 2,          "DataSet drop a: primeira a=2")
-check(dda:at(3, "a") == 3,          "DataSet drop a: a=3")
-
--- keep last por a
-local ddl = ds:drop_duplicates("a", "last")
-check(ddl:nrows() == 3,             "DataSet drop a last: 3 linhas")
-check(ddl:at(1, "b") == "x",        "DataSet drop a last: última a=1 tem b=x")
-
--- ================================================================
--- Resultado
--- ================================================================
-
-
--- ================================================================
+-- =====================================================================
 -- 5.1 — reduções por coluna → DataSet 1-linha
--- ================================================================
+-- =====================================================================
 do
     local df = smaug.DataSet({
         {"a", {10, 20, 30}, "int64"},
@@ -227,8 +193,25 @@ do
     local cnn = df:count_nonnull()
     check(cnn:column("a"):get(1) == 3 and cnn:column("a")._dtype == "int64", "5.1 count_nonnull=3 int64")
 
-    -- prod
-    check(df:prod():column("a"):get(1) == 6000, "5.1 prod a=6000")
+    -- prod (int64) e regressão de prod (float64) — cobre o mesmo defeito
+    -- corrigido em Series:prod (delegação C invertida no i64, idioma
+    -- `and nil or` no f64); no DataSet, ignore_na é sempre true (não há
+    -- parâmetro exposto — só min_count), então o caso relevante aqui é
+    -- confirmar que a NA é ignorada corretamente com a implementação nova.
+    check(df:prod():column("a"):get(1) == 6000, "5.1 prod a=6000 (int64)")
+    local dfp_na = smaug.DataSet({{"a", {2, NA, 3}, "int64"}, {"b", {2.0, NA, 3.0}, "float64"}})
+    check(dfp_na:prod():column("a"):get(1) == 6, "5.1 prod int64 ignora NA = 6")
+    check(approx(dfp_na:prod():column("b"):get(1), 6.0), "5.1 prod float64 ignora NA = 6.0 (regressão)")
+
+    -- skew/kurtosis/mad/sem: delegação pura à Series (Anel 1 não reimplementa
+    -- a fórmula) — checado contra o mesmo cálculo chamado direto na coluna,
+    -- não contra um valor decorado à mão.
+    local dfsk = smaug.DataSet({{"a", {2, 4, 4, 4, 5, 5, 7, 9}, "float64"}})
+    local col  = dfsk:column("a")
+    check(approx(dfsk:skew():column("a"):get(1), col:skew()), "5.1 skew: DataSet delega à Series")
+    check(approx(dfsk:kurtosis():column("a"):get(1), col:kurtosis()), "5.1 kurtosis: DataSet delega à Series")
+    check(approx(dfsk:mad():column("a"):get(1), col:mad()), "5.1 mad: DataSet delega à Series")
+    check(approx(dfsk:sem():column("a"):get(1), col:sem()), "5.1 sem: DataSet delega à Series")
 
     -- NA quando a coluna não tem dados suficientes (var de 1 não-nulo = NA amostral)
     local dfsmall = smaug.DataSet({{"a", {5, NA}, "int64"}})
@@ -236,20 +219,26 @@ do
     check(dfsmall:sum():column("a"):get(1) == 5, "5.1 sum ignora NA")
 
     -- erro: nenhuma coluna numérica
-    local oknn = pcall(function() return smaug.DataSet({{"x", {"a"}, "string"}}):sum() end)
-    check(not oknn, "5.1 erro sem coluna numérica")
+    check(not pcall(function() return smaug.DataSet({{"x", {"a"}, "string"}}):sum() end),
+          "5.1 erro sem coluna numérica")
+    check(not pcall(function() return smaug.DataSet({{"x", {"a"}, "string"}}):skew() end),
+          "5.1 skew erro sem coluna numérica")
 
-    -- 5.5: min_count opt-in em sum (DataSet)
+    -- 5.5: min_count opt-in em sum e prod (DataSet)
     local dfmc = smaug.DataSet({{"a", {10, NA, NA}, "int64"}, {"b", {1, 2, 3}, "int64"}})
     check(dfmc:sum():column("a"):get(1) == 10, "5.5 sum default: NA ignorado (a=10)")
     local mc = dfmc:sum(2)
     check(mc:column("a"):is_null(1), "5.5 sum(min_count=2): a tem 1 não-nulo → NA")
     check(mc:column("b"):get(1) == 6, "5.5 sum(min_count=2): b tem 3 não-nulos → 6")
+
+    local mcp = dfmc:prod(2)
+    check(mcp:column("a"):is_null(1), "5.5 prod(min_count=2): a tem 1 não-nulo → NA")
+    check(mcp:column("b"):get(1) == 6, "5.5 prod(min_count=2): b tem 3 não-nulos → 6")
 end
 
--- ================================================================
+-- =====================================================================
 -- 5.2 / 5.3 — element-wise e transforms → DataSet mesma forma
--- ================================================================
+-- =====================================================================
 do
     local df = smaug.DataSet({{"a", {-1, 2, -3}, "int64"}, {"b", {1.5, 2.5, 3.5}, "float64"}})
 
@@ -258,10 +247,18 @@ do
     check(r:nrows() == 3 and #r._col_names == 2, "5.2 abs: mesma forma")
     check(r:column("a"):get(1) == 1 and r:column("a"):get(3) == 3, "5.2 abs valores")
 
-    -- cumsum acumula por coluna
+    -- cumsum/cummin/cummax/cumprod acumulam por coluna
+    local dfc = smaug.DataSet({{"a", {3, 1, 4, 1, 5}, "int64"}, {"b", {2.0, 4.0, 1.0, 3.0, 5.0}, "float64"}})
     local cs = df:cumsum()
     check(cs:column("a"):get(3) == -2, "5.2 cumsum a[3]=-2")
     check(approx(cs:column("b"):get(3), 7.5), "5.2 cumsum b[3]=7.5")
+
+    local cmi = dfc:cummin()
+    check(cmi:column("a"):get(1) == 3 and cmi:column("a"):get(2) == 1
+      and cmi:column("a"):get(5) == 1, "5.2 cummin a: 3,1,1,1,1")
+    local cma = dfc:cummax()
+    check(cma:column("b"):get(1) == 2.0 and cma:column("b"):get(2) == 4.0
+      and cma:column("b"):get(5) == 5.0, "5.2 cummax b: 2,4,4,4,5")
 
     -- round / clip com argumentos
     check(df:round(0):column("b"):get(2) == 3, "5.2 round(0) b[2]=3")
@@ -274,15 +271,22 @@ do
 
     -- D4-i: element-wise numérico erra com coluna não-numérica
     local dfs = smaug.DataSet({{"a", {1, 2}, "int64"}, {"nome", {"x", "y"}, "string"}})
-    local oke = pcall(function() return dfs:abs() end)
-    check(not oke, "5.2 D4-i: abs erra com coluna string")
-    local okc = pcall(function() return dfs:cumsum() end)
-    check(not okc, "5.2 D4-i: cumsum erra com coluna string")
+    check(not pcall(function() return dfs:abs() end), "5.2 D4-i: abs erra com coluna string")
+    check(not pcall(function() return dfs:cumsum() end), "5.2 D4-i: cumsum erra com coluna string")
+    check(not pcall(function() return dfs:cummin() end), "5.2 D4-i: cummin erra com coluna string")
+    check(not pcall(function() return dfs:cummax() end), "5.2 D4-i: cummax erra com coluna string")
 
     -- ffill/bfill/shift funcionam em qualquer dtype (string incluída)
     local dff = smaug.DataSet({{"s", {"a", NA, "c"}, "string"}})
     check(dff:ffill():column("s"):get(2) == "a", "5.3 ffill em string")
     check(dff:shift(1):column("s"):is_null(1), "5.3 shift em string: borda NA")
+
+    local dfb = smaug.DataSet({{"a", {NA, 2.0, NA, 4.0}, "float64"}})
+    local bf = dfb:bfill()
+    check(bf:column("a"):get(1) == 2.0, "5.3 bfill a[1]=2.0 (preenche do próximo)")
+    check(bf:column("a"):get(3) == 4.0, "5.3 bfill a[3]=4.0")
+    local dfbs = smaug.DataSet({{"s", {NA, "y", NA}, "string"}})
+    check(dfbs:bfill():column("s"):get(1) == "y", "5.3 bfill funciona em string também")
 
     -- isna/notna → DataSet bool, todas as colunas (qualquer dtype)
     local dfm = smaug.DataSet({{"x", {1, NA}, "int64"}, {"nome", {"a", NA}, "string"}})
@@ -296,11 +300,8 @@ do
     local at = dfm:astype({x = "float64"})
     check(at:column("x")._dtype == "float64", "5.3 astype: x → float64")
     check(at:column("nome")._dtype == "string", "5.3 astype: coluna fora do mapa inalterada")
-    local oka = pcall(function() return dfm:astype({zzz = "int64"}) end)
-    check(not oka, "5.3 astype: erro em coluna inexistente")
-    local okt = pcall(function() return dfm:astype("float64") end)
-    check(not okt, "5.3 astype: erro se não for mapa")
+    check(not pcall(function() return dfm:astype({zzz = "int64"}) end), "5.3 astype: erro em coluna inexistente")
+    check(not pcall(function() return dfm:astype("float64") end), "5.3 astype: erro se não for mapa")
 end
 
-
-print(string.format("OK — %d checks passaram (DataSet: corr/cov, equals, compare, duplicated, drop_duplicates)", n_ok))
+print(string.format("OK — %d checks passaram (DataSet: corr/cov, equals, compare, duplicated, drop_duplicates, reduções, transforms)", n_ok))

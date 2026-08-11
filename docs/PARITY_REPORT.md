@@ -11,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-08-10 19:17:10 UTC
+Gerado em: 2026-08-11 12:58:20 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -823,23 +823,23 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `series/test_categorical` | 312 | 7 | 7 | 8 | 5 | 13 | 59 |
 | `dataset/test_core` | 238 | 30 | 33 | 8 | 14 | — | 1 |
 | `dataset/test_relational` | 184 | 15 | 65 | 4 | 34 | — | — |
-| `dataset/test_stat` | 91 | 10 | 16 | 1 | 13 | — | — |
+| `dataset/test_stat` | 107 | 14 | 18 | 1 | 15 | — | — |
 | `dataset/test_io_support` | 53 | 4 | 15 | 1 | 7 | — | — |
 | `io/test_csv` | 138 | 3 | 7 | 2 | 11 | 4 | 1 |
 | `io/test_json` | 48 | 4 | 4 | 1 | 2 | 2 | — |
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 88 | 23 | 3 | 2 | 5 | 1 | 1 |
 
-**Total de checks:** 2803
+**Total de checks:** 2819
 
 ### Menções totais por dtype (toda a suite)
 
 | dtype | menções |
 | :--- | :-: |
-| float64 | 221 |
-| int64 | 367 |
+| float64 | 225 |
+| int64 | 369 |
 | bool | 71 |
-| string | 230 |
+| string | 232 |
 | datetime | 96 |
 | categorical | 64 |
 
