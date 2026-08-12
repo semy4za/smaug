@@ -11,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-08-12 01:24:25 UTC
+Gerado em: 2026-08-12 02:26:09 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -811,8 +811,8 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 
 | arquivo | checks | float64 | int64 | bool | string | datetime | categorical |
 | :--- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| `series/test_constructors` | 382 | 44 | 67 | 23 | 21 | 3 | 1 |
-| `series/test_access` | 185 | 22 | 25 | 1 | 14 | 3 | — |
+| `series/test_constructors` | 187 | 32 | 32 | 16 | 16 | 1 | 1 |
+| `series/test_access` | 184 | 21 | 25 | 1 | 14 | 3 | — |
 | `series/test_reduce` | 57 | 7 | 2 | 3 | 4 | 2 | — |
 | `series/test_stat` | 139 | 51 | 10 | 3 | 10 | 2 | — |
 | `series/test_window` | 137 | 10 | 12 | 3 | 7 | 2 | — |
@@ -820,7 +820,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `series/test_selection` | 73 | 7 | 8 | 6 | 8 | 2 | 1 |
 | `series/test_str` | 273 | 4 | 9 | 1 | 50 | — | — |
 | `series/test_dt` | 272 | 3 | 6 | 2 | 12 | 62 | — |
-| `series/test_categorical` | 312 | 7 | 7 | 8 | 5 | 13 | 59 |
+| `series/test_categorical` | 86 | 5 | 1 | 3 | 5 | 1 | 35 |
 | `dataset/test_core` | 238 | 30 | 33 | 8 | 14 | — | 1 |
 | `dataset/test_relational` | 184 | 15 | 65 | 4 | 34 | — | — |
 | `dataset/test_stat` | 107 | 14 | 18 | 1 | 15 | — | — |
@@ -830,18 +830,18 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 88 | 23 | 3 | 2 | 5 | 1 | 1 |
 
-**Total de checks:** 2901
+**Total de checks:** 2479
 
 ### Menções totais por dtype (toda a suite)
 
 | dtype | menções |
 | :--- | :-: |
-| float64 | 266 |
-| int64 | 372 |
-| bool | 72 |
-| string | 241 |
-| datetime | 98 |
-| categorical | 64 |
+| float64 | 251 |
+| int64 | 331 |
+| bool | 60 |
+| string | 236 |
+| datetime | 84 |
+| categorical | 40 |
 
 ## Eixo 12 — Sincronização docs ↔ código
 

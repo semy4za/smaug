@@ -1,6 +1,6 @@
 # Smaug -- MANIFEST de integridade
 # Gerado por scripts/make_manifest.sh (o .ps1 delega a este)
-# Arvore: 21f5144 + alteracoes nao commitadas
+# Arvore: bac5fc1 + alteracoes nao commitadas
 # Formato: <sha256>  <linhas>  <caminho>
 #
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
@@ -17,7 +17,7 @@ b31b63bd7db2e904bb31ab37efc7ef5bef25a282cbf58c1474e1056d21cc09eb    4711  ./docs
 f26d5211d1726c8a28f08979ada97bb01e38b2709a921f388d626260c17ca9a7     515  ./docs/CONTRACT.md
 f0cba08fe8e3f27264a36eab4d6c550cce1e77b9990e68d8f83d916f9e909fad     378  ./docs/COVERAGE.md
 9f89a9d98d9531648723af2b8aff51121dc75c71fb7bd0620ffb6b71938cbae3     173  ./docs/COW.md
-81c05f173d4d3fd6bf3de8732b84456cc3cffc5f628dbf6449f0d83396bd6b71     934  ./docs/PARITY_REPORT.md
+ea6a6146a634a959ab772198af560eb5d4eb42ebcbd8880c87469a8d92241b3d     934  ./docs/PARITY_REPORT.md
 6fe8a42f42e93ab4b3a257227c51fcff83b0b88fee7123f14bbdd31b64c06675     108  ./docs/README.md
 766339e2686fc9cc00364cc94c8014529cb4315527f97f45bf0c69c3bc187e11     887  ./docs/Roadmap.md
 1722e1a5806e185b2f934f2a66ec5193cc6ab8dc5a03837be43be80628c8fb86      39  ./include/smaug.h
@@ -122,10 +122,10 @@ f06b457fde629011bccc29bb40dd2e47db9efecea34ce026a00cb3ecfbe63c14     521  ./test
 7d003fa4dc45979b92dbb5bc010d6d1b258c5549109ee3ae8afd417f043765e4     178  ./tests/io/test_json.lua
 03b3fc851055e5fae58f54721fdde369abd4d5c506caf8c946dd7d9ef09b0925     200  ./tests/props/test_integration.lua
 508581de821c8e2c7fc49f35c7a89ac51a7aca7bf563a69ee39ad5b7fd61fa92     557  ./tests/props/test_props.lua
-32508f9e35c7814dc93eea87a7caf93c587ece136b55c2171aaeefe9f8880662     644  ./tests/series/test_access.lua
-fd9c4bcea76153afe45d1d9f05451d7ed5c77dee4901e84c57ff6115577bf0a4     924  ./tests/series/test_categorical.lua
-08abcb5b7bced3a6ee796b86c370f21bf0bebaa846d6362ac84609dd9ce012e9    1085  ./tests/series/test_constructors.lua
-bbb6b5e74977e8dba46c6a1c612920fa85f31689a0c5441920449b8f281a6122     809  ./tests/series/test_dt.lua
+651f64a8375745d349030c5ae16e5c452f930e2d2aa1659163f2bbf77d11d490     536  ./tests/series/test_access.lua
+a331e550d657965ad6a8d384c5ff57b679e809001cc4b89a86adbe88526e48ce     379  ./tests/series/test_categorical.lua
+f499bedf699273f25089ed9111a8149920d41ee5c6ca0c446d5345f305acd380     615  ./tests/series/test_constructors.lua
+db0d384b72e672c01c65803a38fb7ba613d820b9d5a5b7a0942129f1866c3cb9     808  ./tests/series/test_dt.lua
 27a0f9842f5266a9de880ca3049e3bbf20e8f9841f2b34dd2307e4a01327b6d2     572  ./tests/series/test_predicates.lua
 e94ccf03fafe4d476a43a3a834c3930486576728589301bb4a426406b9b23335     207  ./tests/series/test_reduce.lua
 b542ddaa48de92016d0a70c88e44bf30640e1dd7c860dd38f98bd6b2feecaa87     297  ./tests/series/test_selection.lua
