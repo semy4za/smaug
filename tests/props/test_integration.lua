@@ -100,9 +100,10 @@ local rna = S.from_table({3.0, NA, 1.0}, "float64"):rank()
 check(rna:is_null(2),         "rank NA → NA")
 check(approx(rna:get(1), 2), "rank[1]=2")
 
--- pct_rank
+-- pct_rank: fórmula (rank-1)/(n-1) — min→0, max→1 (ver series/test_stat.lua
+-- seção 7 para a bateria completa, incluindo os casos de borda n=0/n=1)
 local pr = S.from_table({1.0,2.0,3.0,4.0}, "float64"):pct_rank()
-check(approx(pr:get(1), 0.25), "pct_rank[1]=0.25")
+check(approx(pr:get(1), 0.0), "pct_rank[1]=0.0")
 check(approx(pr:get(4), 1.0),  "pct_rank[4]=1.0")
 
 -- rank em dtypes ordenáveis não-numéricos (item 7.3): str/dt/bool delegam ao C

@@ -173,11 +173,17 @@ return function(I)
         return out
     end
 
-    -- pct_rank(): rank normalizado para [0, 1].
+    -- pct_rank(): rank normalizado para [0, 1]. min→0, max→1 (n>=2).
+    -- n=0: série vazia, devolve r (já vazio) sem tocar. n=1: não há como
+    -- dividir por (n-1)=0 — o único elemento é ao mesmo tempo mínimo e
+    -- máximo, então por convenção mapeia para 0.0 (não para o rank cru).
     function methods.pct_rank(self)
         local r = self:rank("average")
         local n = tonumber(self._d.count_nonnull and self._d.count_nonnull(self._c) or self:count_nonnull())
-        if n <= 1 then return r end
+        if n == 0 then return r end
+        if n == 1 then
+            return r:map(function(v) return v ~= nil and 0.0 or nil end, "float64", self._name)
+        end
         return r:map(function(v) return v ~= nil and (v - 1) / (n - 1) or nil end, "float64", self._name)
     end
 
