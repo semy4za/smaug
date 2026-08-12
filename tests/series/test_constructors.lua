@@ -51,7 +51,7 @@ do
     check(s:count_nonnull() == 2, "count_nonnull")
     
     -- from_table com nulos
-    local t = Series.from_table({5, NA, 15, 20}, "float64", "t")
+    local t = Series.from_array({5, NA, 15, 20}, "float64", "t")
     check(t:len() == 4, "from_table: len")
     check(t:is_null(2), "from_table: nil -> null")
     check(approx(t:sum(), 40.0), "from_table: sum")
@@ -84,7 +84,7 @@ end
 -- 2. Reduções Core (f64)
 -- =====================================================================
 do
-    local s = Series.from_table({10.0, NA, 3.0}, "float64")
+    local s = Series.from_array({10.0, NA, 3.0}, "float64")
     
     -- ignore_na = true (default)
     check(approx(s:sum(), 13.0), "sum ignora NA")
@@ -94,7 +94,7 @@ do
     check(s:sum(false) == nil, "sum(false) com NA -> nil")
     
     -- describe
-    local dd = Series.from_table({1, 2, 3, 4, NA}, "float64"):describe()
+    local dd = Series.from_array({1, 2, 3, 4, NA}, "float64"):describe()
     check(dd.count == 4 and dd.nulls == 1, "describe: count/nulls")
     check(approx(dd.mean, 2.5), "describe: mean")
     check(dd.min == 1 and dd.max == 4, "describe: min/max")
@@ -106,7 +106,7 @@ end
 -- =====================================================================
 do
     -- série × escalar
-    local a = Series.from_table({1, 2, 3}, "float64")
+    local a = Series.from_array({1, 2, 3}, "float64")
     local b = a + 10
     check(b:get(1) == 11.0 and b:get(3) == 13.0, "Series + escalar")
     local c = 2 * a
@@ -114,13 +114,13 @@ do
     check(a:get(1) == 1.0, "imutabilidade: original intacto")
     
     -- série × série
-    local d = Series.from_table({1, 2, 3}, "float64")
-    local e = Series.from_table({10, 20, 30}, "float64")
+    local d = Series.from_array({1, 2, 3}, "float64")
+    local e = Series.from_array({10, 20, 30}, "float64")
     local f = d + e
     check(f:get(1) == 11.0 and f:get(3) == 33.0, "Series + Series")
     
     -- propagação de NA
-    local g = Series.from_table({1, NA, 3}, "float64")
+    local g = Series.from_array({1, NA, 3}, "float64")
     local h = g + e
     check(h:is_null(2), "NA propaga em Series+Series")
 end
@@ -130,15 +130,15 @@ end
 -- =====================================================================
 do
     -- aritmética básica
-    local i64s = Series.from_table({10, 20, 30}, "int64")
-    local i64b = Series.from_table({3, 4, 5}, "int64")
+    local i64s = Series.from_array({10, 20, 30}, "int64")
+    local i64b = Series.from_array({3, 4, 5}, "int64")
     check((i64s + i64b):get(1) == 13, "i64: add")
     check((i64s - i64b):get(1) == 7, "i64: sub")
     check((i64s * i64b):get(1) == 30, "i64: mul")
     
     -- divisão: '/' é float64, floordiv é int64
-    local num = Series.from_table({10, 20}, "int64")
-    local den = Series.from_table({2, 0}, "int64")
+    local num = Series.from_array({10, 20}, "int64")
+    local den = Series.from_array({2, 0}, "int64")
     local q = num / den
     check(q._dtype == "float64", "N.3: '/' entre int64 promove a float64")
     check(q:get(1) == 5, "f64 div ok (10/2=5)")
@@ -150,7 +150,7 @@ do
     check(qi:is_null(2), "floordiv por zero -> null")
     
     -- sentinela INT64_MIN
-    local k = Series.from_table({10, NA, 30}, "int64")
+    local k = Series.from_array({10, NA, 30}, "int64")
     check(k:sum() == 40, "i64 sum ignora NA")
     check(k:sum(false) == nil, "i64 sum(false) com NA -> nil (sentinela)")
     check(k:max() == 30, "i64 max")
@@ -184,7 +184,7 @@ end
 do
     local A = ffi.new("int64_t", 9007199254740992LL)  -- 2^53
     local B = ffi.new("int64_t", 9007199254740993LL)  -- 2^53 + 1
-    local s = Series.from_table({A, B}, "int64", "id")
+    local s = Series.from_array({A, B}, "int64", "id")
     
     -- cdata int64_t no threshold: aceito e distingue exato
     local m = s:eq(B)
@@ -198,12 +198,12 @@ do
     check(ok_boundary == false, "9.3.2: number 2^53+1 (degrada p/ 2^53) recusado")
     
     -- number seguro (< 2^53): comparação normal
-    local sp = Series.from_table({5, 9}, "int64")
+    local sp = Series.from_array({5, 9}, "int64")
     local ms = sp:eq(5)
     check(ms:get(1) == true and ms:get(2) == false, "9.3.3: number < 2^53 compara normal")
     
     -- aritmética escalar com cdata
-    local x = Series.from_table({1}, "int64")
+    local x = Series.from_array({1}, "int64")
     check((x + B):get_raw(1) == 9007199254740994LL, "9.3.7: série int64 + cdata preserva exato")
     check((x:floordiv(B)):get_raw(1) == 0LL, "9.3.7: floordiv por cdata exato")
     
@@ -216,8 +216,8 @@ end
 -- =====================================================================
 do
     -- int64 + float64 promove para float64
-    local i = Series.from_table({2, 3, 4}, "int64")
-    local f = Series.from_table({1.5, 2.0, 0.5}, "float64")
+    local i = Series.from_array({2, 3, 4}, "int64")
+    local f = Series.from_array({1.5, 2.0, 0.5}, "float64")
     check((i * f)._dtype == "float64", "N.1: int*float -> float64")
     check((i * f):get(1) == 3.0, "N.1: valor correto (2*1.5=3)")
     
@@ -226,8 +226,8 @@ do
     check((i * 2.5):get(1) == 5.0, "N.2: valor correto (2*2.5=5)")
     
     -- guardas: numérico × não-numérico barra
-    check_err(function() return i * Series.from_table({true,false,true}, "bool") end, "N: int*bool barrado")
-    check_err(function() return i * Series.from_table({"a","b","c"}, "string") end, "N: int*string barrado")
+    check_err(function() return i * Series.from_array({true,false,true}, "bool") end, "N: int*bool barrado")
+    check_err(function() return i * Series.from_array({"a","b","c"}, "string") end, "N: int*string barrado")
 end
 
 -- =====================================================================
@@ -235,23 +235,23 @@ end
 -- =====================================================================
 do
     -- promoção segura dentro da família numérica
-    check(Series.from_table({1, 2, 3})._dtype == "int64", "12.31.1: só inteiros → int64")
-    check(Series.from_table({1, 2.5})._dtype == "float64", "12.31.1: int+float → float64")
-    check(Series.from_table({1, NA, 2.5})._dtype == "float64", "12.31.1: nulos não atrapalham")
+    check(Series.from_array({1, 2, 3})._dtype == "int64", "12.31.1: só inteiros → int64")
+    check(Series.from_array({1, 2.5})._dtype == "float64", "12.31.1: int+float → float64")
+    check(Series.from_array({1, NA, 2.5})._dtype == "float64", "12.31.1: nulos não atrapalham")
     
     -- famílias homogêneas
-    check(Series.from_table({"a", "b"})._dtype == "string", "12.31.2: só strings → string")
-    check(Series.from_table({true, false})._dtype == "bool", "12.31.2: só booleanos → bool")
-    check(Series.from_table({})._dtype == "string", "12.31.2: lista vazia → string")
-    check(Series.from_table({NA})._dtype == "string", "12.31.2: só-nula → string")
+    check(Series.from_array({"a", "b"})._dtype == "string", "12.31.2: só strings → string")
+    check(Series.from_array({true, false})._dtype == "bool", "12.31.2: só booleanos → bool")
+    check(Series.from_array({})._dtype == "string", "12.31.2: lista vazia → string")
+    check(Series.from_array({NA})._dtype == "string", "12.31.2: só-nula → string")
     
     -- mistura entre famílias: erro na inferência
-    check_err(function() return Series.from_table({1, "x"}) end, "12.31.3: número + string recusado")
-    check_err(function() return Series.from_table({true, 1}) end, "12.31.3: booleano + número recusado")
-    check_err(function() return Series.from_table({"a", true}) end, "12.31.3: string + booleano recusado")
+    check_err(function() return Series.from_array({1, "x"}) end, "12.31.3: número + string recusado")
+    check_err(function() return Series.from_array({true, 1}) end, "12.31.3: booleano + número recusado")
+    check_err(function() return Series.from_array({"a", true}) end, "12.31.3: string + booleano recusado")
     
     -- dtype explícito ignora inferência
-    local ok2, err2 = pcall(function() return Series.from_table({1, "x"}, "string") end)
+    local ok2, err2 = pcall(function() return Series.from_array({1, "x"}, "string") end)
     check(not ok2 and tostring(err2):match("valor para string") ~= nil, "12.31.5: dtype explícito ignora inferência")
 end
 
@@ -260,14 +260,14 @@ end
 -- =====================================================================
 do
     -- clone independente
-    local orig = Series.from_table({1, 2, 3}, "float64")
+    local orig = Series.from_array({1, 2, 3}, "float64")
     local cl = orig:clone()
     cl[1] = 99
     check(orig[1] == 1.0, "clone: original intacto")
     check(cl[1] == 99, "clone: modificado")
     
     -- view: zero-copy, COW-writable
-    local base = Series.from_table({10, 20, 30, 40, 50}, "float64", "base")
+    local base = Series.from_array({10, 20, 30, 40, 50}, "float64", "base")
     local vw = base:view(2, 3)  -- [20, 30, 40]
     check(vw:len() == 3, "view: len")
     check(vw:get(1) == 20.0 and vw:get(3) == 40.0, "view: valores")
@@ -302,14 +302,14 @@ do
     check(vw_clone:get(1) == -1.0 and vw3:get(1) == 99.0, "clone de view é independente")
     
     -- view em string (suportado, 9.2)
-    local sv_base = Series.from_table({"SP", "RJ", "MG", "BA"}, "string")
+    local sv_base = Series.from_array({"SP", "RJ", "MG", "BA"}, "string")
     local sv_win = sv_base:view(2, 2)
     sv_win:set(1, "MINAS")
     check(sv_win:get(1) == "MINAS", "view string: set na view reflete")
     check(sv_base:get(2) == "RJ", "view string: pai intacta após COW")
     
     -- view em categorical não é suportado
-    local ok_cv, e_cv = pcall(function() return Series.from_table({"x", "y"}, "categorical"):view(1,1) end)
+    local ok_cv, e_cv = pcall(function() return Series.from_array({"x", "y"}, "categorical"):view(1,1) end)
     check(not ok_cv and e_cv:match("'categorical'") and e_cv:match("sem buffer"), "view categorical: erro com razão")
 end
 
@@ -318,24 +318,24 @@ end
 -- =====================================================================
 do
     -- take
-    local src = Series.from_table({100, 200, 300, 400}, "float64")
+    local src = Series.from_array({100, 200, 300, 400}, "float64")
     local tk = src:take({4, 1, 3})
     check(tk:len() == 3, "take: len")
     check(tk:get(1) == 400.0 and tk:get(2) == 100.0 and tk:get(3) == 300.0, "take: ordem")
     check_err(function() return src:take({1, 99}) end, "take: índice fora dos limites")
     
     -- head / tail
-    local long = Series.from_table({1, 2, 3, 4, 5, 6}, "float64")
+    local long = Series.from_array({1, 2, 3, 4, 5, 6}, "float64")
     local hd = long:head(2)
     check(hd:len() == 2 and hd:get(1) == 1.0 and hd:get(2) == 2.0, "head")
     local tl = long:tail(2)
     check(tl:len() == 2 and tl:get(1) == 5.0 and tl:get(2) == 6.0, "tail")
     
     -- sort
-    local uns = Series.from_table({3, 1, 2}, "float64")
+    local uns = Series.from_array({3, 1, 2}, "float64")
     local sorted = uns:sort(true)
     check(sorted:get(1) == 1.0 and sorted:get(3) == 3.0, "sort asc")
-    local g = Series.from_table({1, NA, 3}, "float64")
+    local g = Series.from_array({1, NA, 3}, "float64")
     check_err(function() return g:sort() end, "sort com NA dá erro")
     
     -- tostring não crasha
@@ -347,14 +347,14 @@ end
 -- =====================================================================
 do
     -- f64 → i64 (trunca)
-    local floats = Series.from_table({1.9, 2.1, NA, 4.7}, "float64")
+    local floats = Series.from_array({1.9, 2.1, NA, 4.7}, "float64")
     local ints = floats:astype("int64")
     check(ints._dtype == "int64", "astype: muda dtype")
     check(ints:get(1) == 1 and ints:get(2) == 2, "astype: f64->i64 trunca")
     check(ints:is_null(3), "astype: preserva null")
     
     -- i64 → f64
-    local back = Series.from_table({5, 6}, "int64"):astype("float64")
+    local back = Series.from_array({5, 6}, "int64"):astype("float64")
     check(back._dtype == "float64" and back:get(1) == 5.0, "astype: i64->f64")
     
     -- i64 > 2^53 em astype (10.7)
@@ -365,22 +365,22 @@ do
     check(s:astype("int64"):astype("string"):get(1) == "9007199254740993", "10.7: i64->i64 preserva exato")
     
     -- bool → int64/string
-    local sb = Series.from_table({true, false, true}, "bool")
+    local sb = Series.from_array({true, false, true}, "bool")
     local si = sb:astype("int64")
     check(si._dtype == "int64" and si:get(1) == 1 and si:get(2) == 0, "astype: bool->int64")
     local ss = sb:astype("string")
     check(ss._dtype == "string" and ss:get(1) == "true", "astype: bool->string")
     
     -- int64 → bool (rígido: só 0/1)
-    check_err(function() Series.from_table({0, 1, 2, 0}, "int64"):astype("bool") end, "astype: int64->bool: 2 é erro")
+    check_err(function() Series.from_array({0, 1, 2, 0}, "int64"):astype("bool") end, "astype: int64->bool: 2 é erro")
     
     -- string → bool
-    local st = Series.from_table({"true", "false", "x"}, "string")
+    local st = Series.from_array({"true", "false", "x"}, "string")
     local stb = st:astype("bool")
     check(stb:get(1) == true and stb:get(2) == false and stb:is_null(3), "astype: string->bool")
     
     -- datetime ↔ bool não suportado
-    local bb = Series.from_table({true, false}, "bool")
+    local bb = Series.from_array({true, false}, "bool")
     local ok1, err1 = pcall(function() return bb:astype("datetime") end)
     check(not ok1 and tostring(err1):match("não suportado") ~= nil, "10.7: bool->datetime erro limpo")
     
@@ -392,7 +392,7 @@ do
     check_err(function() a:append(2.7) end, "i64 append recusa 2.7")
     
     -- astype f64->i64: NaN/Inf → null
-    local f = Series.from_table({1.9, 2.1, -3.7, 0/0, 1/0}, "float64")
+    local f = Series.from_array({1.9, 2.1, -3.7, 0/0, 1/0}, "float64")
     local i = f:astype("int64")
     check(i:get(1) == 1 and i:get(2) == 2 and i:get(3) == -3, "astype: trunca em direção a zero")
     check(i:is_null(4) and i:is_null(5), "astype: NaN/Inf → null")
@@ -403,7 +403,7 @@ end
 -- =====================================================================
 do
     -- f64
-    local cmp = Series.from_table({10, 20, 30, 40}, "float64")
+    local cmp = Series.from_array({10, 20, 30, 40}, "float64")
     local gt = cmp:gt(25)
     check(gt:len() == 4, "gt: len")
     check(gt:get(1) == false and gt:get(3) == true, "gt: valores")
@@ -411,7 +411,7 @@ do
     check(gt:any() == true and gt:all() == false, "any/all")
     
     -- ge/le/ne com NA
-    local cmpf = Series.from_table({10, 20, 30, NA}, "float64")
+    local cmpf = Series.from_array({10, 20, 30, NA}, "float64")
     check(cmpf:ge(20):get(1) == false, "f64 ge: abaixo -> false")
     check(cmpf:ge(20):get(2) == true, "f64 ge: igual -> true")
     check(cmpf:ge(20):is_null(4), "f64 ge: null -> NA")
@@ -419,18 +419,18 @@ do
     check(cmpf:ne(20):get(2) == false, "f64 ne: igual -> false")
     
     -- NaN (IEEE: NaN >= x = false)
-    local nan_s = Series.from_table({0/0}, "float64")
+    local nan_s = Series.from_array({0/0}, "float64")
     check(nan_s:ge(0):get(1) == false, "f64 ge: NaN -> false")
     check(nan_s:ne(0):get(1) == true, "f64 ne: NaN != 0 -> true")
     
     -- i64
-    local cmpi = Series.from_table({1, 2, 3, NA}, "int64")
+    local cmpi = Series.from_array({1, 2, 3, NA}, "int64")
     check(cmpi:ge(2):get(1) == false, "i64 ge: abaixo -> false")
     check(cmpi:ge(2):get(2) == true, "i64 ge: igual -> true")
     check(cmpi:ge(2):is_null(4), "i64 ge: null -> NA")
     
     -- string
-    local cmps = Series.from_table({"a", "b", "c", NA}, "string")
+    local cmps = Series.from_array({"a", "b", "c", NA}, "string")
     check(cmps:ge("b"):get(1) == false, "str ge: abaixo -> false")
     check(cmps:ge("b"):get(2) == true, "str ge: igual -> true")
     check(cmps:ge("b"):is_null(4), "str ge: null -> NA")
@@ -445,15 +445,15 @@ end
 -- =====================================================================
 do
     -- filter
-    local cmp = Series.from_table({10, 20, 30, 40}, "float64")
+    local cmp = Series.from_array({10, 20, 30, 40}, "float64")
     local gt = cmp:gt(25)
     local kept = cmp:filter(gt)
     check(kept:len() == 2 and kept:get(1) == 30.0 and kept:get(2) == 40.0, "filter")
     check_err(function() return cmp:filter({}) end, "filter exige Series<bool>")
     
     -- lógica AND/OR/XOR/NOT
-    local a = Series.from_table({1, 1, 0, 0}, "int64"):gt(0)  -- [T,T,F,F]
-    local b = Series.from_table({1, 0, 1, 0}, "int64"):gt(0)  -- [T,F,T,F]
+    local a = Series.from_array({1, 1, 0, 0}, "int64"):gt(0)  -- [T,T,F,F]
+    local b = Series.from_array({1, 0, 1, 0}, "int64"):gt(0)  -- [T,F,T,F]
     check(a:land(b):to_table()[1] == true and a:land(b):get(2) == false, "and")
     check((a + b):get(2) == true, "or via operador +")
     check((a - b):get(1) == false and (a - b):get(2) == true, "xor via operador -")
@@ -461,8 +461,8 @@ do
     check(a:lnot():get(1) == false and a:lnot():get(3) == true, "not")
     
     -- Kleene (três valores)
-    local x = Series.from_table({1, NA, NA}, "int64"):gt(0)  -- [T, NA, NA]
-    local y = Series.from_table({0, 0, 1}, "int64"):gt(0)    -- [F, F, T]
+    local x = Series.from_array({1, NA, NA}, "int64"):gt(0)  -- [T, NA, NA]
+    local y = Series.from_array({0, 0, 1}, "int64"):gt(0)    -- [F, F, T]
     local kand = x:land(y)
     check(kand:get(1) == false, "T and F = F")
     check(kand:get(2) == false, "NA and F = F (Kleene)")
@@ -481,63 +481,71 @@ end
 -- =====================================================================
 do
     local s = Series.from_table({true, NA, false, true}, "bool")
+
     check(s._dtype == "bool", "dtype bool")
     check(s:len() == 4, "len")
     check(s:get(1) == true, "get true")
     check(s:get(2) == nil, "get NA -> nil")
     check(s:count_nonnull() == 3, "count_nonnull")
-    
+
     -- check_value: rejeita não-boolean
     local sn = Series.new("bool", 3)
     check_err(function() sn:set(1, 42) end, "set(42) rejeitado")
     check_err(function() sn:set(1, "x") end, "set('x') rejeitado")
     check_err(function() sn:set(1, 1.5) end, "set(1.5) rejeitado")
-    
+
     -- append
     local sa = Series.new("bool", 0)
     sa:append(true); sa:append(false); sa:append(NA)
     check(sa:len() == 3, "append len")
     check(sa:get(1) == true, "append true")
     check(sa:is_null(3), "append NA")
-    
+
     -- fillna
     local f = s:fillna(false)
     check(f:get(2) == false, "fillna false substituiu NA")
     check(f:count_nonnull() == 4, "fillna count_nonnull")
     check_err(function() s:fillna(1) end, "fillna(1) rejeitado")
-    
+
     -- dropna
     local dn = s:dropna()
     check(dn:len() == 3, "dropna len")
     check(dn:count_nonnull() == 3, "dropna nonnull")
-    
+
     -- describe
     local d = s:describe()
     check(d.count == 3, "describe count")
     check(d.nulls == 1, "describe nulls")
     check(d.count_true == 2, "describe count_true")
     check(d.count_false == 1, "describe count_false")
-    
+
     -- sort / argsort (sem null)
     local s2 = Series.from_table({true, false, true, false}, "bool")
+
     local asc = s2:sort(true)
     check(asc:get(1) == false, "sort asc: false primeiro")
     check(asc:get(3) == true, "sort asc: true terceiro")
+
     local desc = s2:sort(false)
     check(desc:get(1) == true, "sort desc: true primeiro")
+
     local p = s2:argsort(true)
     check(p[1] == 2 and p[2] == 4, "argsort estável: falses 2,4")
+
     check_err(function() return s:sort(true) end, "sort com null recusado")
-    
+
     -- DataSet com coluna bool
     local ds = DataSet({
         {"ativo", {true, NA, false, true}, "bool"},
         {"nome", {"SP", "RJ", "MG", "RS"}, "string"},
     })
+
     check(ds:col("ativo")._dtype == "bool", "DataSet col dtype bool")
     check(ds:dtypes().ativo == "bool", "DataSet dtypes ativo")
+
     local h = ds:head(2)
     check(h:col("ativo")._dtype == "bool", "head preserva dtype bool")
+
     local dd = ds:describe()
     check(dd.ativo ~= nil, "describe DataSet tem ativo")
     check(dd.ativo.count_true == 2, "describe ativo count_true")
@@ -548,7 +556,7 @@ end
 -- =====================================================================
 do
     -- básico: transformação inteira
-    local s = Series.from_table({1, 2, 3}, "int64")
+    local s = Series.from_array({1, 2, 3}, "int64")
     local r = s:map(function(v) return v * 2 end)
     check(r._dtype == "int64", "map: dtype inferido int64")
     check(r:get(1) == 2, "map: valor 1")
@@ -556,14 +564,14 @@ do
     check(r:len() == 3, "map: comprimento preservado")
     
     -- null na entrada -> null na saída
-    local sn = Series.from_table({1, NA, 3}, "int64")
+    local sn = Series.from_array({1, NA, 3}, "int64")
     local rn = sn:map(function(v) if v == nil then return nil end return v + 10 end)
     check(rn:get(1) == 11, "map: null in: valor 1 ok")
     check(rn:is_null(2), "map: null in -> null out")
     check(rn:get(3) == 13, "map: null in: valor 3 ok")
     
     -- fn retorna nil condicionalmente -> null
-    local sc = Series.from_table({5, 15, 25}, "int64")
+    local sc = Series.from_array({5, 15, 25}, "int64")
     local rc = sc:map(function(v) if v > 10 then return v end return nil end)
     check(rc:is_null(1), "map: nil cond -> null")
     check(rc:get(2) == 15, "map: nil cond: valor 2 ok")
