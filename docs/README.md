@@ -100,7 +100,7 @@ bash scripts/build.sh --all  # + Valgrind + coverage + manifest
 
 ```powershell
 # Windows (MSYS2-UCRT64)
-scripts/build_win.ps1
+scripts/build.ps1
 ```
 
 ## Licença

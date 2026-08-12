@@ -3,7 +3,7 @@ CFLAGS  = -std=c11 -fPIC -Wall -Wextra -O2 -I./include
 LDFLAGS = -shared
 
 # Backend C completo: descobre todos os src/*.c automaticamente (12.19) — assim
-# um .c novo entra sem editar lista. Espelha o glob de build.sh e build_win.ps1.
+# um .c novo entra sem editar lista. Espelha o glob de build.sh e build.ps1.
 SRCS = $(wildcard src/*.c)
 
 # Headers entram como dependência do alvo (achado 2026-07-27). Sem isto,

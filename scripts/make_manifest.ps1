@@ -20,13 +20,13 @@
 $ErrorActionPreference = "Stop"
 
 # Raiz do projeto = pasta-pai do diretorio deste script (mesmo criterio do
-# build_win.ps1). O .sh usa caminhos relativos, entao precisa rodar da raiz.
+# build.ps1). O .sh usa caminhos relativos, entao precisa rodar da raiz.
 $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $Root
 
 # ATENCAO (aprendido na primeira execucao real, 2026-07-27): nao basta achar o
 # bash. As coreutils que o .sh usa (sha256sum, cut, wc, sort, find) ficam em
-# C:\msys64\usr\bin, enquanto o build_win.ps1 poe no PATH apenas
+# C:\msys64\usr\bin, enquanto o build.ps1 poe no PATH apenas
 # C:\msys64\ucrt64\bin (onde moram gcc e luajit). E bash NAO-interativo nao le
 # /etc/profile, entao herda o PATH do Windows tal como esta -- sem as
 # ferramentas. Resultado da primeira tentativa: "sha256sum: command not found".
@@ -45,7 +45,7 @@ if (Test-Path (Join-Path $MsysUsrBin "bash.exe")) {
 if (-not $Bash) {
     throw "bash nao encontrado (PATH nem $MsysUsrBin\bash.exe). " +
           "O MANIFEST e gerado por scripts/make_manifest.sh; instale o MSYS2 " +
-          "(o build_win.ps1 -Setup faz isso) e rode de novo."
+          "(o build.ps1 -Setup faz isso) e rode de novo."
 }
 
 # Poe no PATH o diretorio do proprio bash (onde ficam suas coreutils irmas) e,

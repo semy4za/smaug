@@ -27,7 +27,7 @@ command -v luajit >/dev/null 2>&1 || { echo "ERRO: luajit nao encontrado (necess
 # Backend C: descobre todos os src/*.c automaticamente (12.19). Antes era uma
 # lista hardcoded — a mais perigosa das cópias de SRCS: esquecer um .c novo aqui
 # deixava o build verde enquanto o arquivo reportava 0% e não entrava no selo.
-# Agora acompanha o glob de build.sh/Makefile/build_win.ps1. Formato "smaug_X"
+# Agora acompanha o glob de build.sh/Makefile/build.ps1. Formato "smaug_X"
 # (sem src/ nem .c) porque o resto do script referencia os objetos por esse nome.
 SRCS=""
 for _f in src/*.c; do _b="${_f##*/}"; SRCS="$SRCS ${_b%.c}"; done

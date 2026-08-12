@@ -196,7 +196,7 @@ documentada (`get_raw`).
 # Timeline — caminho até a v1.0
 
 **Critério geral de fechamento** (vale para todo item, salvo exceção explícita):
-build verde (`build.sh --all` no Fedora / `build_win.ps1` no Windows), teste
+build verde (`build.sh --all` no Fedora / `build.ps1` no Windows), teste
 que guarda o comportamento novo, parity 12/12, e — para itens de Ring 0 —
 Valgrind-clean + cobertura medida no Fedora. Nenhum item fecha sem um teste que o
 proteja de regressão. Documentação afetada (`CHANGELOG`, contrato, COW.md)
@@ -235,7 +235,7 @@ correto — delegar ao descritor → C — já existe. Subitens 10.5 a 10.9 fech
   opostos** — dimensionado em 2026-07-28; tratá-las como um item só esconde isso.
   - **Fatia A — os 11 componentes base: [Done — Fedora + Windows 2026-07-28]** Valgrind 0 erros nos 13 binários; cobertura **95,07% branch-alvo
     e 98,87% linha**, com 139 exclusões (as 11 novas justificadas). Falta o
-    `build_win.ps1`: são 11 `cdef` novos, superfície FFI. Macro `DT_COMPONENT_SERIES_IMPL` gera as onze versões de série
+    `build.ps1`: são 11 `cdef` novos, superfície FFI. Macro `DT_COMPONENT_SERIES_IMPL` gera as onze versões de série
     sobre as escalares que já existiam e já eram testadas — nenhuma matemática de
     calendário nova. Ganho **medido: 1,5×** (0,082 s → 0,053 s em 1M linhas).
     Modesto de propósito: o gargalo aqui nunca foi o FFI (0,079 s por 1M
@@ -702,7 +702,7 @@ Vinte e quatro subitens já fecharam (ver índice acima). Restam:
    `cdef` — **não muda ABI**). Valgrind 0 erros; cobertura confirmou a previsão
    exata: **226 ramos descobertos antes e depois**, com 24 ramos cobertos a menos
    no total (a lógica duplicada). MANIFEST 126→128 arquivos.
-   A edição do `build_win.ps1` (lista de testes Lua), que não pôde ser testada no
+   A edição do `build.ps1` (lista de testes Lua), que não pôde ser testada no
    ambiente de desenvolvimento, foi **confirmada no Windows em 2026-07-27**: os
    dois testes de `core/` passaram a aparecer na saída de lá, o que também
    comprovou na prática o achado das listas divergentes.
@@ -821,12 +821,12 @@ com o eixo verde.
 - **Fedora:** `build.sh --all` verde, Valgrind 0 erros em todos os binários,
   cobertura medida (linha e branch-alvo), `allocfail` varrendo todos os pontos,
   stress.
-- **Windows MSYS2-UCRT64:** `build_win.ps1` verde, com a **mesma** contagem de
+- **Windows MSYS2-UCRT64:** `build.ps1` verde, com a **mesma** contagem de
   checks do Fedora. Divergência de contagem é sintoma, não detalhe.
 - **Paridade 15/15**, com `exceptions.txt` limpo e reconciliado — cada exceção
   ainda justificada, nenhuma herdada por inércia.
 - Cada teste C rodando nas duas plataformas: hoje o Windows roda 11 binários e o
-  Fedora 12 (falta `test_astype` na lista do `build_win.ps1`).
+  Fedora 12 (falta `test_astype` na lista do `build.ps1`).
 - MANIFEST idêntico nas duas plataformas para a mesma árvore (12.32), com
   procedência apontando o commit certo.
 

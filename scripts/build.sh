@@ -2,7 +2,7 @@
 # scripts/build.sh
 #
 # Build + testes completos do Smaug no Linux/macOS.
-# Equivalente ao build_win.ps1, com Valgrind e coverage adicionais.
+# Equivalente ao build.ps1, com Valgrind e coverage adicionais.
 #
 # O que faz (por padrao, tudo):
 #   1. Compila o backend C em build/libsmaug.so
@@ -118,7 +118,7 @@ fi
 # Listas de teste (fonte unica — espelha o Makefile)
 # ---------------------------------------------------------------------------
 # Fontes do backend C: descobre TODOS os src/*.c automaticamente, para nunca
-# dessincronizar quando um novo .c entra (espelha build_win.ps1 / A3, item 12.29).
+# dessincronizar quando um novo .c entra (espelha build.ps1 / A3, item 12.29).
 # O glob do bash expande ordenado alfabeticamente → build reproduzível.
 SRCS=(src/*.c)
 if [[ ${#SRCS[@]} -eq 0 || ! -e "${SRCS[0]}" ]]; then

@@ -525,7 +525,7 @@ caminho feliz. Fechou em **94.94%**, acima do baseline.
 `test_access` 168→191, `test_ops_edge` 346→381, allocfail 1972→2032.
 
 ---
-## 2026-07-27 — 10.2 fechado, e a edição não testada do build_win.ps1 se provou
+## 2026-07-27 — 10.2 fechado, e a edição não testada do build.ps1 se provou
 
 Uma rodada no Windows fechou três pendências. A fatia 2 do 10.2 atravessou a ABI
 do MSYS2-UCRT64 — o `str_between` tem a assinatura mais larga do conjunto, com
@@ -533,7 +533,7 @@ dois pares (ponteiro, tamanho), que é justamente o caso em que o Linux passa e 
 Windows quebra. **Com isso o 10.2 está completo: os quatro dtypes ordenáveis
 comparam no Anel 0**, e o item saiu da timeline para o índice do concluído.
 
-A edição do `build_win.ps1` que eu havia entregue com a ressalva de "não pôde ser
+A edição do `build.ps1` que eu havia entregue com a ressalva de "não pôde ser
 testada" funcionou: `core/test_keys` e `core/test_collation` apareceram na saída
 do Windows. Isso confirmou na prática o achado das listas divergentes — os dois
 testes existiam e passavam, mas o Windows nunca os rodava. O `test_keys` guarda a
@@ -544,7 +544,7 @@ A fatia A do 10.3 também passou no Windows, mas segue **sem selo**: Valgrind e
 cobertura só rodam no Fedora, e é lá que a medição vale.
 
 Fica registrado o que ainda diverge entre plataformas: Fedora roda 12 binários em
-C, Windows 11 — falta `test_astype` na lista do `build_win.ps1`. A matriz de
+C, Windows 11 — falta `test_astype` na lista do `build.ps1`. A matriz de
 conversão nunca foi confirmada na ABI do Windows.
 
 ---
@@ -640,7 +640,7 @@ Os dois testes de `core/` apareceram na saída da suíte pela primeira vez, o qu
 confirma na prática o achado das listas divergentes: o `test_keys` existia e
 passava, mas o build só o rodava numa das três configurações.
 
-Ressalva registrada: o `build_win.ps1` foi editado e **não pôde ser testado** —
+Ressalva registrada: o `build.ps1` foi editado e **não pôde ser testado** —
 não há PowerShell no ambiente de desenvolvimento. Mesma situação do
 `make_manifest.ps1`, que falhou na primeira execução real. A próxima rodada no
 Windows valida a edição.
@@ -703,7 +703,7 @@ C. Com a fatia 1 selada, a fatia 2 do 10.2 (datetime + string) está desbloquead
 com o desenho já aprovado.
 
 Fica registrado que o Fedora roda **12** binários em C e o Windows **11**: falta
-`test_astype` na lista do `build_win.ps1`. Não afeta estes itens (astype não foi
+`test_astype` na lista do `build.ps1`. Não afeta estes itens (astype não foi
 tocado), mas significa que a matriz de conversão nunca foi confirmada no Windows.
 
 ---
@@ -792,7 +792,7 @@ O `.sh` foi testado nos três casos (fora de git, repo limpo, repo sujo). O `.ps
 falhou na primeira execução real, de um jeito que rende duas lições.
 
 A primeira: achar o bash não basta. As coreutils que o `.sh` usa vivem em
-`C:\msys64\usr\bin`, e o `build_win.ps1` só põe `ucrt64\bin` no PATH — de onde vêm
+`C:\msys64\usr\bin`, e o `build.ps1` só põe `ucrt64\bin` no PATH — de onde vêm
 gcc e luajit. Bash não-interativo não lê `/etc/profile`, então herda o PATH do
 Windows sem as ferramentas, e o script morre em `sha256sum: command not found`. O
 wrapper agora garante o diretório das coreutils.
@@ -1231,12 +1231,12 @@ Achado (A3): o eixo 14 (thread-safety) iterava uma lista fixa de `src/*.c`. Um
 `.c` novo não-listado não era auditado — passava em silêncio. O levantamento
 revelou que o problema era maior que o registrado: **três** listas de fontes, e
 as duas hardcoded eram só do Linux (`build.sh` `SRCS` e o eixo 14), enquanto o
-`build_win.ps1` já descobria via glob. A do `build.sh` era mais grave — um `.c`
+`build.ps1` já descobria via glob. A do `build.sh` era mais grave — um `.c`
 novo nem compilaria no Linux até editarem a lista. Optamos pelo escopo completo:
 alinhar o Linux ao Windows nas duas.
 
 Solução: `build.sh` usa `SRCS=(src/*.c)` (glob) e grava a lista descoberta em
-`build/SOURCES`; `build_win.ps1` grava o mesmo arquivo (normalizado para forward
+`build/SOURCES`; `build.ps1` grava o mesmo arquivo (normalizado para forward
 slash, formato único nos dois OS). O eixo 14 lê `build/SOURCES` — a lista fresca
 do que foi de fato compilado, sem defasagem — com fallback ao MANIFEST versionado
 quando rodado standalone, e falha-visível se nenhum der lista.
@@ -2050,7 +2050,7 @@ Três incrementos, cada um selado antes do próximo:
 
 Selo Fedora `--all`: Valgrind 0 erros (13 binários), 18 suites Lua +
 property-based (360862 checks), coverage 98.73%/94.69%, parity 12/12.
-**Windows (`build_win.ps1`) é follow-up obrigatório** antes de considerar o 10.8
+**Windows (`build.ps1`) é follow-up obrigatório** antes de considerar o 10.8
 fechado de vez — (c) introduz símbolo C novo (ABI/FFI).
 
 ---
@@ -2200,14 +2200,14 @@ Testes: degrau → paridade Anel 0 nas 4 dtypes (selection 48 checks). Windows
 12/12; prévia Ubuntu branch-alvo 94.38→94.49%. Selo Fedora pendente.
 
 ---
-## 2026-07-09 — rename: scripts/windows_build.ps1 → scripts/build_win.ps1
+## 2026-07-09 — rename: scripts/windows_build.ps1 → scripts/build.ps1
 
-Renomeado o script de build do Windows para `build_win.ps1`, alinhando com o
+Renomeado o script de build do Windows para `build.ps1`, alinhando com o
 par `build.sh`. O replace foi global (docs + scripts + header do próprio
 script); nenhuma referência a `windows_build.ps1` permanece no repo.
 
 Nota de registro: o replace alcançou também as entradas históricas deste
-CHANGELOG — sessões anteriores a esta data mencionam `build_win.ps1` embora, à
+CHANGELOG — sessões anteriores a esta data mencionam `build.ps1` embora, à
 época, o arquivo se chamasse `windows_build.ps1`. Escolha consciente para manter
 todas as referências apontando ao arquivo vigente; esta entrada documenta o
 rename para que o nome novo nas entradas antigas tenha explicação. Sem mudança
@@ -2740,7 +2740,7 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   inalteradas (compartilhadas; Series são COW). Erro em coluna inexistente ou se o
   argumento não for mapa.
 - Tudo Lua-puro sobre a 5.0 (Anel 0 já validado no Fedora). DataSet stat: 49→90
-  checks. **Item 5 fecha** por equivalência Fedora; follow-up `build_win.ps1`.
+  checks. **Item 5 fecha** por equivalência Fedora; follow-up `build.ps1`.
 
 ---
 ## 2026-06-28 — Item 5: reduções DataSet (5.1), min_count (5.5), delegação GroupBy (5.4)
@@ -2829,7 +2829,7 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
 - `[Windows]` Lua-puro, mesma categoria dos itens 2/3 (nenhum C tocado). Build
   Linux verde, parity 12/12. **Mudança de comportamento** + contrato novo, então
   os testes são o guard. Fecha por equivalência Fedora com confirmação do
-  `build_win.ps1`.
+  `build.ps1`.
 
 ---
 ## 2026-06-28 — Timeline item 3: bool_view (exposição na camada Lua)
@@ -2868,7 +2868,7 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   (já provada no Windows). É a mesma categoria Lua-pura do item 2, não expõe C novo.
 - Fechado por equivalência Fedora: suíte Lua verde (incl. bool view+COW), parity
   12/12 (eixos 1 e 10 coerentes), Valgrind-clean. Follow-up leve: confirmar no
-  `build_win.ps1`. A regra "C novo não fecha por equivalência" segue válida;
+  `build.ps1`. A regra "C novo não fecha por equivalência" segue válida;
   o item só não se enquadra nela.
 
 ---
@@ -2881,7 +2881,7 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
 - **Item 2 (Done via Fedora):** Lua puro, sem C tocado. Critério `[Windows]`
   suprido por validação Fedora (mesmo LuaJIT; parity eixo 09 OK; ponto sensível
   do `_dt.lua` exercitado de fato). Follow-up leve: confirmar com
-  `build_win.ps1`. **Equivalência vale só por ser Lua puro — não é regra.**
+  `build.ps1`. **Equivalência vale só por ser Lua puro — não é regra.**
 
 ### Incidente: `lua/smaug/init.lua` (entry point) sobrescrito
 - Na aplicação do item 2, o orquestrador da Series (`core/series/init.lua`) foi
@@ -2985,7 +2985,7 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   realloc` não intercepta esses dois (resolvem internamente na libc), deixando
   todos os guards de OOM sobre eles sem exercício. Adicionados `__wrap_calloc`
   e `__wrap_strdup`; flag propagada às quatro configurações de build (Makefile,
-  build.sh, make_coverage.sh, build_win.ps1). Verificações 1492 → 1515
+  build.sh, make_coverage.sh, build.ps1). Verificações 1492 → 1515
   (inclui sweep de OOM em `multi_argsort`/`multi_argsort_ffi`, antes sem
   cobertura de falha de alocação).
 - **Cobertura branch-alvo dos parsers** (medição Fedora autoritativa):
@@ -3121,7 +3121,7 @@ a família `smaug_{f64,i64}_rolling_*` — símbolos que o `ffi_loader.lua` decl
 e consome. A `.so` gerada pelo `build.sh` ficava sem eles: qualquer uso de
 rolling ou sort multi-coluna pelo frontend Lua quebraria em runtime com símbolo
 indefinido. Confirmado por `nm -D` (0 símbolos antes, 10 depois). O Makefile e
-o `build_win.ps1` (que descobre `src/*.c` por glob) já estavam corretos —
+o `build.ps1` (que descobre `src/*.c` por glob) já estavam corretos —
 o bug era exclusivo do `build.sh`.
 
 ### Bug 2 — cobertura cega em `make_coverage.sh` (corrigido)
@@ -3141,7 +3141,7 @@ estrutura por domínio:
 - **`build.sh`** — `SRCS` += `smaug_ops_window.c`; `C_TESTS_PLAIN` += `test_ops_window`;
   testes C compilam de `tests/c/`; `LUA_TESTS` passou a listar as 18 suítes em
   subpasta (`series/…`, `dataset/…`, `io/…`, `props/…`).
-- **`build_win.ps1`** — testes C de `tests\c\`; lista Lua atualizada para as
+- **`build.ps1`** — testes C de `tests\c\`; lista Lua atualizada para as
   18 suítes; normalização de separador (`/`→`\`) no caminho do luajit; cabeçalho
   corrigido (era "8 suites Lua").
 - **`make_coverage.sh`** — `SRCS` e `C_TESTS` corrigidos (ver Bug 2); testes C e
@@ -3173,7 +3173,7 @@ estrutura nova, confirmando zero dependência residual.
 
 ### Validação
 
-`build_win.ps1` verde no Windows (MSYS2-UCRT64): DLL com 10 fontes, 12
+`build.ps1` verde no Windows (MSYS2-UCRT64): DLL com 10 fontes, 12
 testes C (incl. `test_ops_window` 207 checks, `test_io_c` 190 checks), 18 suítes
 Lua, 12 eixos de paridade OK, property-based 360 862 checks. MANIFEST: 113
 arquivos (era 154 antes da limpeza). Valgrind + cobertura no Fedora pendentes
@@ -3436,7 +3436,7 @@ função de classe, documentada à parte como `from_columns`). Roadmap marca F.5
 
 ### Corrigido — testes de I/O com path hardcoded (Windows)
 
-`build_win.ps1` falhou em `test_io_c`, `test_io` e `test_io_real`: os testes
+`build.ps1` falhou em `test_io_c`, `test_io` e `test_io_real`: os testes
 escreviam em `/tmp/...`, que não existe no Windows/UCRT64. Não era regressão da
 biblioteca — `to_csv`/`smaug_write_csv` reportaram fielmente a falha de escrita.
 Introduzido helper `tmp_path` (um em C, um em Lua) que resolve o diretório
@@ -3491,10 +3491,10 @@ helpers `str_map` (→ Series<string>) e `bool_map` (→ Series<bool>) existente
 
 ### Sincronização das três fontes de build
 
-`build_win.ps1` estava atrás em duas dimensões: faltava `test_datetime_c`
+`build.ps1` estava atrás em duas dimensões: faltava `test_datetime_c`
 (C) e seis suítes Lua (`test_datetime`, `test_categorical`, `test_completeness`,
 `test_dt_extended`, `test_stats`, `test_predicates`). Alinhado ao Makefile
-canônico — as três fontes (`Makefile`, `build.sh`, `build_win.ps1`) agora
+canônico — as três fontes (`Makefile`, `build.sh`, `build.ps1`) agora
 rodam o conjunto idêntico, verificado por diff: 9 binários C plain + allocfail +
 stress, e 26 suítes Lua.
 
@@ -4084,7 +4084,7 @@ função de classe, documentada à parte como `from_columns`). Roadmap marca F.5
 
 ### Corrigido — testes de I/O com path hardcoded (Windows)
 
-`build_win.ps1` falhou em `test_io_c`, `test_io` e `test_io_real`: os testes
+`build.ps1` falhou em `test_io_c`, `test_io` e `test_io_real`: os testes
 escreviam em `/tmp/...`, que não existe no Windows/UCRT64. Não era regressão da
 biblioteca — `to_csv`/`smaug_write_csv` reportaram fielmente a falha de escrita.
 Introduzido helper `tmp_path` (um em C, um em Lua) que resolve o diretório
@@ -4139,10 +4139,10 @@ helpers `str_map` (→ Series<string>) e `bool_map` (→ Series<bool>) existente
 
 ### Sincronização das três fontes de build
 
-`build_win.ps1` estava atrás em duas dimensões: faltava `test_datetime_c`
+`build.ps1` estava atrás em duas dimensões: faltava `test_datetime_c`
 (C) e seis suítes Lua (`test_datetime`, `test_categorical`, `test_completeness`,
 `test_dt_extended`, `test_stats`, `test_predicates`). Alinhado ao Makefile
-canônico — as três fontes (`Makefile`, `build.sh`, `build_win.ps1`) agora
+canônico — as três fontes (`Makefile`, `build.sh`, `build.ps1`) agora
 rodam o conjunto idêntico, verificado por diff: 9 binários C plain + allocfail +
 stress, e 26 suítes Lua.
 

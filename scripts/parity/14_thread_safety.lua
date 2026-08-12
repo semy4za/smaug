@@ -25,7 +25,7 @@ local C = dofile("scripts/parity/common.lua")
 -- Buscamos `static <tipo> <nome>` fora de função, sem const.
 -- Descobre os fontes do Anel 0 a auditar SEM lista hardcoded (12.29/A3). Antes,
 -- uma lista fixa aqui não pegava um .c novo não-listado — passava em silêncio.
--- Fonte primária: build/SOURCES (gravado por build.sh/build_win.ps1 a partir do
+-- Fonte primária: build/SOURCES (gravado por build.sh/build.ps1 a partir do
 -- glob que compilou — a lista exata do que foi construído, sem defasagem).
 -- Fallback: os src/*.c do MANIFEST (quando rodado standalone, sem build antes).
 -- Salvaguarda: se nenhuma fonte der lista, o eixo FALHA (não audita vazio em
