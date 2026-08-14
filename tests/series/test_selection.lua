@@ -29,7 +29,7 @@ local NA = smaug.NA
 -- 1. Series:at / iat — acesso escalar (indexação e chamada)
 -- ================================================================
 
-local s = S.from_table({10, 20, NA, 40}, "int64")
+local s = S.from_array({10, 20, NA, 40}, "int64")
 
 -- indexação s.at[i]
 check(s.at[1] == 10,                "at[1] = 10")
@@ -56,7 +56,7 @@ do
     check(err:find("<Series", 1, true) ~= nil,
                                            "12.9 s:iat(3) descreve a Series sem conteúdo")
     -- a classe toda: nenhum método de acesso vaza dados na mensagem
-    local big = S.from_table({"aaa", "bbb", "ccc"}, "string")
+    local big = S.from_array({"aaa", "bbb", "ccc"}, "string")
     for _, case in ipairs({
         { "get",      function() big:get(big) end },
         { "set",      function() big:set(big, "x") end },
@@ -71,7 +71,7 @@ do
 end
 
 -- string e datetime
-local ss = S.from_table({"x", "y"}, "string")
+local ss = S.from_array({"x", "y"}, "string")
 check(ss.at[1] == "x",              "at[1] string = x")
 
 -- fora dos limites → erro
@@ -87,14 +87,14 @@ check(not pcall(function() return s.at["x"] end), "at['x'] = erro (não-numéric
 -- =====================================================================
 
 -- isna / notna
-local isn = S.from_table({1.0, NA, 3.0}, "float64")
+local isn = S.from_array({1.0, NA, 3.0}, "float64")
 check(isn:isna(2) == true,   "isna(2)=true")
 check(isn:isna(1) == false,  "isna(1)=false")
 check(isn:notna(1) == true,  "notna(1)=true")
 check(isn:notna(2) == false, "notna(2)=false")
 
 -- where / mask / ifelse
-local sw  = S.from_table({1.0,2.0,3.0,4.0}, "float64")
+local sw  = S.from_array({1.0,2.0,3.0,4.0}, "float64")
 local cnd = sw:gt(2)
 local w   = sw:where(cnd, 0.0)
 check(w:get(1) == 0.0, "where[1]=0 (falso)")
@@ -112,7 +112,7 @@ check(ife:get(4) == 4.0, "ifelse[4]=4 (verdadeiro)")
 -- 7.4 — bool eq/ne (único dtype que faltava igualdade)
 -- ================================================================
 do
-    local b = S.from_table({true, false, NA}, "bool")
+    local b = S.from_array({true, false, NA}, "bool")
     local function show(r) local o = {}; for i = 1, r:len() do o[i] = r:is_null(i) and "NA" or tostring(r:get(i)) end; return table.concat(o, ",") end
 
     check(show(b:eq(true)) == "true,false,NA", "7.4 bool eq(true)")
@@ -185,7 +185,7 @@ do
     -- (exercita `if (len>0)` e o ramo `total>0 ? total : INIT`).
     local ea = S.new("string", 2); ea:set(1, ""); ea:set_null(2)
     local eb = S.new("string", 2); eb:set_null(1); eb:set(2, "")
-    local c2s = S.from_table({true, false}, "bool")
+    local c2s = S.from_array({true, false}, "bool")
     local ew = ea:where(c2s, eb)   -- [ea[1]="", eb[2]=""]
     check(ew:get(1) == "" and ew:get(2) == "" and not ew:is_null(1) and not ew:is_null(2),
           "10.6b: where str '' válida len==0 / total==0")
@@ -197,17 +197,17 @@ do
     check(dw:get(1) == 1000 and dw:get(2) == 2000 and dw:is_null(3), "10.6b: where dt tabela-verdade")
 
     -- não-regressão: int64 <= 2^53 intacto
-    local sm = S.from_table({10, 20}, "int64")
-    local c2 = S.from_table({true, false}, "bool")
+    local sm = S.from_array({10, 20}, "int64")
+    local c2 = S.from_array({true, false}, "bool")
     check(sm:where(c2, sm):get(1) == 10,     "10.6b: where i64<=2^53 intacto")
     check(S.ifelse(c2, sm, sm):get(1) == 10, "10.6b: ifelse i64<=2^53 intacto")
 
     -- falha visível: operando série de dtype diferente
-    local wrong = S.from_table({1.0, 2.0, 3.0}, "float64")
+    local wrong = S.from_array({1.0, 2.0, 3.0}, "float64")
     check(not pcall(function() return a:where(cond, wrong) end),
           "10.6b: where dtype divergente → erro visível")
     -- falha visível: cond de tamanho diferente
-    check(not pcall(function() return a:where(S.from_table({true}, "bool"), o) end),
+    check(not pcall(function() return a:where(S.from_array({true}, "bool"), o) end),
           "10.6b: where cond tamanho errado → erro visível")
 end
 
@@ -225,7 +225,7 @@ do
     local a = ffi.new("int64_t", 9007199254740992LL)  -- 2^53
     local b = ffi.new("int64_t", 9007199254740993LL)  -- 2^53 + 1
     local c = ffi.new("int64_t", 9007199254740995LL)  -- 2^53 + 3 (vira …996 em double)
-    local s = S.from_table({a, b, c}, "int64", "big")
+    local s = S.from_array({a, b, c}, "int64", "big")
 
     -- 9.4.1 — os valores devolvidos ESTÃO no dataset (nada fabricado).
     local top = s:nlargest(2)
@@ -244,12 +244,12 @@ do
     check(s:nlargest(10):len() == 3, "9.4.3 n > len devolve o que há")
 
     -- 9.4.4 — float64 segue igual (double é nativo, nada a preservar).
-    local f = S.from_table({3.5, 1.25, 9.75}, "float64", "f")
+    local f = S.from_array({3.5, 1.25, 9.75}, "float64", "f")
     check(f:nlargest(1):get(1) == 9.75, "9.4.4 float64 nlargest inalterado")
     check(f:nsmallest(1):get(1) == 1.25, "9.4.4 float64 nsmallest inalterado")
 
     -- 9.4.5 — nulos continuam ignorados (sorted_nonnull), sem degradar o resto.
-    local sn = S.from_table({b, NA, c}, "int64", "comnull")
+    local sn = S.from_array({b, NA, c}, "int64", "comnull")
     local t2 = sn:nlargest(2)
     check(t2:len() == 2, "9.4.5 nulos ignorados")
     check(t2:get_raw(1) == 9007199254740995LL, "9.4.5 exatidão mantida com nulos")
@@ -265,15 +265,15 @@ end
 -- colunas, drop_duplicates→contagem errada.
 -- ===================================================================
 do
-    local st  = S.from_table({"a", "b", "c"}, "string")
-    local ser = S.from_table({1, 2}, "int64")
+    local st  = S.from_array({"a", "b", "c"}, "string")
+    local ser = S.from_array({1, 2}, "int64")
 
     -- 12.38.1 — os cinco casos que aceitavam em silêncio agora erram
     check(not pcall(function() return st:take(ser) end),
           "12.38.1 take(Series) recusado (devolvia 0 elementos)")
     check(not pcall(function() return st:isin(ser) end),
           "12.38.1 isin(Series) recusado (devolvia tudo false)")
-    local cat = S.from_table({"a", "b", "a"}, "string"):astype("categorical")
+    local cat = S.from_array({"a", "b", "a"}, "string"):astype("categorical")
     check(not pcall(function() return cat:take(ser) end),
           "12.38.1 categorical:take(Series) recusado")
 

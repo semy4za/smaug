@@ -36,7 +36,7 @@ end
 -- +Inf / -Inf — ordenáveis, válidos em reduções
 -- ===================================================================
 do
-    local s = S.from_table({3.0, inf, 1.0, ninf, 2.0}, "float64")
+    local s = S.from_array({3.0, inf, 1.0, ninf, 2.0}, "float64")
     check(s:min() == ninf, "Inf: min == -Inf")
     check(s:max() == inf,  "Inf: max == +Inf")
     -- +Inf + -Inf = NaN → soma indefinida vira nil
@@ -46,7 +46,7 @@ do
     check(sorted:get(1) == ninf, "Inf: sort põe -Inf no início")
     check(sorted:get(5) == inf,  "Inf: sort põe +Inf no fim")
 
-    local p = S.from_table({1.0, inf, 2.0}, "float64")
+    local p = S.from_array({1.0, inf, 2.0}, "float64")
     check(p:sum() == inf, "Inf: 1+Inf+2 = Inf")
     check(p:mean() == inf, "Inf: mean = Inf")
     check(p:max() == inf, "Inf: max")
@@ -105,11 +105,11 @@ end
 -- ===================================================================
 -- div/0 → null (decisão explícita: div/0 não passa, é previsível)
 -- 0/0, n/0 e -n/0 todos produzem null; NaN via op foi removido.
--- NaN ainda existe como valor literal (S.from_table({0/0})).
+-- NaN ainda existe como valor literal (S.from_array({0/0})).
 -- ===================================================================
 do
-    local a = S.from_table({0.0, 1.0, -1.0}, "float64")
-    local b = S.from_table({0.0, 0.0,  0.0}, "float64")
+    local a = S.from_array({0.0, 1.0, -1.0}, "float64")
+    local b = S.from_array({0.0, 0.0,  0.0}, "float64")
     local c = a / b
     check(c:is_null(1), "op: 0/0  → null")
     check(c:is_null(2), "op: 1/0  → null")
@@ -129,8 +129,8 @@ do
     check_err(function() return s:sort() end, "NaN: sort recusa NaN")
     check(s:argsort() == nil, "NaN: argsort retorna nil com NaN")
     -- null vindo de div/0 também é recusado pelo sort
-    local a = S.from_table({0.0, 1.0}, "float64")
-    local b = S.from_table({0.0, 2.0}, "float64")
+    local a = S.from_array({0.0, 1.0}, "float64")
+    local b = S.from_array({0.0, 2.0}, "float64")
     local c = a / b            -- [1] = null (0/0 → null), [2] = 0.5
     check_err(function() return c:sort() end, "div/0: sort recusa null resultante")
 end
@@ -155,7 +155,7 @@ end
 -- -0.0 — igual a 0.0 nas comparações, neutro na soma
 -- ===================================================================
 do
-    local z = S.from_table({-0.0, 0.0}, "float64")
+    local z = S.from_array({-0.0, 0.0}, "float64")
     check(z:eq(0.0):count_true() == 2, "-0.0: -0 e +0 ambos == 0")
     check(z:sum() == 0, "-0.0: soma neutra")
     check(z:min() == z:max(), "-0.0: min == max (mesmo valor)")
@@ -164,11 +164,11 @@ end
 
 -- 5.5 — min_count opt-in em sum/prod (Series)
 do
-    local c = Series.from_table({10, NA, NA}, "int64")
+    local c = Series.from_array({10, NA, NA}, "int64")
     check(c:sum() == 10, "5.5 Series sum default ignora NA = 10")
     check(c:sum(nil, 2) == nil, "5.5 Series sum(min_count=2): 1 não-nulo → NA")
     check(c:sum(nil, 1) == 10, "5.5 Series sum(min_count=1): 1 não-nulo → 10")
-    local an = Series.from_table({NA, NA}, "int64")
+    local an = Series.from_array({NA, NA}, "int64")
     check(an:sum() == 0, "5.5 Series sum all-null default = 0 (preservado)")
     check(an:sum(nil, 1) == nil, "5.5 Series sum all-null min_count=1 → NA")
     check(c:prod(nil, 2) == nil, "5.5 Series prod(min_count=2) → NA")
@@ -177,29 +177,29 @@ do
     -- min/max em dtypes ordenáveis não-numéricos (item 7.2b): retornam
     -- VALOR (D7.2-a ii). Fecha a incoerência argmin✓/min✗ que havia em dt.
     -- ===============================================================
-    local d = Series.from_table({"2020-03-01", "2020-01-01", "2020-06-15"}, "datetime")
+    local d = Series.from_array({"2020-03-01", "2020-01-01", "2020-06-15"}, "datetime")
     check(d:min() == d:get(d:argmin()), "7.2b dt:min == get(argmin)")
     check(d:max() == d:get(d:argmax()), "7.2b dt:max == get(argmax)")
     check(type(d:min()) == "number",     "7.2b dt:min retorna número (epoch)")
 
-    local sm = Series.from_table({"banana", "abacaxi", "caju"}, "string")
+    local sm = Series.from_array({"banana", "abacaxi", "caju"}, "string")
     check(sm:min() == "abacaxi", "7.2b str:min = abacaxi")
     check(sm:max() == "caju",    "7.2b str:max = caju")
-    local sv = Series.from_table({"z", "", "m"}, "string")
+    local sv = Series.from_array({"z", "", "m"}, "string")
     check(sv:min() == "",       "7.2b str:min com vazia = '' (válida)")
 
-    local bm = Series.from_table({true, false, true}, "bool")
+    local bm = Series.from_array({true, false, true}, "bool")
     check(bm:min() == false, "7.2b bool:min = false")
     check(bm:max() == true,  "7.2b bool:max = true")
 
-    check(Series.from_table({NA, NA}, "string"):min()   == nil, "7.2b str all-NA min = nil")
-    check(Series.from_table({NA, NA}, "bool"):min()     == nil, "7.2b bool all-NA min = nil")
-    check(Series.from_table({NA, NA}, "datetime"):min() == nil, "7.2b dt all-NA min = nil")
+    check(Series.from_array({NA, NA}, "string"):min()   == nil, "7.2b str all-NA min = nil")
+    check(Series.from_array({NA, NA}, "bool"):min()     == nil, "7.2b bool all-NA min = nil")
+    check(Series.from_array({NA, NA}, "datetime"):min() == nil, "7.2b dt all-NA min = nil")
 
-    local smn = Series.from_table({"a", NA, "c"}, "string")
+    local smn = Series.from_array({"a", NA, "c"}, "string")
     check(smn:min()      == "a",  "7.2b str:min default ignora NA")
     check(smn:min(false) == nil,  "7.2b str:min(false) com NA = nil")
-    local bmn = Series.from_table({true, NA}, "bool")
+    local bmn = Series.from_array({true, NA}, "bool")
     check(bmn:min(false) == nil,  "7.2b bool:min(false) com NA = nil")
 end
 

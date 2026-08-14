@@ -26,7 +26,7 @@ end
 -- =====================================================================
 do
     -- from_table básico
-    local c = Series.from_table({"SP", "RJ", "SP", NA, "MG"}, "categorical")
+    local c = Series.from_array({"SP", "RJ", "SP", NA, "MG"}, "categorical")
     check(c._dtype == "categorical", "dtype = categorical")
     check(c:len() == 5, "len = 5")
     check(c:get(1) == "SP", "get(1) = SP")
@@ -55,12 +55,12 @@ do
     end, "from_codes: nível duplicado literal")
     
     -- Série vazia
-    local c0 = Series.from_table({}, "categorical")
+    local c0 = Series.from_array({}, "categorical")
     check(c0:len() == 0, "vazio: len=0")
     check(#c0.cat:levels() == 0, "vazio: 0 levels")
     
     -- Série toda nula
-    local c_null = Series.from_table({NA, NA, NA}, "categorical")
+    local c_null = Series.from_array({NA, NA, NA}, "categorical")
     check(c_null:get(1) == nil, "tudo NA: get=nil")
     check(c_null:count_nonnull() == 0, "tudo NA: count_nonnull=0")
 end
@@ -69,7 +69,7 @@ end
 -- 2. Acesso e Mutação
 -- =====================================================================
 do
-    local cm = Series.from_table({"A", "B", "C"}, "categorical")
+    local cm = Series.from_array({"A", "B", "C"}, "categorical")
     
     -- is_null / set_null
     check(not cm:is_null(1), "is_null(1) = false")
@@ -87,7 +87,7 @@ do
     check(#cm.cat:levels() == 4, "novo level criado (4 total)")
     
     -- append
-    local ca = Series.from_table({"X"}, "categorical")
+    local ca = Series.from_array({"X"}, "categorical")
     ca:append("Y")
     ca:append(NA)
     ca:append("X") -- reutiliza level
@@ -96,7 +96,7 @@ do
     check(ca:is_null(3), "append NA")
     
     -- count_nonnull
-    local c = Series.from_table({"SP", "RJ", "SP", NA, "MG"}, "categorical")
+    local c = Series.from_array({"SP", "RJ", "SP", NA, "MG"}, "categorical")
     check(c:count_nonnull() == 4, "count_nonnull = 4")
 end
 
@@ -104,7 +104,7 @@ end
 -- 3. .cat Accessor
 -- =====================================================================
 do
-    local ccat = Series.from_table({"B", "A", NA, "C", "A"}, "categorical")
+    local ccat = Series.from_array({"B", "A", NA, "C", "A"}, "categorical")
     
     -- codes()
     local codes = ccat.cat:codes()
@@ -136,7 +136,7 @@ end
 -- 4. Comparações e Ordenação
 -- =====================================================================
 do
-    local ccmp = Series.from_table({"SP", "RJ", "SP", NA, "MG"}, "categorical")
+    local ccmp = Series.from_array({"SP", "RJ", "SP", NA, "MG"}, "categorical")
     
     -- eq / ne
     local eq = ccmp:eq("SP")
@@ -145,19 +145,19 @@ do
     check(eq:is_null(4), "eq: NA → NA")
     
     -- lt / gt / le / ge
-    local cord = Series.from_table({"B", "A", "C"}, "categorical")
+    local cord = Series.from_array({"B", "A", "C"}, "categorical")
     check(cord:lt("B"):get(2) == true, "lt: A < B")
     check(cord:gt("B"):get(3) == true, "gt: C > B")
     check(cord:le("B"):get(1) == true, "le: B <= B")
     
     -- sort
-    local csort = Series.from_table({"C", "A", "B", "A"}, "categorical")
+    local csort = Series.from_array({"C", "A", "B", "A"}, "categorical")
     local sorted = csort:sort(true)
     check(sorted:get(1) == "A", "sort asc: 1º = A")
     check(sorted:get(4) == "C", "sort asc: 4º = C")
     
     -- sort com nulo → erro
-    local cnull = Series.from_table({"A", NA, "B"}, "categorical")
+    local cnull = Series.from_array({"A", NA, "B"}, "categorical")
     check_err(function() cnull:sort(true) end, "sort com null")
     
     -- argsort
@@ -170,7 +170,7 @@ do
     check(filtered:len() == 2, "filter: len=2")
     
     -- dropna
-    local cdn = Series.from_table({"A", NA, "B", NA, "C"}, "categorical")
+    local cdn = Series.from_array({"A", NA, "B", NA, "C"}, "categorical")
     local dropped = cdn:dropna()
     check(dropped:len() == 3, "dropna: len=3")
 end
@@ -180,13 +180,13 @@ end
 -- =====================================================================
 do
     -- fillna
-    local cfn = Series.from_table({"A", NA, NA, "C"}, "categorical")
+    local cfn = Series.from_array({"A", NA, NA, "C"}, "categorical")
     local filled = cfn:fillna("B")
     check(filled:get(2) == "B", "fillna: NA preenchido")
     check(cfn:is_null(2), "fillna: original não mutado")
     
     -- ffill
-    local c3 = Series.from_table({NA, "SP", NA, "RJ", NA}, "categorical")
+    local c3 = Series.from_array({NA, "SP", NA, "RJ", NA}, "categorical")
     local ff = c3:ffill()
     check(ff:get(1) == nil, "ffill[1] = nil")
     check(ff:get(3) == "SP", "ffill[3] = SP")
@@ -197,20 +197,20 @@ do
     check(bf:get(5) == nil, "bfill[5] = nil")
     
     -- shift
-    local c5 = Series.from_table({"A", "B", "C"}, "categorical")
+    local c5 = Series.from_array({"A", "B", "C"}, "categorical")
     local sh = c5:shift(1)
     check(sh:get(1) == nil, "shift(1)[1] = null")
     check(sh:get(2) == "A", "shift(1)[2] = A")
     
     -- map
-    local c6 = Series.from_table({"sp", "rj", NA}, "categorical")
+    local c6 = Series.from_array({"sp", "rj", NA}, "categorical")
     local up = c6:map(function(v) return v and string.upper(v) or nil end, "string")
     check(up._dtype == "string", "map → string")
     check(up:get(3) == nil, "map: null propaga")
     
     -- where / mask
-    local c7 = Series.from_table({"SP", "RJ", "MG"}, "categorical")
-    local mask = Series.from_table({true, false, true}, "bool")
+    local c7 = Series.from_array({"SP", "RJ", "MG"}, "categorical")
+    local mask = Series.from_array({true, false, true}, "bool")
     local w1 = c7:where(mask, "OUTRO")
     check(w1:get(2) == "OUTRO", "where: substitui onde false")
     check(w1:get(1) == "SP", "where: mantém onde true")
@@ -223,7 +223,7 @@ end
 -- 6. Estatísticas e Metadados
 -- =====================================================================
 do
-    local cu = Series.from_table({"C", "A", "B", "A", NA, "C"}, "categorical")
+    local cu = Series.from_array({"C", "A", "B", "A", NA, "C"}, "categorical")
     
     -- unique / nunique
     local uniq = cu:unique()
@@ -235,7 +235,7 @@ do
     check(type(vc) == "table", "value_counts: retorna tabela")
     
     -- describe
-    local cd = Series.from_table({"SP", "RJ", "SP", NA, "MG", "SP"}, "categorical")
+    local cd = Series.from_array({"SP", "RJ", "SP", NA, "MG", "SP"}, "categorical")
     local desc = cd:describe()
     check(desc.dtype == "categorical", "describe: dtype")
     check(desc.count == 5, "describe: count=5")
@@ -243,7 +243,7 @@ do
     check(desc.freq == 3, "describe: freq=3")
     
     -- min / max
-    local c2 = Series.from_table({"SP", "RJ", NA, "AM", "MG"}, "categorical")
+    local c2 = Series.from_array({"SP", "RJ", NA, "AM", "MG"}, "categorical")
     check(c2:min() == "AM", "min() = AM")
     check(c2:max() == "SP", "max() = SP")
 end
@@ -252,7 +252,7 @@ end
 -- 7. Conversão de Tipo (astype)
 -- =====================================================================
 do
-    local cas = Series.from_table({"SP", NA, "RJ"}, "categorical")
+    local cas = Series.from_array({"SP", NA, "RJ"}, "categorical")
     
     -- categorical → string
     local as_str = cas:astype("string")
@@ -260,13 +260,13 @@ do
     check(as_str:is_null(2), "astype: NA → null")
     
     -- categorical → float64
-    local cnum = Series.from_table({"1.5", "2.0", NA, "invalido"}, "categorical")
+    local cnum = Series.from_array({"1.5", "2.0", NA, "invalido"}, "categorical")
     local as_f64 = cnum:astype("float64")
     check(as_f64._dtype == "float64", "astype cat→f64")
     check(as_f64:is_null(4), "astype: invalido → null")
     
     -- string → categorical
-    local ss = Series.from_table({"SP", "RJ", NA}, "string")
+    local ss = Series.from_array({"SP", "RJ", NA}, "string")
     local as_cat = ss:astype("categorical")
     check(as_cat._dtype == "categorical", "astype str→cat")
     
@@ -278,7 +278,7 @@ end
 -- 8. Serialização (to_table)
 -- =====================================================================
 do
-    local ctt = Series.from_table({"A", NA, "B"}, "categorical")
+    local ctt = Series.from_array({"A", NA, "B"}, "categorical")
     
     -- to_table padrão
     local t = ctt:to_table()
@@ -316,7 +316,7 @@ do
     check(gb:nrows() == 3, "groupby sum: 3 grupos")
     
     -- assign
-    local ds2 = ds:assign("regiao", Series.from_table({"SE", "SE", "SE", "SE", "SE"}, "categorical"))
+    local ds2 = ds:assign("regiao", Series.from_array({"SE", "SE", "SE", "SE", "SE"}, "categorical"))
     check(ds2:has_column("regiao"), "assign: coluna criada")
     
     -- concat
@@ -329,11 +329,11 @@ end
 -- 10. Erros e Limites (Edge Cases)
 -- =====================================================================
 do
-    local c = Series.from_table({"A", "B", "C"}, "categorical")
+    local c = Series.from_array({"A", "B", "C"}, "categorical")
     
     -- .cat em dtype errado
     check_err(function()
-        Series.from_table({1.0, 2.0}, "float64").cat:levels()
+        Series.from_array({1.0, 2.0}, "float64").cat:levels()
     end, "erro: .cat em float64")
     
     -- Índices fora dos limites
@@ -351,13 +351,13 @@ do
     
     -- filter tamanho diferente
     check_err(function()
-        local m2 = Series.from_table({true, false}, "bool")
+        local m2 = Series.from_array({true, false}, "bool")
         c:filter(m2)
     end, "erro: filter tamanho diferente")
     
     -- fillna sem argumento
     check_err(function()
-        Series.from_table({"A", NA}, "categorical"):fillna(nil)
+        Series.from_array({"A", NA}, "categorical"):fillna(nil)
     end, "erro: fillna nil")
 end
 

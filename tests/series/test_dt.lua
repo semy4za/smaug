@@ -82,13 +82,13 @@ do
     check(s_full:get(1) == 0, "full: get(1)=0 (epoch)")
     check(s_full:get(3) == 0, "full: get(3)=0")
 
-    local s_epochs = Series.from_table({ep_ref, ep_mar, NA, ep_dec}, "datetime")
+    local s_epochs = Series.from_array({ep_ref, ep_mar, NA, ep_dec}, "datetime")
     check(s_epochs:len() == 4, "from_table[num]: len=4")
     check(s_epochs:get(1) == ep_ref, "from_table[num]: get(1)=ep_ref")
     check(s_epochs:is_null(3), "from_table[num]: NA -> null")
     check(s_epochs:get(4) == ep_dec, "from_table[num]: get(4)=ep_dec")
 
-    local s_iso = Series.from_table({
+    local s_iso = Series.from_array({
         "2024-01-15T12:30:00.500Z",
         "2024-03-20T00:00:00Z",
         NA
@@ -146,7 +146,7 @@ do
     check(sa:get(1) == 0, "append epoch_ms")
     check(sa:get(2) == 0, "append string ISO")
 
-    local sc = Series.from_table({ep_ref, NA, ep_mar, NA, ep_dec}, "datetime")
+    local sc = Series.from_array({ep_ref, NA, ep_mar, NA, ep_dec}, "datetime")
     check(sc:count_nonnull() == 3, "count_nonnull: 3")
 end
 
@@ -154,7 +154,7 @@ end
 -- 3. Accessor .dt — componentes calendário
 -- =====================================================================
 do
-    local s1 = Series.from_table({ep_ref}, "datetime")
+    local s1 = Series.from_array({ep_ref}, "datetime")
 
     check(s1.dt:year():get(1) == 2024, "dt:year()")
     check(s1.dt:month():get(1) == 1, "dt:month() = 1 (janeiro)")
@@ -166,18 +166,18 @@ do
     check(s1.dt:weekday():get(1) == 0, "dt:weekday() = 0 (seg)")
     check(s1.dt:quarter():get(1) == 1, "dt:quarter() = 1 (Q1)")
 
-    local s2 = Series.from_table({ep_mar}, "datetime")
+    local s2 = Series.from_array({ep_mar}, "datetime")
     check(s2.dt:month():get(1) == 3, "dt:month() = 3 (março)")
     check(s2.dt:day():get(1) == 20, "dt:day() = 20")
     check(s2.dt:quarter():get(1) == 1, "dt:quarter() = 1 (mar ainda Q1)")
 
-    local s3 = Series.from_table({ep_dec}, "datetime")
+    local s3 = Series.from_array({ep_dec}, "datetime")
     check(s3.dt:year():get(1) == 2024, "dt:year() dec")
     check(s3.dt:month():get(1) == 12, "dt:month() = 12")
     check(s3.dt:day():get(1) == 31, "dt:day() = 31")
     check(s3.dt:quarter():get(1) == 4, "dt:quarter() = 4 (Q4)")
 
-    local sn = Series.from_table({ep_ref, NA, ep_mar}, "datetime")
+    local sn = Series.from_array({ep_ref, NA, ep_mar}, "datetime")
     check(sn.dt:year():is_null(2), "year: NA propaga")
     check(sn.dt:month():is_null(2), "month: NA propaga")
     check(sn.dt:day():is_null(2), "day: NA propaga")
@@ -192,7 +192,7 @@ end
 -- 4. format() e truncate()
 -- =====================================================================
 do
-    local s_fmt = Series.from_table({ep_zero, NA, ep_ref}, "datetime")
+    local s_fmt = Series.from_array({ep_zero, NA, ep_ref}, "datetime")
     local fmts = s_fmt.dt:format()
 
     check(fmts._dtype == "string", "format: dtype=string")
@@ -200,7 +200,7 @@ do
     check(fmts:is_null(2), "format: NA -> null")
     check(fmts:get(3):sub(1, 10) == "2024-01-15", "format: ep_ref prefixo")
 
-    local st = Series.from_table({ep_ref, NA}, "datetime")
+    local st = Series.from_array({ep_ref, NA}, "datetime")
 
     local td = st.dt:truncate("D")
     check(td._dtype == "datetime", "truncate: dtype=datetime")
@@ -235,7 +235,7 @@ do
     local ep_d2 = Series.dt_from_parts(2024, 1, 2, 0, 0, 0, 0)
     local ep_d3 = Series.dt_from_parts(2024, 1, 4, 0, 0, 0, 0)
 
-    local sdt = Series.from_table({ep_d1, ep_d2, ep_d3}, "datetime")
+    local sdt = Series.from_array({ep_d1, ep_d2, ep_d3}, "datetime")
     local diffs = sdt.dt:diff()
 
     check(diffs._dtype == "int64", "diff: dtype=int64")
@@ -248,14 +248,14 @@ do
     check(d2:is_null(2), "diff(2)[2] = null")
     check(d2:get(3) == 3 * MS_PER_DAY, "diff(2)[3] = 3 dias")
 
-    local sna2 = Series.from_table({ep_d1, NA, ep_d3}, "datetime")
+    local sna2 = Series.from_array({ep_d1, NA, ep_d3}, "datetime")
     local dna = sna2.dt:diff()
 
     check(dna:is_null(1), "diff NA: [1] null")
     check(dna:is_null(2), "diff NA: [2] null (era NA)")
     check(dna:is_null(3), "diff NA: [3] null (b era NA)")
 
-    local base = Series.from_table({ep_zero, NA}, "datetime")
+    local base = Series.from_array({ep_zero, NA}, "datetime")
 
     local added = base.dt:add_ms(1000)
     check(added:get(1) == 1000, "add_ms: epoch+1000ms")
@@ -278,7 +278,7 @@ end
 -- 6. Comparações -> Series<bool>
 -- =====================================================================
 do
-    local sc2 = Series.from_table({ep_a, ep_b, ep_c, NA}, "datetime")
+    local sc2 = Series.from_array({ep_a, ep_b, ep_c, NA}, "datetime")
     local pivot = ep_b
 
     local gt = sc2:gt(pivot)
@@ -316,7 +316,7 @@ end
 -- 7. Ordenação e seleção
 -- =====================================================================
 do
-    local su = Series.from_table({ep_c, ep_a, ep_b}, "datetime")
+    local su = Series.from_array({ep_c, ep_a, ep_b}, "datetime")
 
     local sorted = su:sort(true)
     check(sorted:get(1) == ep_a, "sort asc: 1º = jan")
@@ -327,7 +327,7 @@ do
     check(sortd:get(1) == ep_c, "sort desc: 1º = dec")
     check(sortd:get(3) == ep_a, "sort desc: 3º = jan")
 
-    local snu = Series.from_table({ep_b, NA, ep_a}, "datetime")
+    local snu = Series.from_array({ep_b, NA, ep_a}, "datetime")
     check_err(function() snu:sort(true) end, "sort com null")
 
     local idx = su:argsort(true)
@@ -351,7 +351,7 @@ do
     check(stail:len() == 1, "tail(1): len=1")
     check(stail:get(1) == ep_b, "tail(1): 1º = ep_b")
 
-    local sdn = Series.from_table({ep_a, NA, ep_b, NA, ep_c}, "datetime")
+    local sdn = Series.from_array({ep_a, NA, ep_b, NA, ep_c}, "datetime")
     local dropped = sdn:dropna()
 
     check(dropped:len() == 3, "dropna: len=3")
@@ -373,7 +373,7 @@ do
     cl:set(1, ep_zero)
     check(su:get(1) == ep_c, "clone: original intacto")
 
-    local sv_base = Series.from_table({ep_a, ep_b, ep_c}, "datetime")
+    local sv_base = Series.from_array({ep_a, ep_b, ep_c}, "datetime")
     local sv = sv_base:view(2, 2)
 
     check(sv:len() == 2, "dt view: len da janela = 2")
@@ -402,7 +402,7 @@ do
     check(Series.dt_parse("5/6/2026", true) == Series.dt_parse("2026-06-05"),
           "dt_parse 5/6 dayfirst=true = 5 jun")
 
-    local sd_day = Series.from_table({"13/06/2026", "25/12/2026"}, "string")
+    local sd_day = Series.from_array({"13/06/2026", "25/12/2026"}, "string")
     local conv = sd_day:astype("datetime", {dayfirst = true})
 
     check(conv:get(1) == Series.dt_parse("2026-06-13"),
@@ -411,13 +411,13 @@ do
     check(conv:get(2) == Series.dt_parse("2026-12-25"),
           "astype datetime dayfirst=true: 25/12 -> natal")
 
-    local sd_default = Series.from_table({"13/06/2026"}, "string")
+    local sd_default = Series.from_array({"13/06/2026"}, "string")
     local conv2 = sd_default:astype("datetime")
 
     check(conv2:is_null(1),
           "astype datetime default: 13/06 -> null (MM/DD, mês 13 inválido)")
 
-    local sd_name = Series.from_table({"2026-06-13"}, "string")
+    local sd_name = Series.from_array({"2026-06-13"}, "string")
     local conv3 = sd_name:astype("datetime", "nome_custom")
 
     check(conv3._name == "nome_custom",
@@ -428,7 +428,7 @@ end
 -- 8. fillna / is_null
 -- =====================================================================
 do
-    local s_fill = Series.from_table({ep_a, NA, NA, ep_c}, "datetime")
+    local s_fill = Series.from_array({ep_a, NA, NA, ep_c}, "datetime")
     local filled = s_fill:fillna(ep_b)
 
     check(filled:get(1) == ep_a, "fillna: não-nulo intacto")
@@ -443,7 +443,7 @@ end
 -- 9. astype
 -- =====================================================================
 do
-    local sas = Series.from_table({ep_zero, NA}, "datetime")
+    local sas = Series.from_array({ep_zero, NA}, "datetime")
 
     local as_str = sas:astype("string")
     check(as_str._dtype == "string", "astype dt->str: dtype")
@@ -455,7 +455,7 @@ do
     check(as_i64:get(1) == 0, "astype dt->i64: epoch zero = 0")
     check(as_i64:is_null(2), "astype dt->i64: NA -> null")
 
-    local si = Series.from_table({0, NA, ep_ref}, "int64")
+    local si = Series.from_array({0, NA, ep_ref}, "int64")
     local as_dt = si:astype("datetime")
 
     check(as_dt._dtype == "datetime", "astype i64->dt: dtype")
@@ -463,7 +463,7 @@ do
     check(as_dt:is_null(2), "astype i64->dt: NA -> null")
     check(as_dt:get(3) == ep_ref, "astype i64->dt: ep_ref")
 
-    local ss2 = Series.from_table({
+    local ss2 = Series.from_array({
         "2024-01-15T12:30:00.500Z",
         NA,
         "invalido"
@@ -481,7 +481,7 @@ end
 -- 10. describe
 -- =====================================================================
 do
-    local s_desc = Series.from_table({ep_a, NA, ep_b, ep_c}, "datetime")
+    local s_desc = Series.from_array({ep_a, NA, ep_b, ep_c}, "datetime")
     local desc = s_desc:describe()
 
     check(type(desc) == "table", "describe: retorna tabela")
@@ -557,7 +557,7 @@ end
 do
     check_err_match(
         function()
-            Series.from_table({1.0, 2.0}, "float64").dt:year()
+            Series.from_array({1.0, 2.0}, "float64").dt:year()
         end,
         "datetime",
         "erro: .dt em float64"
@@ -568,7 +568,7 @@ do
 
     check_err(
         function()
-            Series.from_table({"2024-01-15", "INVALIDO"}, "datetime")
+            Series.from_array({"2024-01-15", "INVALIDO"}, "datetime")
         end,
         "from_table string inválida"
     )
@@ -590,7 +590,7 @@ end
 -- F.3.1 is_month_start / is_month_end
 -- =====================================================================
 do
-    local m = Series.from_table({
+    local m = Series.from_array({
         P("2024-01-01T00:00:00Z"),
         P("2024-02-29T12:00:00Z"),
         P("2024-03-15T00:00:00Z"),
@@ -614,7 +614,7 @@ end
 -- F.3.2 is_quarter_start / is_quarter_end
 -- =====================================================================
 do
-    local q = Series.from_table({
+    local q = Series.from_array({
         P("2024-01-01T00:00:00Z"),
         P("2024-04-01T00:00:00Z"),
         P("2024-03-31T00:00:00Z"),
@@ -637,7 +637,7 @@ end
 -- F.3.3 is_year_start / is_year_end
 -- =====================================================================
 do
-    local y = Series.from_table({
+    local y = Series.from_array({
         P("2024-01-01T00:00:00Z"),
         P("2024-12-31T00:00:00Z"),
         P("2024-06-15T00:00:00Z"),
@@ -653,7 +653,7 @@ end
 -- F.3.4 is_leap_year
 -- =====================================================================
 do
-    local ly = Series.from_table({
+    local ly = Series.from_array({
         P("2024-06-01T00:00:00Z"),
         P("2023-06-01T00:00:00Z"),
         P("2000-06-01T00:00:00Z"),
@@ -671,7 +671,7 @@ end
 -- F.3.5 days_in_month
 -- =====================================================================
 do
-    local dim = Series.from_table({
+    local dim = Series.from_array({
         P("2024-01-15T00:00:00Z"),
         P("2024-02-15T00:00:00Z"),
         P("2025-02-15T00:00:00Z"),
@@ -690,7 +690,7 @@ end
 -- F.3.6 month_name / day_name
 -- =====================================================================
 do
-    local nm = Series.from_table({
+    local nm = Series.from_array({
         P("2024-01-01T00:00:00Z"),
         P("2024-07-04T00:00:00Z"),
         P("2024-12-25T00:00:00Z"),
@@ -712,7 +712,7 @@ end
 -- F.3.7 normalize (= truncate D)
 -- =====================================================================
 do
-    local nz = Series.from_table({
+    local nz = Series.from_array({
         P("2024-06-15T14:30:45Z"),
         P("2024-06-15T00:00:00Z"),
         NA,
@@ -729,7 +729,7 @@ end
 -- F.3.8 ceil — menor início-de-período >= v
 -- =====================================================================
 do
-    local ch = Series.from_table({
+    local ch = Series.from_array({
         P("2024-06-15T10:20:00Z"),
         P("2024-06-15T10:00:00Z"),
     }, "datetime")
@@ -738,7 +738,7 @@ do
     check(iso_of(ceil_h, 1) == "2024-06-15T11:00:00.000Z", "ceil h 10:20 -> 11:00")
     check(iso_of(ceil_h, 2) == "2024-06-15T10:00:00.000Z", "ceil h alinhado -> mesmo")
 
-    local cm = Series.from_table({
+    local cm = Series.from_array({
         P("2024-01-10T00:00:00Z"),
         P("2024-12-20T00:00:00Z"),
         P("2024-03-01T00:00:00Z"),
@@ -749,7 +749,7 @@ do
     check(iso_of(ceil_m, 2) == "2025-01-01T00:00:00.000Z", "ceil M dez-20 -> 2025-jan-01")
     check(iso_of(ceil_m, 3) == "2024-03-01T00:00:00.000Z", "ceil M alinhado -> mesmo")
 
-    local cq = Series.from_table({P("2024-02-15T00:00:00Z")}, "datetime")
+    local cq = Series.from_array({P("2024-02-15T00:00:00Z")}, "datetime")
     check(iso_of(cq.dt:ceil("Q"), 1) == "2024-04-01T00:00:00.000Z", "ceil Q fev -> abr-01")
     check(iso_of(cq.dt:ceil("Y"), 1) == "2025-01-01T00:00:00.000Z", "ceil Y 2024 -> 2025-01-01")
 
@@ -760,7 +760,7 @@ end
 -- F.3.9 round — período mais próximo (half-up no empate)
 -- =====================================================================
 do
-    local rh = Series.from_table({
+    local rh = Series.from_array({
         P("2024-06-15T10:20:00Z"),
         P("2024-06-15T10:40:00Z"),
         P("2024-06-15T10:30:00Z"),
@@ -771,7 +771,7 @@ do
     check(iso_of(round_h, 2) == "2024-06-15T11:00:00.000Z", "round h 10:40 -> 11:00")
     check(iso_of(round_h, 3) == "2024-06-15T11:00:00.000Z", "round h 10:30 empate -> 11:00 (half-up)")
 
-    local rd = Series.from_table({
+    local rd = Series.from_array({
         P("2024-06-15T05:00:00Z"),
         P("2024-06-15T20:00:00Z"),
     }, "datetime")
@@ -785,7 +785,7 @@ end
 -- F.3.10 strftime
 -- =====================================================================
 do
-    local s_strftime = Series.from_table({P("2024-02-05T14:09:07Z")}, "datetime")
+    local s_strftime = Series.from_array({P("2024-02-05T14:09:07Z")}, "datetime")
 
     local out = s_strftime.dt:strftime("%Y-%m-%d %H:%M:%S")
     check(out._dtype == "string", "strftime -> string")
@@ -801,7 +801,7 @@ do
     check(s_strftime.dt:strftime("100%%"):get(1) == "100%", "strftime %% -> %")
     check(s_strftime.dt:strftime("%Z"):get(1) == "%Z", "strftime token desconhecido -> literal")
 
-    local mid = Series.from_table({
+    local mid = Series.from_array({
         P("2024-01-01T00:00:00Z"),
         P("2024-01-01T12:00:00Z")
     }, "datetime")
@@ -809,7 +809,7 @@ do
     check(mid.dt:strftime("%I %p"):get(1) == "12 AM", "strftime meia-noite -> 12 AM")
     check(mid.dt:strftime("%I %p"):get(2) == "12 PM", "strftime meio-dia -> 12 PM")
 
-    local s_na = Series.from_table({NA}, "datetime")
+    local s_na = Series.from_array({NA}, "datetime")
     check(s_na.dt:strftime("%Y"):get(1) == nil, "strftime NA -> nil")
 
     check_err(function() s_strftime.dt:strftime(42) end, "strftime fmt não-string")

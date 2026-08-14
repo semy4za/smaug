@@ -77,7 +77,7 @@ do
     check(type(smaug.int64) == "function", "init: smaug.int64 exposto")
     check(type(smaug.string) == "function", "init: smaug.string exposto")
     check(type(smaug.datetime) == "function", "init: smaug.datetime exposto")
-    check(smaug.from_table == nil, "init: from_table removido do top-level")
+    check(smaug.from_array == nil, "init: from_table removido do top-level")
 end
 
 -- =====================================================================
@@ -480,7 +480,7 @@ end
 -- 13. Bool: Construção, fillna, dropna, describe, sort
 -- =====================================================================
 do
-    local s = Series.from_table({true, NA, false, true}, "bool")
+    local s = Series.from_array({true, NA, false, true}, "bool")
 
     check(s._dtype == "bool", "dtype bool")
     check(s:len() == 4, "len")
@@ -520,7 +520,7 @@ do
     check(d.count_false == 1, "describe count_false")
 
     -- sort / argsort (sem null)
-    local s2 = Series.from_table({true, false, true, false}, "bool")
+    local s2 = Series.from_array({true, false, true, false}, "bool")
 
     local asc = s2:sort(true)
     check(asc:get(1) == false, "sort asc: false primeiro")

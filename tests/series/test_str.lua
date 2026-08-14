@@ -29,7 +29,7 @@ local function rejects(fn) return pcall(fn) == false end
 -- Construção e acesso
 -- ===================================================================
 do
-    local s = S.from_table({"SP", "RJ", smaug.NA, "Minas"}, "string")
+    local s = S.from_array({"SP", "RJ", smaug.NA, "Minas"}, "string")
     check(s:len() == 4, "len")
     check(s:get(1) == "SP", "get string")
     check(s:get(4) == "Minas", "get string longa")
@@ -43,7 +43,7 @@ end
 -- String vazia é distinta de NULL
 -- ===================================================================
 do
-    local s = S.from_table({"", smaug.NA, "x"}, "string")
+    local s = S.from_array({"", smaug.NA, "x"}, "string")
     check(s:get(1) == "", "vazia -> '' (nao nil)")
     check(not s:is_null(1), "vazia nao e null")
     check(s:get(2) == nil, "NA -> nil")
@@ -55,7 +55,7 @@ end
 -- Mutação: set (3 casos via backend), set_null, append
 -- ===================================================================
 do
-    local s = S.from_table({"SP", "RJ", "MG"}, "string")
+    local s = S.from_array({"SP", "RJ", "MG"}, "string")
     -- mesmo tamanho
     s:set(1, "AC")
     check(s:get(1) == "AC", "set mesmo tamanho")
@@ -89,7 +89,7 @@ end
 -- clone independente
 -- ===================================================================
 do
-    local s = S.from_table({"alpha", smaug.NA, "gamma"}, "string")
+    local s = S.from_array({"alpha", smaug.NA, "gamma"}, "string")
     local c = s:clone()
     check(c:get(1) == "alpha" and c:is_null(2) and c:get(3) == "gamma",
           "clone copia conteudo")
@@ -101,7 +101,7 @@ end
 -- Sem coerção: set recusa não-string; ops numéricas recusam com erro claro
 -- ===================================================================
 do
-    local s = S.from_table({"a", "b"}, "string")
+    local s = S.from_array({"a", "b"}, "string")
     check(rejects(function() s:set(1, 42) end), "set recusa numero")
     check(rejects(function() s:set(1, true) end), "set recusa boolean")
     -- operações numéricas não se aplicam
@@ -127,7 +127,7 @@ end
 -- Comparações (eq/lt/gt) -> Series<bool>
 -- ===================================================================
 do
-    local s = S.from_table({"SP", "RJ", smaug.NA, "MG", "SP"}, "string")
+    local s = S.from_array({"SP", "RJ", smaug.NA, "MG", "SP"}, "string")
 
     local eq = s:eq("SP")
     check(eq:get(1) == true and eq:get(5) == true, "eq casa SP")
@@ -145,13 +145,13 @@ do
     check(gt:get(4) == false, "gt: MG nao > RJ")
 
     -- string vazia compara normalmente
-    local s2 = S.from_table({"", "a"}, "string")
+    local s2 = S.from_array({"", "a"}, "string")
     check(s2:eq(""):get(1) == true, "eq '' casa vazia")
     check(s2:lt("a"):get(1) == true, "lt: '' < 'a'")
 
     -- recusa de tipo (sem coerção), nos dois sentidos
     check(rejects(function() return s:eq(42) end), "string:eq(numero) recusa")
-    local n = S.from_table({1, 2}, "int64")
+    local n = S.from_array({1, 2}, "int64")
     check(rejects(function() return n:eq("x") end), "int64:eq(string) recusa")
 end
 
@@ -159,7 +159,7 @@ end
 -- Seleção: filter (por máscara de comparação) e take (por índices)
 -- ===================================================================
 do
-    local s = S.from_table({"SP", "RJ", smaug.NA, "MG", "SP"}, "string")
+    local s = S.from_array({"SP", "RJ", smaug.NA, "MG", "SP"}, "string")
 
     -- o caso de uso principal: filter(eq)
     local f = s:filter(s:eq("SP"))
@@ -193,7 +193,7 @@ end
 -- Ordenação: sort e argsort (lexicográfico; recusa NULL)
 -- ===================================================================
 do
-    local s = S.from_table({"MG", "AC", "SP", "BA", "AC"}, "string")
+    local s = S.from_array({"MG", "AC", "SP", "BA", "AC"}, "string")
 
     local asc = s:sort()
     check(asc:get(1) == "AC" and asc:get(2) == "AC" and asc:get(3) == "BA"
@@ -207,12 +207,12 @@ do
     check(ix[1] == 2 and ix[2] == 5 and ix[5] == 3, "argsort 1-based estavel")
 
     -- vazia ordena primeiro
-    local v = S.from_table({"b", "", "a"}, "string"):sort()
+    local v = S.from_array({"b", "", "a"}, "string"):sort()
     check(v:get(1) == "" and v:get(2) == "a" and v:get(3) == "b",
           "sort: vazia vem primeiro")
 
     -- NULL recusa (sort levanta erro; argsort retorna nil)
-    local sn = S.from_table({"x", smaug.NA, "a"}, "string")
+    local sn = S.from_array({"x", smaug.NA, "a"}, "string")
     check(rejects(function() return sn:sort() end), "sort recusa NULL")
     check(sn:argsort() == nil, "argsort com NULL -> nil")
 
@@ -226,7 +226,7 @@ end
 -- =====================================================================
 local function test_string_ux()
     -- fillna: preenche NULL com string; mantém não-nulos intactos
-    local s = S.from_table({"SP", smaug.NA, "RJ", smaug.NA}, "string", "uf")
+    local s = S.from_array({"SP", smaug.NA, "RJ", smaug.NA}, "string", "uf")
     local f = s:fillna("?")
     check(f:get(1) == "SP", "fillna string: não-nulo preservado")
     check(f:get(2) == "?",  "fillna string: null preenchido")
@@ -247,19 +247,19 @@ local function test_string_ux()
     check(d.freq   >= 1,    "describe str: freq >= 1")
 
     -- describe: série com valor mais frequente
-    local s2 = S.from_table({"a","b","a","a","b"}, "string")
+    local s2 = S.from_array({"a","b","a","a","b"}, "string")
     local d2 = s2:describe()
     check(d2.top == "a" and d2.freq == 3, "describe str: top/freq corretos")
     check(d2.unique == 2,                 "describe str: unique 2 valores")
 
     -- describe: série toda NULL
-    local sn = S.from_table({smaug.NA, smaug.NA}, "string")
+    local sn = S.from_array({smaug.NA, smaug.NA}, "string")
     local dn = sn:describe()
     check(dn.count == 0 and dn.nulls == 2, "describe str: toda-null")
     check(dn.top == nil and dn.freq == nil, "describe str: top nil em toda-null")
 
     -- astype string → float64: parse numérico
-    local nums = S.from_table({"1.5", "2.0", "abc", smaug.NA}, "string")
+    local nums = S.from_array({"1.5", "2.0", "abc", smaug.NA}, "string")
     local f64  = nums:astype("float64")
     check(f64._dtype == "float64",       "astype str->f64: dtype")
     check(f64:get(1) == 1.5,             "astype str->f64: valor")
@@ -268,20 +268,20 @@ local function test_string_ux()
     check(f64:is_null(4),                "astype str->f64: null preservado")
 
     -- astype string → int64
-    local ints = S.from_table({"3", "7", "x"}, "string"):astype("int64")
+    local ints = S.from_array({"3", "7", "x"}, "string"):astype("int64")
     check(ints:get(1) == 3,  "astype str->i64: valor")
     check(ints:get(2) == 7,  "astype str->i64: valor 2")
     check(ints:is_null(3),   "astype str->i64: parse inválido -> null")
 
     -- astype float64 → string
-    local strs = S.from_table({1.5, 0.0/0.0, smaug.NA}, "float64"):astype("string")
+    local strs = S.from_array({1.5, 0.0/0.0, smaug.NA}, "float64"):astype("string")
     check(strs._dtype == "string",       "astype f64->str: dtype")
     check(strs:get(1) == "1.5",          "astype f64->str: valor")
     check(strs:get(2) ~= nil,            "astype f64->str: NaN vira string (nao null)")
     check(strs:is_null(3),               "astype f64->str: null preservado")
 
     -- astype int64 → string
-    local si = S.from_table({10, 20, smaug.NA}, "int64"):astype("string")
+    local si = S.from_array({10, 20, smaug.NA}, "int64"):astype("string")
     check(si:get(1) == "10" and si:get(2) == "20", "astype i64->str: valores")
     check(si:is_null(3),                            "astype i64->str: null preservado")
 end
@@ -292,7 +292,7 @@ test_string_ux()
 -- .str Tier A: len, lower, upper, strip, contains, startswith, endswith
 -- =====================================================================
 local function test_str_accessor()
-    local s = S.from_table({"  Sao Paulo  ", "rio", smaug.NA, "MINAS"}, "string")
+    local s = S.from_array({"  Sao Paulo  ", "rio", smaug.NA, "MINAS"}, "string")
 
     -- len: comprimento em bytes; null -> null
     local l = s.str:len()
@@ -322,7 +322,7 @@ local function test_str_accessor()
     check(st:is_null(3),                  "str:strip null -> null")
 
     -- strip: string de só espaços vira ""
-    local sp = S.from_table({"   "}, "string")
+    local sp = S.from_array({"   "}, "string")
     check(sp.str:strip():get(1) == "",    "str:strip só espaços -> ''")
 
     -- contains: busca de substring; null -> NA
@@ -353,9 +353,9 @@ local function test_str_accessor()
     check(s.str:endswith(""):get(2) == true, "str:endswith '' sempre true")
 
     -- dtype errado dá erro descritivo
-    local n = S.from_table({1.0, 2.0}, "float64")
+    local n = S.from_array({1.0, 2.0}, "float64")
     check(rejects(function() return n.str:lower() end), "str em float64 -> erro")
-    local i = S.from_table({1, 2}, "int64")
+    local i = S.from_array({1, 2}, "int64")
     check(rejects(function() return i.str:len() end),   "str em int64 -> erro")
 
     -- argumento de tipo errado
@@ -365,7 +365,7 @@ local function test_str_accessor()
 
     -- integração: filter com .str:contains
     -- "tos" só ocorre em "Santos"; NA na máscara conta como false (descartado)
-    local cidades = S.from_table({"São Paulo", "Rio de Janeiro", "Santos", smaug.NA}, "string")
+    local cidades = S.from_array({"São Paulo", "Rio de Janeiro", "Santos", smaug.NA}, "string")
     local mask = cidades.str:contains("tos")
     check(mask:get(1) == false,           "str:contains integração: SP false")
     check(mask:get(3) == true,            "str:contains integração: Santos true")
@@ -381,7 +381,7 @@ test_str_accessor()
 -- .str:replace — substituição literal de substring
 -- =====================================================================
 local function test_str_replace()
-    local s = S.from_table({"foo bar foo", "hello", smaug.NA, "foo"}, "string")
+    local s = S.from_array({"foo bar foo", "hello", smaug.NA, "foo"}, "string")
 
     -- substituição básica
     local r = s.str:replace("foo", "baz")
@@ -399,7 +399,7 @@ local function test_str_replace()
     check(s.str:replace("", "x"):get(1) == "foo bar foo", "str:replace: old vazio -> no-op")
 
     -- metacaracteres Lua no old e new são tratados literalmente
-    local s2 = S.from_table({"a.b.c", "x+y", "2^3"}, "string")
+    local s2 = S.from_array({"a.b.c", "x+y", "2^3"}, "string")
     check(s2.str:replace(".", "-"):get(1)    == "a-b-c",  "str:replace: '.' literal")
     check(s2.str:replace("+", "plus"):get(2) == "xplusy", "str:replace: '+' literal")
     check(s2.str:replace("^", ""):get(3)     == "23",     "str:replace: '^' literal")
@@ -420,7 +420,7 @@ local smaug = require("smaug")
 local NA    = smaug.Series.NA
 
 
-local s = smaug.Series.from_table({"hello world","foo bar","baz",NA}, "string")
+local s = smaug.Series.from_array({"hello world","foo bar","baz",NA}, "string")
 
 -- ================================================================
 -- find
@@ -469,7 +469,7 @@ local sle = s.str:slice(7)
 check(sle:get(1) == "world",   "slice(7): 'hello world' -> 'world'")
 
 -- série vazia
-local se = smaug.Series.from_table({}, "string")
+local se = smaug.Series.from_array({}, "string")
 check(se.str:slice(1,3):len() == 0, "slice: série vazia -> vazia")
 
 -- ================================================================
@@ -503,7 +503,7 @@ check(not ok4,                     "pad: side inválido recusado")
 -- ================================================================
 -- zfill
 -- ================================================================
-local nums = smaug.Series.from_table({"42","7","100","1000",NA}, "string")
+local nums = smaug.Series.from_array({"42","7","100","1000",NA}, "string")
 local z = nums.str:zfill(5)
 check(z:get(1) == "00042",     "zfill(5): '42' -> '00042'")
 check(z:get(2) == "00007",     "zfill(5): '7' -> '00007'")
@@ -514,7 +514,7 @@ check(z:is_null(5),            "zfill: NA propaga")
 -- ================================================================
 -- rep
 -- ================================================================
-local r = smaug.Series.from_table({"ab","x",NA}, "string")
+local r = smaug.Series.from_array({"ab","x",NA}, "string")
 local r2 = r.str:rep(2)
 check(r2:get(1) == "abab",     "rep(2): 'ab' -> 'abab'")
 check(r2:get(2) == "xx",       "rep(2): 'x' -> 'xx'")
@@ -541,7 +541,7 @@ local c2 = s.str:cat()
 check(c2 == "hello worldfoo barbaz", "cat sem sep")
 
 -- todos NA
-local na_s = smaug.Series.from_table({NA, NA}, "string")
+local na_s = smaug.Series.from_array({NA, NA}, "string")
 check(na_s.str:cat() == "",     "cat: todos NA -> string vazia")
 
 -- série vazia
@@ -550,7 +550,7 @@ check(se.str:cat() == "",       "cat: série vazia -> string vazia")
 -- ================================================================
 -- split
 -- ================================================================
-local csv = smaug.Series.from_table({"a:b:c","x:y","z",NA}, "string")
+local csv = smaug.Series.from_array({"a:b:c","x:y","z",NA}, "string")
 local cols = csv.str:split(":")
 
 check(#cols == 3,               "split: 3 colunas (max partes)")
@@ -565,14 +565,14 @@ check(cols[2]:is_null(3),      "split: col2[3] = NA (sem segunda parte)")
 check(cols[1]:is_null(4),      "split: col1[4] = NA (entrada NA)")
 
 -- separador multi-char
-local ms = smaug.Series.from_table({"a::b::c","x::y"}, "string")
+local ms = smaug.Series.from_array({"a::b::c","x::y"}, "string")
 local msp = ms.str:split("::")
 check(msp[1]:get(1) == "a",    "split '::' col1 = a")
 check(msp[2]:get(1) == "b",    "split '::' col2 = b")
 check(msp[3]:get(1) == "c",    "split '::' col3 = c")
 
 -- max_splits
-local lim = smaug.Series.from_table({"a:b:c:d"}, "string")
+local lim = smaug.Series.from_array({"a:b:c:d"}, "string")
 local lsp = lim.str:split(":", 2)
 check(#lsp == 3,                "split max=2: 3 partes")
 check(lsp[1]:get(1) == "a",    "split max=2 [1]=a")
@@ -580,7 +580,7 @@ check(lsp[2]:get(1) == "b",    "split max=2 [2]=b")
 check(lsp[3]:get(1) == "c:d",  "split max=2 [3]=c:d (resto)")
 
 -- nenhum match: 1 coluna com a string original
-local nm = smaug.Series.from_table({"abc","def"}, "string")
+local nm = smaug.Series.from_array({"abc","def"}, "string")
 local nmp = nm.str:split(",")
 check(#nmp == 1,                "split sem match: 1 coluna")
 check(nmp[1]:get(1) == "abc",  "split sem match: valor original")
@@ -609,7 +609,7 @@ local NA = smaug.NA
 -- 1. count — ocorrências literais não-sobrepostas
 -- ================================================================
 
-local c = S.from_table({"banana", "aaaa", "xyz", "", NA}, "string")
+local c = S.from_array({"banana", "aaaa", "xyz", "", NA}, "string")
 local cnt = c.str:count("a")
 check(cnt._dtype == "int64",        "count → int64")
 check(cnt:get(1) == 3,              "count 'a' em banana = 3")
@@ -624,7 +624,7 @@ check(cnt2:get(2) == 2,             "count 'aa' em aaaa = 2 (não-sobreposto)")
 check(cnt2:get(1) == 0,             "count 'aa' em banana = 0 (a's não-adjacentes)")
 
 -- substring multichar
-local cm = S.from_table({"abcabcabc"}, "string")
+local cm = S.from_array({"abcabcabc"}, "string")
 check(cm.str:count("abc"):get(1) == 3, "count 'abc' = 3")
 
 -- sub vazio → erro
@@ -638,7 +638,7 @@ check(not ok_type,                  "count não-string = erro")
 -- 2. Predicados ASCII — string vazia sempre false; null → nil
 -- ================================================================
 
-local p = S.from_table({
+local p = S.from_array({
     "abc123",  -- 1: alnum
     "abc",     -- 2: alpha, lower
     "123",     -- 3: digit
@@ -685,7 +685,7 @@ check(upper:get(6) == false,        "isupper abC → false (tem minúscula)")
 check(upper:get(3) == false,        "isupper 123 → false (sem letras)")
 
 -- isspace com tab/newline
-local ws = S.from_table({"\t\n", " \t ", "a b"}, "string")
+local ws = S.from_array({"\t\n", " \t ", "a b"}, "string")
 check(ws.str:isspace():get(1) == true,  "isspace tab+newline → true")
 check(ws.str:isspace():get(3) == false, "isspace 'a b' → false")
 
@@ -693,7 +693,7 @@ check(ws.str:isspace():get(3) == false, "isspace 'a b' → false")
 -- 3. removeprefix / removesuffix — idempotente
 -- ================================================================
 
-local r = S.from_table({"unhappy", "happy", "test.lua", "test", NA}, "string")
+local r = S.from_array({"unhappy", "happy", "test.lua", "test", NA}, "string")
 
 local rp = r.str:removeprefix("un")
 check(rp._dtype == "string",        "removeprefix → string")
@@ -710,7 +710,7 @@ check(r.str:removeprefix(""):get(1) == "unhappy", "removeprefix vazio → inalte
 check(r.str:removesuffix(""):get(1) == "unhappy", "removesuffix vazio → inalterado")
 
 -- prefixo maior que a string
-local short = S.from_table({"ab"}, "string")
+local short = S.from_array({"ab"}, "string")
 check(short.str:removeprefix("abcdef"):get(1) == "ab", "removeprefix maior → inalterado")
 
 -- não-string → erro
@@ -721,7 +721,7 @@ check(not ok_rp,                    "removeprefix não-string = erro")
 -- 4. capitalize / title / swapcase
 -- ================================================================
 
-local k = S.from_table({"hello WORLD", "foo bar baz", "aBcD", "", NA}, "string")
+local k = S.from_array({"hello WORLD", "foo bar baz", "aBcD", "", NA}, "string")
 
 local cap = k.str:capitalize()
 check(cap:get(1) == "Hello world",  "capitalize hello WORLD → Hello world")
@@ -735,7 +735,7 @@ check(tit:get(2) == "Foo Bar Baz",  "title foo bar baz → Foo Bar Baz")
 check(tit:get(3) == "Abcd",         "title aBcD → Abcd")
 
 -- title com separadores não-letra
-local tsep = S.from_table({"a-b c.d", "joão123silva"}, "string")
+local tsep = S.from_array({"a-b c.d", "joão123silva"}, "string")
 check(tsep.str:title():get(1) == "A-B C.D", "title com hífen/ponto/espaço")
 -- 'joão' tem byte não-ASCII (ã); título trata cada letra ASCII; verifica que ç/ã não quebram
 check(type(tsep.str:title():get(2)) == "string", "title com não-ASCII não quebra")
@@ -748,17 +748,17 @@ check(swap:get(3) == "AbCd",         "swapcase aBcD → AbCd")
 -- 5. join (atalho de cat)
 -- ================================================================
 
-local j = S.from_table({"a", "b", NA, "c"}, "string")
+local j = S.from_array({"a", "b", NA, "c"}, "string")
 check(j.str:join("-") == "a-b-c",   "join '-' ignora nulos")
 check(j.str:join("") == "abc",      "join '' concatena")
 check(j.str:join("-") == j.str:cat("-"), "join idêntico a cat")
 
 -- série vazia
-local je = S.from_table({}, "string")
+local je = S.from_array({}, "string")
 check(je.str:join(",") == "",       "join série vazia → vazia")
 
 -- view de string agora suportada (9.2): zero-copy na leitura, COW na escrita
-local sv = S.from_table({"SP", "RJ", "MG"}, "string")
+local sv = S.from_array({"SP", "RJ", "MG"}, "string")
 local sv_w = sv:view(1, 2)                  -- [SP, RJ]
 check(sv_w:len() == 2,                      "string view: janela com len correto")
 check(sv_w:get(1) == "SP" and sv_w:get(2) == "RJ", "string view: lê o pai (zero-copy)")

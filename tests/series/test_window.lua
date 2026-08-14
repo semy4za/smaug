@@ -22,7 +22,7 @@ local NA    = smaug.Series.NA
 
 local function approx(a, b) return math.abs(a - b) < 1e-9 end
 
-local s = smaug.Series.from_table({1,2,3,4,5}, "int64")
+local s = smaug.Series.from_array({1,2,3,4,5}, "int64")
 
 -- ================================================================
 -- sum
@@ -46,7 +46,7 @@ check(rns:is_null(4),                  "sum(n): [4]=NA")
 check(rns:get(5) == 15,               "sum(n): [5]=15")
 
 -- float64
-local sf = smaug.Series.from_table({1.0,2.0,3.0}, "float64")
+local sf = smaug.Series.from_array({1.0,2.0,3.0}, "float64")
 local rfs = sf:rolling(2):sum()
 check(approx(rfs:get(2), 3.0),        "sum float: [2]=3.0")
 check(approx(rfs:get(3), 5.0),        "sum float: [3]=5.0")
@@ -76,7 +76,7 @@ check(r2x:get(5) == 5,                 "max(2): [5]=5")
 -- ================================================================
 -- NA dentro da janela: ignorado
 -- ================================================================
-local sn = smaug.Series.from_table({10, NA, 30, 40}, "int64")
+local sn = smaug.Series.from_array({10, NA, 30, 40}, "int64")
 local rn = sn:rolling(2):sum()
 check(rn:is_null(1),                   "NA na janela: [1]=NA")
 check(rn:get(2) == 10,                 "NA na janela: [2]=10 (NA ignorado)")
@@ -84,7 +84,7 @@ check(rn:get(3) == 30,                 "NA na janela: [3]=30 (NA ignorado)")
 check(rn:get(4) == 70,                 "NA na janela: [4]=70 (30+40)")
 
 -- janela toda de NA: resultado NA
-local sna = smaug.Series.from_table({NA, NA, 30}, "int64")
+local sna = smaug.Series.from_array({NA, NA, 30}, "int64")
 local rna = sna:rolling(2):mean()
 check(rna:is_null(1),                  "janela NA: [1]=NA")
 check(rna:is_null(2),                  "janela toda NA: [2]=NA")
@@ -93,7 +93,7 @@ check(approx(rna:get(3), 30.0),       "janela com 1 válido: [3]=30.0")
 -- ================================================================
 -- Série pequena (tamanho < window)
 -- ================================================================
-local s2 = smaug.Series.from_table({1,2}, "int64")
+local s2 = smaug.Series.from_array({1,2}, "int64")
 local r5 = s2:rolling(5):sum()
 check(r5:len() == 2,                   "janela > len: tamanho preservado")
 check(r5:is_null(1),                   "janela > len: [1]=NA")
@@ -102,7 +102,7 @@ check(r5:is_null(2),                   "janela > len: [2]=NA")
 -- ================================================================
 -- Série vazia
 -- ================================================================
-local se = smaug.Series.from_table({}, "int64")
+local se = smaug.Series.from_array({}, "int64")
 local re = se:rolling(3):sum()
 check(re:len() == 0,                   "série vazia: len=0")
 
@@ -117,7 +117,7 @@ local ok3, _ = pcall(function() s:rolling(-1) end)
 check(not ok3,                         "erro: window negativo")
 
 -- dtype inválido
-local ss = smaug.Series.from_table({"a","b"}, "string")
+local ss = smaug.Series.from_array({"a","b"}, "string")
 local ok4, _ = pcall(function() ss:rolling(2) end)
 check(not ok4,                         "erro: rolling em string")
 
@@ -129,7 +129,7 @@ check(not ok4,                         "erro: rolling em string")
 -- Rolling estendido
 -- ================================================================
 
-local rs = S.from_table({1.0,2.0,3.0,4.0,5.0}, "float64")
+local rs = S.from_array({1.0,2.0,3.0,4.0,5.0}, "float64")
 
 -- std / var
 local rstd = rs:rolling(3):std()
@@ -142,7 +142,7 @@ check(rvar:is_null(1),             "rolling var[1]=NA")
 check(approx(rvar:get(3), 1.0),   "rolling var[3]=1.0")
 
 -- count
-local rc = S.from_table({1.0,NA,3.0,NA,5.0}, "float64"):rolling(3):count()
+local rc = S.from_array({1.0,NA,3.0,NA,5.0}, "float64"):rolling(3):count()
 check(rc:is_null(1),              "rolling count[1]=NA (janela incompleta)")
 check(rc:is_null(2),              "rolling count[2]=NA")
 check(rc:get(3) == 2,             "rolling count[3]=2 ({1,NA,3}→2 não-nulos)")
@@ -186,7 +186,7 @@ local bmean = rs:rolling(3):min_periods(1):mean()
 check(approx(bmean:get(1), 1.0), "8a mean mp1[1]=1")
 check(approx(bmean:get(2), 1.5), "8a mean mp1[2]=1.5")
 -- i64 min_periods preserva tipo no rescan
-local bi = S.from_table({10,20,30,40}, "int64"):rolling(2):min_periods(1):max()
+local bi = S.from_array({10,20,30,40}, "int64"):rolling(2):min_periods(1):max()
 check(bi:get(1) == 10,           "8a i64 max mp1[1]=10")
 check(bi:get(4) == 40,           "8a i64 max mp1[4]=40")
 -- default (min_periods=0) inalterado: janela-cheia
@@ -195,7 +195,7 @@ check(bdef:is_null(1) and bdef:is_null(2), "8a sum default[1,2]=NA (janela-cheia
 check(approx(bdef:get(3), 6.0),  "8a sum default[3]=6")
 
 -- expanding
-local exp_s = S.from_table({1.0,2.0,3.0,4.0}, "float64")
+local exp_s = S.from_array({1.0,2.0,3.0,4.0}, "float64")
 local es = exp_s:expanding():sum()
 check(es:get(1) == 1, "expanding sum[1]=1")
 check(es:get(2) == 3, "expanding sum[2]=3")
@@ -215,7 +215,7 @@ check(approx(emd:get(2), 1.5), "expanding median[2]=1.5")
 -- item 8b: expanding delega a rolling(n, min_periods>=1). Tipos coerentes
 -- com rolling: sum→dtype, mean/std/var→float64, count→int64 (correção: o
 -- expanding antigo retornava col._dtype p/ tudo, truncando mean de i64).
-local exp_i = S.from_table({10,20,30}, "int64")
+local exp_i = S.from_array({10,20,30}, "int64")
 check(exp_i:expanding():sum():dtype()   == "int64",   "8b expanding sum i64→int64")
 check(exp_i:expanding():mean():dtype()  == "float64", "8b expanding mean i64→float64 (corrigido)")
 check(exp_i:expanding():count():dtype() == "int64",   "8b expanding count→int64")
@@ -226,7 +226,7 @@ local emp = exp_s:expanding(2):sum()
 check(emp:is_null(1),          "8b expanding(mp=2) sum[1]=NA")
 check(approx(emp:get(2), 3.0), "8b expanding(mp=2) sum[2]=3")
 -- expanding count acumula não-nulos
-local ecn = S.from_table({1.0, NA, 3.0}, "float64"):expanding():count()
+local ecn = S.from_array({1.0, NA, 3.0}, "float64"):expanding():count()
 check(ecn:get(1) == 1 and ecn:get(2) == 1 and ecn:get(3) == 2, "8b expanding count acumula não-nulos")
 
 -- ===================================================================
@@ -235,7 +235,7 @@ check(ecn:get(1) == 1 and ecn:get(2) == 1 and ecn:get(3) == 2, "8b expanding cou
 -- ===================================================================
 
 -- bool
-local sb  = S.from_table({true, NA, NA, false, NA}, "bool")
+local sb  = S.from_array({true, NA, NA, false, NA}, "bool")
 local sbf = sb:ffill()
 check(sbf:get(1) == true  and sbf:get(3) == true,  "bool ffill: carry true")
 check(sbf:get(4) == false and sbf:get(5) == false, "bool ffill: carry false")
@@ -244,7 +244,7 @@ check(sbb:get(2) == false and sbb:get(1) == true,  "bool bfill: carry")
 check(sbb:is_null(5),                              "bool bfill: borda final NA")
 
 -- string (com vazia válida e multibyte)
-local ss  = S.from_table({"a", NA, "", NA, "héllo"}, "string")
+local ss  = S.from_array({"a", NA, "", NA, "héllo"}, "string")
 local ssf = ss:ffill()
 check(ssf:get(2) == "a",      "str ffill: [2]=a (carry)")
 check(ssf:get(3) == "",       "str ffill: [3]= (vazia válida)")
@@ -255,12 +255,12 @@ check(ssb:get(1) == "a",      "str bfill: [1]=a")
 check(ssb:get(2) == "",       "str bfill: [2]= (carry vazia seguinte)")
 check(ssb:get(4) == "héllo",  "str bfill: [4]=héllo")
 -- bordas sem fonte permanecem NA
-local ss2 = S.from_table({NA, "x", NA}, "string")
+local ss2 = S.from_array({NA, "x", NA}, "string")
 check(ss2:ffill():is_null(1), "str ffill: borda inicial NA")
 check(ss2:bfill():is_null(3), "str bfill: borda final NA")
 
 -- datetime
-local sd  = S.from_table({"2020-01-01", NA, NA, "2020-06-15"}, "datetime")
+local sd  = S.from_array({"2020-01-01", NA, NA, "2020-06-15"}, "datetime")
 local sdf = sd:ffill()
 check(sdf:count_nonnull() == 4,        "dt ffill: preenche 4")
 check(sdf:get(2) == sdf:get(1),        "dt ffill: [2] carrega [1]")
@@ -285,7 +285,7 @@ do
 end
 
 -- série toda nula permanece toda nula
-local sn = S.from_table({NA, NA, NA}, "string")
+local sn = S.from_array({NA, NA, NA}, "string")
 check(sn:ffill():count_nonnull() == 0, "str ffill all-null: 0 válidos")
 check(sn:bfill():count_nonnull() == 0, "str bfill all-null: 0 válidos")
 
@@ -295,7 +295,7 @@ check(sn:bfill():count_nonnull() == 0, "str bfill all-null: 0 válidos")
 -- ===================================================================
 
 -- f64 positivo e negativo
-local nf = S.from_table({1.0, 2.0, 3.0, 4.0}, "float64")
+local nf = S.from_array({1.0, 2.0, 3.0, 4.0}, "float64")
 local nfp = nf:shift(1)   -- [NA,1,2,3]
 check(nfp:is_null(1) and nfp:get(2) == 1 and nfp:get(4) == 3, "f64 shift(1)")
 local nfn = nf:shift(-1)  -- [2,3,4,NA]
@@ -305,15 +305,15 @@ check(nf:shift(10):count_nonnull() == 0,                      "f64 shift(>=size)
 check(nf:shift(-10):count_nonnull() == 0,                     "f64 shift(<=-size)=all-NA")
 
 -- f64 com NA preservado no deslocamento
-local nfna = S.from_table({1.0, NA, 3.0}, "float64")
+local nfna = S.from_array({1.0, NA, 3.0}, "float64")
 check(nfna:shift(-1):is_null(1) and nfna:shift(-1):get(2) == 3, "f64 shift(-1) preserva NA")
 
 -- i64 negativo
-local ni = S.from_table({10, 20, 30}, "int64")
+local ni = S.from_array({10, 20, 30}, "int64")
 check(ni:shift(-1):get(1) == 20 and ni:shift(-1):is_null(3), "i64 shift(-1)")
 
 -- string negativo (offset-based)
-local nss = S.from_table({"a", "b", "c", "d"}, "string")
+local nss = S.from_array({"a", "b", "c", "d"}, "string")
 local nssn = nss:shift(-2)  -- [c,d,NA,NA]
 check(nssn:get(1) == "c" and nssn:get(2) == "d", "str shift(-2): valores")
 check(nssn:is_null(3) and nssn:is_null(4),       "str shift(-2): bordas NA")
@@ -321,12 +321,12 @@ local nssp = nss:shift(2)   -- [NA,NA,a,b]
 check(nssp:is_null(1) and nssp:get(3) == "a" and nssp:get(4) == "b", "str shift(2)")
 
 -- bool negativo
-local nb = S.from_table({true, false, true}, "bool")
+local nb = S.from_array({true, false, true}, "bool")
 local nbn = nb:shift(-1)  -- [false,true,NA]
 check(nbn:get(1) == false and nbn:get(2) == true and nbn:is_null(3), "bool shift(-1)")
 
 -- datetime negativo
-local nd = S.from_table({"2020-01-01", "2020-02-01", "2020-03-01"}, "datetime")
+local nd = S.from_array({"2020-01-01", "2020-02-01", "2020-03-01"}, "datetime")
 local ndn = nd:shift(-1)
 check(ndn:count_nonnull() == 2 and ndn:get(1) == nd:get(2), "dt shift(-1)")
 
@@ -339,20 +339,20 @@ check(not pcall(function() return nf:shift(1.5) end), "shift(1.5) erra (não-int
 -- smaug_bool_argmin (testados em test_ops_window) e o descritor já os ligava,
 -- mas um guard por dtype barrava str/bool antes do gate — capacidade morta.
 -- Nenhum teste Lua exercitava esses dtypes, por isso a suíte ficava verde.
-local as = S.from_table({"banana", "abacaxi", "caju"})
+local as = S.from_array({"banana", "abacaxi", "caju"})
 check(as:argmin() == 2, "7.2a str argmin = 2 (abacaxi, lexicográfico, 1-based)")
 check(as:argmax() == 3, "7.2a str argmax = 3 (caju)")
 check(as:min() == as:get(as:argmin()), "7.2a str min == get(argmin)")
 check(as:max() == as:get(as:argmax()), "7.2a str max == get(argmax)")
 
 -- str: vazia é a menor; prefixo mais curto vem antes
-local as2 = S.from_table({"z", NA, "", "m"})
+local as2 = S.from_array({"z", NA, "", "m"})
 check(as2:argmin() == 3, "7.2a str argmin ignora NA e acha a vazia")
 check(as2:argmax() == 1, "7.2a str argmax = 1 (z)")
-check(S.from_table({"abc", "ab"}):argmin() == 2, "7.2a str prefixo: 'ab' < 'abc'")
+check(S.from_array({"abc", "ab"}):argmin() == 2, "7.2a str prefixo: 'ab' < 'abc'")
 
 -- bool: false < true
-local ab = S.from_table({true, false, true})
+local ab = S.from_array({true, false, true})
 check(ab:argmin() == 2, "7.2a bool argmin = 2 (false < true)")
 check(ab:argmax() == 1, "7.2a bool argmax = 1 (true)")
 
@@ -361,8 +361,8 @@ check(as:idxmin() == as:argmin(), "7.2a str idxmin == argmin")
 check(ab:idxmax() == ab:argmax(), "7.2a bool idxmax == argmax")
 
 -- bordas: toda-NA e vazia → nil (SIZE_MAX do C traduzido)
-check(S.from_table({NA, NA}, "string"):argmin() == nil, "7.2a str toda-NA = nil")
-check(S.from_table({}, "string"):argmin() == nil,        "7.2a str vazia = nil")
-check(S.from_table({NA, NA}, "bool"):argmax() == nil,    "7.2a bool toda-NA = nil")
+check(S.from_array({NA, NA}, "string"):argmin() == nil, "7.2a str toda-NA = nil")
+check(S.from_array({}, "string"):argmin() == nil,        "7.2a str vazia = nil")
+check(S.from_array({NA, NA}, "bool"):argmax() == nil,    "7.2a bool toda-NA = nil")
 
 print(string.format("OK — %d checks passaram (Series: rolling, expanding, cumsum, cummin, cummax, diff, shift, ffill, bfill, argmin, argmax)", n_ok))

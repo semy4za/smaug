@@ -70,7 +70,7 @@ end
 -- SÉRIE DE 1 ELEMENTO
 -- ===================================================================
 do
-    local one = Series.from_table({42}, "float64")
+    local one = Series.from_array({42}, "float64")
     check(one:len() == 1, "1-elem: len 1")
     check(one:sum() == 42, "1-elem: sum 42")
     check(one:mean() == 42, "1-elem: mean 42")
@@ -90,7 +90,7 @@ end
 -- SÉRIE TODA-NULA
 -- ===================================================================
 do
-    local n = Series.from_table({NA, NA, NA}, "float64")
+    local n = Series.from_array({NA, NA, NA}, "float64")
     check(n:len() == 3, "toda-nula: len 3")
     check(n:count_nonnull() == 0, "toda-nula: count_nonnull 0")
     -- sum toda-nula = 0 (default). PENDENTE (1.6): sum(min_count=1) == nil
@@ -111,7 +111,7 @@ end
 -- SÉRIE TODA-IGUAL
 -- ===================================================================
 do
-    local eq = Series.from_table({5, 5, 5, 5}, "float64")
+    local eq = Series.from_array({5, 5, 5, 5}, "float64")
     check(eq:sum() == 20, "toda-igual: sum 20")
     check(eq:mean() == 5, "toda-igual: mean 5")
     check(eq:min() == 5 and eq:max() == 5, "toda-igual: min==max==5")
@@ -134,12 +134,12 @@ do
     local e = Series.int64(0)
     check(e:sum() == 0, "i64 vazia: sum 0")
     check(e:mean() == nil, "i64 vazia: mean nil")
-    local n = Series.from_table({NA, NA}, "int64")
+    local n = Series.from_array({NA, NA}, "int64")
     check(n:sum() == 0, "i64 toda-nula: sum 0 (ignore_na)")
     -- sentinela INT64_MIN deve virar nil quando ignore_na=false
     check(n:sum(false) == nil, "i64 toda-nula: sum(false) nil (sentinela→nil)")
     check(n:max() == nil, "i64 toda-nula: max nil")
-    local one = Series.from_table({7}, "int64")
+    local one = Series.from_array({7}, "int64")
     check(one:sum() == 7 and one:std() == nil, "i64 1-elem: sum=7, std=NA (amostral)")
 end
 
@@ -148,7 +148,7 @@ end
 -- Comparar um nulo produz NA na máscara — nunca false.
 -- ===================================================================
 do
-    local s = Series.from_table({10, NA, 30}, "float64")
+    local s = Series.from_array({10, NA, 30}, "float64")
     local b = s:gt(15)              -- F, NA, T
     check(b:get(1) == false, "cmp-misto: 10 >15 false")
     check(b:get(2) == nil,   "cmp-misto: NA >15 → NA (não false)")
@@ -164,26 +164,26 @@ end
 -- ===================================================================
 do
     -- f64 com NULL intercalado
-    local a = Series.from_table({1, NA, 3, NA, 5}, "float64")
+    local a = Series.from_array({1, NA, 3, NA, 5}, "float64")
     local c = a:dropna()
     check(c:len() == 3, "dropna: remove os NULLs (5->3)")
     check(c:get(1) == 1 and c:get(2) == 3 and c:get(3) == 5, "dropna: mantem ordem dos validos")
     -- a mensagem "use dropna primeiro" agora e verdadeira: dropna+sort funciona
-    local x = Series.from_table({3, NA, 1, 2}, "int64")
+    local x = Series.from_array({3, NA, 1, 2}, "int64")
     local sorted = x:dropna():sort()
     check(sorted:len() == 3 and sorted:get(1) == 1 and sorted:get(3) == 3,
           "dropna habilita sort em serie com nulos")
     -- string tambem
-    local s = Series.from_table({"SP", NA, "MG"}, "string")
+    local s = Series.from_array({"SP", NA, "MG"}, "string")
     check(s:dropna():len() == 2, "dropna string")
     -- tudo NULL -> serie vazia (sem erro)
-    local z = Series.from_table({NA, NA}, "float64")
+    local z = Series.from_array({NA, NA}, "float64")
     check(z:dropna():len() == 0, "dropna tudo-NULL = serie vazia")
     -- sem NULL -> copia de mesmo tamanho
-    local f = Series.from_table({1, 2, 3}, "float64")
+    local f = Series.from_array({1, 2, 3}, "float64")
     check(f:dropna():len() == 3, "dropna sem NULL = copia igual")
     -- string vazia "" NAO e NULL: dropna a mantem
-    local sv = Series.from_table({"", NA, "a"}, "string")
+    local sv = Series.from_array({"", NA, "a"}, "string")
     check(sv:dropna():len() == 2, "dropna: '' nao e NULL, e mantida")
 end
 
@@ -192,7 +192,7 @@ end
 -- =====================================================================
 do
     -- Series:fillna — preenche null, devolve NOVA series
-    local s = Series.from_table({1.0, NA, 3.0, NA}, "float64")
+    local s = Series.from_array({1.0, NA, 3.0, NA}, "float64")
     local f = s:fillna(0)
     -- nova series, original intacta
     check(s:is_null(2) == true, "fillna: original não muda (imutável)")
@@ -220,7 +220,7 @@ do
     check_err(function() return s:fillna() end, "fillna: sem argumento")
     check_err(function() return s:fillna(nil) end, "fillna: argumento nil")
     -- i64: preencher com não-inteiro é erro (sem coerção)
-    local si = Series.from_table({1, NA, 3}, "int64")
+    local si = Series.from_array({1, NA, 3}, "int64")
     check_err(function() return si:fillna(1.5) end, "fillna: i64 recusa 1.5 (sem coerção)")
     -- i64 com inteiro funciona
     local fi = si:fillna(0)
@@ -229,14 +229,14 @@ do
 
     -- casos degenerados
     -- série sem nulos: fillna devolve cópia equivalente
-    local s_clean = Series.from_table({1.0, 2.0}, "float64")
+    local s_clean = Series.from_array({1.0, 2.0}, "float64")
     local f_clean = s_clean:fillna(0)
     check(f_clean:get(1) == 1.0 and f_clean:get(2) == 2.0, "fillna: sem nulos = cópia igual")
     -- série vazia: fillna não quebra
     local e = Series.float64(0)
     check(e:fillna(0):len() == 0, "fillna: vazia ok")
     -- série toda-nula: tudo vira o valor
-    local n_all = Series.from_table({NA, NA}, "float64")
+    local n_all = Series.from_array({NA, NA}, "float64")
     local fn_all = n_all:fillna(7)
     check(fn_all:get(1) == 7 and fn_all:get(2) == 7, "fillna: toda-nula → tudo 7")
     check(fn_all:count_nonnull() == 2, "fillna: toda-nula preenchida")
@@ -264,17 +264,17 @@ end
 -- =====================================================================
 do
     -- 6.1 dtype singular
-    check(Series.from_table({1, 2}, "int64"):dtype() == "int64", "6.1 dtype int64")
-    check(Series.from_table({1.0}, "float64"):dtype() == "float64", "6.1 dtype float64")
-    check(Series.from_table({"a"}, "string"):dtype() == "string", "6.1 dtype string")
+    check(Series.from_array({1, 2}, "int64"):dtype() == "int64", "6.1 dtype int64")
+    check(Series.from_array({1.0}, "float64"):dtype() == "float64", "6.1 dtype float64")
+    check(Series.from_array({"a"}, "string"):dtype() == "string", "6.1 dtype string")
     -- 6.3 sample: n elementos, sem reposição, determinístico com seed
-    local x = Series.from_table({10, 20, 30, 40, 50}, "int64")
+    local x = Series.from_array({10, 20, 30, 40, 50}, "int64")
     local sm = x:sample(3, 1)
     check(sm:len() == 3, "6.3 sample: tamanho n")
     check(x:sample(3, 1):to_table()[1] == sm:to_table()[1], "6.3 sample: determinístico com seed")
     check(x:sample(99):len() == 5, "6.3 sample: n > len limita a len")
     -- 6.3 to_string / to_markdown (1 coluna, NA legível)
-    local y = Series.from_table({1, NA}, "int64")
+    local y = Series.from_array({1, NA}, "int64")
     local ts = y:to_string()
     check(ts:find("NA") ~= nil, "6.3 to_string mostra NA")
     local md = y:to_markdown()
@@ -289,14 +289,14 @@ do
           "11.4 __tostring: int64 > 2^53 EXATO")
     check(sb:to_string():find("e+", 1, true) == nil,
           "11.4 to_string: sem notação científica no int64 grande")
-    local sf = Series.from_table({3.14159265358979}, "float64")
+    local sf = Series.from_array({3.14159265358979}, "float64")
     check(sf:to_string():find("3.14159", 1, true) ~= nil,
           "11.5 to_string: float via %.6g")
-    local sp2 = Series.from_table({0/0, 1/0, -1/0}, "float64")
+    local sp2 = Series.from_array({0/0, 1/0, -1/0}, "float64")
     local tsp = sp2:to_string()
     check(tsp:find("nan", 1, true) and tsp:find("inf", 1, true) and tsp:find("-inf", 1, true),
           "11.5 to_string: NaN/inf normalizados")
-    local su = Series.from_table({"José", "François"}, "string")
+    local su = Series.from_array({"José", "François"}, "string")
     local ul = {}; for line in (su:to_string().."\n"):gmatch("(.-)\n") do ul[#ul+1] = line end
     local Display = require("smaug.core.display")
     check(Display.dwidth(ul[2]) == Display.dwidth(ul[3]),
@@ -343,9 +343,9 @@ do
         local t = tostring(x)
         check(type(t) == "string" and t:find("^table:") == nil and #t > 0, tag)
     end
-    local sstr = Series.from_table({"a", "b"}, "string"); sstr._name = "s"
-    local sdt  = Series.from_table({1000, 2000}, "datetime"); sdt._name = "t"
-    local snum = Series.from_table({1, 2, 3, 4}, "float64"); snum._name = "v"
+    local sstr = Series.from_array({"a", "b"}, "string"); sstr._name = "s"
+    local sdt  = Series.from_array({1000, 2000}, "datetime"); sdt._name = "t"
+    local snum = Series.from_array({1, 2, 3, 4}, "float64"); snum._name = "v"
     notleaky(sstr.str,           "11.2 .str proxy __tostring")
     notleaky(sdt.dt,             "11.2 .dt proxy __tostring")
     notleaky(sstr.at,            "11.2 .at proxy __tostring")
@@ -358,7 +358,7 @@ end
 -- 12.12: método desconhecido erra com sugestão
 -- =====================================================================
 do
-    local sx = Series.from_table({1, 2, 3}, "float64")
+    local sx = Series.from_array({1, 2, 3}, "float64")
     local function msg(fn) local _, e = pcall(fn); return tostring(e) end
     local m1 = msg(function() return sx:sumn() end)
     check(m1:find("não existe", 1, true) ~= nil, "12.12 Series: método inexistente erra")
@@ -391,19 +391,19 @@ do
     check(big:round():get_raw(1) == BIG,       "10.3.2 round(n>=0) é identidade exata")
     check(big:round(3):get_raw(1) == BIG,      "10.3.2 ndigits positivo também é identidade")
     -- 10.3.3 — ndigits < 0 faz trabalho real, em aritmética inteira
-    local q = Series.from_table({1234, -1567, 7}, "int64")
+    local q = Series.from_array({1234, -1567, 7}, "int64")
     check(q:round(-2):get(1) == 1200,   "10.3.3 round(1234,-2)=1200")
     check(q:round(-2):get(2) == -1600,  "10.3.3 round(-1567,-2)=-1600 (half-away-from-zero)")
     check(q:round(-3):get(1) == 1000,   "10.3.3 round(1234,-3)=1000")
     check(q:round(-1):get(3) == 10,     "10.3.3 round(7,-1)=10")
     -- 10.3.3b — o PONTO EXATO de meio caminho
-    local h = Series.from_table({1250, -1250, 1350, 50}, "int64")
+    local h = Series.from_array({1250, -1250, 1350, 50}, "int64")
     check(h:round(-2):get(1) == 1300,  "10.3.3b round(1250,-2)=1300 (meio → afasta do zero)")
     check(h:round(-2):get(2) == -1300, "10.3.3b round(-1250,-2)=-1300 (simétrico)")
     check(h:round(-2):get(3) == 1400,  "10.3.3b round(1350,-2)=1400")
     check(h:round(-2):get(4) == 100,   "10.3.3b round(50,-2)=100 (meio de zero afasta)")
     -- abaixo do meio arredonda para baixo
-    local u = Series.from_table({1249, -1249}, "int64")
+    local u = Series.from_array({1249, -1249}, "int64")
     check(u:round(-2):get(1) == 1200,  "10.3.3b round(1249,-2)=1200")
     check(u:round(-2):get(2) == -1200, "10.3.3b round(-1249,-2)=-1200")
     -- 10.3.4 — as três decisões: casos sem resposta erram
@@ -413,18 +413,18 @@ do
     check(not ok_min, "10.3.4 abs(INT64_MIN) erra (não tem contrapartida positiva)")
     check(tostring(e_min):match("INT64_MIN") ~= nil,
           "10.3.4 mensagem nomeia a causa, não só 'falhou'")
-    local ok_clip, e_clip = pcall(function() return Series.from_table({1,5,9},"int64"):clip(8,2) end)
+    local ok_clip, e_clip = pcall(function() return Series.from_array({1,5,9},"int64"):clip(8,2) end)
     check(not ok_clip, "10.3.4 clip(lo>hi) erra (antes devolvia {8,8,2}, fora de faixa)")
     check(tostring(e_clip):match("contradit") ~= nil, "10.3.4 mensagem explica a faixa")
     check(not pcall(function() return q:round(-19) end),
           "10.3.4 round(-19) erra (fator 10^19 não cabe em int64)")
     -- 10.3.5 — caminho normal intacto nos dois dtypes
-    local sm = Series.from_table({-3, 2}, "int64")
+    local sm = Series.from_array({-3, 2}, "int64")
     check(sm:abs():get(1) == 3,          "10.3.5 abs int64 pequeno")
     check(sm:clip(-1, 1):get(1) == -1,   "10.3.5 clip int64 pequeno")
     check(sm:clip(nil, 1):get(2) == 1,   "10.3.5 clip só com limite superior")
     check(sm:clip(-1, nil):get(1) == -1, "10.3.5 clip só com limite inferior")
-    local f = Series.from_table({-1.7, 2.345})
+    local f = Series.from_array({-1.7, 2.345})
     check(f:abs():get(1) == 1.7,         "10.3.5 abs float64")
     check(f:round():get(1) == -2,        "10.3.5 round float64 half-away-from-zero")
     check(f:round(2):get(2) == 2.35,     "10.3.5 round float64 com ndigits")
@@ -434,11 +434,11 @@ do
     check(wn:abs():is_null(1),           "10.3.6 abs preserva nulo (int64)")
     check(wn:round():is_null(1),         "10.3.6 round preserva nulo (int64)")
     check(wn:clip(0, 10):is_null(1),     "10.3.6 clip preserva nulo (int64)")
-    local fn = Series.from_table({4.0, NA}, "float64")
+    local fn = Series.from_array({4.0, NA}, "float64")
     check(fn:abs():is_null(2),           "10.3.6 abs preserva nulo (f64)")
     -- 10.3.7 — série vazia e dtype não numérico
     check(Series.int64(0):abs():len() == 0,   "10.3.7 série vazia não estoura")
-    check(not pcall(function() return Series.from_table({"a"},"string"):abs() end),
+    check(not pcall(function() return Series.from_array({"a"},"string"):abs() end),
           "10.3.7 dtype não numérico recusado")
 end
 
@@ -449,7 +449,7 @@ do
     local A  = ffi.new("int64_t", 9007199254740992LL)   -- 2^53
     local B  = ffi.new("int64_t", 9007199254740993LL)   -- 2^53 + 1
     local Cc = ffi.new("int64_t", 9007199254740995LL)   -- 2^53 + 3
-    local s  = Series.from_table({A, B, Cc}, "int64", "big")
+    local s  = Series.from_array({A, B, Cc}, "int64", "big")
     -- 10.2.1 — between(x, x) no próprio x. Só a linha de B pode ser true.
     local m = s:between(B, B)
     check(m:get(1) == false and m:get(2) == true and m:get(3) == false,
@@ -478,13 +478,13 @@ do
     local rn = wn:between(0, 15)
     check(rn:get(1) == true and rn:is_null(2) and rn:get(3) == false,
           "10.2.4 nulo propaga nulo")
-    local fn = Series.from_table({1.0, 0/0, 3.0}, "float64", "f")
+    local fn = Series.from_array({1.0, 0/0, 3.0}, "float64", "f")
     local rf = fn:between(0.5, 3.5)
     check(rf:get(1) == true and rf:get(2) == false and rf:get(3) == true,
           "10.2.4 NaN → false (não nulo), coerente com os comparadores")
     check(not rf:is_null(2), "10.2.4 NaN tem máscara válida")
     -- 10.2.5 — os quatro modos TAMBÉM em f64.
-    local fm = Series.from_table({1.0, 2.0, 3.0}, "float64", "fm")
+    local fm = Series.from_array({1.0, 2.0, 3.0}, "float64", "fm")
     local fb = fm:between(1.0, 3.0)
     check(fb:get(1) and fb:get(2) and fb:get(3), "10.2.5 f64 both")
     local fnei = fm:between(1.0, 3.0, "neither")
@@ -498,7 +498,7 @@ do
     check(Series.int64(0):between(1, 5):len() == 0, "10.2.6 série int64 vazia → len 0")
     check(Series.float64(0):between(1, 5):len() == 0, "10.2.6 série f64 vazia → len 0")
     -- 10.2.7 (fatia 2) — string desceu ao Anel 0
-    local st = Series.from_table({"a", "c", "e"}, "string", "s")
+    local st = Series.from_array({"a", "c", "e"}, "string", "s")
     local sb = st:between("a", "c")
     check(sb:get(1) and sb:get(2) and sb:get(3) == false, "10.2.7 string both")
     local sn = st:between("a", "e", "neither")
@@ -509,10 +509,10 @@ do
     local sr = st:between("a", "e", "right")
     check(sr:get(1) == false and sr:get(3) == true, "10.2.7 string right")
     -- desempate por prefixo
-    check(Series.from_table({"ab"}, "string"):between("a", "b"):get(1) == true,
+    check(Series.from_array({"ab"}, "string"):between("a", "b"):get(1) == true,
           "10.2.7 string prefixo mais curta vem antes")
     -- 10.2.8 (fatia 2) — datetime, os quatro modos.
-    local d = Series.from_table({0, 1000, 2000}, "datetime", "d")
+    local d = Series.from_array({0, 1000, 2000}, "datetime", "d")
     check(d:between(0, 2000):get(1) and d:between(0, 2000):get(3),
           "10.2.8 datetime both inclui as pontas")
     local dn = d:between(0, 2000, "neither")
@@ -523,14 +523,14 @@ do
     local dr = d:between(0, 2000, "right")
     check(dr:get(1) == false and dr:get(3) == true, "10.2.8 datetime right")
     -- 10.2.9 — nulo propaga nos QUATRO dtypes
-    check(Series.from_table({"a", NA, "c"}, "string"):between("a", "z"):is_null(2),
+    check(Series.from_array({"a", NA, "c"}, "string"):between("a", "z"):is_null(2),
           "10.2.9 string propaga nulo")
-    check(Series.from_table({0, NA, 2000}, "datetime"):between(0, 3000):is_null(2),
+    check(Series.from_array({0, NA, 2000}, "datetime"):between(0, 3000):is_null(2),
           "10.2.9 datetime propaga nulo")
-    check(Series.from_table({"a"}, "string"):between("a", "z"):len() == 1,
+    check(Series.from_array({"a"}, "string"):between("a", "z"):len() == 1,
           "10.2.9 string série de 1 elemento")
     -- 10.2.10 — dtype sem ordem continua recusado (bool não tem cmp_between).
-    check(not pcall(function() return Series.from_table({true}, "bool"):between(true, true) end),
+    check(not pcall(function() return Series.from_array({true}, "bool"):between(true, true) end),
           "10.2.10 bool recusado (sem ordem)")
 end
 
