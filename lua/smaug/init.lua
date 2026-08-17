@@ -28,6 +28,7 @@ local smaug = {
 
 -- API pública
 smaug.NA      = Series.NA
+smaug.NAN     = Series.NAN
 smaug.dataset = DataSet
 smaug.concat  = DataSet.concat
 smaug.join    = function(a, b, on, how, suffixes)

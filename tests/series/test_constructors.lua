@@ -77,7 +77,7 @@ do
     check(type(smaug.int64) == "function", "init: smaug.int64 exposto")
     check(type(smaug.string) == "function", "init: smaug.string exposto")
     check(type(smaug.datetime) == "function", "init: smaug.datetime exposto")
-    check(smaug.from_array == nil, "init: from_table removido do top-level")
+    check(smaug.from_table == nil, "init: from_table removido do top-level")
 end
 
 -- =====================================================================

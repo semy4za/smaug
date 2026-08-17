@@ -7,34 +7,28 @@ package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 
 local smaug  = require("smaug")
 local Series = smaug.Series
+local S      = Series
 local NA     = Series.NA
 
+local inf, ninf, nan = math.huge, -math.huge, 0/0
+
 local function approx(a, b) return math.abs(a - b) < 1e-9 end
+local function is_nan(x) return x ~= x end
+
 local n_ok = 0
 local function check(cond, msg)
     if not cond then error("FALHOU: " .. msg, 2) end
     n_ok = n_ok + 1
 end
 
---   * +Inf/-Inf são ordenáveis (não recusados)
--- Rode da raiz:  luajit tests/test_special.lua
-
-package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
-
-local smaug = require("smaug")
-local S     = smaug.Series
-
-local inf, ninf, nan = math.huge, -math.huge, 0/0
-local function is_nan(x) return x ~= x end
-
 local function check_err(fn, msg)
     local ok = pcall(fn)
     check(not ok, msg .. " (deveria lançar erro)")
 end
 
--- ===================================================================
--- +Inf / -Inf — ordenáveis, válidos em reduções
--- ===================================================================
+-- =====================================================================
+-- 1. +Inf / -Inf — ordenáveis, válidos em reduções
+-- =====================================================================
 do
     local s = S.from_array({3.0, inf, 1.0, ninf, 2.0}, "float64")
     check(s:min() == ninf, "Inf: min == -Inf")
@@ -55,9 +49,9 @@ do
     check(p:sort():len() == 3, "Inf: sort permitido (sem NaN)")
 end
 
--- ===================================================================
--- NaN é distinto de null — set(i, NaN) grava NaN, NÃO null
--- ===================================================================
+-- =====================================================================
+-- 2. NaN é distinto de null — set(i, NaN) grava NaN, NÃO null
+-- =====================================================================
 do
     local q = S.float64(3)
     q:set(1, 1.0)
@@ -71,15 +65,16 @@ do
     check(q:count_nonnull() == 3, "NaN: count_nonnull conta o NaN")
 end
 
--- ===================================================================
--- nil continua sendo null (distinto de NaN)
--- ===================================================================
+-- =====================================================================
+-- 3. nil continua sendo null (distinto de NaN)
+-- =====================================================================
 do
     local r = S.float64(2)
     r:set(1, nil)        -- nil → null
     r:set(2, 5.0)
     check(r:is_null(1) == true, "nil: set(nil) vira null")
     check(r:get(1) == nil, "nil: get de null devolve nil")
+
     -- numa mesma série dá pra ter null E NaN distintos
     local mix = S.float64(3)
     mix:set(1, nil)      -- null
@@ -91,9 +86,9 @@ do
     check(mix:count_nonnull() == 2, "mix: count_nonnull = 2 (null não conta, NaN+valor sim)")
 end
 
--- ===================================================================
--- NaN é contagioso; ignore_na NÃO pula NaN (só pula null)
--- ===================================================================
+-- =====================================================================
+-- 4. NaN é contagioso; ignore_na NÃO pula NaN (só pula null)
+-- =====================================================================
 do
     local s = S.float64(3)
     s:set(1, 1.0); s:set(2, nan); s:set(3, 3.0)
@@ -102,11 +97,9 @@ do
     check(s:mean() == nil, "NaN: mean com NaN real → nil")
 end
 
--- ===================================================================
--- div/0 → null (decisão explícita: div/0 não passa, é previsível)
--- 0/0, n/0 e -n/0 todos produzem null; NaN via op foi removido.
--- NaN ainda existe como valor literal (S.from_array({0/0})).
--- ===================================================================
+-- =====================================================================
+-- 5. div/0 → null (decisão explícita: div/0 não passa, é previsível)
+-- =====================================================================
 do
     local a = S.from_array({0.0, 1.0, -1.0}, "float64")
     local b = S.from_array({0.0, 0.0,  0.0}, "float64")
@@ -120,9 +113,9 @@ do
     check(d:is_null(2), "op: f64 / escalar 0 → null (2)")
 end
 
--- ===================================================================
--- sort/argsort RECUSAM séries com NaN (além de null)
--- ===================================================================
+-- =====================================================================
+-- 6. sort/argsort RECUSAM séries com NaN (além de null)
+-- =====================================================================
 do
     local s = S.float64(3)
     s:set(1, 3.0); s:set(2, nan); s:set(3, 1.0)
@@ -135,10 +128,9 @@ do
     check_err(function() return c:sort() end, "div/0: sort recusa null resultante")
 end
 
--- ===================================================================
--- comparações com NaN → false (IEEE), com máscara VÁLIDA (não NA)
--- distinção importante: NaN comparado dá false-válido; null dá NA.
--- ===================================================================
+-- =====================================================================
+-- 7. Comparações com NaN → false (IEEE), com máscara VÁLIDA (não NA)
+-- =====================================================================
 do
     local s = S.float64(3)
     s:set(1, 5.0); s:set(2, nan); s:set(3, 10.0)
@@ -151,9 +143,9 @@ do
     check(b:count_true() == 2, "cmp-NaN: count_true 2")
 end
 
--- ===================================================================
--- -0.0 — igual a 0.0 nas comparações, neutro na soma
--- ===================================================================
+-- =====================================================================
+-- 8. -0.0 — igual a 0.0 nas comparações, neutro na soma
+-- =====================================================================
 do
     local z = S.from_array({-0.0, 0.0}, "float64")
     check(z:eq(0.0):count_true() == 2, "-0.0: -0 e +0 ambos == 0")
@@ -161,8 +153,9 @@ do
     check(z:min() == z:max(), "-0.0: min == max (mesmo valor)")
 end
 
-
--- 5.5 — min_count opt-in em sum/prod (Series)
+-- =====================================================================
+-- 9. min_count opt-in em sum/prod (Series)
+-- =====================================================================
 do
     local c = Series.from_array({10, NA, NA}, "int64")
     check(c:sum() == 10, "5.5 Series sum default ignora NA = 10")
@@ -172,11 +165,12 @@ do
     check(an:sum() == 0, "5.5 Series sum all-null default = 0 (preservado)")
     check(an:sum(nil, 1) == nil, "5.5 Series sum all-null min_count=1 → NA")
     check(c:prod(nil, 2) == nil, "5.5 Series prod(min_count=2) → NA")
+end
 
-    -- ===============================================================
-    -- min/max em dtypes ordenáveis não-numéricos (item 7.2b): retornam
-    -- VALOR (D7.2-a ii). Fecha a incoerência argmin✓/min✗ que havia em dt.
-    -- ===============================================================
+-- =====================================================================
+-- 10. min/max em dtypes ordenáveis não-numéricos (7.2b)
+-- =====================================================================
+do
     local d = Series.from_array({"2020-03-01", "2020-01-01", "2020-06-15"}, "datetime")
     check(d:min() == d:get(d:argmin()), "7.2b dt:min == get(argmin)")
     check(d:max() == d:get(d:argmax()), "7.2b dt:max == get(argmax)")
@@ -202,6 +196,5 @@ do
     local bmn = Series.from_array({true, NA}, "bool")
     check(bmn:min(false) == nil,  "7.2b bool:min(false) com NA = nil")
 end
-
 
 print(string.format("OK — %d checks passaram (Series: reduções, valores especiais f64)", n_ok))

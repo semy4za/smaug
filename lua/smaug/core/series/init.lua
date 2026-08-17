@@ -157,6 +157,7 @@ local CategoricalSeries = I.CategoricalSeries
 Series._DTYPES = DTYPES
 Series.NA      = NA_
 
+
 -- Expõe CategoricalSeries como Series.Categorical
 Series.Categorical = CategoricalSeries
 
