@@ -156,7 +156,7 @@ local CategoricalSeries = I.CategoricalSeries
 -- Exposição de constantes públicas
 Series._DTYPES = DTYPES
 Series.NA      = NA_
-
+Series.NAN     = NAN
 
 -- Expõe CategoricalSeries como Series.Categorical
 Series.Categorical = CategoricalSeries
