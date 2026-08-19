@@ -7,13 +7,14 @@ package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 
 local smaug  = require("smaug")
 local Series = smaug.Series
-local NA     = Series.NA
+
 
 local n_ok = 0
 local function check(cond, msg)
     if not cond then error("FALHOU: " .. msg, 2) end
     n_ok = n_ok + 1
 end
+
 
 --
 -- Rode da raiz:  luajit tests/test_string.lua
@@ -420,7 +421,7 @@ local smaug = require("smaug")
 local NA    = smaug.Series.NA
 
 
-local s = smaug.Series.from_array({"hello world","foo bar","baz",NA}, "string")
+local s = smaug.Series.from_array({"hello world","foo bar","baz",smaug.NA}, "string")
 
 -- ================================================================
 -- find
@@ -514,7 +515,7 @@ check(z:is_null(5),            "zfill: NA propaga")
 -- ================================================================
 -- rep
 -- ================================================================
-local r = smaug.Series.from_array({"ab","x",NA}, "string")
+local r = smaug.Series.from_array({"ab","x",smaug.NA}, "string")
 local r2 = r.str:rep(2)
 check(r2:get(1) == "abab",     "rep(2): 'ab' -> 'abab'")
 check(r2:get(2) == "xx",       "rep(2): 'x' -> 'xx'")
