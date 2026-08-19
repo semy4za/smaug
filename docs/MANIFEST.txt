@@ -1,6 +1,6 @@
 # Smaug -- MANIFEST de integridade
 # Gerado por scripts/make_manifest.sh (o .ps1 delega a este)
-# Arvore: 265e638 + alteracoes nao commitadas
+# Arvore: 10b06b8 + alteracoes nao commitadas
 # Formato: <sha256>  <linhas>  <caminho>
 #
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
@@ -17,7 +17,7 @@ b31b63bd7db2e904bb31ab37efc7ef5bef25a282cbf58c1474e1056d21cc09eb    4711  ./docs
 f26d5211d1726c8a28f08979ada97bb01e38b2709a921f388d626260c17ca9a7     515  ./docs/CONTRACT.md
 f0cba08fe8e3f27264a36eab4d6c550cce1e77b9990e68d8f83d916f9e909fad     378  ./docs/COVERAGE.md
 9f89a9d98d9531648723af2b8aff51121dc75c71fb7bd0620ffb6b71938cbae3     173  ./docs/COW.md
-637e2940b802fe39a04e8e80e9563068ee75661c30d8816f1618c48c09099edf     934  ./docs/PARITY_REPORT.md
+bfe46c584e5bb11d6cdbfa9125efc6f2f3fdb7156ef586acc830f88168b981f3     934  ./docs/PARITY_REPORT.md
 6fe8a42f42e93ab4b3a257227c51fcff83b0b88fee7123f14bbdd31b64c06675     108  ./docs/README.md
 766339e2686fc9cc00364cc94c8014529cb4315527f97f45bf0c69c3bc187e11     887  ./docs/Roadmap.md
 1722e1a5806e185b2f934f2a66ec5193cc6ab8dc5a03837be43be80628c8fb86      39  ./include/smaug.h
@@ -49,7 +49,7 @@ ae40ea4adeabf354c793d51cf922f8cb4c182fa6176acdc4667e82382bea7e12     112  ./lua/
 be9516d3729802616e7afa39dca77d72b1bd56094accc6b9789de0b095266079     100  ./lua/smaug/core/series/access/_access.lua
 060cfc7b8a087da41ffb4f78c0b240cd4a7ee1a0434238c9d47229d76d685b95     532  ./lua/smaug/core/series/access/_transform.lua
 6f306ccbb520d603b091171951b9e96ec8f46ed54230cf1a37c739e877d85c32     685  ./lua/smaug/core/series/categorical/_categorical.lua
-b7dbbadf5ca1ec388d1adbaf5099d1c06d7f6558757b1ed0bda4acc0bb0b71d1     210  ./lua/smaug/core/series/init.lua
+ce1b2f4fe9fb100c8836a0110dfe2aae12eceac7406f4f5a75448b4c55b82e06     210  ./lua/smaug/core/series/init.lua
 8f7df72a425d69447ffdbd46d605f47fbb9bcae06e421fd09bbdebb7dd355cae     364  ./lua/smaug/core/series/selection/_predicates.lua
 d1ba531efd1345fbd73b1a95dd9e0983d2c8421a260a0b15b0f427ec25a0a5c5     300  ./lua/smaug/core/series/selection/_selection.lua
 2e16a5832d9c6a895b517b8206f1b8b1f6f2cb00e902952f7f7501cf086b0a61      35  ./lua/smaug/core/series/stats/_reduce.lua
@@ -130,7 +130,7 @@ c089ffb96dcf0a51f7386623a11da3ccb340c81a77a5d7f10b51b0d92d06b370     820  ./test
 4b3fe1170af5a1dc35106b6744161a048cd98d4e544b89ab83c5a81fb9259e81     199  ./tests/series/test_reduce.lua
 cbab0c33f1aa4ee9f11c36ba529642a13b0a44349bb0e9dc9280a8dcae44bf63     297  ./tests/series/test_selection.lua
 055231639e8ab1df873da3a539b1cf29340f0029b829e12bd1aa48f1aecfcfc1     547  ./tests/series/test_stat.lua
-fe8adfdaf071166e80b8878394741686bbb546787795a00969d18faf8991176b     775  ./tests/series/test_str.lua
+a7927b8efcbce06eff497a086e6f99d70cc47db4bd1fe7556c80d927f358c246     776  ./tests/series/test_str.lua
 e53a2ffbbfd70e2e0d1e18870c69d836cbc1f1c35bb109c34bfcedaa28bd3ca1     368  ./tests/series/test_window.lua
 #
 # total de arquivos: 129
