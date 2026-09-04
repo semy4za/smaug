@@ -139,7 +139,7 @@ LUA_TESTS=(core/test_keys core/test_collation \
            io/test_csv io/test_json \
            props/test_props props/test_integration)
 
-CFLAGS=(-std=c11 -fPIC -Wall -Wextra -O2 -I./include)
+CFLAGS=(-std=c11 -fPIC -fwrapv -Wall -Wextra -O2 -I./include)
 TEST_CFLAGS=(-std=c11 -g -O0 -Wall -Wextra -I./include)
 WRAP_FLAGS=(-Wl,--wrap=malloc -Wl,--wrap=realloc -Wl,--wrap=calloc -Wl,--wrap=strdup)
 

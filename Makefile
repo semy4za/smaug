@@ -1,5 +1,13 @@
 CC      = gcc
-CFLAGS  = -std=c11 -fPIC -Wall -Wextra -O2 -I./include
+# -fwrapv: signed integer overflow vira wrap em complemento de 2 (definido pelo
+# compilador), em vez de UB do C11. Sem esta flag, o contrato "platform-wrap"
+# (CODE_REVIEW A4 / test_ops_edge.c:i64_overflow_behavior) é uma promessa que o
+# otimizador não assina — funciona hoje em gcc -O2, mas pode quebrar em -O3, LTO
+# ou versões futuras. Adicionada 2026-09-01 (Fase 1 do endurecimento). Não vale
+# para TEST_CFLAGS: os testes rodam com -O0 (sem otimizador), onde -fwrapv é
+# inócuo — manter os testes sem ela preserva a propriedade de o teste provar o
+# comportamento na configuração de release, não só na de debug.
+CFLAGS  = -std=c11 -fPIC -fwrapv -Wall -Wextra -O2 -I./include
 LDFLAGS = -shared
 
 # Backend C completo: descobre todos os src/*.c automaticamente (12.19) — assim
@@ -39,64 +47,64 @@ LUA_TESTS         = $(LUA_TESTS_SERIES) $(LUA_TESTS_DATASET) $(LUA_TESTS_IO) $(L
 WRAP_FLAGS    = -Wl,--wrap=malloc -Wl,--wrap=realloc -Wl,--wrap=calloc -Wl,--wrap=strdup
 
 $(TARGET): $(SRCS) $(HDRS) | build
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(SRCS)
-	@echo "Compilado: $@	-- OK"
+        $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(SRCS)
+        @echo "Compilado: $@    -- OK"
 
 build:
-	mkdir -p build
+        mkdir -p build
 
 # Compila e roda os testes em C (plain + wrap), iterando sobre as listas.
 test: build
-	@for t in $(C_TESTS_PLAIN); do \
-		echo "  CC    $$t"; \
-		$(CC) $(TEST_CFLAGS) tests/c/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
-	done
-	@for t in $(C_TEST_WRAP); do \
-		echo "  CC    $$t (--wrap)"; \
-		$(CC) $(TEST_CFLAGS) $(WRAP_FLAGS) tests/c/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
-	done
-	@for t in $(C_TESTS_PLAIN) $(C_TEST_WRAP); do \
-		echo "  RUN   $$t"; ./build/$$t || exit 1; \
-	done
+        @for t in $(C_TESTS_PLAIN); do \
+                echo "  CC    $$t"; \
+                $(CC) $(TEST_CFLAGS) tests/c/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
+        done
+        @for t in $(C_TEST_WRAP); do \
+                echo "  CC    $$t (--wrap)"; \
+                $(CC) $(TEST_CFLAGS) $(WRAP_FLAGS) tests/c/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
+        done
+        @for t in $(C_TESTS_PLAIN) $(C_TEST_WRAP); do \
+                echo "  RUN   $$t"; ./build/$$t || exit 1; \
+        done
 
 # Compila e roda os testes de stress (N grande; mais lento que make test)
 test-stress: build
-	@for t in $(C_TEST_STRESS); do \
-		echo "  CC    $$t"; \
-		$(CC) $(TEST_CFLAGS) tests/c/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
-	done
-	@for t in $(C_TEST_STRESS); do \
-		echo "  RUN   $$t"; ./build/$$t || exit 1; \
-	done
+        @for t in $(C_TEST_STRESS); do \
+                echo "  CC    $$t"; \
+                $(CC) $(TEST_CFLAGS) tests/c/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
+        done
+        @for t in $(C_TEST_STRESS); do \
+                echo "  RUN   $$t"; ./build/$$t || exit 1; \
+        done
 
 # Roda todos os testes C sob Valgrind (requer valgrind instalado)
 valgrind: test test-stress
-	@for t in $(C_TESTS_PLAIN) $(C_TEST_WRAP) $(C_TEST_STRESS); do \
-		echo "  VALGRIND $$t"; \
-		valgrind --leak-check=full --error-exitcode=1 ./build/$$t || exit 1; \
-	done
+        @for t in $(C_TESTS_PLAIN) $(C_TEST_WRAP) $(C_TEST_STRESS); do \
+                echo "  VALGRIND $$t"; \
+                valgrind --leak-check=full --error-exitcode=1 ./build/$$t || exit 1; \
+        done
 
 # Smoke test do frontend Lua (requer luajit e a .so compilada)
 test-lua: $(TARGET)
-	@for t in $(LUA_TESTS); do \
-		luajit tests/$$t.lua || exit 1; \
-	done
+        @for t in $(LUA_TESTS); do \
+                luajit tests/$$t.lua || exit 1; \
+        done
 
 # Mede cobertura do backend C e gera docs/COVERAGE.md (requer gcov; só Linux)
 coverage:
-	bash scripts/make_coverage.sh
+        bash scripts/make_coverage.sh
 
 # Gera docs/MANIFEST.txt (sha256 + linhas de cada arquivo versionável)
 manifest:
-	bash scripts/make_manifest.sh
+        bash scripts/make_manifest.sh
 
 # Verifica a árvore atual contra o MANIFEST.txt (detecta perda/divergência)
 verify:
-	@bash scripts/make_manifest.sh >/dev/null
-	@git diff --stat docs/MANIFEST.txt 2>/dev/null || true
-	@echo "MANIFEST regenerado; compare com a versão anterior (git diff) para detectar mudanças."
+        @bash scripts/make_manifest.sh >/dev/null
+        @git diff --stat docs/MANIFEST.txt 2>/dev/null || true
+        @echo "MANIFEST regenerado; compare com a versão anterior (git diff) para detectar mudanças."
 
 clean:
-	rm -rf build
+        rm -rf build
 
 .PHONY : clean test test-stress valgrind test-lua coverage manifest verify

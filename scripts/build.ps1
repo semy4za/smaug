@@ -114,7 +114,11 @@ Write-Host ("Fontes ({0}): {1}" -f $sources.Count, ($sources -join ", ")) -Foreg
 
 Write-Host ""
 Write-Host "== Compilando build\smaug.dll ==" -ForegroundColor Cyan
-& $gcc -std=c11 -Wall -Wextra -O2 -I".\include" -shared -static-libgcc -o "build\smaug.dll" @sources
+# -fwrapv: signed integer overflow vira wrap em complemento de 2 (definido pelo
+# compilador), em vez de UB do C11. Endurece o contrato "platform-wrap"
+# (CODE_REVIEW A4 / test_ops_edge.c:i64_overflow_behavior). Adicionada
+# 2026-09-01 (Fase 1 do endurecimento).
+& $gcc -std=c11 -fPIC -fwrapv -Wall -Wextra -O2 -I".\include" -shared -static-libgcc -o "build\smaug.dll" @sources
 if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar a DLL." }
 Write-Host "OK -> build\smaug.dll" -ForegroundColor Green
 

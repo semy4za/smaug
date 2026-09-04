@@ -1,23 +1,23 @@
 # Smaug -- MANIFEST de integridade
 # Gerado por scripts/make_manifest.sh (o .ps1 delega a este)
-# Arvore: 10b06b8 + alteracoes nao commitadas
+# Arvore: a877095 + alteracoes nao commitadas
 # Formato: <sha256>  <linhas>  <caminho>
 #
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
 ed7d63f5177cc7d7fbfee9c7c18ebeb4d6fd7da02680ec7778cfe23be1d15b03      31  ./.gitattributes
 1639453637a28077c77ef9609cfed9a815feaad1a77d63f4d981d20ef72e077e       7  ./.gitignore
 d66b9d6d1b2bb00272d0e347f966d34ccdf8e7d58e40c8d94e2aa63a2e09fce3      21  ./LICENSE
-037f903d250f42559ad4ebfc3343145622ace94203b272b763f5bb572bd78bcd     102  ./Makefile
+ae858fee8ca85c64e956be3551b170fa1c4262641a3c2ab7353b8c36f1ff06f6     110  ./Makefile
 a0c76e9e9d254d33ff7bf92374e48f644e20c35ec98753dc9d7236761e10b02a     593  ./docs/API_INDEX.md
 169580ce180057b12b223529ce84767b6ff0920a8773e7432fd6c6d91befaeb1     636  ./docs/API_Reference.md
 f33e15a9714d57c233b804221fd789b8e62269c6639aa398efd831a0f02112cd     481  ./docs/ARCHITECTURE.md
 d95533092661b3481d5b398fdb20889a3e2a351243a08cba637bd7f04a326b8a     185  ./docs/Build_and_Testing.md
-b31b63bd7db2e904bb31ab37efc7ef5bef25a282cbf58c1474e1056d21cc09eb    4711  ./docs/CHANGELOG.md
+be88b62ba610251d4f52a2b42c5447a1c2db9bf9de7ad05348ed8f2ec4fbfbb7    4799  ./docs/CHANGELOG.md
 9a5745e0953b96ecc14c62e02951b104b7e2575938630a0bde0a5cecafee14ee      98  ./docs/CODE_REVIEW.md
 f26d5211d1726c8a28f08979ada97bb01e38b2709a921f388d626260c17ca9a7     515  ./docs/CONTRACT.md
 f0cba08fe8e3f27264a36eab4d6c550cce1e77b9990e68d8f83d916f9e909fad     378  ./docs/COVERAGE.md
 9f89a9d98d9531648723af2b8aff51121dc75c71fb7bd0620ffb6b71938cbae3     173  ./docs/COW.md
-bfe46c584e5bb11d6cdbfa9125efc6f2f3fdb7156ef586acc830f88168b981f3     934  ./docs/PARITY_REPORT.md
+80423736739cacf3f9b465a1df71eba371a6acbd90185678968d271d9bd7d056     934  ./docs/PARITY_REPORT.md
 6fe8a42f42e93ab4b3a257227c51fcff83b0b88fee7123f14bbdd31b64c06675     108  ./docs/README.md
 766339e2686fc9cc00364cc94c8014529cb4315527f97f45bf0c69c3bc187e11     887  ./docs/Roadmap.md
 1722e1a5806e185b2f934f2a66ec5193cc6ab8dc5a03837be43be80628c8fb86      39  ./include/smaug.h
@@ -64,8 +64,8 @@ e26fc858c7f7f424f2442c238ba0eb2dadb101c85d4c62c41716ad3e049fdc18     642  ./lua/
 185ed528a59ce102b3afcc01aa60d0fd34746fcfbb0c041ab6abed43ffb43a5a      59  ./lua/smaug/init.lua
 d3ceeed50376fa2fe08c3c5bffc7b1ded8d752f53dec120608296ac59316d459     388  ./lua/smaug/io/csv.lua
 35162240dbb9fa72e97b7fae1b0634cb013148ee0b825731a4b80e4399ef002d      91  ./lua/smaug/io/json.lua
-ebc95ed9dfb7c9865419823fb2578da1c8b90267bf650907f922a1f589ac8057     243  ./scripts/build.ps1
-63edf27323303f0e470cae7720357b39b332e488a6ee01a0e306bacd1f67c33c     309  ./scripts/build.sh
+01ad9fac8b0644de110a62efa11d3556cfa6bec280f58635fa15f702a411039b     247  ./scripts/build.ps1
+552e9278a5c07bfab2a6bb83ea166fcd22548a8ad9a1d58c2df1670fc03eb44e     309  ./scripts/build.sh
 e41168bcf875c85cacc135dba6c9a60f8cd154207fe81b94f68b0917fcfad4b5     225  ./scripts/make_coverage.sh
 749673189f41c7ae83cd740a2c0936cff276c1904955832e45eaa5a325f935b2      65  ./scripts/make_manifest.ps1
 d421657b2eb8b14a8bd0ed0c1e442f1c3d328b7f3015d07275266d87406fa217      76  ./scripts/make_manifest.sh
@@ -130,7 +130,7 @@ c089ffb96dcf0a51f7386623a11da3ccb340c81a77a5d7f10b51b0d92d06b370     820  ./test
 4b3fe1170af5a1dc35106b6744161a048cd98d4e544b89ab83c5a81fb9259e81     199  ./tests/series/test_reduce.lua
 cbab0c33f1aa4ee9f11c36ba529642a13b0a44349bb0e9dc9280a8dcae44bf63     297  ./tests/series/test_selection.lua
 055231639e8ab1df873da3a539b1cf29340f0029b829e12bd1aa48f1aecfcfc1     547  ./tests/series/test_stat.lua
-a7927b8efcbce06eff497a086e6f99d70cc47db4bd1fe7556c80d927f358c246     776  ./tests/series/test_str.lua
+224b6a2b8d10ac7ae8c5d1c9fa26e0d5bcef538838ab1c8560c0e0a1b7f1e259     751  ./tests/series/test_str.lua
 e53a2ffbbfd70e2e0d1e18870c69d836cbc1f1c35bb109c34bfcedaa28bd3ca1     368  ./tests/series/test_window.lua
 #
 # total de arquivos: 129

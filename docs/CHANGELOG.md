@@ -5,6 +5,94 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+## 2026-09-01 — Fase 1: `-fwrapv` no build, ou: como um "bug" virou contrato
+
+Primeira sessão de um esforço de endurecimento baseado numa auditoria externa.
+A auditoria (relatório técnico separado, ~50 achados entre P0/P1/P2) afirmava
+que overflow de `int64_t` em `add`/`sub`/`mul`/`cumsum`/`cumprod`/`sum` era
+"comportamento indefinido (UB) e deveria usar `__builtin_*_overflow` +
+`smaug_status_t`". Antes de tocar no código, fui conferir na documentação —
+esse é o método que o projeto exige (Roadmap 14.3: "a doc descreve o que o
+código faz").
+
+**O que encontrei mudou o diagnóstico.** Em `tests/c/test_ops_edge.c:702-743`
+existe `i64_overflow_behavior`, que afirma explicitamente o wrap em
+complemento de 2 como **contrato do projeto** — espelhando pandas/numpy. O
+`CODE_REVIEW.md` A4 registra: *"Overflow aritmético do i64 é silencioso —
+RESOLVIDO. Comportamento documentado como aceito (wrap em complemento de 2,
+mesmo que pandas/numpy) (...). O conteúdo é **platform-wrap**."* E o teste
+verifica não só que o resultado é "valor presente" — checa o valor exato
+(`INT64_MAX+1 == INT64_MIN`, `INT64_MAX*2 == -2`).
+
+Palavra-chave: **platform-wrap**. O projeto admite que o resultado depende da
+plataforma, e aceita isso como contrato. Não é "wrap garantido em complemento
+de 2" — é "o wrap da plataforma". Sem `-fwrapv`, isso é uma promessa que o
+otimizador não assina: funciona hoje em gcc 14.2 com `-O2` (medido), mas o
+padrão C11 diz que é UB, e futuros gcc/clang com `-O3`, LTO ou análises
+interprocedurais podem quebrar.
+
+**A correção não é mudar o comportamento — é endurecer o contrato que já
+existe.** Adicionar `-fwrapv` ao `CFLAGS` transforma "platform-wrap" em
+"compiler-guaranteed wrap". O teste `i64_overflow_behavior` continua passando,
+agora por razões certas (garantia formal do compilador), não por coincidência
+de otimizador. O critério de saída do pré-1.0 (Roadmap 14.1: *"Overflow e
+casos degenerados estão decididos?"*) fica mais sólido: a decisão agora é
+defendida pelo build, não só pela documentação.
+
+**O que foi feito:**
+
+- `Makefile`: `CFLAGS` ganhou `-fwrapv` (com comentário explicando por que
+  `TEST_CFLAGS` não ganha — os testes rodam com `-O0`, onde `-fwrapv` é
+  inócuo; manter os testes sem ela preserva a propriedade de o teste provar o
+  comportamento **na configuração de release**, não só na de debug).
+- `scripts/build.sh`: `CFLAGS` (array bash) ganhou `-fwrapv`, mesmo padrão.
+- `scripts/build.ps1`: linha de compilação da DLL ganhou `-fwrapv`. Esse é o
+  caminho do Windows (MSYS2-UCRT64), onde o gcc também reconhece a flag.
+- `TEST_CFLAGS` (Linux) e a linha de compilação dos testes C no `build.ps1`
+  **não** receberam a flag, pelo motivo acima.
+
+**Confirmação:** build completo verde — 12 suítes C (incluindo
+`test_ops_edge` com `i64_overflow_behavior`, 381 checks) + 22 suítes Lua
+(~3.128 checks) + property-based (360.862 checks) + 15 auditores de paridade.
+Zero regressões. O wrap continua funcionando; agora é garantido.
+
+**Decisões deliberadas que NÃO foram tomadas nesta fase:**
+
+1. **Não adicionei `smaug_status_t` às operações aritméticas i64.** Isso seria
+   mudar a API pública de propósito, contrariando o A4 do CODE_REVIEW.md —
+   uma decisão já tomada, documentada e testada. A auditoria original tratou
+   isso como bug; a leitura da documentação mostrou que é design choice.
+
+2. **Não toquei em `prod` nem nas escalares de datetime.** Esses sim são
+   decisões pendentes — Roadmap 10.1 (produto de int64 que estoura: erro ou
+   promoção a float64?) e Roadmap 12.36 (componentes `dt` prometem `-1` em
+   overflow e não cumprem). Ambos estão registrados como "a decidir" e têm
+   precedente de como tratar (Roadmap 10.3: `smaug_status_t +
+   SMG_ERR_ARGUMENT`, como em `abs(INT64_MIN)` e `clip(lo > hi)`). Ficam para
+   fases posteriores.
+
+3. **Não corrigi `smaug_dt_add_ms`.** A função faz `int64_t result = epoch_ms
+   + delta_ms;` e só depois checa sinal — o overflow ocorre antes da
+   detecção. Com `-fwrapv`, a checagem pós-overflow passa a ser confiável
+   (o wrap é definido, então a comparação de sinais detecta corretamente).
+   Antes do `-fwrapv`, funcionava por coincidência. Agora funciona por
+   garantia. Não mexer foi deliberado: a função está correta sob `-fwrapv`.
+
+**Achado lateral:** o ambiente de trabalho (LuaJIT 2.1 compilado do source em
+`/home/z/.local/`, por falta de root para `apt install`) teve que ser
+reinstalado nesta sessão — o `/home/z/.local/` não persiste entre sessões.
+Resolvido com `make install` rápido (fontes já clonados em
+`/home/z/my-project/deps/luajit-src`). Se voltar a acontecer, o caminho é
+`cd /home/z/my-project/deps/luajit-src && make -j2 PREFIX=/home/z/.local &&
+make install PREFIX=/home/z/.local`.
+
+**Próxima fase (2):** NaN em `smaug_f64_rank` e `smaug_f64_sorted_nonnull` —
+bug real, sem nuance contratual. `smaug_f64_argsort` já recusa NaN
+explicitamente (linha 651 de `smaug_ops_f64.c`); as duas irmãs não. Espelhar
+o que `argsort` faz é a correção natural.
+
+---
+
 ## 2026-07-27 — Roadmap enxuto: só o que falta, e uma porta de entrega de verdade
 
 O roadmap tinha 1562 linhas e ~70% delas descreviam trabalho já feito. Um arquivo
