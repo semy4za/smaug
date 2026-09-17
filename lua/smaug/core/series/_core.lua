@@ -3,7 +3,8 @@
 -- Núcleo da Series: metatype, helpers de fronteira, reduce_num.
 -- Recebe I com: I.C, I.ffi, I.DTYPES, I.NA, I.is_nan, I.is_na, I.I64_MIN, I.warn
 -- Produz em I: I.Series, I.methods, I.wrap, I.check_index, I.check_value,
---              I.checkrc, I.require_op, I.reduce_num, I.SMG_ERR_NOMEM
+--              I.checkrc, I.check_status, I.checked_call, I.require_op,
+--              I.reduce_num, I.SMG_ERR_NOMEM
 
 local Err        = require("smaug.core.errors")
 local int_scalar = require("smaug.core.int_scalar")
@@ -17,8 +18,14 @@ return function(I)
     local is_na  = I.is_na
     local warn   = I.warn
 
-    local SMG_ERR_NOMEM = 4   -- espelha smaug_types.h (enum fixo, 0-indexed)
+    local SMG_NULL_VALUE   = 1
+    local SMG_ERR_OOB      = 2
+    local SMG_ERR_ARGUMENT = 3
+    local SMG_ERR_NOMEM    = 4
+    local SMG_ERR_OVERFLOW = 5   -- espelha smaug_types.h (enum fixo, 0-indexed)
     I.SMG_ERR_NOMEM = SMG_ERR_NOMEM
+    I.SMG_ERR_OVERFLOW = SMG_ERR_OVERFLOW
+    I.SMG_ERR_ARGUMENT = SMG_ERR_ARGUMENT
 
     -- =====================================================================
     -- Metatype e tabela de métodos
@@ -98,8 +105,9 @@ return function(I)
                       .. "recebido " .. type(v), level or 3)
             end
         elseif dt == "datetime" then
-            if type(v) ~= "number" and type(v) ~= "string" then
-                error("smaug: valor para datetime deve ser número (epoch_ms) ou string ISO 8601; "
+            if type(v) ~= "number" and type(v) ~= "string"
+               and not int_scalar.is_int_cdata(v) then
+                error("smaug: valor para datetime deve ser número, int64_t (epoch_ms) ou string ISO 8601; "
                       .. "recebido " .. type(v), level or 3)
             end
         else  -- float64
@@ -118,13 +126,54 @@ return function(I)
     -- aritmetica no tipo nativo, entao o degrau ficou sem consumidor e foi
     -- removido em vez de virar codigo morto. O historico esta no CHANGELOG.
 
-    local function checkrc(rc, what)
+    local function check_status(rc, what, level)
+        rc = tonumber(rc)
         if rc == 0 then return end
-        if tonumber(rc) == SMG_ERR_NOMEM then
-            error("smaug: falha de memória ao materializar view (COW detach)", 3)
+        if rc == SMG_ERR_NOMEM then
+            error("smaug: falha de memória durante " .. what, level or 3)
         end
-        error("smaug: backend "..what.." devolveu status "..tonumber(rc)..
-              " (esperado SMG_OK=0); invariante interno violado", 3)
+        if rc == SMG_ERR_OVERFLOW then
+            error("smaug: " .. what .. " excede o intervalo int64", level or 3)
+        end
+        if rc == SMG_ERR_OOB then
+            error("smaug: " .. what .. " recebeu índice fora dos limites", level or 3)
+        end
+        if rc == SMG_ERR_ARGUMENT then
+            error("smaug: " .. what .. " recebeu argumento inválido", level or 3)
+        end
+        if rc == SMG_NULL_VALUE then return nil end
+        error("smaug: backend "..what.." devolveu status "..rc, level or 3)
+    end
+
+    -- Ponte única para funções FFI que retornam ponteiro/valor + status.
+    -- O buffer pertence ao estado Lua e a chamada não faz yield, portanto é
+    -- seguro reutilizá-lo sem alocar por operação.
+    local op_status = ffi.new("smaug_status_t[1]")
+    local function checked_call(fn, what, ...)
+        -- Lua só expande `...` integralmente na última posição da chamada;
+        -- como status precisa ser o último argumento da ABI C, a expansão
+        -- direta `fn(..., op_status)` perderia todos menos o primeiro operando.
+        local n = select("#", ...)
+        local r
+        if n == 1 then
+            r = fn((...), op_status)
+        elseif n == 2 then
+            local a, b = ...
+            r = fn(a, b, op_status)
+        elseif n == 3 then
+            local a, b, c = ...
+            r = fn(a, b, c, op_status)
+        else
+            error("smaug: chamada interna com aridade de status inválida", 3)
+        end
+        check_status(op_status[0], what, 4)
+        return r
+    end
+    I.check_status = check_status
+    I.checked_call = checked_call
+
+    local function checkrc(rc, what)
+        return check_status(rc, what, 3)
     end
     I.checkrc = checkrc
 
@@ -143,7 +192,9 @@ return function(I)
     local function reduce_num(self, fn_name, ignore_na)
         require_op(self, fn_name, 3)
         if ignore_na == nil then ignore_na = true end
-        local v = self._d[fn_name](self._c, ignore_na)
+        local checked = self._d[fn_name .. "_checked"]
+        local v = checked and checked_call(checked, fn_name .. "()", self._c, ignore_na)
+                          or self._d[fn_name](self._c, ignore_na)
         if (fn_name == "sum" or fn_name == "min" or fn_name == "max")
            and self._d.is_int_sentinel(v) then
             return nil

@@ -4,9 +4,8 @@ CC      = gcc
 # (CODE_REVIEW A4 / test_ops_edge.c:i64_overflow_behavior) é uma promessa que o
 # otimizador não assina — funciona hoje em gcc -O2, mas pode quebrar em -O3, LTO
 # ou versões futuras. Adicionada 2026-09-01 (Fase 1 do endurecimento). Não vale
-# para TEST_CFLAGS: os testes rodam com -O0 (sem otimizador), onde -fwrapv é
-# inócuo — manter os testes sem ela preserva a propriedade de o teste provar o
-# comportamento na configuração de release, não só na de debug.
+# O teste de borda que exerce esse contrato também recebe a flag, para que o
+# comportamento verificado seja definido pela mesma semântica da release.
 CFLAGS  = -std=c11 -fPIC -fwrapv -Wall -Wextra -O2 -I./include
 LDFLAGS = -shared
 
@@ -25,6 +24,7 @@ TARGET = build/libsmaug.so
 
 # Flags para os binários de teste (debug, sem -fPIC/-shared)
 TEST_CFLAGS = -std=c11 -g -O0 -Wall -Wextra -I./include
+EDGE_CFLAGS = $(TEST_CFLAGS) -fwrapv
 
 # === Listas de teste centralizadas (FONTE ÚNICA) ============================
 # Adicionar um teste = editar AQUI e em mais nenhum lugar. Os alvos test,
@@ -55,10 +55,11 @@ build:
 
 # Compila e roda os testes em C (plain + wrap), iterando sobre as listas.
 test: build
-        @for t in $(C_TESTS_PLAIN); do \
-                echo "  CC    $$t"; \
-                $(CC) $(TEST_CFLAGS) tests/c/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
-        done
+	@for t in $(C_TESTS_PLAIN); do \
+		echo "  CC    $$t"; \
+		if [ "$$t" = "test_ops_edge" ]; then flags='$(EDGE_CFLAGS)'; else flags='$(TEST_CFLAGS)'; fi; \
+		$(CC) $$flags tests/c/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
+	done
         @for t in $(C_TEST_WRAP); do \
                 echo "  CC    $$t (--wrap)"; \
                 $(CC) $(TEST_CFLAGS) $(WRAP_FLAGS) tests/c/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \

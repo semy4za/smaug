@@ -139,6 +139,18 @@ smaug_series_i64_t* smaug_i64_sub_scalar(const smaug_series_i64_t *a, int64_t sc
 smaug_series_i64_t* smaug_i64_mul_scalar(const smaug_series_i64_t *a, int64_t scalar);
 smaug_series_i64_t* smaug_i64_div_scalar(const smaug_series_i64_t *a, int64_t scalar);
 
+/* Variantes com status para fronteiras que precisam distinguir overflow de OOM
+   ou argumento inválido. As versões legadas acima continuam seguras: em
+   overflow devolvem NULL, mas não conseguem comunicar a causa. */
+smaug_series_i64_t* smaug_i64_add_checked_series(const smaug_series_i64_t *a, const smaug_series_i64_t *b, smaug_status_t *status);
+smaug_series_i64_t* smaug_i64_sub_checked_series(const smaug_series_i64_t *a, const smaug_series_i64_t *b, smaug_status_t *status);
+smaug_series_i64_t* smaug_i64_mul_checked_series(const smaug_series_i64_t *a, const smaug_series_i64_t *b, smaug_status_t *status);
+smaug_series_i64_t* smaug_i64_div_checked_series(const smaug_series_i64_t *a, const smaug_series_i64_t *b, smaug_status_t *status);
+smaug_series_i64_t* smaug_i64_add_scalar_checked(const smaug_series_i64_t *a, int64_t scalar, smaug_status_t *status);
+smaug_series_i64_t* smaug_i64_sub_scalar_checked(const smaug_series_i64_t *a, int64_t scalar, smaug_status_t *status);
+smaug_series_i64_t* smaug_i64_mul_scalar_checked(const smaug_series_i64_t *a, int64_t scalar, smaug_status_t *status);
+smaug_series_i64_t* smaug_i64_div_scalar_checked(const smaug_series_i64_t *a, int64_t scalar, smaug_status_t *status);
+
 /* coalesce_scalar (null-mask): onde self[i] é nulo, entra value; senão self[i].
    Resultado sem nulos. Serve fillna. */
 smaug_series_i64_t* smaug_i64_coalesce_scalar(const smaug_series_i64_t *self, int64_t value);
@@ -155,6 +167,8 @@ smaug_series_i64_t* smaug_i64_select(const smaug_series_bool_t *cond,
 
 /* Reduções (sum/min/max retornam INT64_MIN como sentinela; mean/var/std → double) */
 int64_t smaug_i64_sum(const smaug_series_i64_t *s, bool ignore_na);
+int64_t smaug_i64_sum_checked(const smaug_series_i64_t *s, bool ignore_na,
+                              smaug_status_t *status);
 int64_t smaug_i64_min(const smaug_series_i64_t *s, bool ignore_na);
 int64_t smaug_i64_max(const smaug_series_i64_t *s, bool ignore_na);
 double  smaug_i64_mean(const smaug_series_i64_t *s, bool ignore_na);
@@ -189,6 +203,9 @@ smaug_series_i64_t* smaug_i64_cumprod(const smaug_series_i64_t *s);
 smaug_series_i64_t* smaug_i64_cummin (const smaug_series_i64_t *s);
 smaug_series_i64_t* smaug_i64_cummax (const smaug_series_i64_t *s);
 smaug_series_i64_t* smaug_i64_diff   (const smaug_series_i64_t *s, size_t periods);
+smaug_series_i64_t* smaug_i64_cumsum_checked (const smaug_series_i64_t *s, smaug_status_t *status);
+smaug_series_i64_t* smaug_i64_cumprod_checked(const smaug_series_i64_t *s, smaug_status_t *status);
+smaug_series_i64_t* smaug_i64_diff_checked   (const smaug_series_i64_t *s, size_t periods, smaug_status_t *status);
 smaug_series_i64_t* smaug_i64_shift  (const smaug_series_i64_t *s, int64_t periods);
 smaug_series_i64_t* smaug_i64_ffill  (const smaug_series_i64_t *s);
 smaug_series_i64_t* smaug_i64_bfill  (const smaug_series_i64_t *s);

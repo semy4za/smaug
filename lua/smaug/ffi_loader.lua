@@ -32,7 +32,8 @@ ffi.cdef([[
         SMG_NULL_VALUE,
         SMG_ERR_OOB,
         SMG_ERR_ARGUMENT,
-        SMG_ERR_NOMEM
+        SMG_ERR_NOMEM,
+        SMG_ERR_OVERFLOW
     } smaug_status_t;
 
     /* ===================================================================
@@ -188,15 +189,24 @@ ffi.cdef([[
     smaug_series_i64_t* smaug_i64_sub(const smaug_series_i64_t *a, const smaug_series_i64_t *b);
     smaug_series_i64_t* smaug_i64_mul(const smaug_series_i64_t *a, const smaug_series_i64_t *b);
     smaug_series_i64_t* smaug_i64_div(const smaug_series_i64_t *a, const smaug_series_i64_t *b);
+    smaug_series_i64_t* smaug_i64_add_checked_series(const smaug_series_i64_t *a, const smaug_series_i64_t *b, smaug_status_t *status);
+    smaug_series_i64_t* smaug_i64_sub_checked_series(const smaug_series_i64_t *a, const smaug_series_i64_t *b, smaug_status_t *status);
+    smaug_series_i64_t* smaug_i64_mul_checked_series(const smaug_series_i64_t *a, const smaug_series_i64_t *b, smaug_status_t *status);
+    smaug_series_i64_t* smaug_i64_div_checked_series(const smaug_series_i64_t *a, const smaug_series_i64_t *b, smaug_status_t *status);
 
     /* --- Aritmeticas serie x escalar --- */
     smaug_series_i64_t* smaug_i64_add_scalar(const smaug_series_i64_t *a, int64_t scalar);
     smaug_series_i64_t* smaug_i64_sub_scalar(const smaug_series_i64_t *a, int64_t scalar);
     smaug_series_i64_t* smaug_i64_mul_scalar(const smaug_series_i64_t *a, int64_t scalar);
     smaug_series_i64_t* smaug_i64_div_scalar(const smaug_series_i64_t *a, int64_t scalar);
+    smaug_series_i64_t* smaug_i64_add_scalar_checked(const smaug_series_i64_t *a, int64_t scalar, smaug_status_t *status);
+    smaug_series_i64_t* smaug_i64_sub_scalar_checked(const smaug_series_i64_t *a, int64_t scalar, smaug_status_t *status);
+    smaug_series_i64_t* smaug_i64_mul_scalar_checked(const smaug_series_i64_t *a, int64_t scalar, smaug_status_t *status);
+    smaug_series_i64_t* smaug_i64_div_scalar_checked(const smaug_series_i64_t *a, int64_t scalar, smaug_status_t *status);
 
     /* --- Reducoes --- */
     int64_t smaug_i64_sum (const smaug_series_i64_t *s, bool ignore_na);
+    int64_t smaug_i64_sum_checked(const smaug_series_i64_t *s, bool ignore_na, smaug_status_t *status);
     int64_t smaug_i64_min (const smaug_series_i64_t *s, bool ignore_na);
     int64_t smaug_i64_max (const smaug_series_i64_t *s, bool ignore_na);
     double  smaug_i64_mean(const smaug_series_i64_t *s, bool ignore_na);
@@ -237,6 +247,10 @@ ffi.cdef([[
     smaug_series_i64_t* smaug_i64_cummin (const smaug_series_i64_t *s);
     smaug_series_i64_t* smaug_i64_cummax (const smaug_series_i64_t *s);
     smaug_series_i64_t* smaug_i64_diff   (const smaug_series_i64_t *s, size_t periods);
+    smaug_series_i64_t* smaug_i64_cumsum_checked (const smaug_series_i64_t *s, smaug_status_t *status);
+    smaug_series_i64_t* smaug_i64_cumprod_checked(const smaug_series_i64_t *s, smaug_status_t *status);
+    smaug_series_i64_t* smaug_i64_diff_checked   (const smaug_series_i64_t *s, size_t periods, smaug_status_t *status);
+    smaug_series_i64_t* smaug_i64_rolling_sum_checked(const smaug_series_i64_t *s, size_t window, size_t min_periods, smaug_status_t *status);
     smaug_series_i64_t* smaug_i64_shift  (const smaug_series_i64_t *s, int64_t periods);
     smaug_series_i64_t* smaug_i64_ffill  (const smaug_series_i64_t *s);
     smaug_series_i64_t* smaug_i64_bfill  (const smaug_series_i64_t *s);
@@ -503,9 +517,17 @@ ffi.cdef([[
     /* Construção e aritmética */
     int64_t smaug_dt_from_parts(int year, int month, int day,
                                  int hour, int minute, int second, int ms);
+    smaug_status_t smaug_dt_from_parts_checked(int year, int month, int day,
+                                                int hour, int minute, int second, int ms,
+                                                int64_t *out);
     int64_t smaug_dt_diff_ms  (int64_t a, int64_t b);
+    smaug_status_t smaug_dt_diff_ms_checked(int64_t a, int64_t b, int64_t *out);
     int64_t smaug_dt_add_ms   (int64_t epoch_ms, int64_t delta_ms);
+    smaug_status_t smaug_dt_add_ms_checked(int64_t epoch_ms, int64_t delta_ms,
+                                            int64_t *out);
     int64_t smaug_dt_truncate (int64_t epoch_ms, char unit);
+    smaug_status_t smaug_dt_truncate_checked(int64_t epoch_ms, char unit,
+                                              int64_t *out);
 
     /* Comparações */
     uint8_t* smaug_dt_gt(const smaug_series_dt_t *s, int64_t threshold, uint8_t **out_mask);

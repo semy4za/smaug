@@ -14,6 +14,7 @@ return function(I)
     local ffi     = I.ffi
     local wrap    = I.wrap
     local methods = I.methods
+    local checked_call = I.checked_call
 
     -- =====================================================================
     -- bool_mask_parts: extrai (uint8_t* vals, smaug_mask_t* nulls, size_t n)
@@ -108,7 +109,9 @@ return function(I)
                 if series_fn == "div" or a._dtype ~= b._dtype then
                     a, b = to_f64(a), to_f64(b)
                 end
-                local r = a._d[series_fn](a._c, b._c)
+                local checked = a._d[series_fn .. "_checked"]
+                local r = checked and checked_call(checked, opname .. "()", a._c, b._c)
+                               or a._d[series_fn](a._c, b._c)
                 if r == nil then error("smaug: '"..opname.."' falhou", 2) end
                 return wrap(r, a._dtype, a._name)
             end
@@ -136,7 +139,9 @@ return function(I)
                     b = int_scalar.check_operation(b, "'"..opname.."' com escalar int64", 3)
                 end
             end
-            local r = a._d[scalar_fn](a._c, b)
+            local checked = a._d[scalar_fn .. "_checked"]
+            local r = checked and checked_call(checked, opname .. "()", a._c, b)
+                               or a._d[scalar_fn](a._c, b)
             if r == nil then error("smaug: '"..opname.."' falhou", 2) end
             return wrap(r, a._dtype, a._name)
         end
@@ -154,7 +159,9 @@ return function(I)
                         a = int_scalar.check_operation(a, "'"..opname.."' com escalar int64", 3)
                     end
                 end
-                local r = b._d[scalar_fn](b._c, a)
+                local checked = b._d[scalar_fn .. "_checked"]
+                local r = checked and checked_call(checked, opname .. "()", b._c, a)
+                               or b._d[scalar_fn](b._c, a)
                 if r == nil then error("smaug: '"..opname.."' falhou", 2) end
                 return wrap(r, b._dtype, b._name)
             end

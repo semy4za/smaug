@@ -13,6 +13,7 @@ return function(I)
     local wrap          = I.wrap
     local NA            = I.NA
     local median_sorted = I.median_sorted
+    local checked_call  = I.checked_call
 
     -- =====================================================================
     -- SeriesRolling
@@ -58,7 +59,10 @@ return function(I)
     local function mp(self) return self._min_periods or 0 end
 
     function SeriesRolling:sum()
-        local r = self._s._d.rolling_sum(self._s._c, self._window, mp(self))
+        local checked = self._s._d.rolling_sum_checked
+        local r = checked and checked_call(checked, "rolling:sum()", self._s._c,
+                                           self._window, mp(self))
+                          or self._s._d.rolling_sum(self._s._c, self._window, mp(self))
         if r == nil then error("smaug: rolling:sum falhou (OOM)", 2) end
         return wrap(r, self._s._dtype, self._s._name)
     end

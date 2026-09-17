@@ -1,5 +1,6 @@
 #include "../include/smaug_core.h"
 #include <math.h>      /* NAN */
+#include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -9,6 +10,46 @@
    os alocou. Ver smaug_core.h. */
 void smaug_free(void *ptr) {
     free(ptr);
+}
+
+/* ===================================================================
+   Aritmética int64 verificada
+   -------------------------------------------------------------------
+   Estas funções não usam uma operação assinada antes da guarda. O uso
+   deliberado de expressões de limite, em vez de calcular e inspecionar o
+   sinal depois, é o que elimina UB em C11. `out` pode ser NULL para quem
+   só precisa saber se a operação cabe. */
+bool smaug_i64_add_checked(int64_t a, int64_t b, int64_t *out) {
+    if ((b > 0 && a > INT64_MAX - b) ||
+        (b < 0 && a < INT64_MIN - b)) return false;
+    if (out) *out = a + b;
+    return true;
+}
+
+bool smaug_i64_sub_checked(int64_t a, int64_t b, int64_t *out) {
+    if ((b > 0 && a < INT64_MIN + b) ||
+        (b < 0 && a > INT64_MAX + b)) return false;
+    if (out) *out = a - b;
+    return true;
+}
+
+bool smaug_i64_mul_checked(int64_t a, int64_t b, int64_t *out) {
+    if (a == 0 || b == 0) {
+        if (out) *out = 0;
+        return true;
+    }
+    if ((a > 0 && b > 0 && a > INT64_MAX / b) ||
+        (a > 0 && b < 0 && b < INT64_MIN / a) ||
+        (a < 0 && b > 0 && a < INT64_MIN / b) ||
+        (a < 0 && b < 0 && a < INT64_MAX / b)) return false;
+    if (out) *out = a * b;
+    return true;
+}
+
+bool smaug_i64_div_checked(int64_t a, int64_t b, int64_t *out) {
+    if (b == 0 || (a == INT64_MIN && b == -1)) return false;
+    if (out) *out = a / b;
+    return true;
 }
 
 /* ===================================================================

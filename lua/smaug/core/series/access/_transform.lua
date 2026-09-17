@@ -333,9 +333,11 @@ return function(I)
             return wrap(self._d.coalesce_scalar(self._c, value and 1 or 0), dt, self._name)
         end
 
-        -- datetime restrito a number (epoch_ms) nesta leva; string ISO → 12.16.
-        if dt == "datetime" and type(value) ~= "number" then
-            error("smaug: fillna em série datetime espera número (epoch_ms); "
+        -- datetime aceita number ou int64_t exato como epoch_ms; string ISO
+        -- continua fora deste método até existir parser vetorial próprio.
+        if dt == "datetime" and type(value) ~= "number"
+           and not int_scalar.is_int_cdata(value) then
+            error("smaug: fillna em série datetime espera número ou int64_t (epoch_ms); "
                   .. "recebido " .. type(value) .. " (string ISO ainda não; ver 12.16)", 2)
         end
 

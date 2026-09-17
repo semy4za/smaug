@@ -135,6 +135,14 @@ do
     check((i64s + i64b):get(1) == 13, "i64: add")
     check((i64s - i64b):get(1) == 7, "i64: sub")
     check((i64s * i64b):get(1) == 30, "i64: mul")
+
+    -- Overflow não faz wrap: o FFI preserva SMG_ERR_OVERFLOW e a superfície
+    -- Lua explica a causa em vez de confundir com OOM ou erro genérico.
+    local max_i64 = 9223372036854775807LL
+    local over = Series.from_array({max_i64}, "int64")
+    local ok_over, err_over = pcall(function() return over + 1 end)
+    check(not ok_over and err_over:match("smaug: %+%(%) excede o intervalo int64"),
+          "i64: add overflow devolve erro Lua claro")
     
     -- divisão: '/' é float64, floordiv é int64
     local num = Series.from_array({10, 20}, "int64")

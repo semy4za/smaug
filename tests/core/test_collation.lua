@@ -22,18 +22,17 @@
 package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 
 local smaug  = require("smaug")
-local Series = smaug.Series
 
-local n_ok = 0
-local function check(cond, msg)
-    if not cond then error("FALHOU: " .. msg, 2) end
-    n_ok = n_ok + 1
+local passed_checks = 0
+local function check(condition, message)
+    if not condition then error("FALHOU: " .. message, 2) end
+    passed_checks = passed_checks + 1
 end
 
 -- Pares escolhidos onde memcmp e colação de locale DIVERGEM de fato.
 -- Sob locale pt_BR/en_US, strcoll costuma ordenar case-insensitive e tratar
 -- acento como equivalente à letra base -- exatamente o oposto de memcmp.
-local pares = {
+local comparison_pairs = {
     { "a",     "B"     },  -- minúscula x MAIÚSCULA: byte 'a'(97) > 'B'(66)
     { "Z",     "a"     },  -- 'Z'(90) < 'a'(97); locale poria "a" antes de "Z"
     { "abc",   "abd"   },  -- diferença no último byte
@@ -47,33 +46,33 @@ local pares = {
     { "ab\0z", "ab\0a" },  -- NUL embutido: compara os bytes DEPOIS do NUL
 }
 
-for _, p in ipairs(pares) do
-    local a, b = p[1], p[2]
-    local rot = string.format("%q x %q", a, b):gsub("\\0", "\\0")
+for pair_index, comparison_pair in ipairs(comparison_pairs) do
+    local left_value, right_value = comparison_pair[1], comparison_pair[2]
+    local comparison_description = string.format("%q x %q", left_value, right_value):gsub("\\0", "\\0")
 
-    -- lado C: série com [a], comparada com o alvo b pelos comparadores do Anel 0
-    local s = Series.from_table({ a }, "string")
-    local c_lt = s:lt(b):get(1)
-    local c_gt = s:gt(b):get(1)
-    local c_eq = s:eq(b):get(1)
+    -- Lado C: série com left_value, comparada com right_value pelo Anel 0.
+    local source_series = smaug.Series({ left_value }, "string")
+    local backend_less_than = source_series:lt(right_value):get(1)
+    local backend_greater_than = source_series:gt(right_value):get(1)
+    local backend_equal = source_series:eq(right_value):get(1)
 
     -- lado Lua: o operador nativo, que é o que o CategoricalSeries usa
-    check((a < b) == c_lt, "Lua '<' concorda com o C em " .. rot)
-    check((a > b) == c_gt, "Lua '>' concorda com o C em " .. rot)
-    check((a == b) == c_eq, "Lua '==' concorda com o C em " .. rot)
+    check((left_value < right_value) == backend_less_than, "Lua '<' concorda com o C em " .. comparison_description)
+    check((left_value > right_value) == backend_greater_than, "Lua '>' concorda com o C em " .. comparison_description)
+    check((left_value == right_value) == backend_equal, "Lua '==' concorda com o C em " .. comparison_description)
 end
 
 -- E a consequência prática: CategoricalSeries (compara em Lua) tem de dar o
 -- mesmo resultado que Series<string> (compara no C) sobre os mesmos dados.
 do
-    local vals = { "a", "B", "Z", "ab", "á" }
-    local ss = Series.from_table(vals, "string")
-    local cs = Series.from_table(vals, "string"):astype("categorical")
-    for _, alvo in ipairs({ "B", "a", "M", "ab", "" }) do
-        local ms, mc = ss:lt(alvo), cs:lt(alvo)
-        for i = 1, #vals do
-            check(ms:get(i) == mc:get(i),
-                  "categorical concorda com string em lt('" .. alvo .. "') idx " .. i)
+    local source_values = { "a", "B", "Z", "ab", "á" }
+    local string_series = smaug.Series(source_values, "string")
+    local categorical_series = smaug.Series(source_values, "string"):astype("categorical")
+    for target_index, comparison_target in ipairs({ "B", "a", "M", "ab", "" }) do
+        local string_comparison, categorical_comparison = string_series:lt(comparison_target), categorical_series:lt(comparison_target)
+        for row_index = 1, #source_values do
+            check(string_comparison:get(row_index) == categorical_comparison:get(row_index),
+                  "categorical concorda com string em lt('" .. comparison_target .. "') idx " .. row_index)
         end
     end
 end
@@ -81,9 +80,9 @@ end
 -- sort usa a mesma colação (o desempate por índice é preocupação de sort, não
 -- de colação): a ordem resultante tem de ser a de memcmp, não a de locale.
 do
-    local s = Series.from_table({ "b", "A", "a", "B" }, "string"):sort()
-    check(s:get(1) == "A" and s:get(2) == "B" and s:get(3) == "a" and s:get(4) == "b",
+    local sorted_series = smaug.Series({ "b", "A", "a", "B" }, "string"):sort()
+    check(sorted_series:get(1) == "A" and sorted_series:get(2) == "B" and sorted_series:get(3) == "a" and sorted_series:get(4) == "b",
           "sort ordena por byte (maiúsculas antes), não por locale")
 end
 
-print(string.format("OK — %d checks passaram (colação: invariante Lua <-> C)", n_ok))
+print(string.format("OK — %d checks passaram (colação: invariante Lua <-> C)", passed_checks))

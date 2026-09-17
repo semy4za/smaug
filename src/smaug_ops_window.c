@@ -501,28 +501,53 @@ smaug_series_f64_t *smaug_f64_rolling_max(const smaug_series_f64_t *s,
    i64 rolling (mesmo padrão, tipo diferente)
    =================================================================== */
 
-smaug_series_i64_t *smaug_i64_rolling_sum(const smaug_series_i64_t *s,
-                                           size_t window, size_t min_periods) {
-    if (!s || window == 0) return NULL;
-    smaug_series_i64_t *r = smaug_i64_create(s->size);
-    if (!r) return NULL;
-
+static bool i64_rolling_sum_apply(const smaug_series_i64_t *s, size_t window,
+                                  size_t min_periods, smaug_series_i64_t *r) {
     int64_t sum = 0;
     size_t  cnt = 0;
-
     for (size_t i = 0; i < s->size; i++) {
-        if (SMAUG_VALID(s->null_mask, i)) { sum += s->data[i]; cnt++; }
+        /* Remove antes de adicionar: `sum` sempre representa uma janela real,
+           jamais a janela temporária de window+1 elementos. */
         if (i >= window) {
             size_t out = i - window;
-            if (SMAUG_VALID(s->null_mask, out)) { sum -= s->data[out]; cnt--; }
+            if (SMAUG_VALID(s->null_mask, out)) {
+                if (!smaug_i64_sub_checked(sum, s->data[out], &sum)) return false;
+                cnt--;
+            }
         }
-        if (min_periods == 0 && i + 1 < window) continue;
-        size_t need = (min_periods == 0) ? 1 : min_periods;
-        if (cnt < need) continue;
-        r->data[i]      = sum;
-        r->null_mask[i] = SMAUG_MASK_VALID;
+        if (SMAUG_VALID(s->null_mask, i)) {
+            if (!smaug_i64_add_checked(sum, s->data[i], &sum)) return false;
+            cnt++;
+        }
+        if (r && !(min_periods == 0 && i + 1 < window)) {
+            size_t need = (min_periods == 0) ? 1 : min_periods;
+            if (cnt >= need) {
+                r->data[i]      = sum;
+                r->null_mask[i] = SMAUG_MASK_VALID;
+            }
+        }
     }
+    return true;
+}
+
+smaug_series_i64_t *smaug_i64_rolling_sum_checked(const smaug_series_i64_t *s,
+                                                    size_t window, size_t min_periods,
+                                                    smaug_status_t *status) {
+    if (status) *status = SMG_OK;
+    if (!s || window == 0) { if (status) *status = SMG_ERR_ARGUMENT; return NULL; }
+    if (!i64_rolling_sum_apply(s, window, min_periods, NULL)) {
+        if (status) *status = SMG_ERR_OVERFLOW;
+        return NULL;
+    }
+    smaug_series_i64_t *r = smaug_i64_create(s->size);
+    if (!r) { if (status) *status = SMG_ERR_NOMEM; return NULL; }
+    (void)i64_rolling_sum_apply(s, window, min_periods, r);
     return r;
+}
+
+smaug_series_i64_t *smaug_i64_rolling_sum(const smaug_series_i64_t *s,
+                                           size_t window, size_t min_periods) {
+    return smaug_i64_rolling_sum_checked(s, window, min_periods, NULL);
 }
 
 /* Converte os dados int64 para double e aplica o motor genérico.

@@ -16,12 +16,27 @@ return function(I)
     local ffi     = I.ffi
     local NA      = I.NA
     local wrap    = I.wrap
+    local check_status = I.check_status
 
     -- Sentinela i64 central (init.lua). Operações de datetime do Ring 0 devolvem
     -- I64_MIN como valor inválido/overflow; is_int_sentinel é o predicado canônico
     -- (mesmo idioma de reduce_num em _core.lua). Nada de literal cru aqui.
     local I64_MIN         = I.I64_MIN
     local is_int_sentinel = I.DTYPES.datetime.is_int_sentinel
+    local out_i64 = ffi.new("int64_t[1]")
+
+    local function checked_dt_add(a, b, what)
+        check_status(C.smaug_dt_add_ms_checked(a, b, out_i64), what, 3)
+        return out_i64[0]
+    end
+    local function checked_dt_diff(a, b, what)
+        check_status(C.smaug_dt_diff_ms_checked(a, b, out_i64), what, 3)
+        return out_i64[0]
+    end
+    local function checked_dt_truncate(v, unit, what)
+        check_status(C.smaug_dt_truncate_checked(v, unit, out_i64), what, 3)
+        return out_i64[0]
+    end
 
     -- =====================================================================
     -- SeriesDT
@@ -107,8 +122,7 @@ return function(I)
             if v == nil then
                 vals[i] = NA
             else
-                local r = C.smaug_dt_truncate(v, u)
-                vals[i] = is_int_sentinel(r) and NA or tonumber(r)
+                vals[i] = checked_dt_truncate(v, u, "dt:truncate()")
             end
         end
         return Series.from_table(vals, "datetime", s._name)
@@ -126,7 +140,7 @@ return function(I)
             else
                 local a = s:get(i)
                 local b = s:get(i - periods)
-                vals[i] = (a ~= nil and b ~= nil) and tonumber(C.smaug_dt_diff_ms(a, b)) or NA
+                vals[i] = (a ~= nil and b ~= nil) and checked_dt_diff(a, b, "dt:diff()") or NA
             end
         end
         return Series.from_table(vals, "int64", s._name)
@@ -145,8 +159,7 @@ return function(I)
             if v == nil then
                 vals[i] = NA
             else
-                local r = C.smaug_dt_add_ms(v, delta_ms)
-                vals[i] = is_int_sentinel(r) and NA or tonumber(r)
+                vals[i] = checked_dt_add(v, delta_ms, "dt:add_ms()")
             end
         end
         return Series.from_table(vals, "datetime", s._name)
@@ -248,11 +261,11 @@ return function(I)
             local nm = m + 1
             if nm > 12 then nm = 1; y = y + 1 end
             return C.smaug_dt_from_parts(y, nm, 1, 0, 0, 0, 0)
-        elseif unit == "W" then return C.smaug_dt_add_ms(floor_ms, 7 * 86400000)
-        elseif unit == "D" then return C.smaug_dt_add_ms(floor_ms, 86400000)
-        elseif unit == "h" then return C.smaug_dt_add_ms(floor_ms, 3600000)
-        elseif unit == "m" then return C.smaug_dt_add_ms(floor_ms, 60000)
-        elseif unit == "s" then return C.smaug_dt_add_ms(floor_ms, 1000)
+        elseif unit == "W" then return checked_dt_add(floor_ms, 7 * 86400000, "dt:ceil()")
+        elseif unit == "D" then return checked_dt_add(floor_ms, 86400000, "dt:ceil()")
+        elseif unit == "h" then return checked_dt_add(floor_ms, 3600000, "dt:ceil()")
+        elseif unit == "m" then return checked_dt_add(floor_ms, 60000, "dt:ceil()")
+        elseif unit == "s" then return checked_dt_add(floor_ms, 1000, "dt:ceil()")
         end
         return I64_MIN
     end
@@ -265,8 +278,7 @@ return function(I)
         end
         local u = string.byte(unit)
         return dt_map(self, function(v)
-            local floor = C.smaug_dt_truncate(v, u)
-            if is_int_sentinel(floor) then return nil end
+            local floor = checked_dt_truncate(v, u, "dt:ceil()")
             if floor == v then return tonumber(v) end
             local nxt = next_period(floor, unit)
             if is_int_sentinel(nxt) then return nil end
@@ -280,12 +292,11 @@ return function(I)
         end
         local u = string.byte(unit)
         return dt_map(self, function(v)
-            local floor = C.smaug_dt_truncate(v, u)
-            if is_int_sentinel(floor) then return nil end
+            local floor = checked_dt_truncate(v, u, "dt:round()")
             local nxt = next_period(floor, unit)
             if is_int_sentinel(nxt) then return nil end
-            local to_floor = tonumber(C.smaug_dt_diff_ms(v, floor))
-            local to_next  = tonumber(C.smaug_dt_diff_ms(nxt, v))
+            local to_floor = tonumber(checked_dt_diff(v, floor, "dt:round()"))
+            local to_next  = tonumber(checked_dt_diff(nxt, v, "dt:round()"))
             if to_floor < to_next then
                 return tonumber(floor)
             else
@@ -387,9 +398,11 @@ return function(I)
 
     function Series.dt_from_parts(year, month, day, hour, minute, second, ms)
         hour = hour or 0; minute = minute or 0; second = second or 0; ms = ms or 0
-        local r = C.smaug_dt_from_parts(year, month, day, hour, minute, second, ms)
-        if is_int_sentinel(r) then return nil end
-        return tonumber(r)
+        local rc = C.smaug_dt_from_parts_checked(year, month, day, hour, minute,
+                                                  second, ms, out_i64)
+        if tonumber(rc) == I.SMG_ERR_ARGUMENT then return nil end
+        check_status(rc, "Series.dt_from_parts()", 2)
+        return out_i64[0]
     end
 
     -- Reservado no methods; resolvido via __index no init.lua

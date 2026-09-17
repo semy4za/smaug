@@ -141,6 +141,7 @@ LUA_TESTS=(core/test_keys core/test_collation \
 
 CFLAGS=(-std=c11 -fPIC -fwrapv -Wall -Wextra -O2 -I./include)
 TEST_CFLAGS=(-std=c11 -g -O0 -Wall -Wextra -I./include)
+EDGE_CFLAGS=("${TEST_CFLAGS[@]}" -fwrapv)
 WRAP_FLAGS=(-Wl,--wrap=malloc -Wl,--wrap=realloc -Wl,--wrap=calloc -Wl,--wrap=strdup)
 
 ALL_PASS=1
@@ -177,7 +178,11 @@ info "== Testes em C =="
 
 for t in "${C_TESTS_PLAIN[@]}"; do
     printf "  CC    %-20s" "$t"
-    gcc "${TEST_CFLAGS[@]}" "tests/c/$t.c" "${SRCS[@]}" -lm -o "build/$t" 2>/tmp/cc_err
+    if [[ "$t" == "test_ops_edge" ]]; then
+        gcc "${EDGE_CFLAGS[@]}" "tests/c/$t.c" "${SRCS[@]}" -lm -o "build/$t" 2>/tmp/cc_err
+    else
+        gcc "${TEST_CFLAGS[@]}" "tests/c/$t.c" "${SRCS[@]}" -lm -o "build/$t" 2>/tmp/cc_err
+    fi
     if [[ $? -ne 0 ]]; then
         fail "FALHOU (compilacao)"; cat /tmp/cc_err; ALL_PASS=0; continue
     fi

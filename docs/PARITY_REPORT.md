@@ -11,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-09-04 02:50:41 UTC
+Gerado em: 2026-09-17 18:52:15 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -346,13 +346,16 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `view` | 🟩 |  |
 
 
-### i64 — 64 funções C
+### i64 — 81 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
 | `abs` | 🟩 |  |
 | `add` | 🟩 |  |
+| `add_checked` | 🟩 |  |
+| `add_checked_series` | 🟩 |  |
 | `add_scalar` | 🟩 |  |
+| `add_scalar_checked` | 🟩 |  |
 | `append` | 🟩 |  |
 | `append_null` | 🟩 |  |
 | `argmax` | 🟩 |  |
@@ -371,10 +374,16 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `cummax` | 🟩 |  |
 | `cummin` | 🟩 |  |
 | `cumprod` | 🟩 |  |
+| `cumprod_checked` | 🟩 |  |
 | `cumsum` | 🟩 |  |
+| `cumsum_checked` | 🟩 |  |
 | `diff` | 🟩 |  |
+| `diff_checked` | 🟩 |  |
 | `div` | 🟩 |  |
+| `div_checked` | 🟩 |  |
+| `div_checked_series` | 🟩 |  |
 | `div_scalar` | 🟩 |  |
+| `div_scalar_checked` | 🟩 |  |
 | `eq` | 🟩 |  |
 | `ffill` | 🟩 |  |
 | `filter` | 🟩 |  |
@@ -389,7 +398,10 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `mean` | 🟩 |  |
 | `min` | 🟩 |  |
 | `mul` | 🟩 |  |
+| `mul_checked` | 🟩 |  |
+| `mul_checked_series` | 🟩 |  |
 | `mul_scalar` | 🟩 |  |
+| `mul_scalar_checked` | 🟩 |  |
 | `ne` | 🟩 |  |
 | `prod` | 🟩 |  |
 | `rank` | 🟩 |  |
@@ -399,6 +411,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `rolling_min` | 🟩 |  |
 | `rolling_std` | 🟩 |  |
 | `rolling_sum` | 🟩 |  |
+| `rolling_sum_checked` | 🟩 |  |
 | `rolling_var` | 🟩 |  |
 | `round` | 🟩 |  |
 | `select` | 🟩 |  |
@@ -409,8 +422,12 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `sorted_nonnull` | 🟩 |  |
 | `std` | 🟩 |  |
 | `sub` | 🟩 |  |
+| `sub_checked` | 🟩 |  |
+| `sub_checked_series` | 🟩 |  |
 | `sub_scalar` | 🟩 |  |
+| `sub_scalar_checked` | 🟩 |  |
 | `sum` | 🟩 |  |
+| `sum_checked` | 🟩 |  |
 | `take` | 🟩 |  |
 | `var` | 🟩 |  |
 | `view` | 🟩 |  |
@@ -505,11 +522,12 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `view` | 🟩 |  |
 
 
-### dt — 63 funções C
+### dt — 67 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
 | `add_ms` | 🟩 |  |
+| `add_ms_checked` | 🟩 |  |
 | `append` | 🟩 |  |
 | `append_null` | 🟩 |  |
 | `argmax` | 🟩 |  |
@@ -527,12 +545,14 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `day` | 🟩 |  |
 | `day_series` | 🟩 |  |
 | `diff_ms` | 🟩 |  |
+| `diff_ms_checked` | 🟩 |  |
 | `eq` | 🟩 |  |
 | `ffill` | 🟩 |  |
 | `filter` | 🟩 |  |
 | `format` | 🟩 |  |
 | `free` | 🟩 |  |
 | `from_parts` | 🟩 |  |
+| `from_parts_checked` | 🟩 |  |
 | `ge` | 🟩 |  |
 | `get` | 🟩 |  |
 | `gt` | 🟩 |  |
@@ -563,6 +583,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `sort` | 🟩 |  |
 | `take` | 🟩 |  |
 | `truncate` | 🟩 |  |
+| `truncate_checked` | 🟩 |  |
 | `view` | 🟩 |  |
 | `week` | 🟩 |  |
 | `week_series` | 🟩 |  |
@@ -773,7 +794,7 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 236/236 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 240/240 erros com prefixo `smaug:` (100.0%)
 - `dataset.lua`: 92/92 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
@@ -921,7 +942,7 @@ O `cdef` do `ffi_loader.lua` replica à mão o layout de cada struct dos headers
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 1092
+- 🟩 paridade: 1113
 - ⬜ exceção registrada: 215
 - 🟨 suspeita (revisar): 279
 - 🟥 inconsistência clara: 15

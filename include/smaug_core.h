@@ -19,6 +19,15 @@
    ------------------------------------------------------------------- */
 void smaug_free(void *ptr);
 
+/* Aritmética int64 com resultado verificável. Estes helpers são a fonte
+   única para operações do engine que precisam preservar a semântica de
+   inteiros assinados do C: nunca calculam antes de provar que o resultado cabe.
+   Retornam true e escrevem em `out` no sucesso; false significa overflow. */
+bool smaug_i64_add_checked(int64_t a, int64_t b, int64_t *out);
+bool smaug_i64_sub_checked(int64_t a, int64_t b, int64_t *out);
+bool smaug_i64_mul_checked(int64_t a, int64_t b, int64_t *out);
+bool smaug_i64_div_checked(int64_t a, int64_t b, int64_t *out);
+
 /* ===================== FLOAT64 — Lifecycle ===================== */
 smaug_series_f64_t* smaug_f64_create(size_t size);
 smaug_series_f64_t* smaug_f64_create_with_capacity(size_t size, size_t capacity);

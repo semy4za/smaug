@@ -23,7 +23,8 @@ typedef enum {
     SMG_NULL_VALUE,    /* leitura: elemento é NULL (não é erro)   */
     SMG_ERR_OOB,       /* índice fora dos limites                 */
     SMG_ERR_ARGUMENT,  /* ponteiro nulo / argumento inconsistente */
-    SMG_ERR_NOMEM      /* falha de alocação no COW detach         */
+    SMG_ERR_NOMEM,     /* falha de alocação no COW detach         */
+    SMG_ERR_OVERFLOW   /* resultado não cabe no intervalo do tipo   */
 } smaug_status_t;
 
 /* Tipo opaque para hash table (uso futuro: GroupBy/joins) */

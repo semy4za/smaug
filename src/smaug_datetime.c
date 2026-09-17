@@ -45,8 +45,9 @@
 /* Dia civil (0 = 1970-01-01) a partir de epoch_ms. */
 static int64_t epoch_ms_to_civil_day(int64_t epoch_ms) {
     /* Divisão floor para dias negativos (antes de 1970). */
-    if (epoch_ms >= 0) return epoch_ms / MS_PER_DAY;
-    return (epoch_ms - MS_PER_DAY + 1) / MS_PER_DAY;
+    int64_t q = epoch_ms / MS_PER_DAY;
+    int64_t r = epoch_ms % MS_PER_DAY;
+    return (r < 0) ? q - 1 : q;
 }
 
 /* Milissegundos dentro do dia (0–86399999). */
@@ -476,17 +477,15 @@ int smaug_dt_parse(const char *str, size_t len, int64_t *epoch_ms, int dayfirst)
     /* sobra algo no buffer → inválido */
     if (p != end) return -1;
 
-    int64_t days   = days_from_civil(y, mo, d);
-    int64_t result = days       * MS_PER_DAY
-                   + (int64_t)h   * MS_PER_HOUR
-                   + (int64_t)mi  * MS_PER_MINUTE
-                   + (int64_t)sec * MS_PER_SECOND
-                   + ms;
+    int64_t result;
+    if (smaug_dt_from_parts_checked(y, mo, d, h, mi, sec, ms, &result) != SMG_OK)
+        return -1;
 
     /* subtrai offset de timezone para obter UTC */
     if (tz_sign != 0) {
         int64_t tz_offset = ((int64_t)tz_h * 60 + tz_m) * MS_PER_MINUTE;
-        result -= tz_sign * tz_offset;
+        if (smaug_dt_add_ms_checked(result, tz_sign > 0 ? -tz_offset : tz_offset,
+                                    &result) != SMG_OK) return -1;
     }
 
     *epoch_ms = result;
@@ -594,11 +593,9 @@ int smaug_dt_week(int64_t epoch_ms) {
         /* última 5ª-feira do ano anterior */
         int wd_dec28 = (int)((dec28 + 3) % 7);
         if (wd_dec28 < 0) wd_dec28 += 7;
-        week = (smaug_dt_yearday(
-                    (days_from_civil(y-1,1,1) + 363 + 3 - wd_dec28) * MS_PER_DAY)
-                + 6) / 7;
-        (void)week;
-        /* simplificação: retorna 53 quando pertence ao ano anterior */
+        /* O contrato desta API retorna 53 para a semana que pertence ao ano
+           anterior. Não materializamos um epoch intermediário: no extremo
+           int64 ele poderia não caber e o valor calculado era descartado. */
         week = 53;
     } else if (week > 52) {
         /* verificar se semana 53 existe */
@@ -670,76 +667,111 @@ DT_COMPONENT_SERIES_IMPL(week)   /* COV-EXCL-BR: o ramo falso do `v >= 0` e inal
    Construção a partir de componentes
    =================================================================== */
 
-int64_t smaug_dt_from_parts(int year, int month, int day,
-                              int hour, int minute, int second, int ms) {
-    if (!is_valid_date(year, month, day)) return DT_SENTINEL;
+smaug_status_t smaug_dt_from_parts_checked(int year, int month, int day,
+                                            int hour, int minute, int second, int ms,
+                                            int64_t *out) {
+    if (!out || !is_valid_date(year, month, day)) return SMG_ERR_ARGUMENT;
     if (hour < 0 || hour > 23 || minute < 0 || minute > 59 ||
-        second < 0 || second > 59 || ms < 0 || ms > 999) return DT_SENTINEL;
+        second < 0 || second > 59 || ms < 0 || ms > 999) return SMG_ERR_ARGUMENT;
 
     int64_t days   = days_from_civil(year, month, day);
-    return days       * MS_PER_DAY
-         + (int64_t)hour   * MS_PER_HOUR
-         + (int64_t)minute * MS_PER_MINUTE
-         + (int64_t)second * MS_PER_SECOND
-         + ms;
+    int64_t result, part;
+    if (!smaug_i64_mul_checked(days, MS_PER_DAY, &result) ||
+        !smaug_i64_mul_checked((int64_t)hour, MS_PER_HOUR, &part) ||
+        !smaug_i64_add_checked(result, part, &result) ||
+        !smaug_i64_mul_checked((int64_t)minute, MS_PER_MINUTE, &part) ||
+        !smaug_i64_add_checked(result, part, &result) ||
+        !smaug_i64_mul_checked((int64_t)second, MS_PER_SECOND, &part) ||
+        !smaug_i64_add_checked(result, part, &result) ||
+        !smaug_i64_add_checked(result, (int64_t)ms, &result))
+        return SMG_ERR_OVERFLOW;
+    *out = result;
+    return SMG_OK;
+}
+
+int64_t smaug_dt_from_parts(int year, int month, int day,
+                             int hour, int minute, int second, int ms) {
+    int64_t out;
+    return smaug_dt_from_parts_checked(year, month, day, hour, minute, second, ms,
+                                       &out) == SMG_OK ? out : DT_SENTINEL;
 }
 
 /* ===================================================================
    Aritmética
    =================================================================== */
 
+smaug_status_t smaug_dt_diff_ms_checked(int64_t a, int64_t b, int64_t *out) {
+    if (!out) return SMG_ERR_ARGUMENT;
+    return smaug_i64_sub_checked(a, b, out) ? SMG_OK : SMG_ERR_OVERFLOW;
+}
 int64_t smaug_dt_diff_ms(int64_t a, int64_t b) {
-    return a - b;
+    int64_t out;
+    return smaug_dt_diff_ms_checked(a, b, &out) == SMG_OK ? out : DT_SENTINEL;
+}
+
+smaug_status_t smaug_dt_add_ms_checked(int64_t epoch_ms, int64_t delta_ms,
+                                       int64_t *out) {
+    if (!out) return SMG_ERR_ARGUMENT;
+    return smaug_i64_add_checked(epoch_ms, delta_ms, out) ? SMG_OK : SMG_ERR_OVERFLOW;
 }
 
 int64_t smaug_dt_add_ms(int64_t epoch_ms, int64_t delta_ms) {
-    /* Detecta overflow: se os sinais de epoch_ms e delta_ms são iguais
-       e o resultado tem sinal diferente, houve overflow. */
-    int64_t result = epoch_ms + delta_ms;
-    if ((delta_ms > 0 && result < epoch_ms) ||
-        (delta_ms < 0 && result > epoch_ms)) return DT_SENTINEL;
-    return result;
+    int64_t out;
+    return smaug_dt_add_ms_checked(epoch_ms, delta_ms, &out) == SMG_OK ? out : DT_SENTINEL;
 }
 
-int64_t smaug_dt_truncate(int64_t epoch_ms, char unit) {
+static smaug_status_t truncate_fixed_unit(int64_t epoch_ms, int64_t unit,
+                                          int64_t *out) {
+    int64_t q = epoch_ms / unit;
+    if (epoch_ms % unit < 0) q--;
+    return smaug_i64_mul_checked(q, unit, out) ? SMG_OK : SMG_ERR_OVERFLOW;
+}
+
+smaug_status_t smaug_dt_truncate_checked(int64_t epoch_ms, char unit, int64_t *out) {
+    if (!out) return SMG_ERR_ARGUMENT;
+    int64_t d, start;
     switch (unit) {
-        case 's': /* segundo */
-            return (epoch_ms / MS_PER_SECOND) * MS_PER_SECOND
-                 - (epoch_ms < 0 && epoch_ms % MS_PER_SECOND != 0 ? MS_PER_SECOND : 0);
-        case 'm': /* minuto */
-            return (epoch_ms / MS_PER_MINUTE) * MS_PER_MINUTE
-                 - (epoch_ms < 0 && epoch_ms % MS_PER_MINUTE != 0 ? MS_PER_MINUTE : 0);
-        case 'h': /* hora */
-            return (epoch_ms / MS_PER_HOUR) * MS_PER_HOUR
-                 - (epoch_ms < 0 && epoch_ms % MS_PER_HOUR != 0 ? MS_PER_HOUR : 0);
+        case 's': return truncate_fixed_unit(epoch_ms, MS_PER_SECOND, out);
+        case 'm': return truncate_fixed_unit(epoch_ms, MS_PER_MINUTE, out);
+        case 'h': return truncate_fixed_unit(epoch_ms, MS_PER_HOUR, out);
         case 'D': { /* dia */
-            int64_t d = epoch_ms_to_civil_day(epoch_ms);
-            return d * MS_PER_DAY;
+            d = epoch_ms_to_civil_day(epoch_ms);
+            return smaug_i64_mul_checked(d, MS_PER_DAY, out) ? SMG_OK : SMG_ERR_OVERFLOW;
         }
         case 'W': { /* semana — retrocede para a segunda-feira anterior */
-            int64_t d  = epoch_ms_to_civil_day(epoch_ms);
+            d  = epoch_ms_to_civil_day(epoch_ms);
             int     wd = smaug_dt_weekday(epoch_ms); /* 0=seg */
-            return (d - wd) * MS_PER_DAY;
+            if (!smaug_i64_sub_checked(d, (int64_t)wd, &start) ||
+                !smaug_i64_mul_checked(start, MS_PER_DAY, out)) return SMG_ERR_OVERFLOW;
+            return SMG_OK;
         }
         case 'M': { /* mês */
             int y, mo, d;
             civil_from_days(epoch_ms_to_civil_day(epoch_ms), &y, &mo, &d);
-            return days_from_civil(y, mo, 1) * MS_PER_DAY;
+            return smaug_i64_mul_checked(days_from_civil(y, mo, 1), MS_PER_DAY, out)
+                   ? SMG_OK : SMG_ERR_OVERFLOW;
         }
         case 'Q': { /* trimestre */
             int y, mo, d;
             civil_from_days(epoch_ms_to_civil_day(epoch_ms), &y, &mo, &d);
             int q_start = ((mo - 1) / 3) * 3 + 1;
-            return days_from_civil(y, q_start, 1) * MS_PER_DAY;
+            return smaug_i64_mul_checked(days_from_civil(y, q_start, 1), MS_PER_DAY, out)
+                   ? SMG_OK : SMG_ERR_OVERFLOW;
         }
         case 'Y': { /* ano */
             int y, mo, d;
             civil_from_days(epoch_ms_to_civil_day(epoch_ms), &y, &mo, &d);
-            return days_from_civil(y, 1, 1) * MS_PER_DAY;
+            return smaug_i64_mul_checked(days_from_civil(y, 1, 1), MS_PER_DAY, out)
+                   ? SMG_OK : SMG_ERR_OVERFLOW;
         }
         default:
-            return DT_SENTINEL;
+            return SMG_ERR_ARGUMENT;
     }
+}
+
+int64_t smaug_dt_truncate(int64_t epoch_ms, char unit) {
+    int64_t out;
+    return smaug_dt_truncate_checked(epoch_ms, unit, &out) == SMG_OK ? out : DT_SENTINEL;
 }
 
 /* ===================================================================

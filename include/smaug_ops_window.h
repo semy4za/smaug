@@ -71,6 +71,7 @@ smaug_series_i64_t *smaug_f64_rolling_count(const smaug_series_f64_t *s, size_t 
 
 /* i64: sum/min/max retornam i64; mean/std/var retornam f64; count retorna i64. */
 smaug_series_i64_t *smaug_i64_rolling_sum  (const smaug_series_i64_t *s, size_t window, size_t min_periods);
+smaug_series_i64_t *smaug_i64_rolling_sum_checked(const smaug_series_i64_t *s, size_t window, size_t min_periods, smaug_status_t *status);
 smaug_series_f64_t *smaug_i64_rolling_mean (const smaug_series_i64_t *s, size_t window, size_t min_periods);
 smaug_series_i64_t *smaug_i64_rolling_min  (const smaug_series_i64_t *s, size_t window, size_t min_periods);
 smaug_series_i64_t *smaug_i64_rolling_max  (const smaug_series_i64_t *s, size_t window, size_t min_periods);

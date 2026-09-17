@@ -700,43 +700,53 @@ static void nan_in_compare(void) {
 }
 
 /* ======================================================================
-   Semântica Fechada — A4: overflow de int64_t em operações aritméticas.
-   C não define o comportamento de overflow de inteiros sinalizados, mas em
-   todas as plataformas suportadas (x86/x64, GCC/Clang -O2) o resultado é
-   wrap-around em complemento de 2 — o mesmo comportamento de pandas/numpy.
-   O contrato do Smaug é: overflow produz um valor presente (não NULL),
-   sendo o valor resultante dependente da plataforma (wrap em C).
+   Overflow int64: a operação precisa falhar de forma definida, antes de
+   executar a expressão assinada. A API com status preserva a causa para o
+   FFI; a API legada também fica segura e devolve NULL.
    ====================================================================== */
 static void i64_overflow_behavior(void) {
-    /* Testa que overflow não causa crash, não vira NULL, não corrompe. */
     smaug_series_i64_t *a = smaug_i64_create(1);
     smaug_series_i64_t *b = smaug_i64_create(1);
+    smaug_status_t st = SMG_OK;
 
     smaug_i64_set(a, 0, INT64_MAX);
     smaug_i64_set(b, 0, 1);
-    smaug_series_i64_t *r = smaug_i64_add(a, b);  /* INT64_MAX + 1 */
-    OK(r != NULL,                   "i64 overflow: add retorna serie");
-    OK(!smaug_i64_is_null(r, 0),    "i64 overflow: resultado e valor presente (nao NULL)");
-    /* o contrato documenta wrap determinístico em complemento de 2:
-     * INT64_MAX + 1 == INT64_MIN. Verificar o valor prova que o wrap é
-     * determinístico, não só "presente". */
-    OK(smaug_i64_get(r, 0, NULL) == INT64_MIN, "i64 overflow: INT64_MAX+1 == INT64_MIN (wrap c2)");
-    smaug_i64_free(r);
+    OK(smaug_i64_add_checked_series(a, b, &st) == NULL && st == SMG_ERR_OVERFLOW,
+       "i64 add: overflow comunicado");
+    OK(smaug_i64_add(a, b) == NULL, "i64 add legado: overflow seguro");
 
-    /* mul overflow: INT64_MAX * 2 == -2 em complemento de 2 */
+    smaug_i64_set(a, 0, INT64_MIN);
+    OK(smaug_i64_sub_checked_series(a, b, &st) == NULL && st == SMG_ERR_OVERFLOW,
+       "i64 sub: overflow comunicado");
+    smaug_series_i64_t *ok_div = smaug_i64_div_checked_series(a, b, &st);
+    OK(ok_div != NULL && st == SMG_OK, "i64 div por 1 permanece valida");
+    smaug_i64_free(ok_div);
+
+    smaug_i64_set(a, 0, INT64_MAX);
     smaug_i64_set(b, 0, 2);
-    r = smaug_i64_mul(a, b);
-    OK(r != NULL,                   "i64 overflow mul: retorna serie");
-    OK(!smaug_i64_is_null(r, 0),    "i64 overflow mul: resultado presente");
-    OK(smaug_i64_get(r, 0, NULL) == -2, "i64 overflow mul: INT64_MAX*2 == -2 (wrap c2)");
-    smaug_i64_free(r);
+    OK(smaug_i64_mul_checked_series(a, b, &st) == NULL && st == SMG_ERR_OVERFLOW,
+       "i64 mul: overflow comunicado");
+    OK(smaug_i64_add_scalar_checked(a, 1, &st) == NULL && st == SMG_ERR_OVERFLOW,
+       "i64 add escalar: overflow comunicado");
 
-    /* scalar: INT64_MAX + 1 via add_scalar == INT64_MIN */
-    r = smaug_i64_add_scalar(a, 1);
-    OK(r != NULL,                   "i64 overflow add_scalar: retorna serie");
-    OK(!smaug_i64_is_null(r, 0),    "i64 overflow add_scalar: resultado presente");
-    OK(smaug_i64_get(r, 0, NULL) == INT64_MIN, "i64 overflow add_scalar: == INT64_MIN (wrap c2)");
-    smaug_i64_free(r);
+    smaug_i64_set(a, 0, INT64_MIN);
+    smaug_i64_set(b, 0, -1);
+    OK(smaug_i64_div_checked_series(a, b, &st) == NULL && st == SMG_ERR_OVERFLOW,
+       "i64 div INT64_MIN/-1: overflow comunicado");
+
+    smaug_series_i64_t *sum = smaug_i64_create(2);
+    smaug_i64_set(sum, 0, INT64_MAX); smaug_i64_set(sum, 1, 1);
+    (void)smaug_i64_sum_checked(sum, true, &st);
+    OK(st == SMG_ERR_OVERFLOW, "i64 sum: overflow comunicado");
+    OK(smaug_i64_cumsum_checked(sum, &st) == NULL && st == SMG_ERR_OVERFLOW,
+       "i64 cumsum: overflow comunicado");
+    smaug_series_i64_t *ok_diff = smaug_i64_diff_checked(sum, 1, &st);
+    OK(ok_diff != NULL && st == SMG_OK, "i64 diff sem overflow permanece valida");
+    smaug_i64_free(ok_diff);
+    smaug_i64_set(sum, 0, INT64_MIN); smaug_i64_set(sum, 1, INT64_MAX);
+    OK(smaug_i64_diff_checked(sum, 1, &st) == NULL && st == SMG_ERR_OVERFLOW,
+       "i64 diff: overflow comunicado");
+    smaug_i64_free(sum);
 
     smaug_i64_free(a);
     smaug_i64_free(b);

@@ -98,7 +98,7 @@ static void test_prod(void) {
     smaug_i64_set(s_i64, 1, 2);
     smaug_i64_set_null(s_i64, 2); // para não falhar no ignore_na=false
     out = smaug_i64_prod(s_i64, true, &status);
-    OK(status == SMG_ERR_OOB, "i64 prod overflow -> SMG_ERR_OOB");
+    OK(status == SMG_ERR_OVERFLOW, "i64 prod overflow -> SMG_ERR_OVERFLOW");
 
     // Teste i64 vazio
     smaug_series_i64_t *s_empty = smaug_i64_create(0);

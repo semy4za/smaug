@@ -88,6 +88,7 @@ está em [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | [Contract](CONTRACT.md) | contratos defensivos do backend |
 | [COW](COW.md) | especificação Copy-on-Write |
 | [Build and Testing](Build_and_Testing.md) | compilação, testes, cobertura |
+| [Coding Style](CODING_STYLE.md) | nomes descritivos e convenções de chamadas e testes |
 | [Changelog](CHANGELOG.md) | histórico de decisões e achados |
 
 ## Build

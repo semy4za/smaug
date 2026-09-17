@@ -126,20 +126,28 @@ smaug_series_i64_t* smaug_dt_week_series   (const smaug_series_dt_t *s);
    Retorna INT64_MIN em caso de data inválida. */
 int64_t smaug_dt_from_parts(int year, int month, int day,
                               int hour, int minute, int second, int ms);
+smaug_status_t smaug_dt_from_parts_checked(int year, int month, int day,
+                                            int hour, int minute, int second, int ms,
+                                            int64_t *out);
 
 /* ===================== Aritmética ===================== */
 
 /* Diferença entre dois epoch_ms em milissegundos (a - b). */
 int64_t smaug_dt_diff_ms(int64_t a, int64_t b);
+smaug_status_t smaug_dt_diff_ms_checked(int64_t a, int64_t b, int64_t *out);
 
 /* Adiciona delta_ms a epoch_ms (saturação em overflow: retorna INT64_MIN). */
 int64_t smaug_dt_add_ms(int64_t epoch_ms, int64_t delta_ms);
+smaug_status_t smaug_dt_add_ms_checked(int64_t epoch_ms, int64_t delta_ms,
+                                       int64_t *out);
 
 /* Trunca epoch_ms para o início do período especificado (UTC).
    unit: 's' = segundo, 'm' = minuto, 'h' = hora, 'D' = dia,
          'W' = semana (segunda-feira), 'M' = mês, 'Q' = trimestre, 'Y' = ano.
    Retorna INT64_MIN em caso de unit inválida. */
 int64_t smaug_dt_truncate(int64_t epoch_ms, char unit);
+smaug_status_t smaug_dt_truncate_checked(int64_t epoch_ms, char unit,
+                                         int64_t *out);
 
 /* ===================== Comparações (série) ===================== */
 

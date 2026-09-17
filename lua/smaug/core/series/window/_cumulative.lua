@@ -11,15 +11,21 @@ return function(I)
     local methods = I.methods
     local Series  = I.Series
     local C       = I.C
+    local ffi     = I.ffi
     local NA      = I.NA
     local wrap    = I.wrap
+    local checked_call = I.checked_call
+    local check_status = I.check_status
+    local dt_out = ffi.new("int64_t[1]")
 
     -- cumsum(): soma cumulativa. Null na posição i → null em [i, n-1].
     function methods.cumsum(self)
         if self._dtype ~= "float64" and self._dtype ~= "int64" then
             error("smaug: cumsum() requer dtype numérico, não '"..self._dtype.."'", 2)
         end
-        local r = self._d.cumsum(self._c)
+        local r = self._d.cumsum_checked
+            and checked_call(self._d.cumsum_checked, "cumsum()", self._c)
+            or self._d.cumsum(self._c)
         if r == nil then error("smaug: cumsum falhou (OOM)", 2) end
         return wrap(r, self._dtype, self._name)
     end
@@ -29,7 +35,9 @@ return function(I)
         if self._dtype ~= "float64" and self._dtype ~= "int64" then
             error("smaug: cumprod() requer dtype numérico, não '"..self._dtype.."'", 2)
         end
-        local r = self._d.cumprod(self._c)
+        local r = self._d.cumprod_checked
+            and checked_call(self._d.cumprod_checked, "cumprod()", self._c)
+            or self._d.cumprod(self._c)
         if r == nil then error("smaug: cumprod falhou (OOM)", 2) end
         return wrap(r, self._dtype, self._name)
     end
@@ -52,12 +60,19 @@ return function(I)
                 else
                     local a = self:get(i)
                     local b = self:get(i - periods)
-                    vals[i] = (a ~= nil and b ~= nil) and tonumber(C.smaug_dt_diff_ms(a, b)) or NA
+                    if a ~= nil and b ~= nil then
+                        check_status(C.smaug_dt_diff_ms_checked(a, b, dt_out), "diff()", 3)
+                        vals[i] = dt_out[0]
+                    else
+                        vals[i] = NA
+                    end
                 end
             end
             return Series.from_table(vals, "int64", self._name)
         end
-        local r = self._d.diff(self._c, periods)
+        local r = self._d.diff_checked
+            and checked_call(self._d.diff_checked, "diff()", self._c, periods)
+            or self._d.diff(self._c, periods)
         if r == nil then error("smaug: diff falhou (OOM)", 2) end
         return wrap(r, self._dtype, self._name)
     end

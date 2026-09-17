@@ -16,137 +16,88 @@ static smaug_series_i64_t *alloc_result(size_t size) {
    i64_div: divisão inteira (truncação). Divisor 0 → NULL (evita UB).
    =================================================================== */
 
-smaug_series_i64_t *smaug_i64_add(const smaug_series_i64_t *a,
-                                   const smaug_series_i64_t *b) {
-    if (!a || !b || a->size != b->size) return NULL;
+typedef bool (*i64_op_t)(int64_t, int64_t, int64_t *);
 
-    smaug_series_i64_t *r = alloc_result(a->size);
-    if (!r) return NULL;
-
+static smaug_series_i64_t *i64_binary_checked(const smaug_series_i64_t *a,
+                                                const smaug_series_i64_t *b,
+                                                i64_op_t op, bool null_on_zero,
+                                                smaug_status_t *status) {
+    if (status) *status = SMG_OK;
+    if (!a || !b || a->size != b->size) {
+        if (status) *status = SMG_ERR_ARGUMENT;
+        return NULL;
+    }
+    /* Valida a operação inteira antes de alocar/materializar a saída: o
+       resultado é todo-válido ou não existe, nunca uma série parcial. */
     for (size_t i = 0; i < a->size; i++) {
-        if (SMAUG_VALID(a->null_mask, i) && SMAUG_VALID(b->null_mask, i)) {
-            r->data[i]      = a->data[i] + b->data[i];
+        if (SMAUG_VALID(a->null_mask, i) && SMAUG_VALID(b->null_mask, i)
+            && !(null_on_zero && b->data[i] == 0)
+            && !op(a->data[i], b->data[i], NULL)) {
+            if (status) *status = SMG_ERR_OVERFLOW;
+            return NULL;
+        }
+    }
+    smaug_series_i64_t *r = alloc_result(a->size);
+    if (!r) { if (status) *status = SMG_ERR_NOMEM; return NULL; }
+    for (size_t i = 0; i < a->size; i++) {
+        if (SMAUG_VALID(a->null_mask, i) && SMAUG_VALID(b->null_mask, i)
+            && !(null_on_zero && b->data[i] == 0)) {
+            (void)op(a->data[i], b->data[i], &r->data[i]);
             r->null_mask[i] = SMAUG_MASK_VALID;
         }
     }
     return r;
 }
 
-smaug_series_i64_t *smaug_i64_sub(const smaug_series_i64_t *a,
-                                   const smaug_series_i64_t *b) {
-    if (!a || !b || a->size != b->size) return NULL;
-
+static smaug_series_i64_t *i64_scalar_checked(const smaug_series_i64_t *a,
+                                                int64_t scalar, i64_op_t op,
+                                                bool null_on_zero,
+                                                smaug_status_t *status) {
+    if (status) *status = SMG_OK;
+    if (!a) { if (status) *status = SMG_ERR_ARGUMENT; return NULL; }
+    if (!(null_on_zero && scalar == 0)) {
+        for (size_t i = 0; i < a->size; i++) {
+            if (SMAUG_VALID(a->null_mask, i) && !op(a->data[i], scalar, NULL)) {
+                if (status) *status = SMG_ERR_OVERFLOW;
+                return NULL;
+            }
+        }
+    }
     smaug_series_i64_t *r = alloc_result(a->size);
-    if (!r) return NULL;
-
+    if (!r) { if (status) *status = SMG_ERR_NOMEM; return NULL; }
+    if (null_on_zero && scalar == 0) return r;  /* contrato legado: tudo NA */
     for (size_t i = 0; i < a->size; i++) {
-        if (SMAUG_VALID(a->null_mask, i) && SMAUG_VALID(b->null_mask, i)) {
-            r->data[i]      = a->data[i] - b->data[i];
+        if (SMAUG_VALID(a->null_mask, i)) {
+            (void)op(a->data[i], scalar, &r->data[i]);
             r->null_mask[i] = SMAUG_MASK_VALID;
         }
     }
     return r;
 }
 
-smaug_series_i64_t *smaug_i64_mul(const smaug_series_i64_t *a,
-                                   const smaug_series_i64_t *b) {
-    if (!a || !b || a->size != b->size) return NULL;
+smaug_series_i64_t *smaug_i64_add_checked_series(const smaug_series_i64_t *a, const smaug_series_i64_t *b, smaug_status_t *status) { return i64_binary_checked(a, b, smaug_i64_add_checked, false, status); }
+smaug_series_i64_t *smaug_i64_sub_checked_series(const smaug_series_i64_t *a, const smaug_series_i64_t *b, smaug_status_t *status) { return i64_binary_checked(a, b, smaug_i64_sub_checked, false, status); }
+smaug_series_i64_t *smaug_i64_mul_checked_series(const smaug_series_i64_t *a, const smaug_series_i64_t *b, smaug_status_t *status) { return i64_binary_checked(a, b, smaug_i64_mul_checked, false, status); }
+smaug_series_i64_t *smaug_i64_div_checked_series(const smaug_series_i64_t *a, const smaug_series_i64_t *b, smaug_status_t *status) { return i64_binary_checked(a, b, smaug_i64_div_checked, true, status); }
 
-    smaug_series_i64_t *r = alloc_result(a->size);
-    if (!r) return NULL;
-
-    for (size_t i = 0; i < a->size; i++) {
-        if (SMAUG_VALID(a->null_mask, i) && SMAUG_VALID(b->null_mask, i)) {
-            r->data[i]      = a->data[i] * b->data[i];
-            r->null_mask[i] = SMAUG_MASK_VALID;
-        }
-    }
-    return r;
-}
-
-/* Divisão inteira. Divisor 0 → NULL (evita undefined behavior). */
-smaug_series_i64_t *smaug_i64_div(const smaug_series_i64_t *a,
-                                   const smaug_series_i64_t *b) {
-    if (!a || !b || a->size != b->size) return NULL;
-
-    smaug_series_i64_t *r = alloc_result(a->size);
-    if (!r) return NULL;
-
-    for (size_t i = 0; i < a->size; i++) {
-        if (SMAUG_VALID(a->null_mask, i) && SMAUG_VALID(b->null_mask, i) && b->data[i] != 0) {
-            r->data[i]      = a->data[i] / b->data[i];
-            r->null_mask[i] = SMAUG_MASK_VALID;
-        }
-        /* divisão por zero fica como NULL (null_mask[i] == SMAUG_MASK_NULL) */
-    }
-    return r;
-}
+smaug_series_i64_t *smaug_i64_add(const smaug_series_i64_t *a, const smaug_series_i64_t *b) { return smaug_i64_add_checked_series(a, b, NULL); }
+smaug_series_i64_t *smaug_i64_sub(const smaug_series_i64_t *a, const smaug_series_i64_t *b) { return smaug_i64_sub_checked_series(a, b, NULL); }
+smaug_series_i64_t *smaug_i64_mul(const smaug_series_i64_t *a, const smaug_series_i64_t *b) { return smaug_i64_mul_checked_series(a, b, NULL); }
+smaug_series_i64_t *smaug_i64_div(const smaug_series_i64_t *a, const smaug_series_i64_t *b) { return smaug_i64_div_checked_series(a, b, NULL); }
 
 /* ===================================================================
    ARITMÉTICAS — série × escalar
    =================================================================== */
 
-smaug_series_i64_t *smaug_i64_add_scalar(const smaug_series_i64_t *a, int64_t scalar) {
-    if (!a) return NULL;
+smaug_series_i64_t *smaug_i64_add_scalar_checked(const smaug_series_i64_t *a, int64_t scalar, smaug_status_t *status) { return i64_scalar_checked(a, scalar, smaug_i64_add_checked, false, status); }
+smaug_series_i64_t *smaug_i64_sub_scalar_checked(const smaug_series_i64_t *a, int64_t scalar, smaug_status_t *status) { return i64_scalar_checked(a, scalar, smaug_i64_sub_checked, false, status); }
+smaug_series_i64_t *smaug_i64_mul_scalar_checked(const smaug_series_i64_t *a, int64_t scalar, smaug_status_t *status) { return i64_scalar_checked(a, scalar, smaug_i64_mul_checked, false, status); }
+smaug_series_i64_t *smaug_i64_div_scalar_checked(const smaug_series_i64_t *a, int64_t scalar, smaug_status_t *status) { return i64_scalar_checked(a, scalar, smaug_i64_div_checked, true, status); }
 
-    smaug_series_i64_t *r = alloc_result(a->size);
-    if (!r) return NULL;
-
-    for (size_t i = 0; i < a->size; i++) {
-        if (SMAUG_VALID(a->null_mask, i)) {
-            r->data[i]      = a->data[i] + scalar;
-            r->null_mask[i] = SMAUG_MASK_VALID;
-        }
-    }
-    return r;
-}
-
-smaug_series_i64_t *smaug_i64_sub_scalar(const smaug_series_i64_t *a, int64_t scalar) {
-    if (!a) return NULL;
-
-    smaug_series_i64_t *r = alloc_result(a->size);
-    if (!r) return NULL;
-
-    for (size_t i = 0; i < a->size; i++) {
-        if (SMAUG_VALID(a->null_mask, i)) {
-            r->data[i]      = a->data[i] - scalar;
-            r->null_mask[i] = SMAUG_MASK_VALID;
-        }
-    }
-    return r;
-}
-
-smaug_series_i64_t *smaug_i64_mul_scalar(const smaug_series_i64_t *a, int64_t scalar) {
-    if (!a) return NULL;
-
-    smaug_series_i64_t *r = alloc_result(a->size);
-    if (!r) return NULL;
-
-    for (size_t i = 0; i < a->size; i++) {
-        if (SMAUG_VALID(a->null_mask, i)) {
-            r->data[i]      = a->data[i] * scalar;
-            r->null_mask[i] = SMAUG_MASK_VALID;
-        }
-    }
-    return r;
-}
-
-/* Escalar 0 → NULL (evita UB de divisão inteira por zero). */
-smaug_series_i64_t *smaug_i64_div_scalar(const smaug_series_i64_t *a, int64_t scalar) {
-    if (!a) return NULL;
-    if (scalar == 0) return alloc_result(a->size);  /* tudo NULL */
-
-    smaug_series_i64_t *r = alloc_result(a->size);
-    if (!r) return NULL;
-
-    for (size_t i = 0; i < a->size; i++) {
-        if (SMAUG_VALID(a->null_mask, i)) {
-            r->data[i]      = a->data[i] / scalar;
-            r->null_mask[i] = SMAUG_MASK_VALID;
-        }
-    }
-    return r;
-}
+smaug_series_i64_t *smaug_i64_add_scalar(const smaug_series_i64_t *a, int64_t scalar) { return smaug_i64_add_scalar_checked(a, scalar, NULL); }
+smaug_series_i64_t *smaug_i64_sub_scalar(const smaug_series_i64_t *a, int64_t scalar) { return smaug_i64_sub_scalar_checked(a, scalar, NULL); }
+smaug_series_i64_t *smaug_i64_mul_scalar(const smaug_series_i64_t *a, int64_t scalar) { return smaug_i64_mul_scalar_checked(a, scalar, NULL); }
+smaug_series_i64_t *smaug_i64_div_scalar(const smaug_series_i64_t *a, int64_t scalar) { return smaug_i64_div_scalar_checked(a, scalar, NULL); }
 
 /* coalesce_scalar (natureza null-mask): onde self[i] é nulo, entra `value`;
    senão, mantém self[i]. `value` é sempre presente → resultado sem nulos.
@@ -348,18 +299,28 @@ smaug_series_i64_t *smaug_i64_select(const smaug_series_bool_t *cond,
    Funções que retornam double usam NAN normalmente.
    =================================================================== */
 
-int64_t smaug_i64_sum(const smaug_series_i64_t *s, bool ignore_na) {
-    if (!s) return 0;
+int64_t smaug_i64_sum_checked(const smaug_series_i64_t *s, bool ignore_na,
+                              smaug_status_t *status) {
+    if (status) *status = SMG_OK;
+    if (!s) { if (status) *status = SMG_ERR_ARGUMENT; return 0; }
 
     int64_t sum = 0;
     for (size_t i = 0; i < s->size; i++) {
         if (SMAUG_VALID(s->null_mask, i)) {
-            sum += s->data[i];
+            if (!smaug_i64_add_checked(sum, s->data[i], &sum)) {
+                if (status) *status = SMG_ERR_OVERFLOW;
+                return 0;
+            }
         } else if (!ignore_na) {
+            if (status) *status = SMG_NULL_VALUE;
             return INT64_MIN;   /* sentinel: série contém NULL */
         }
     }
     return sum;
+}
+
+int64_t smaug_i64_sum(const smaug_series_i64_t *s, bool ignore_na) {
+    return smaug_i64_sum_checked(s, ignore_na, NULL);
 }
 
 int64_t smaug_i64_min(const smaug_series_i64_t *s, bool ignore_na) {
@@ -443,26 +404,6 @@ double smaug_i64_std(const smaug_series_i64_t *s, bool ignore_na) {
     return sqrt(smaug_i64_var(s, ignore_na));
 }
 
-static bool mul_overflow_i64(int64_t a, int64_t b, int64_t *res) {
-#ifdef __has_builtin
-    if (__has_builtin(__builtin_mul_overflow)) {
-        return __builtin_mul_overflow(a, b, res);
-    }
-#endif
-    if (a == 0 || b == 0) {
-        *res = 0;
-        return false;
-    }
-    if ((a > 0 && b > INT64_MAX / a) ||
-        (a < 0 && b > 0 && a < INT64_MIN / b) ||
-        (a > 0 && b < 0 && b < INT64_MIN / a) ||
-        (a < 0 && b < 0 && a != 0 && b < INT64_MAX / a)) {
-        return true;
-    }
-    *res = a * b;
-    return false;
-}
-
 int64_t smaug_i64_prod(const smaug_series_i64_t *s, bool ignore_na, smaug_status_t *status) {
     if (status) *status = SMG_OK;
     if (!s) {
@@ -483,8 +424,8 @@ int64_t smaug_i64_prod(const smaug_series_i64_t *s, bool ignore_na, smaug_status
     bool found_valid = false;
     for (size_t i = 0; i < s->size; i++) {
         if (SMAUG_VALID(s->null_mask, i)) {
-            if (mul_overflow_i64(prod, s->data[i], &prod)) {
-                if (status) *status = SMG_ERR_OOB;
+            if (!smaug_i64_mul_checked(prod, s->data[i], &prod)) {
+                if (status) *status = SMG_ERR_OVERFLOW;
                 return 0;
             }
             found_valid = true;
@@ -779,40 +720,70 @@ smaug_series_i64_t *smaug_i64_take(const smaug_series_i64_t *s,
    i64 overflow faz wrap (complemento de 2) — contrato documentado.
    =================================================================== */
 
-smaug_series_i64_t *smaug_i64_cumsum(const smaug_series_i64_t *s) {
-    if (!s) return NULL;
-    smaug_series_i64_t *r = alloc_result(s->size);
-    if (!r) return NULL;
+smaug_series_i64_t *smaug_i64_cumsum_checked(const smaug_series_i64_t *s,
+                                              smaug_status_t *status) {
+    if (status) *status = SMG_OK;
+    if (!s) { if (status) *status = SMG_ERR_ARGUMENT; return NULL; }
     int64_t acc = 0;
     int null_seen = 0;
     for (size_t i = 0; i < s->size; i++) {
         if (null_seen || SMAUG_NULL(s->null_mask, i)) {
             null_seen = 1;
+        } else if (!smaug_i64_add_checked(acc, s->data[i], &acc)) {
+            if (status) *status = SMG_ERR_OVERFLOW;
+            return NULL;
+        }
+    }
+    smaug_series_i64_t *r = alloc_result(s->size);
+    if (!r) { if (status) *status = SMG_ERR_NOMEM; return NULL; }
+    acc = 0;
+    null_seen = 0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (null_seen || SMAUG_NULL(s->null_mask, i)) {
+            null_seen = 1;
         } else {
-            acc += s->data[i];   /* wrap-around intencional (contrato i64) */
+            (void)smaug_i64_add_checked(acc, s->data[i], &acc);
             r->data[i]      = acc;
             r->null_mask[i] = SMAUG_MASK_VALID;
         }
     }
     return r;
 }
+smaug_series_i64_t *smaug_i64_cumsum(const smaug_series_i64_t *s) {
+    return smaug_i64_cumsum_checked(s, NULL);
+}
 
-smaug_series_i64_t *smaug_i64_cumprod(const smaug_series_i64_t *s) {
-    if (!s) return NULL;
-    smaug_series_i64_t *r = alloc_result(s->size);
-    if (!r) return NULL;
+smaug_series_i64_t *smaug_i64_cumprod_checked(const smaug_series_i64_t *s,
+                                               smaug_status_t *status) {
+    if (status) *status = SMG_OK;
+    if (!s) { if (status) *status = SMG_ERR_ARGUMENT; return NULL; }
     int64_t acc = 1;
     int null_seen = 0;
     for (size_t i = 0; i < s->size; i++) {
         if (null_seen || SMAUG_NULL(s->null_mask, i)) {
             null_seen = 1;
+        } else if (!smaug_i64_mul_checked(acc, s->data[i], &acc)) {
+            if (status) *status = SMG_ERR_OVERFLOW;
+            return NULL;
+        }
+    }
+    smaug_series_i64_t *r = alloc_result(s->size);
+    if (!r) { if (status) *status = SMG_ERR_NOMEM; return NULL; }
+    acc = 1;
+    null_seen = 0;
+    for (size_t i = 0; i < s->size; i++) {
+        if (null_seen || SMAUG_NULL(s->null_mask, i)) {
+            null_seen = 1;
         } else {
-            acc *= s->data[i];   /* wrap-around intencional */
+            (void)smaug_i64_mul_checked(acc, s->data[i], &acc);
             r->data[i]      = acc;
             r->null_mask[i] = SMAUG_MASK_VALID;
         }
     }
     return r;
+}
+smaug_series_i64_t *smaug_i64_cumprod(const smaug_series_i64_t *s) {
+    return smaug_i64_cumprod_checked(s, NULL);
 }
 
 smaug_series_i64_t *smaug_i64_cummin(const smaug_series_i64_t *s) {
@@ -847,17 +818,29 @@ smaug_series_i64_t *smaug_i64_cummax(const smaug_series_i64_t *s) {
     return r;
 }
 
-smaug_series_i64_t *smaug_i64_diff(const smaug_series_i64_t *s, size_t periods) {
-    if (!s) return NULL;
+smaug_series_i64_t *smaug_i64_diff_checked(const smaug_series_i64_t *s,
+                                            size_t periods, smaug_status_t *status) {
+    if (status) *status = SMG_OK;
+    if (!s) { if (status) *status = SMG_ERR_ARGUMENT; return NULL; }
+    for (size_t i = periods; i < s->size; i++) {
+        if (SMAUG_VALID(s->null_mask, i) && SMAUG_VALID(s->null_mask, i - periods)
+            && !smaug_i64_sub_checked(s->data[i], s->data[i - periods], NULL)) {
+            if (status) *status = SMG_ERR_OVERFLOW;
+            return NULL;
+        }
+    }
     smaug_series_i64_t *r = alloc_result(s->size);
-    if (!r) return NULL;
+    if (!r) { if (status) *status = SMG_ERR_NOMEM; return NULL; }
     for (size_t i = periods; i < s->size; i++) {
         if (SMAUG_VALID(s->null_mask, i) && SMAUG_VALID(s->null_mask, i - periods)) {
-            r->data[i]      = s->data[i] - s->data[i - periods];
+            (void)smaug_i64_sub_checked(s->data[i], s->data[i - periods], &r->data[i]);
             r->null_mask[i] = SMAUG_MASK_VALID;
         }
     }
     return r;
+}
+smaug_series_i64_t *smaug_i64_diff(const smaug_series_i64_t *s, size_t periods) {
+    return smaug_i64_diff_checked(s, periods, NULL);
 }
 
 smaug_series_i64_t *smaug_i64_shift(const smaug_series_i64_t *s, int64_t periods) {
@@ -1049,4 +1032,3 @@ double *smaug_i64_rank(const smaug_series_i64_t *s, int method) {
     free(pairs);
     return result;
 }
-

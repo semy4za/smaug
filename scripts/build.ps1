@@ -131,7 +131,9 @@ Write-Host ""
 Write-Host "== Testes em C ==" -ForegroundColor Cyan
 foreach ($t in $cTests) {
     $exe = "build\$t.exe"
-    & $gcc -std=c11 -g -O0 -Wall -Wextra -I".\include" "tests\c\$t.c" @sources -lm -o $exe
+    $testFlags = @("-std=c11", "-g", "-O0", "-Wall", "-Wextra", "-I.\include")
+    if ($t -eq "test_ops_edge") { $testFlags += "-fwrapv" }
+    & $gcc @testFlags "tests\c\$t.c" @sources -lm -o $exe
     if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar $t." }
 
     $out = (& ".\$exe") | Out-String
