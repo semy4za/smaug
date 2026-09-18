@@ -1,5 +1,20 @@
 # Smaug — Roadmap
 
+**Decisão datetime — 2026-09-18:** aprovados anos completos de `-9999` a `9999`,
+inclusive, com ano zero; UTC quando o offset for omitido e aceitação de frações somente
+quando exatas em milissegundos. Entrada estrita rejeita perda; `astype` converte
+o elemento inconversível em NA. Contrato e critérios de verificação estão em
+`CONTRACT.md`, seção "Perfil datetime". Limites aplicados após normalização
+do offset para UTC. Implementação, validação desses limites e
+migração das APIs com sentinelas continuam pendentes; itens históricos abaixo
+não substituem essa decisão.
+
+> Alinhamento documental — 2026-09-18: `CONTRACT.md` define as garantias
+> vigentes; `TEST_SUITE_REWRITE_REVIEW.md` registra as lacunas de verificação.
+> Entradas concluídas e medições abaixo são históricas, não certificação da
+> árvore atual. Em particular, a auditoria refutou exclusões de datetime e
+> reabriu a suficiência das verificações de OOM, parity e cobertura.
+
 Este roadmap é uma **timeline sequencial**. Cada número é um tema; os decimais são
 subtarefas. A ordem reflete dependência e risco — temas anteriores são fundação
 dos seguintes. A **v1.0 ganha o direito de existir quando a timeline zerar**
@@ -224,13 +239,13 @@ correto — delegar ao descritor → C — já existe. Subitens 10.5 a 10.9 fech
     `prod` de `{3037000500, 3037000499}` devolve `9223372033963249664` quando o
     exato é `9223372033963249500`. Erra por 164, e o resultado **cabe** em int64 —
     não é limite de faixa, é round-trip por double. Mesma família de 10.2/10.3.
-  - **Decisão a tomar antes de implementar:** produto de int64 que **estoura**
-    int64 — erro (como `abs(INT64_MIN)`) ou promoção a float64? Não é o mesmo caso
-    do bug acima: ali o resultado cabia. Aqui não cabe, e a operação não tem
-    resposta em int64. Implementar sem decidir produziria uma função em C que
-    preserva o defeito ou inventa semântica.
-  - **Sem retrabalho:** a assinatura do `sum` é o padrão a espelhar, e a decisão
-    de overflow tem precedente no 10.3 (`smaug_status_t` + `SMG_ERR_ARGUMENT`).
+  - **Direção acordada, consolidada em 2026-09-18:** overflow int64 deve ser
+    explícito via C/status, FFI e erro Lua, sem wrap ou promoção silenciosa.
+    O bug acima continua distinto: seu resultado cabe, mas perde precisão.
+  - A assinatura deve oferecer canal de status (`SMG_ERR_OVERFLOW`), conforme
+    `CONTRACT.md`; copiar uma assinatura legada sem esse canal não basta.
+    Comportamento de intermediários e migração das reduções devem ser mapeados
+    por operação antes de declarar esta entrega concluída.
 - 10.4 **família `.dt` e `.str` vetorizadas** (E6). **Duas metades com custos
   opostos** — dimensionado em 2026-07-28; tratá-las como um item só esconde isso.
   - **Fatia A — os 11 componentes base: [Done — Fedora + Windows 2026-07-28]** Valgrind 0 erros nos 13 binários; cobertura **95,07% branch-alvo

@@ -1,12 +1,12 @@
 # Views e Copy-on-Write
 
-Uma view é uma janela zero-copy sobre uma faixa de elementos de uma série.
+Uma view é uma janela sobre uma faixa de elementos de uma série.
 Compartilha o buffer do pai até a primeira escrita — aí materializa um buffer
 privado automaticamente. O pai nunca é tocado.
 
 ---
 
-## Criar uma view é O(1)
+## Criar uma view de tipo fixo é O(1)
 
 ```lua
 local smaug = require("smaug")
@@ -25,7 +25,8 @@ print(v:len())
 3
 ```
 
-Nenhum dado copiado. Apenas o struct da view é alocado.
+Neste exemplo numérico, nenhum dado é copiado; apenas a struct é alocada.
+String compartilha bytes e máscara, mas copia offsets: criação O(len).
 
 ---
 
@@ -47,7 +48,10 @@ print(v:get(1))              -- view ainda aponta pro pai
 99.0
 ```
 
-Antes de qualquer escrita na view, leituras refletem mutações no pai.
+O exemplo demonstra alteração de valor em buffer numérico existente. Não
+estabelece segurança para realocação, liberação do pai ou mudança de comprimento
+de strings. Lifetime e invalidação nesses casos permanecem decisões abertas
+na revisão da suíte; não se deve inferir garantia universal deste exemplo.
 
 ---
 
@@ -106,7 +110,7 @@ O detach afeta apenas a view imediata. `v1` continua sendo view de `ds["vendas"]
 
 ## Falha segura no detach (OOM)
 
-O detach aloca memória. Se falhar:
+O detach aloca memória. O contrato de falha na API C é:
 
 - `set` / `set_null` → retornam `SMG_ERR_NOMEM`; view continua apontando pro pai;
   nenhuma escrita ocorre.
@@ -127,7 +131,7 @@ Em qualquer caso: pai intacto, view intacta, sistema consistente.
 
 ## O que NÃO dispara o detach
 
-Operações que produzem novo objeto nunca tocam o armazenamento compartilhado:
+Leituras e operações que produzem novo objeto não disparam detach da origem:
 `get`, `is_null`, `len`, `count_nonnull`, `clone`, `filter`, `take`, `sort`,
 `argsort`, comparações, aritméticas.
 
@@ -154,7 +158,7 @@ soma de ponteiro O(1)), a string é offset-based, então usa um **modelo de poss
 mista** (campo `offsets_owned` na struct): a view compartilha `buffer` e
 `null_mask` com o pai (zero-copy) mas possui um `offsets` próprio de (len+1)
 marcadores absolutos, copiados da janela — O(len), não O(1), mas sem copiar os
-bytes. Criar a view custa só o array de offsets. A primeira mutação dispara o
+bytes. Criar a view aloca a struct e o array de offsets. A primeira mutação dispara o
 detach, que materializa buffer + offsets (rebaseados para 0) + null_mask
 privados da janela; o pai fica intacto. O único dtype sem view é `categorical`
 (Lua puro: codes + dicionário, sem buffer compartilhável) — `:view()` nele lança
@@ -164,8 +168,9 @@ erro orientado.
 
 ## Resumo do contrato
 
-1. Criar uma view é O(1) — sem cópia de dados.
-2. Leitura antes de qualquer escrita reflete o estado atual do pai.
+1. Criar uma view de tipo fixo é O(1); string é O(len), com cópia de offsets.
+2. Compartilhamento depende da validade dos buffers e metadados da janela;
+   lifetime e invalidação por mutação do pai precisam de contrato explícito.
 3. A primeira escrita dispara COW detach automaticamente.
 4. O detach copia apenas a janela, não o pai inteiro.
 5. Após o detach, a view é independente — o pai pode ser liberado sem afetar a view.

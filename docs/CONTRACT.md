@@ -2,7 +2,9 @@
 
 Este documento especifica os contratos de comportamento do Ring 1 (frontend Lua)
 e do Ring 0 (backend C). Um contrato aqui significa: comportamento garantido,
-testado, e que não muda sem decisão explícita e versionada.
+exigido, e que não muda sem decisão explícita e versionada. O contrato não
+certifica seu cumprimento: evidências e gaps estão em
+`TEST_SUITE_REWRITE_REVIEW.md`. Revisão documental: 2026-09-18.
 
 ---
 
@@ -43,15 +45,15 @@ O dtype é **inferido** quando omitido (inteiro → `int64`, fracionário → `f
 quando informado. Fixado o dtype, o frontend aceita apenas o que **preserva a
 informação**:
 
-- **Promoção sem perda é automática.** `int → float64` entra e vira float — todo
-  inteiro representável é float exato, e float é o topo da hierarquia numérica.
-  Não é adivinhação: é widening.
-- **Narrowing e adivinhação são recusados.** Perder dígito (`float → int64`;
-  `number > 2^53`), adivinhar parse (`number ↔ string`) ou semântica
+- **Promoção sem perda é automática quando representável no destino.** Um
+  `number` Lua inteiro, como `5`, pode preencher uma série float64. Isso não
+  significa que todo `int64_t` seja representável exatamente em float64.
+- **Narrowing e adivinhação são recusados.** Truncar fração (`float → int64`),
+  adivinhar parse (`number ↔ string`) ou semântica
   (`number → bool`) falha com erro — nunca em silêncio.
 
-Narrowing **intencional** é o `astype` (Contrato 2): explícito, tolerante,
-inconversível vira `null`. Preservação exata de `int64` além de 2^53 exige a
+Narrowing **intencional** é o `astype` (Contrato 2), com as exceções ali descritas.
+Preservação exata de `int64` além de 2^53 exige a
 **forma exata** — `cdata int64_t` na entrada, `get_raw` na leitura (o `number`
 Lua já perdeu o dígito antes de chegar; a lib não recupera, só torna visível).
 
@@ -62,11 +64,15 @@ O que cabe sem perder informação, entra; o que exigiria decidir pelo usuário,
 **Entrada vs. operação no limiar 2^53.** Um `number` que armazena dado
 (`set`/`append`/`fillna`) e um `number` que parametriza uma operação
 (comparação, aritmética escalar) recebem o mesmo valor com políticas diferentes,
-por uma razão: no armazenamento o valor *é* o dado do usuário — acima de 2^53 ele
+por uma razão: no armazenamento o valor *é* o dado do usuário — com `|v| > 2^53` ele
 **avisa e aceita** (a perda é irrecuperável na origem, a escolha é dele); numa
 operação o valor é *operando* e o resultado seria uma mentira silenciosa — a
-partir de 2^53 (inclusive, pois `2^53+1` degrada para `2^53`) ele **recusa**.
-Em ambos, a forma exata (`cdata int64_t`) sempre preserva. Fonte única do
+partir de `|v| >= 2^53` (inclusive, pois `2^53+1` degrada para `2^53`) ele **recusa**.
+No armazenamento, `|v| == 2^53` é aceito sem o aviso de precisão. Acima disso,
+o aviso indica possível perda na origem; nem todo inteiro acima do limiar é
+inexato. Esta política é da fronteira int-based e não autoriza valores fora da
+faixa do destino. `uint64_t` só é aceito até `INT64_MAX`.
+Em ambos, a forma exata (`cdata int64_t`) preserva os bits de entrada. Fonte única do
 reconhecimento: `core/int_scalar.lua` (ver Roadmap 9.3).
 
 ---
@@ -105,7 +111,7 @@ não é imposta silenciosamente — quem quer defini-la usa `map`.
 
 ---
 
-### Contrato 3 — `fillna` não muta, não coerce
+### Contrato 3 — `fillna` preserva o original e segue a validação de entrada
 
 ```lua
 local smaug = require("smaug")
@@ -121,7 +127,8 @@ print(f:is_null(2))
 print(f:get(2))
 print(f:get(3) ~= f:get(3))
 
-ds["vendas"]:fillna(1)   -- erro
+ds["vendas"]:fillna(1)     -- válido: number inteiro em float64
+ds["vendas"]:fillna("1")   -- erro: não adivinha parse
 ```
 
 ```
@@ -129,12 +136,15 @@ true
 false
 0.0
 true
-smaug: fillna em série float64 espera um número
+smaug: valor para float64 deve ser número; recebido string
 ```
 
 `fillna` devolve nova série — o original é imutável. `NaN` é preservado:
 `fillna` substitui `null` (ausência), não `NaN` (valor indefinido presente).
 São coisas distintas no Smaug.
+
+O preenchimento segue o Contrato 1. Datetime aceita epoch_ms numérico/exato;
+string ISO em `fillna` continua pendência do Roadmap 12.16.
 
 ---
 
@@ -181,8 +191,9 @@ print(d.count, d.nulls, d.count_true, d.count_false)
 3	0	1	2
 ```
 
-Toda coluna aceita pelo DataSet funciona em toda a API do DataSet. O dtype
-da coluna não cria casos especiais na API.
+Bool é coluna de primeira classe nas operações compatíveis com seu dtype.
+Isso não promete aritmética numérica para todo tipo: suporte e rejeições devem
+ser explícitos por operação. Gaps conhecidos não se tornam suporte por esta regra.
 
 ---
 
@@ -304,7 +315,7 @@ Vocabulário do CSV, deliberado:
 - **opt-in:** quem lê CSV de terceiros onde `nan` significa ausência passa
   `na_values = {"nan"}`.
 
-**Datetime nos formatos de texto (12.3):** `smaug_column_t` (Anel 0) carrega
+**Datetime nos formatos de texto (12.3):** `smaug_column_t` (fronteira C de I/O, Anel 3) carrega
 f64/i64/bool/str — não tem `dt`. O Anel 3 converte datetime para **ISO 8601** na
 escrita (`astype("string")`, o mesmo formato do `smaug_dt_format`). CSV não tem
 tipos e JSON não tem tipo *date*: texto ISO é o que ambos comportam, então isto
@@ -331,8 +342,14 @@ ou porte pode passar `NULL`. Logo:
 
 > **Fronteira pública + guard alcançável → TESTA** (custo: 1 linha).
 > **`COV-EXCL-BR` → só para o genuinamente inalcançável**, com justificativa
-> verificada: OOM sem injeção, overflow com `~SIZE_MAX`, invariante interno
-> provado, ramo morto por construção.
+> verificada por ramo: invariante interno provado ou ramo morto por construção.
+
+OOM e falhas de I/O são alcançáveis por falha ambiental. Ausência de injeção é
+gap de teste, não impossibilidade. Limites próximos de `SIZE_MAX` exigem prova
+de domínio e testes dos cálculos sem buffers fictícios ou alocações gigantes.
+Cada exclusão exige condição/ramo, evidência e decisão; não exclui a linha
+inteira. A cobertura bruta permanece visível. O inventário
+`TEST_SUITE_EXCLUSIONS_REVIEW.md` é triagem, não aprovação.
 
 **Justificativa não se copia entre dtypes.** Cada uma vale para o código que está
 embaixo dela — e o código diverge.
@@ -366,7 +383,7 @@ o teste produz proteção.
 > **Nota — calibragem do rigor (decidida em 2026-07-28, aplicável a partir da
 > v1.0).**
 >
-> O padrão de verificação do projeto (MC/DC de ramo, Valgrind, varredura de falha
+> O padrão de verificação do projeto (cobertura de ramos, Valgrind, varredura de falha
 > de alocação, teste de mutação) é **uniforme** hoje. A partir da v1.0 ele passa a
 > ser **proporcional ao que o código protege** — e o critério é a *natureza* do
 > código, não o número da versão nem o calendário.
@@ -381,9 +398,10 @@ o teste produz proteção.
 > conveniência de API: falham alto e barato, e o custo do rigor máximo ali não se
 > paga. Afrouxar é decisão consciente e registrada, não omissão.
 >
-> **A calibragem só é legítima porque o núcleo já está selado.** Afrouxar acima de
-> um Anel 0 verificado é gerenciar risco; afrouxar sobre um núcleo incerto seria
-> apenas correr risco. O direito vem do núcleo — e ele continua no padrão alto.
+> **A calibragem depende de evidência do núcleo.** A revisão de 2026-09-18
+> encontrou lacunas que impedem declará-lo selado. Reduzir rigor exige decisão
+> registrada por risco. Cobertura de ramos não é MC/DC; esta exige
+> instrumentação e evidência próprias.
 >
 > **Duas regras de operação, para o portão continuar passável:**
 >
@@ -408,8 +426,8 @@ séries **diferentes** nunca colidem — e o Smaug é uma biblioteca: quem a usa
 decide sobre threads, não nós.
 
 > **Nenhum estado global mutável no Anel 0.** `static const` (tabelas de lookup,
-> literais) é permitido — é imutável. Auditado a cada build pelo **eixo 14** de
-> paridade.
+> literais) é permitido — é imutável. O **eixo 14** de paridade auxilia a
+> inspeção, mas suas lacunas atuais (R06) impedem usá-lo como prova completa.
 
 O que este contrato **não** promete: mutação concorrente da **mesma** série. Duas
 threads chamando `set` no mesmo objeto competem pelo mesmo buffer — sincronizar o
@@ -444,10 +462,12 @@ Toda fronteira pública em C **valida e comunica**; nunca assume que o caller
 validou. Garantias incondicionais:
 
 1. **Validação na entrada.** Ponteiro, argumentos e índice são checados antes de
-   qualquer acesso à memória. Entrada inválida nunca causa comportamento
-   indefinido, corrupção ou crash evitável.
-2. **Resultado observável.** Toda operação comunica sucesso/falha por código de
-   status — o caller pode sempre saber se a operação pegou ou foi rejeitada.
+   qualquer acesso à memória. Isso cobre NULL e argumentos inválidos dentro do
+   domínio documentado; não promete validar ponteiros arbitrários, memória já
+   liberada ou buffers cujo tamanho real contradiz o informado pelo caller.
+2. **Resultado observável.** Cada API documenta seu canal: status, retorno
+   `0/-1` ou ponteiro/NULL. APIs legadas com sentinelas ambíguas exigem revisão;
+   não herdam uma garantia de status que sua assinatura não oferece.
 3. **Falha segura.** Em erro não há escrita parcial; leitura devolve sentinela
    documentada e o estado permanece consistente.
 
@@ -459,11 +479,71 @@ typedef enum {
     SMG_NULL_VALUE,    /* leitura: elemento é NULL (não é erro)   */
     SMG_ERR_OOB,       /* índice fora dos limites                 */
     SMG_ERR_ARGUMENT,  /* ponteiro nulo / argumento inconsistente */
-    SMG_ERR_NOMEM      /* falha de alocação (COW detach)          */
+    SMG_ERR_NOMEM,     /* falha de alocação (COW detach)          */
+    SMG_ERR_OVERFLOW   /* resultado não cabe no intervalo do tipo */
 } smaug_status_t;
 ```
 
 Espelhado no cdef do FFI (`lua/smaug/ffi_loader.lua`).
+
+**Direção acordada para overflow int64:** erro explícito via C/status, FFI e
+erro Lua orientado. Wrap silencioso não é resultado esperado. A existência do
+enum não significa que todas as APIs já o propaguem: a migração precisa de
+mapa por operação, incluindo APIs legadas e intermediários. Divisão por zero
+tem contrato próprio e não muda implicitamente com esta decisão.
+
+**Decisões ainda abertas:** gramática completa de entrada para anos
+expandidos, migração das assinaturas com sentinela ambígua e garantias de
+lifetime/invalidação de views em mutações do pai. As três escolhas de datetime
+abaixo foram aprovadas; sua implementação e validação permanecem pendentes.
+R02 e R05 registram contraexemplos; comportamento defeituoso não vira esperado.
+
+### Perfil datetime — decisões aprovadas em 2026-09-18
+
+Este perfil fixa as escolhas de domínio, offset omitido e precisão aprovadas
+pelo mantenedor. É contrato a implementar/verificar, não declaração de que o
+parser, formatter e todas as operações atuais já o cumprem.
+
+1. **Anos de `-9999` a `9999`, inclusive, incluindo zero.** Calendário gregoriano
+   proléptico com numeração astronômica: ano `0` corresponde a 1 a.C., ano `-1`
+   a 2 a.C. Todos os anos da faixa são completos. Limites dos instantes UTC:
+   `-009999-01-01T00:00:00.000Z` e `9999-12-31T23:59:59.999Z`, ambos inclusivos.
+   A faixa é uma decisão do Smaug, não um limite imposto pela ISO nem suporte
+   a todo o intervalo de `int64` epoch_ms. Sua implementação ainda será validada.
+   Texto, construção por componentes e entrada por epoch devem respeitar o
+   mesmo domínio. A validação do instante considera o offset normalizado para
+   UTC; normalização ou operação que saia da faixa deve falhar explicitamente,
+   sem wrap nem saturação. Conversão tolerante por `astype` produz NA para o
+   elemento fora do domínio. Ano negativo válido é dado, não ausência ou erro.
+2. **Offset omitido significa UTC.** Uma entrada como
+   `2026-09-18T14:30:00` representa o mesmo instante que
+   `2026-09-18T14:30:00Z`. Data sem horário representa meia-noite UTC.
+   O fuso da máquina não participa dessa interpretação. Fusos nomeados,
+   horários locais e suas ambiguidades não são introduzidos por esta decisão.
+3. **Precisão excedente só entra se for exata em milissegundos.** O
+   armazenamento continua sendo `int64` em milissegundos desde o Unix epoch.
+   Fração `.123000` é aceita como 123 ms; `.123456` e `.000001` são rejeitadas
+   na entrada estrita, sem truncamento ou arredondamento silencioso.
+   Em `astype("datetime")`, um elemento inconversível por perda de precisão
+   torna-se NA, conforme o Contrato 2; isso não transforma falhas de memória
+   ou de infraestrutura em dados ausentes. Arredondamento/truncamento explícito
+   poderá ser proposto separadamente.
+
+**Referências de representação:** ISO 8601-1:2019, com emenda de 2022
+([ISO](https://www.iso.org/standard/70907.html)), e RFC 3339 para intercâmbio
+de timestamps com ano de quatro dígitos
+([RFC Editor](https://www.rfc-editor.org/info/rfc3339/)). O perfil Smaug não
+declara conformidade integral com essas normas. A gramática de anos expandidos
+e o tratamento de segundos intercalares precisam ser especificados antes dessa
+declaração; a aprovação das três escolhas não decide esses pontos adicionais.
+
+**Evidência exigida na reconstrução:** casos independentes para ano zero,
+anos negativos (incluindo `-1` e `-2`), bissextos e passagem de ano; equivalência
+de entrada sem offset e com `Z`; precisão exata versus perda; consistência
+entre parser, componentes, epoch, formatação e conversão tolerante. Testar ambos
+os limites inclusivos, um milissegundo fora de cada um e offsets que cruzem
+essas fronteiras. A colisão da sentinela
+`-1` deve ser eliminada por canal de erro distinto, com migração explícita da API.
 
 ### Mutação pontual (`set` / `set_null`) — retorna `smaug_status_t`
 

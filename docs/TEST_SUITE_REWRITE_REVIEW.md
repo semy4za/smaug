@@ -2,6 +2,23 @@
 
 Data: 2026-09-18. Estado: **proposta para aprovação; implementação não iniciada**.
 
+Retomada da sessão: ver [anotações e próximas decisões](TEST_SUITE_SESSION_NOTES.md),
+incluindo as últimas sugestões de datetime acolhidas e ainda não consolidadas.
+
+**Seguimento documental (2026-09-18):** a pedido do mantenedor, foram alinhados
+`CONTRACT.md`, `ARCHITECTURE.md`, `COW.md` e a contextualização histórica de
+`CODE_REVIEW.md` antes da reconstrução. Corrigidos os exemplos de fillna, os
+limiares de precisão, o enum de status, a política de exclusões, a complexidade
+de views e as alegações de certificação. O diagnóstico abaixo preserva o estado
+observado na auditoria; seus apontamentos documentais não descrevem mais todos
+os textos atuais. O mantenedor aprovou anos completos de `-9999` a `9999`
+(inclusive, com ano zero), limites após normalização do offset para UTC, UTC
+para offset omitido e rejeição de precisão não representável em milissegundos
+(NA na conversão tolerante). Ver o perfil datetime em `CONTRACT.md`.
+Validação dos limites, gramática de anos expandidos, migração das sentinelas
+e lifetime/invalidação continuam pendentes. Esta etapa não implementa nem
+valida a nova suíte.
+
 Árvore avaliada: HEAD `9787701`, com alterações locais de padronização já existentes. O commit sozinho não identifica essa árvore modificada. As referências de linha deste parecer são as observadas nesta avaliação.
 
 ## 1. Decisão recomendada

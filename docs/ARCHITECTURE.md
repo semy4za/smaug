@@ -6,6 +6,10 @@ do ecossistema Smaug. Muda raramente — descreve teoria, não entregas.
 Para o estado atual de cada anel e as próximas entregas concretas, ver
 `Roadmap.md`. Para o histórico de mudanças, ver `CHANGELOG.md`.
 
+Revisão documental: 2026-09-18. `[Done]` identifica entrega de funcionalidade,
+não certificação da implementação. O estado da verificação é o da auditoria
+`TEST_SUITE_REWRITE_REVIEW.md`; alegações históricas de cobertura não a substituem.
+
 ---
 
 ## Princípios
@@ -44,8 +48,8 @@ Conectividade (Anel 3) e os anéis externos de ferramentas/interação servem à
 
 ```
 Anel 0  Núcleo C           buffers, memória, tipos, primitivas, engine
-Anel 1  Abstrações          Series, BoolSeries, operações vetorizadas
-Anel 2  Op. Relacionais     DataSet, join, groupby, reshape
+Anel 1  Abstrações          Series, DataSet alinhado, operações elementares
+Anel 2  Op. Relacionais     join, groupby, reshape sobre DataSet
 Anel 3  Conectividade / I/O CSV, JSON, + conectores externos (SQL, Excel, Parquet)
 
         ── Trilha de Projeto ──        ── Trilha Analítica ──
@@ -82,6 +86,11 @@ externo. Não conhece Series, DataSet, CSV, SQL, modelos nem interfaces.
 - Contratos defensivos — toda fronteira pública valida e comunica o resultado
 
 **Não conhece:** Series, DataSet, CSV, SQL, modelos, interfaces.
+
+Anel é responsabilidade, não linguagem ou diretório: parsers e writers C de
+CSV/JSON pertencem ao Anel 3 e consomem primitivas do núcleo. Sua presença em
+`src/` não os transforma em mecanismos do Anel 0. A fronteira `smaug_table_t`
+pertence ao I/O; os buffers colunares utilizados por ela pertencem ao núcleo.
 
 **Evolução prevista `[Concept]`** — o Núcleo fechou para o que a v1.0 precisa, não
 para sempre. A Trilha Analítica (Anéis 6–8) pressiona o runtime em quatro frentes,
@@ -137,7 +146,9 @@ do Anel 1. GroupBy/Join são o coração do DataFrame.
 
 **DSL encadeável** (propriedade emergente do design eager):
 `ds:filter(...):groupby(...):sum()` e `ds:join(other, "k"):sort_by("v")` funcionam
-porque cada operação retorna um DataSet.
+porque essas composições oferecem os retornos apropriados; `groupby` produz
+um objeto agrupado e sua agregação produz o DataSet seguinte. Não há promessa
+de que toda operação da biblioteca retorne DataSet.
 
 **Dependência:** Anel 2 → Anel 1 → Anel 0.
 
@@ -344,12 +355,11 @@ consomem serviços — não definem lógica de negócio nem semântica de dados.
   compatibilidade entre versões, testes diferenciais contra implementações de
   referência
 
-**Nota sobre benchmark:** hoje a correção é medida à exaustão (MC/DC, Valgrind,
-falha de alocação, property-based, mutação) e **o desempenho não é medido**. Todo
-o item 10 do Roadmap se justifica por coerência arquitetural, não por número. Isso
-é sustentável enquanto o Smaug é uma biblioteca de dados; deixa de ser no momento
-em que a Trilha Analítica começa, porque ali as decisões (SIMD? BLAS externa?
-fusão de operações?) só podem ser tomadas contra medição.
+**Nota sobre benchmark:** há medições pontuais no Roadmap, mas falta uma suíte
+sistemática de regressão de desempenho. A verificação de correção também tem
+lacunas documentadas na auditoria de 2026-09-18. Decisões de otimização (SIMD,
+BLAS externa, fusão de operações) precisam de medições reproduzíveis; cobertura
+de ramos não deve ser apresentada como MC/DC.
 
 ---
 
@@ -439,43 +449,27 @@ A implementação ocorre nesse anel — nunca mais profundamente do que o necess
 
 ---
 
-## Estado atual do núcleo
+## Estado da verificação — revisão de 2026-09-18
 
-### Robustez arquitetural
+A arquitetura define responsabilidades e garantias exigidas. A auditoria
+`TEST_SUITE_REWRITE_REVIEW.md` registra o alcance das evidências disponíveis;
+o inventário `TEST_SUITE_EXCLUSIONS_REVIEW.md` registra a triagem das exclusões.
+Nenhum quadro arquitetural certifica toda a árvore como correta ou selada.
 
-| Área | Estado |
+| Área | Evidência e pendência |
 |---|---|
-| Tipos colunares (f64/i64/bool/string) | ✅ Forte |
-| Separação por tipo (core vs ops) | ✅ Forte |
-| Null bitmask uniforme | ✅ Forte |
-| Semântica null / NaN / ±Inf / div/0 | ✅ Forte — contratos explícitos e decididos |
-| Ordenação determinística | ✅ Forte |
-| Contratos defensivos | ✅ Forte — toda fronteira pública valida |
-| Tratamento de OOM | ✅ Forte — todos os pontos públicos cobertos, incluindo parsers I/O |
-| Integridade de memória | ✅ Forte — Valgrind-clean em todos os binários |
-| Views e Copy-on-Write | ✅ Forte |
-| Isolamento após COW detach | ✅ Forte |
-| Álgebra booleana Kleene | ✅ Forte |
-| Filter / Take / Sort | ✅ Forte |
-| Consistência de API | ✅ Forte |
-| Dependências externas | ✅ Forte — núcleo e Anel 3 v1.0 independentes |
-| Extensibilidade para novos formatos I/O | ✅ Forte — fronteira `smaug_table_t` plugável |
+| Contratos defensivos, máscaras e COW | Garantias em `CONTRACT.md` e `COW.md`; completar matriz por dtype, falha e lifetime |
+| Testes C/Lua | 13 suítes C e 20 Lua na auditoria; execução verde no Windows, com lacunas funcionais demonstradas em R01–R03 |
+| OOM e rollback | Injeção existente; enumeração e oracles incompletos (R03), sem comprovação de todos os pontos públicos |
+| Propriedades e mutação | Mutações diagnósticas revelaram falsos negativos (R01); campanha sistemática pendente |
+| Cobertura | Relatório histórico de outra revisão; baseline bruta integral atual pendente (R04) |
+| Exclusões | 153 marcações inventariadas, sem aprovação automática; sete refutadas (R05) |
+| Reentrância e ABI | Contratos exigidos; verificadores atuais têm lacunas (R06) |
+| Runners e artefato FFI | Precisam invalidar execução incompleta e fixar o artefato carregado (R07) |
+| Memória e plataformas | Resultados antigos não certificam a árvore atual; campanha Linux, sanitizers e Valgrind pendente |
+| Fixtures | Cinco inventariadas; consumidores e expectativas independentes precisam de rastreabilidade (R08) |
+| Fuzzing e concorrência | Campanha pendente; ausência não equivale a sucesso |
 
-### Validação e evidências
-
-> **Nota:** este quadro registra *o que existe e seu estado*, não contagens. Números
-> que mudam com o código (check counts, cobertura) vivem nas fontes vivas — output do
-> `build.sh`, `COVERAGE.md` e `MANIFEST.txt`, sempre regenerados no Fedora, nunca
-> atualizados de memória. Doc afirma estrutura e comportamento; número exato se mede.
-
-| Área | Estado |
-|---|---|
-| Testes C (Anéis 0+3) | ✅ test_alloc, test_ops, test_ops_edge, test_bool, test_bool_lifecycle, test_string, test_cow, test_io_c, test_datetime_c, test_ops_window, test_allocfail, test_stress |
-| Testes Lua (Anéis 1+2+3) | ✅ suítes em `tests/series/`, `tests/dataset/`, `tests/io/`, `tests/props/` |
-| Stress tests | ✅ Forte — N=1M, chains, views simultâneas, ciclos |
-| Property-based testing | ✅ Forte — invariantes × seeds × casos |
-| AllocFail testing | ✅ Forte — OOM em todos os pontos públicos, inclui parsers CSV/JSON |
-| Branch coverage / MC/DC | ✅ branch-alvo e linha — ver `COVERAGE.md` (gerado no Fedora) |
-| Cross-platform (Windows/Linux) | ✅ Validado — MSYS2-UCRT64 + Fedora |
-| Dados reais | ✅ pedidos_digitados.csv (916 linhas), cotações CSV/JSON |
-| Fuzzing | ⚠️ Ausente — lacuna registrada |
+Medições devem identificar árvore, plataforma, ferramentas, flags e artefatos.
+Cobertura de ramos não é MC/DC. Dados históricos permanecem históricos até nova
+execução verificável; contagens não são atualizadas por estimativa.
