@@ -5,7 +5,7 @@
 
 package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 
-local smaug  = require("smaug")
+local smaug = require("smaug")
 
 local positive_infinity, negative_infinity, not_a_number = math.huge, -math.huge, 0/0
 

@@ -4,6 +4,15 @@ Estas regras se aplicam ao código, aos testes e aos exemplos novos ou revisados
 A migração dos arquivos existentes é incremental; este documento não declara
 que toda a base já foi convertida.
 
+Os 33 arquivos de testes C e Lua em `tests/` foram padronizados em 2026-09-18.
+As fixtures de dados foram preservadas. O núcleo e o frontend não fazem parte
+desta etapa de padronização.
+
+Validação desta etapa no Windows (GCC/MinGW e LuaJIT): 13 suítes C e 20 suítes
+Lua passaram, totalizando 450.104 verificações, com as mesmas contagens por
+arquivo da execução anterior à migração. Isso inclui stress e propriedades;
+não representa uma nova certificação de ausência de UB ou de vazamentos.
+
 ## Nomes
 
 - Variáveis, parâmetros e funções auxiliares usam nomes descritivos em inglês,
@@ -66,3 +75,18 @@ local year_series = datetime_series.dt:year()
   campos da API ou dados de teste por substituição cega.
 - Ao migrar um arquivo, execute seus testes e confira que nenhum cenário ou
   verificação foi perdido.
+
+## Checagem de regressões de estilo
+
+Execute `python scripts/check_test_style.py` para verificar todos os testes C
+e Lua. O script usa somente a biblioteca padrão do Python e recusa
+identificadores de uma letra, aliases diretos de `smaug.Series`/`smaug.DataSet`
+e chamadas a `from_table`. Literais, comentários, campos da API e chaves de
+tabelas não são nomes de variáveis. O próprio verificador pode ser exercitado
+com `python scripts/check_test_style.py --self-test`.
+
+Esta checagem léxica não substitui revisão dos nomes, compilação ou execução
+da suíte. Construtores especializados permanecem nos testes dedicados às suas
+APIs; os geradores de propriedades também podem pré-alocar séries com tamanho
+calculado em tempo de execução. As demais fixtures preferem os construtores
+chamáveis.

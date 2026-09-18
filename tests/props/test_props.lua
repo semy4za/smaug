@@ -17,325 +17,324 @@ package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 
 local smaug = require("smaug")
-local S     = smaug.Series
 
 -- Seeds fixas (reprodutível) — múltiplas para ampliar o espaço sem perder
 -- determinismo. Trocar/adicionar seeds é uma decisão consciente.
-local SEEDS = { 20260602, 1337, 987654321 }
-local N_PER_SEED = 400          -- 3 seeds × 400 = 1200 casos por invariante (≥1000)
+local random_seeds = { 20260602, 1337, 987654321 }
+local cases_per_seed = 400          -- 3 seeds × 400 = 1200 casos por invariante (≥1000)
 
-local nan = 0/0
-local function is_nan(x) return x ~= x end
+local nan_value = 0/0
+local function is_nan(value) return value ~= value end
 
 -- estado de teste; registra a seed e o caso atuais para mensagens de falha
-local cur_seed, cur_case = nil, nil
-local n_checks = 0
-local function check(cond, msg)
-    if not cond then
+local current_seed, current_case = nil, nil
+local passed_checks = 0
+local function check(condition, message)
+    if not condition then
         error(string.format("FALHOU [seed=%s caso=%d]: %s",
-              tostring(cur_seed), cur_case or -1, msg), 2)
+              tostring(current_seed), current_case or -1, message), 2)
     end
-    n_checks = n_checks + 1
+    passed_checks = passed_checks + 1
 end
 
 -- ---------- geradores (cada um respeita o contrato da propriedade) ----------
 
 -- série LIMPA: sem null, sem NaN. Para sort/argsort (que recusam ambos).
-local function gen_clean(dtype, n)
-    local s = S.new(dtype, n)
-    for i = 1, n do
-        if dtype == "int64" then s:set(i, math.random(-100000, 100000))
-        else s:set(i, (math.random() - 0.5) * 2e6) end
+local function generate_clean_series(dtype, element_count)
+    local allocated_source_series = smaug.Series.new(dtype, element_count)
+    for row_index = 1, element_count do
+        if dtype == "int64" then allocated_source_series:set(row_index, math.random(-100000, 100000))
+        else allocated_source_series:set(row_index, (math.random() - 0.5) * 2e6) end
     end
-    return s
+    return allocated_source_series
 end
 
 -- série com NULLS (~25%): para filter, clone, Kleene.
-local function gen_nullable(dtype, n)
-    local s = S.new(dtype, n)
-    for i = 1, n do
-        if math.random() < 0.25 then s:set_null(i)
-        elseif dtype == "int64" then s:set(i, math.random(-100000, 100000))
-        else s:set(i, (math.random() - 0.5) * 2e6) end
+local function generate_nullable_series(dtype, element_count)
+    local allocated_source_series = smaug.Series.new(dtype, element_count)
+    for row_index = 1, element_count do
+        if math.random() < 0.25 then allocated_source_series:set_null(row_index)
+        elseif dtype == "int64" then allocated_source_series:set(row_index, math.random(-100000, 100000))
+        else allocated_source_series:set(row_index, (math.random() - 0.5) * 2e6) end
     end
-    return s
+    return allocated_source_series
 end
 
 -- série f64 com NULLS e NaN (~15% null, ~15% NaN): testa null≠NaN.
-local function gen_with_nan(n)
-    local s = S.float64(n)
-    for i = 1, n do
-        local r = math.random()
-        if r < 0.15 then s:set_null(i)
-        elseif r < 0.30 then s:set(i, nan)
-        else s:set(i, (math.random() - 0.5) * 2e6) end
+local function generate_series_with_nan(element_count)
+    local floating_point_series = smaug.Series.float64(element_count)
+    for row_index = 1, element_count do
+        local random_value = math.random()
+        if random_value < 0.15 then floating_point_series:set_null(row_index)
+        elseif random_value < 0.30 then floating_point_series:set(row_index, nan_value)
+        else floating_point_series:set(row_index, (math.random() - 0.5) * 2e6) end
     end
-    return s
+    return floating_point_series
 end
 
 -- permutação aleatória 1..n (Fisher-Yates)
-local function random_perm(n)
-    local p = {}; for i = 1, n do p[i] = i end
-    for i = n, 2, -1 do local j = math.random(i); p[i], p[j] = p[j], p[i] end
-    return p
+local function random_permutation(element_count)
+    local values = {}; for row_index = 1, element_count do values[row_index] = row_index end
+    for row_index = element_count, 2, -1 do local swap_index = math.random(row_index); values[row_index], values[swap_index] = values[swap_index], values[row_index] end
+    return values
 end
 
 -- ---------- a bateria de invariantes ----------
 -- Cada função roda 1 caso aleatório e faz suas asserções.
 
-local PROPERTIES = {}
+local properties = {}
 
 -- INV1: clone é independente — mutar o clone não afeta o original (anti-aliasing)
-PROPERTIES["clone_independente"] = function()
-    local n = math.random(1, 40)
-    local s = gen_nullable("float64", n)
-    local snap = {}; for i = 1, n do snap[i] = s:get(i) end
-    local c = s:clone()
+properties["clone_independente"] = function()
+    local element_count = math.random(1, 40)
+    local nullable_series = generate_nullable_series("float64", element_count)
+    local snapshot_values = {}; for row_index = 1, element_count do snapshot_values[row_index] = nullable_series:get(row_index) end
+    local cloned_series = nullable_series:clone()
     -- muta o clone em posições aleatórias
-    for _ = 1, math.random(1, 5) do c:set(math.random(n), 123456.0) end
-    for i = 1, n do
-        check(s:get(i) == snap[i], "clone mutou o original no idx " .. i)
+    for unused_index = 1, math.random(1, 5) do cloned_series:set(math.random(element_count), 123456.0) end
+    for row_index = 1, element_count do
+        check(nullable_series:get(row_index) == snapshot_values[row_index], "clone mutou o original no idx " .. row_index)
     end
 end
 
 -- INV2: view COMPARTILHA memória — mutar a base reflete na view (oposto do clone)
-PROPERTIES["view_compartilha"] = function()
-    local n = math.random(2, 40)
-    local s = gen_clean("float64", n)
-    local start = math.random(1, n)
-    local len = math.random(1, n - start + 1)
-    local v = s:view(start, len)
-    check(v:len() == len, "view comprimento errado")
-    for i = 1, len do
-        check(v:get(i) == s:get(start + i - 1), "view não reflete a base no idx " .. i)
+properties["view_compartilha"] = function()
+    local element_count = math.random(2, 40)
+    local clean_series = generate_clean_series("float64", element_count)
+    local start = math.random(1, element_count)
+    local length = math.random(1, element_count - start + 1)
+    local series_view = clean_series:view(start, length)
+    check(series_view:len() == length, "view comprimento errado")
+    for row_index = 1, length do
+        check(series_view:get(row_index) == clean_series:get(start + row_index - 1), "view não reflete a base no idx " .. row_index)
     end
 end
 
 -- INV3: sort preserva o MULTICONJUNTO e é monotônico (série limpa)
-PROPERTIES["sort_permutacao"] = function()
-    local n = math.random(1, 40)
-    local s = gen_clean("int64", n)
-    local before = {}; for i = 1, n do before[i] = s:get(i) end
+properties["sort_permutacao"] = function()
+    local element_count = math.random(1, 40)
+    local clean_series = generate_clean_series("int64", element_count)
+    local before = {}; for row_index = 1, element_count do before[row_index] = clean_series:get(row_index) end
     table.sort(before)
-    local sorted = s:sort()
-    check(sorted:len() == n, "sort mudou o tamanho")
-    for i = 1, n do
-        check(sorted:get(i) == before[i],
-              "multiconjunto difere no idx " .. i)
-        if i > 1 then
-            check(sorted:get(i) >= sorted:get(i - 1), "sort não-monotônico no idx " .. i)
+    local sorted = clean_series:sort()
+    check(sorted:len() == element_count, "sort mudou o tamanho")
+    for row_index = 1, element_count do
+        check(sorted:get(row_index) == before[row_index],
+              "multiconjunto difere no idx " .. row_index)
+        if row_index > 1 then
+            check(sorted:get(row_index) >= sorted:get(row_index - 1), "sort não-monotônico no idx " .. row_index)
         end
     end
 end
 
 -- INV4: sort/argsort RECUSAM séries com null ou NaN (contrato)
-PROPERTIES["sort_recusa_null_nan"] = function()
-    local n = math.random(1, 30)
-    local s = gen_with_nan(n)
+properties["sort_recusa_null_nan"] = function()
+    local element_count = math.random(1, 30)
+    local nan_series = generate_series_with_nan(element_count)
     -- só vale o invariante se a série DE FATO tem null ou NaN
     local tem_buraco = false
-    for i = 1, n do
-        if s:is_null(i) or is_nan(s:get(i)) then tem_buraco = true; break end
+    for row_index = 1, element_count do
+        if nan_series:is_null(row_index) or is_nan(nan_series:get(row_index)) then tem_buraco = true; break end
     end
     if tem_buraco then
-        local ok = pcall(function() return s:sort() end)
-        check(not ok, "sort deveria recusar série com null/NaN")
-        check(s:argsort() == nil, "argsort deveria retornar nil com null/NaN")
+        local succeeded = pcall(function() return nan_series:sort() end)
+        check(not succeeded, "sort deveria recusar série com null/NaN")
+        check(nan_series:argsort() == nil, "argsort deveria retornar nil com null/NaN")
     end
 end
 
 -- INV5: len(filter(s, mask)) == count_true(mask), com nulls
-PROPERTIES["filter_count_true"] = function()
-    local n = math.random(1, 40)
-    local s = gen_nullable("float64", n)
-    local k = (math.random() - 0.5) * 2e6
-    local mask = s:gt(k)
-    local filtered = s:filter(mask)
-    check(filtered:len() == mask:count_true(),
-          "len(filter)=" .. filtered:len() .. " != count_true=" .. mask:count_true())
+properties["filter_count_true"] = function()
+    local element_count = math.random(1, 40)
+    local nullable_series = generate_nullable_series("float64", element_count)
+    local threshold = (math.random() - 0.5) * 2e6
+    local filter_mask = nullable_series:gt(threshold)
+    local filtered = nullable_series:filter(filter_mask)
+    check(filtered:len() == filter_mask:count_true(),
+          "len(filter)=" .. filtered:len() .. " != count_true=" .. filter_mask:count_true())
 end
 
 -- INV6: take + permutação inversa = identidade
-PROPERTIES["take_inversa"] = function()
-    local n = math.random(1, 30)
-    local s = gen_clean("float64", n)
-    local perm = random_perm(n)
-    local inv = {}; for i = 1, n do inv[perm[i]] = i end
-    local back = s:take(perm):take(inv)
-    for i = 1, n do
-        check(math.abs(back:get(i) - s:get(i)) < 1e-9, "take+inversa != id no idx " .. i)
+properties["take_inversa"] = function()
+    local element_count = math.random(1, 30)
+    local clean_series = generate_clean_series("float64", element_count)
+    local permutation = random_permutation(element_count)
+    local inverse_permutation = {}; for row_index = 1, element_count do inverse_permutation[permutation[row_index]] = row_index end
+    local selected_result = clean_series:take(permutation):take(inverse_permutation)
+    for row_index = 1, element_count do
+        check(math.abs(selected_result:get(row_index) - clean_series:get(row_index)) < 1e-9, "take+inversa != id no idx " .. row_index)
     end
 end
 
 -- INV7: astype ida-e-volta f64->i64->f64 preserva valores inteiros
-PROPERTIES["astype_ida_volta"] = function()
-    local n = math.random(1, 30)
-    local s = S.float64(n)
-    for i = 1, n do
-        if math.random() < 0.2 then s:set_null(i)
-        else s:set(i, math.random(-100000, 100000)) end  -- inteiros como float
+properties["astype_ida_volta"] = function()
+    local element_count = math.random(1, 30)
+    local floating_point_series = smaug.Series.float64(element_count)
+    for row_index = 1, element_count do
+        if math.random() < 0.2 then floating_point_series:set_null(row_index)
+        else floating_point_series:set(row_index, math.random(-100000, 100000)) end  -- inteiros como float
     end
-    local round = s:astype("int64"):astype("float64")
-    for i = 1, n do
-        if s:is_null(i) then
-            check(round:is_null(i), "astype perdeu null no idx " .. i)
+    local round = floating_point_series:astype("int64"):astype("float64")
+    for row_index = 1, element_count do
+        if floating_point_series:is_null(row_index) then
+            check(round:is_null(row_index), "astype perdeu null no idx " .. row_index)
         else
-            check(round:get(i) == s:get(i), "astype ida-volta difere no idx " .. i)
+            check(round:get(row_index) == floating_point_series:get(row_index), "astype ida-volta difere no idx " .. row_index)
         end
     end
 end
 
 -- INV8: fillna remove todos os nulls e preserva não-nulos e NaN
-PROPERTIES["fillna_remove_null"] = function()
-    local n = math.random(1, 40)
-    local s = gen_with_nan(n)
-    local snap = {}; for i = 1, n do snap[i] = s:get(i) end  -- nil p/ null, NaN p/ nan
-    local f = s:fillna(0)
-    for i = 1, n do
-        if s:is_null(i) then
-            check(f:get(i) == 0, "fillna não preencheu null no idx " .. i)
-        elseif is_nan(snap[i]) then
-            check(is_nan(f:get(i)), "fillna não preservou NaN no idx " .. i)
+properties["fillna_remove_null"] = function()
+    local element_count = math.random(1, 40)
+    local nan_series = generate_series_with_nan(element_count)
+    local snapshot_values = {}; for row_index = 1, element_count do snapshot_values[row_index] = nan_series:get(row_index) end  -- nil p/ null, NaN p/ nan
+    local filled_result = nan_series:fillna(0)
+    for row_index = 1, element_count do
+        if nan_series:is_null(row_index) then
+            check(filled_result:get(row_index) == 0, "fillna não preencheu null no idx " .. row_index)
+        elseif is_nan(snapshot_values[row_index]) then
+            check(is_nan(filled_result:get(row_index)), "fillna não preservou NaN no idx " .. row_index)
         else
-            check(f:get(i) == snap[i], "fillna alterou valor no idx " .. i)
+            check(filled_result:get(row_index) == snapshot_values[row_index], "fillna alterou valor no idx " .. row_index)
         end
     end
 end
 
 -- INV9: Kleene — not(not b) == b
-PROPERTIES["kleene_dupla_negacao"] = function()
-    local n = math.random(1, 30)
-    local s = gen_nullable("float64", n)
-    local b = s:gt(0)
-    local bb = b:lnot():lnot()
-    for i = 1, n do
-        check(b:get(i) == bb:get(i), "not(not b) != b no idx " .. i)
-        check(b:is_null(i) == bb:is_null(i), "not(not b) perdeu NA no idx " .. i)
+properties["kleene_dupla_negacao"] = function()
+    local element_count = math.random(1, 30)
+    local nullable_series = generate_nullable_series("float64", element_count)
+    local greater_than_mask = nullable_series:gt(0)
+    local logical_not_result = greater_than_mask:lnot():lnot()
+    for row_index = 1, element_count do
+        check(greater_than_mask:get(row_index) == logical_not_result:get(row_index), "not(not b) != b no idx " .. row_index)
+        check(greater_than_mask:is_null(row_index) == logical_not_result:is_null(row_index), "not(not b) perdeu NA no idx " .. row_index)
     end
 end
 
 -- INV10: Kleene — De Morgan: not(a and b) == (not a) or (not b)
-PROPERTIES["kleene_de_morgan"] = function()
-    local n = math.random(1, 30)
-    local a = gen_nullable("float64", n):gt(0)
-    local b = gen_nullable("float64", n):gt(0)
-    local left  = a:land(b):lnot()
-    local right = a:lnot():lor(b:lnot())
-    for i = 1, n do
-        check(left:get(i) == right:get(i), "De Morgan (valor) falha no idx " .. i)
-        check(left:is_null(i) == right:is_null(i), "De Morgan (NA) falha no idx " .. i)
+properties["kleene_de_morgan"] = function()
+    local element_count = math.random(1, 30)
+    local greater_than_mask = generate_nullable_series("float64", element_count):gt(0)
+    local greater_than_mask_2 = generate_nullable_series("float64", element_count):gt(0)
+    local logical_not_result  = greater_than_mask:land(greater_than_mask_2):lnot()
+    local right = greater_than_mask:lnot():lor(greater_than_mask_2:lnot())
+    for row_index = 1, element_count do
+        check(logical_not_result:get(row_index) == right:get(row_index), "De Morgan (valor) falha no idx " .. row_index)
+        check(logical_not_result:is_null(row_index) == right:is_null(row_index), "De Morgan (NA) falha no idx " .. row_index)
     end
 end
 
 -- ---------- runner ----------
 
 -- Gerador de série string com valores aleatórios e ~20% nulls
-local WORDS = {"alpha", "beta", "gamma", "delta", "epsilon",
+local words = {"alpha", "beta", "gamma", "delta", "epsilon",
                "zeta", "eta", "theta", "iota", "kappa"}
-local function gen_str(n)
-    local s = S.new("string", n)
-    for i = 1, n do
+local function generate_string_series(element_count)
+    local allocated_string_series = smaug.Series.new("string", element_count)
+    for row_index = 1, element_count do
         if math.random() < 0.2 then
-            s:set_null(i)
+            allocated_string_series:set_null(row_index)
         else
-            s:set(i, WORDS[math.random(#WORDS)])
+            allocated_string_series:set(row_index, words[math.random(#words)])
         end
     end
-    return s
+    return allocated_string_series
 end
 
 -- INV-STR-1: set → get devolve o mesmo valor (round-trip)
-PROPERTIES["str_set_get"] = function()
-    local n = math.random(1, 20)
-    local s = S.new("string", n)
-    local vals = {}
-    for i = 1, n do
-        vals[i] = WORDS[math.random(#WORDS)]
-        s:set(i, vals[i])
+properties["str_set_get"] = function()
+    local element_count = math.random(1, 20)
+    local allocated_string_series = smaug.Series.new("string", element_count)
+    local values = {}
+    for row_index = 1, element_count do
+        values[row_index] = words[math.random(#words)]
+        allocated_string_series:set(row_index, values[row_index])
     end
-    for i = 1, n do
-        check(s:get(i) == vals[i], "str set_get round-trip idx " .. i)
-        check(not s:is_null(i),    "str set_get: não é null idx " .. i)
+    for row_index = 1, element_count do
+        check(allocated_string_series:get(row_index) == values[row_index], "str set_get round-trip idx " .. row_index)
+        check(not allocated_string_series:is_null(row_index),    "str set_get: não é null idx " .. row_index)
     end
 end
 
 -- INV-STR-2: clone é independente — mutar o clone não afeta o original
-PROPERTIES["str_clone_independente"] = function()
-    local n = math.random(2, 20)
-    local s = gen_str(n)
+properties["str_clone_independente"] = function()
+    local element_count = math.random(2, 20)
+    local string_series = generate_string_series(element_count)
     -- snapshot dos valores originais
-    local snap = {}
-    for i = 1, n do snap[i] = s:get(i) end  -- nil se null
-    local c = s:clone()
+    local snapshot_values = {}
+    for row_index = 1, element_count do snapshot_values[row_index] = string_series:get(row_index) end  -- nil se null
+    local cloned_series = string_series:clone()
     -- muta o clone em posições não-null
-    for i = 1, n do
-        if not c:is_null(i) then c:set(i, "mutado") end
+    for row_index = 1, element_count do
+        if not cloned_series:is_null(row_index) then cloned_series:set(row_index, "mutado") end
     end
     -- original deve estar intacto
-    for i = 1, n do
-        check(s:get(i) == snap[i], "str clone: original alterado no idx " .. i)
+    for row_index = 1, element_count do
+        check(string_series:get(row_index) == snapshot_values[row_index], "str clone: original alterado no idx " .. row_index)
     end
 end
 
 -- INV-STR-3: sort produz sequência não-decrescente (valores não-null)
-PROPERTIES["str_sort_ordenado"] = function()
-    local n = math.random(2, 30)
+properties["str_sort_ordenado"] = function()
+    local element_count = math.random(2, 30)
     -- série sem nulls para sort ser aplicável
-    local s = S.new("string", n)
-    for i = 1, n do s:set(i, WORDS[math.random(#WORDS)]) end
-    local sorted = s:sort(true)
-    for i = 1, n - 1 do
-        local a, b = sorted:get(i), sorted:get(i + 1)
-        check(a <= b, "str sort: ordem violada entre idx " .. i .. " e " .. (i+1))
+    local allocated_string_series = smaug.Series.new("string", element_count)
+    for row_index = 1, element_count do allocated_string_series:set(row_index, words[math.random(#words)]) end
+    local sorted = allocated_string_series:sort(true)
+    for row_index = 1, element_count - 1 do
+        local left_value, right_value = sorted:get(row_index), sorted:get(row_index + 1)
+        check(left_value <= right_value, "str sort: ordem violada entre idx " .. row_index .. " e " .. (row_index+1))
     end
 end
 
 -- INV-STR-4: count_nonnull é consistente com is_null
-PROPERTIES["str_count_nonnull"] = function()
-    local n = math.random(1, 30)
-    local s = gen_str(n)
+properties["str_count_nonnull"] = function()
+    local element_count = math.random(1, 30)
+    local string_series = generate_string_series(element_count)
     local manual = 0
-    for i = 1, n do
-        if not s:is_null(i) then manual = manual + 1 end
+    for row_index = 1, element_count do
+        if not string_series:is_null(row_index) then manual = manual + 1 end
     end
-    check(s:count_nonnull() == manual,
-          "str count_nonnull: " .. s:count_nonnull() .. " ≠ " .. manual)
+    check(string_series:count_nonnull() == manual,
+          "str count_nonnull: " .. string_series:count_nonnull() .. " ≠ " .. manual)
 end
 
 -- INV-STR-5: filter reduz o tamanho proporcionalmente à máscara
-PROPERTIES["str_filter_reduz"] = function()
-    local n = math.random(2, 30)
-    local s = gen_str(n)
+properties["str_filter_reduz"] = function()
+    local element_count = math.random(2, 30)
+    local string_series = generate_string_series(element_count)
     -- máscara aleatória
     local mask_vals = {}
     local count_true = 0
-    for i = 1, n do
-        mask_vals[i] = math.random() < 0.5
-        if mask_vals[i] then count_true = count_true + 1 end
+    for row_index = 1, element_count do
+        mask_vals[row_index] = math.random() < 0.5
+        if mask_vals[row_index] then count_true = count_true + 1 end
     end
-    local mask = S.new("float64", n)
-    for i = 1, n do mask:set(i, mask_vals[i] and 1.0 or 0.0) end
-    local bool_mask = mask:gt(0.5)
-    local filtered = s:filter(bool_mask)
+    local filter_mask = smaug.Series.new("float64", element_count)
+    for row_index = 1, element_count do filter_mask:set(row_index, mask_vals[row_index] and 1.0 or 0.0) end
+    local bool_mask = filter_mask:gt(0.5)
+    local filtered = string_series:filter(bool_mask)
     check(filtered:len() == count_true,
           "str filter: tamanho " .. filtered:len() .. " ≠ " .. count_true)
 end
 
 -- INV-STR-5: filter reduz o tamanho proporcionalmente à máscara
-PROPERTIES["str_filter_reduz"] = function()
-    local n = math.random(2, 30)
-    local s = gen_str(n)
+properties["str_filter_reduz"] = function()
+    local element_count = math.random(2, 30)
+    local string_series = generate_string_series(element_count)
     -- máscara aleatória
     local mask_vals = {}
     local count_true = 0
-    for i = 1, n do
-        mask_vals[i] = math.random() < 0.5
-        if mask_vals[i] then count_true = count_true + 1 end
+    for row_index = 1, element_count do
+        mask_vals[row_index] = math.random() < 0.5
+        if mask_vals[row_index] then count_true = count_true + 1 end
     end
-    local mask = S.new("float64", n)
-    for i = 1, n do mask:set(i, mask_vals[i] and 1.0 or 0.0) end
-    local bool_mask = mask:gt(0.5)
-    local filtered = s:filter(bool_mask)
+    local filter_mask = smaug.Series.new("float64", element_count)
+    for row_index = 1, element_count do filter_mask:set(row_index, mask_vals[row_index] and 1.0 or 0.0) end
+    local bool_mask = filter_mask:gt(0.5)
+    local filtered = string_series:filter(bool_mask)
     check(filtered:len() == count_true,
           "str filter: tamanho " .. filtered:len() .. " ≠ " .. count_true)
 end
@@ -344,183 +343,181 @@ end
 -- INV Anel 2 — Operações relacionais
 -- =====================================================================
 
-local DataSet = require("smaug.core.dataset")
-local NA      = S.NA
-local GROUPS  = {"A","B","C"}
+local groups  = {"A","B","C"}
 
 -- INV-G1: groupby sum de cada grupo == sum(serie filtrada por grupo)
-PROPERTIES["groupby_sum_consistente"] = function()
-    local n   = math.random(3, 30)
-    local cat = S.new("string", n)
-    local val = S.new("int64",  n)
+properties["groupby_sum_consistente"] = function()
+    local element_count   = math.random(3, 30)
+    local group_series = smaug.Series.new("string", element_count)
+    local value_series = smaug.Series.new("int64",  element_count)
     local group_sum = {}
-    for g in pairs({A=true,B=true,C=true}) do group_sum[g] = 0 end
-    for i = 1, n do
-        local g = GROUPS[math.random(#GROUPS)]
-        cat:set(i, g)
-        local v = math.random(-100, 100)
-        val:set(i, v)
-        group_sum[g] = group_sum[g] + v
+    for group_key in pairs({A=true,B=true,C=true}) do group_sum[group_key] = 0 end
+    for row_index = 1, element_count do
+        local group_key = groups[math.random(#groups)]
+        group_series:set(row_index, group_key)
+        local random_integer = math.random(-100, 100)
+        value_series:set(row_index, random_integer)
+        group_sum[group_key] = group_sum[group_key] + random_integer
     end
-    local ds = DataSet.from_columns({{"g", cat, "string"}, {"v", val, "int64"}})
-    local gb = ds:groupby("g"):sum("v")
-    for i = 1, gb:nrows() do
-        local g = gb:col("g"):get(i)
-        local s = gb:col("v"):get(i)
-        check(s == group_sum[g], "groupby sum difere para grupo " .. g)
+    local source_dataset = smaug.DataSet({{"g", group_series, "string"}, {"v", value_series, "int64"}})
+    local sum_result = source_dataset:groupby("g"):sum("v")
+    for row_index = 1, sum_result:nrows() do
+        local group_key = sum_result:col("g"):get(row_index)
+        local group_sum_2 = sum_result:col("v"):get(row_index)
+        check(group_sum_2 == group_sum[group_key], "groupby sum difere para grupo " .. group_key)
     end
 end
 
 -- INV-G2: groupby count: soma dos counts == nrows do DataSet original
-PROPERTIES["groupby_count_total"] = function()
-    local n = math.random(2, 30)
-    local cat = S.new("string", n)
-    for i = 1, n do cat:set(i, GROUPS[math.random(#GROUPS)]) end
-    local val = S.new("int64", n)
-    for i = 1, n do val:set(i, math.random(100)) end
-    local ds = DataSet.from_columns({{"g", cat, "string"}, {"v", val, "int64"}})
-    local cnt = ds:groupby("g"):count()
+properties["groupby_count_total"] = function()
+    local element_count = math.random(2, 30)
+    local group_series = smaug.Series.new("string", element_count)
+    for row_index = 1, element_count do group_series:set(row_index, groups[math.random(#groups)]) end
+    local value_series = smaug.Series.new("int64", element_count)
+    for row_index = 1, element_count do value_series:set(row_index, math.random(100)) end
+    local source_dataset = smaug.DataSet({{"g", group_series, "string"}, {"v", value_series, "int64"}})
+    local group_counts = source_dataset:groupby("g"):count()
     local total = 0
-    for i = 1, cnt:nrows() do total = total + cnt:col("count"):get(i) end
-    check(total == n, "groupby count: soma " .. total .. " ≠ " .. n)
+    for row_index = 1, group_counts:nrows() do total = total + group_counts:col("count"):get(row_index) end
+    check(total == element_count, "groupby count: soma " .. total .. " ≠ " .. element_count)
 end
 
 -- INV-C1: concat preserva nrows (len(concat(a,b)) == len(a) + len(b))
-PROPERTIES["concat_nrows"] = function()
-    local na = math.random(1, 20)
-    local nb = math.random(1, 20)
-    local va = S.new("int64", na)
-    local vb = S.new("int64", nb)
-    for i = 1, na do va:set(i, math.random(100)) end
-    for i = 1, nb do vb:set(i, math.random(100)) end
-    local da = DataSet.from_columns({{"v", va, "int64"}})
-    local db = DataSet.from_columns({{"v", vb, "int64"}})
-    local r  = smaug.concat({da, db})
-    check(r:nrows() == na + nb, "concat nrows: " .. r:nrows() .. " ≠ " .. (na+nb))
+properties["concat_nrows"] = function()
+    local left_row_count = math.random(1, 20)
+    local right_row_count = math.random(1, 20)
+    local left_values = smaug.Series.new("int64", left_row_count)
+    local right_values = smaug.Series.new("int64", right_row_count)
+    for row_index = 1, left_row_count do left_values:set(row_index, math.random(100)) end
+    for row_index = 1, right_row_count do right_values:set(row_index, math.random(100)) end
+    local left_dataset = smaug.DataSet({{"v", left_values, "int64"}})
+    local right_dataset = smaug.DataSet({{"v", right_values, "int64"}})
+    local concatenated_result  = smaug.concat({left_dataset, right_dataset})
+    check(concatenated_result:nrows() == left_row_count + right_row_count, "concat nrows: " .. concatenated_result:nrows() .. " ≠ " .. (left_row_count+right_row_count))
     -- valores preservados
-    for i = 1, na do
-        check(r:col("v"):get(i) == va:get(i), "concat: valor esq idx " .. i)
+    for row_index = 1, left_row_count do
+        check(concatenated_result:col("v"):get(row_index) == left_values:get(row_index), "concat: valor esq idx " .. row_index)
     end
-    for i = 1, nb do
-        check(r:col("v"):get(na + i) == vb:get(i), "concat: valor dir idx " .. i)
+    for row_index = 1, right_row_count do
+        check(concatenated_result:col("v"):get(left_row_count + row_index) == right_values:get(row_index), "concat: valor dir idx " .. row_index)
     end
 end
 
 -- INV-J1: inner join ⊆ cross product (toda linha do inner tem match nos dois lados)
-PROPERTIES["join_inner_match"] = function()
-    local na = math.random(2, 10)
-    local nb = math.random(2, 10)
-    local keys_a, keys_b = {}, {}
-    for i = 1, na do keys_a[i] = math.random(1, 5) end
-    for i = 1, nb do keys_b[i] = math.random(1, 5) end
-    local ka = S.new("int64", na); for i=1,na do ka:set(i, keys_a[i]) end
-    local va = S.new("int64", na); for i=1,na do va:set(i, i*10) end
-    local kb = S.new("int64", nb); for i=1,nb do kb:set(i, keys_b[i]) end
-    local vb = S.new("int64", nb); for i=1,nb do vb:set(i, i*100) end
-    local da = DataSet.from_columns({{"k",ka,"int64"},{"va",va,"int64"}})
-    local db = DataSet.from_columns({{"k",kb,"int64"},{"vb",vb,"int64"}})
-    local r  = da:join(db, "k", "inner")
+properties["join_inner_match"] = function()
+    local left_row_count = math.random(2, 10)
+    local right_row_count = math.random(2, 10)
+    local left_key_values, right_key_values = {}, {}
+    for row_index = 1, left_row_count do left_key_values[row_index] = math.random(1, 5) end
+    for row_index = 1, right_row_count do right_key_values[row_index] = math.random(1, 5) end
+    local left_keys = smaug.Series.new("int64", left_row_count); for row_index=1,left_row_count do left_keys:set(row_index, left_key_values[row_index]) end
+    local left_values = smaug.Series.new("int64", left_row_count); for row_index=1,left_row_count do left_values:set(row_index, row_index*10) end
+    local right_keys = smaug.Series.new("int64", right_row_count); for row_index=1,right_row_count do right_keys:set(row_index, right_key_values[row_index]) end
+    local right_values = smaug.Series.new("int64", right_row_count); for row_index=1,right_row_count do right_values:set(row_index, row_index*100) end
+    local left_dataset = smaug.DataSet({{"k",left_keys,"int64"},{"va",left_values,"int64"}})
+    local right_dataset = smaug.DataSet({{"k",right_keys,"int64"},{"vb",right_values,"int64"}})
+    local joined_dataset  = left_dataset:join(right_dataset, "k", "inner")
     -- todo resultado deve ter chave que existe em ambos os lados
-    local ka_set, kb_set = {}, {}
-    for _, v in ipairs(keys_a) do ka_set[v] = true end
-    for _, v in ipairs(keys_b) do kb_set[v] = true end
-    for i = 1, r:nrows() do
-        local k = r:col("k"):get(i)
-        check(ka_set[k] and kb_set[k], "join inner: chave " .. k .. " sem match")
+    local left_key_set, right_key_set = {}, {}
+    for unused_index, element_value in ipairs(left_key_values) do left_key_set[element_value] = true end
+    for unused_index, element_value in ipairs(right_key_values) do right_key_set[element_value] = true end
+    for row_index = 1, joined_dataset:nrows() do
+        local join_key = joined_dataset:col("k"):get(row_index)
+        check(left_key_set[join_key] and right_key_set[join_key], "join inner: chave " .. join_key .. " sem match")
     end
 end
 
 -- INV-J2: left join preserva todos os rows do lado esquerdo
-PROPERTIES["join_left_preserva_esq"] = function()
-    local na = math.random(2, 10)
-    local nb = math.random(2, 10)
-    local ka = S.new("int64", na); for i=1,na do ka:set(i, math.random(1,5)) end
-    local va = S.new("int64", na); for i=1,na do va:set(i, i) end
-    local kb = S.new("int64", nb); for i=1,nb do kb:set(i, math.random(3,7)) end
-    local vb = S.new("int64", nb); for i=1,nb do vb:set(i, i*100) end
-    local da = DataSet.from_columns({{"k",ka,"int64"},{"va",va,"int64"}})
-    local db = DataSet.from_columns({{"k",kb,"int64"},{"vb",vb,"int64"}})
-    local r  = da:join(db, "k", "left")
+properties["join_left_preserva_esq"] = function()
+    local left_row_count = math.random(2, 10)
+    local right_row_count = math.random(2, 10)
+    local left_keys = smaug.Series.new("int64", left_row_count); for row_index=1,left_row_count do left_keys:set(row_index, math.random(1,5)) end
+    local left_values = smaug.Series.new("int64", left_row_count); for row_index=1,left_row_count do left_values:set(row_index, row_index) end
+    local right_keys = smaug.Series.new("int64", right_row_count); for row_index=1,right_row_count do right_keys:set(row_index, math.random(3,7)) end
+    local right_values = smaug.Series.new("int64", right_row_count); for row_index=1,right_row_count do right_values:set(row_index, row_index*100) end
+    local left_dataset = smaug.DataSet({{"k",left_keys,"int64"},{"va",left_values,"int64"}})
+    local right_dataset = smaug.DataSet({{"k",right_keys,"int64"},{"vb",right_values,"int64"}})
+    local joined_dataset  = left_dataset:join(right_dataset, "k", "left")
     -- contamos quantas linhas do esquerdo têm match no direito
-    local kb_set = {}
-    for i = 1, nb do kb_set[kb:get(i)] = true end
+    local right_key_set = {}
+    for row_index = 1, right_row_count do right_key_set[right_keys:get(row_index)] = true end
     local expected = 0
-    for i = 1, na do
-        local k = ka:get(i)
-        if kb_set[k] then
+    for row_index = 1, left_row_count do
+        local join_key = left_keys:get(row_index)
+        if right_key_set[join_key] then
             -- pode ter múltiplos matches; conta todos
-            for j = 1, nb do if kb:get(j) == k then expected = expected + 1 end end
+            for right_row_index = 1, right_row_count do if right_keys:get(right_row_index) == join_key then expected = expected + 1 end end
         else
             expected = expected + 1
         end
     end
-    check(r:nrows() == expected, "join left nrows: " .. r:nrows() .. " ≠ " .. expected)
+    check(joined_dataset:nrows() == expected, "join left nrows: " .. joined_dataset:nrows() .. " ≠ " .. expected)
 end
 
 -- INV-U1: unique preserva ordem de primeira aparição
-PROPERTIES["unique_ordem_aparicao"] = function()
-    local n = math.random(2, 30)
-    local s = S.new("int64", n)
-    for i = 1, n do s:set(i, math.random(1, 5)) end
-    local u  = s:unique()
+properties["unique_ordem_aparicao"] = function()
+    local element_count = math.random(2, 30)
+    local allocated_integer_series = smaug.Series.new("int64", element_count)
+    for row_index = 1, element_count do allocated_integer_series:set(row_index, math.random(1, 5)) end
+    local unique_values  = allocated_integer_series:unique()
     -- verifica que cada valor de u aparece pela primeira vez antes de qualquer
     -- valor subsequente de u na série original
     local first_seen = {}
-    for i = 1, n do
-        local v = s:get(i)
-        if v ~= nil and not first_seen[v] then first_seen[v] = i end
+    for row_index = 1, element_count do
+        local element_value = allocated_integer_series:get(row_index)
+        if element_value ~= nil and not first_seen[element_value] then first_seen[element_value] = row_index end
     end
     local prev_first = 0
-    for i = 1, u:len() do
-        local v = u:get(i)
-        if v ~= nil then
-            check(first_seen[v] > prev_first, "unique: ordem de aparição violada idx " .. i)
-            prev_first = first_seen[v]
+    for row_index = 1, unique_values:len() do
+        local element_value = unique_values:get(row_index)
+        if element_value ~= nil then
+            check(first_seen[element_value] > prev_first, "unique: ordem de aparição violada idx " .. row_index)
+            prev_first = first_seen[element_value]
         end
     end
 end
 
 -- INV-U2: value_counts: sum(count) == count_nonnull(s)
-PROPERTIES["value_counts_soma"] = function()
-    local n = math.random(2, 30)
-    local s = S.new("int64", n)
-    for i = 1, n do
-        if math.random() < 0.2 then s:set_null(i)
-        else s:set(i, math.random(1, 5)) end
+properties["value_counts_soma"] = function()
+    local element_count = math.random(2, 30)
+    local allocated_integer_series = smaug.Series.new("int64", element_count)
+    for row_index = 1, element_count do
+        if math.random() < 0.2 then allocated_integer_series:set_null(row_index)
+        else allocated_integer_series:set(row_index, math.random(1, 5)) end
     end
-    local vc   = s:value_counts()
-    local soma = 0
-    for i = 1, vc:nrows() do soma = soma + vc:col("count"):get(i) end
-    check(soma == s:count_nonnull(), "value_counts soma: " .. soma .. " ≠ " .. s:count_nonnull())
+    local value_counts   = allocated_integer_series:value_counts()
+    local total_sum = 0
+    for row_index = 1, value_counts:nrows() do total_sum = total_sum + value_counts:col("count"):get(row_index) end
+    check(total_sum == allocated_integer_series:count_nonnull(), "value_counts soma: " .. total_sum .. " ≠ " .. allocated_integer_series:count_nonnull())
 end
 
 -- INV-CS1: diff(cumsum(s)) == s (para séries sem NA)
-PROPERTIES["diff_cumsum_identidade"] = function()
-    local n = math.random(2, 30)
-    local s = S.new("int64", n)
-    for i = 1, n do s:set(i, math.random(-100, 100)) end
-    local back = s:cumsum():diff()
+properties["diff_cumsum_identidade"] = function()
+    local element_count = math.random(2, 30)
+    local allocated_integer_series = smaug.Series.new("int64", element_count)
+    for row_index = 1, element_count do allocated_integer_series:set(row_index, math.random(-100, 100)) end
+    local diff_result = allocated_integer_series:cumsum():diff()
     -- primeiros periods=1 são NA; do 2 em diante deve bater
-    for i = 2, n do
-        check(back:get(i) == s:get(i), "diff(cumsum) ≠ s no idx " .. i)
+    for row_index = 2, element_count do
+        check(diff_result:get(row_index) == allocated_integer_series:get(row_index), "diff(cumsum) ≠ s no idx " .. row_index)
     end
-    check(back:is_null(1), "diff(cumsum): idx 1 deve ser NA")
+    check(diff_result:is_null(1), "diff(cumsum): idx 1 deve ser NA")
 end
 
 -- INV-R1: rolling(w):sum() == manual (sem NA)
-PROPERTIES["rolling_sum_manual"] = function()
-    local n = math.random(3, 20)
-    local w = math.random(2, n)
-    local s = S.new("int64", n)
-    for i = 1, n do s:set(i, math.random(1, 100)) end
-    local r = s:rolling(w):sum()
-    for i = 1, n do
-        if i < w then
-            check(r:is_null(i), "rolling sum: idx " .. i .. " deveria ser NA")
+properties["rolling_sum_manual"] = function()
+    local element_count = math.random(3, 20)
+    local window_size = math.random(2, element_count)
+    local allocated_integer_series = smaug.Series.new("int64", element_count)
+    for row_index = 1, element_count do allocated_integer_series:set(row_index, math.random(1, 100)) end
+    local sum_result = allocated_integer_series:rolling(window_size):sum()
+    for row_index = 1, element_count do
+        if row_index < window_size then
+            check(sum_result:is_null(row_index), "rolling sum: idx " .. row_index .. " deveria ser NA")
         else
             local expected = 0
-            for j = i - w + 1, i do expected = expected + s:get(j) end
-            check(r:get(i) == expected, "rolling sum: idx " .. i .. " difere")
+            for window_index = row_index - window_size + 1, row_index do expected = expected + allocated_integer_series:get(window_index) end
+            check(sum_result:get(row_index) == expected, "rolling sum: idx " .. row_index .. " difere")
         end
     end
 end
@@ -541,17 +538,17 @@ local order = {
     "diff_cumsum_identidade", "rolling_sum_manual",
 }
 
-for _, name in ipairs(order) do
-    local prop = PROPERTIES[name]
-    for _, seed in ipairs(SEEDS) do
-        cur_seed = seed
+for unused_index, name in ipairs(order) do
+    local property_test = properties[name]
+    for unused_index_2, seed in ipairs(random_seeds) do
+        current_seed = seed
         math.randomseed(seed)
-        for caso = 1, N_PER_SEED do
-            cur_case = caso
-            prop()
+        for case_index = 1, cases_per_seed do
+            current_case = case_index
+            property_test()
         end
     end
 end
 
 print(string.format("OK — %d invariantes × %d seeds × %d casos = %d checks (property-based)",
-      #order, #SEEDS, N_PER_SEED, n_checks))
+      #order, #random_seeds, cases_per_seed, passed_checks))

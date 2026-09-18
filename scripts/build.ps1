@@ -8,9 +8,9 @@
 #      procura no Windows).
 #   3. Compila e roda os testes em C de tests\c\ (test_alloc, test_ops,
 #      test_ops_edge, test_bool, test_bool_lifecycle, test_string, test_cow,
-#      test_io_c, test_datetime_c, test_ops_window; test_allocfail com
+#      test_io_c, test_datetime_c, test_ops_window, test_astype; test_allocfail com
 #      -Wl,--wrap; e test_stress com N grande).
-#   4. Roda as 18 suites Lua com luajit (series/, dataset/, io/, props/).
+#   4. Roda as 20 suites Lua com luajit (core/, series/, dataset/, io/, props/).
 #   5. Regenera o MANIFEST.txt (make manifest equivalente).
 #
 # Uso (a partir da raiz do projeto):
@@ -122,7 +122,7 @@ Write-Host "== Compilando build\smaug.dll ==" -ForegroundColor Cyan
 if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar a DLL." }
 Write-Host "OK -> build\smaug.dll" -ForegroundColor Green
 
-$cTests      = @("test_alloc", "test_ops", "test_ops_edge", "test_bool", "test_bool_lifecycle", "test_string", "test_cow", "test_io_c", "test_datetime_c", "test_ops_window")
+$cTests      = @("test_alloc", "test_ops", "test_ops_edge", "test_bool", "test_bool_lifecycle", "test_string", "test_cow", "test_io_c", "test_datetime_c", "test_ops_window", "test_astype")
 $cTestsWrap  = @("test_allocfail")
 $cTestsStress = @("test_stress")
 $allPass = $true

@@ -21,7 +21,7 @@
 
 package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 
-local smaug  = require("smaug")
+local smaug = require("smaug")
 
 local passed_checks = 0
 local function check(condition, message)

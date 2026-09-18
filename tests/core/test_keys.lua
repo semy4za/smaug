@@ -6,7 +6,7 @@
 package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 
 local ffi    = require("ffi")
-local smaug  = require("smaug")
+local smaug = require("smaug")
 local keys   = require("smaug.core.keys")
 
 local passed_checks = 0
