@@ -1,128 +1,39 @@
-# API_INDEX — catálogo do que já existe
+# Referência da API — Lua
 
-**Propósito:** inventário de tudo que está implementado. Antes de criar
-qualquer função/método novo, consulte aqui se já não existe. É a defesa contra
-reimplementação e deriva.
+[Início](README.md) · [Primeiros passos](GETTING_STARTED.md) · [Guia do usuário](USER_GUIDE.md) · [API Reference: Lua](API_INDEX.md) | [Núcleo C](API_Reference.md)
 
-**Como manter:** atualizar a cada função/método adicionado ou removido.
+<details>
+<summary>Nesta página</summary>
 
-> Convenção: `<t>` = `f64` ou `i64`. Índices em C são 0-based; no Lua, 1-based.
+- [Objetos e funções Lua](#section-camada-lua-frontend-lua-smaug)
+  - [Series](#section--series-core-series)
+  - [.str — proxy de operações sobre Series string](#section--str-proxy-de-operacoes-sobre-series-string)
+  - [.dt — proxy de operações de calendário sobre Series datetime](#section--dt-proxy-de-operacoes-de-calendario-sobre-series-datetime)
+  - [Datetime — evolução da API Lua](#section-datetime-migracao-lua)
+  - [Métodos exclusivos de Series<bool>](#section-metodos-exclusivos-de-series-bool)
+  - [CategoricalSeries](#section--categoricalseries-core-series-categorical-categorical-lua)
+  - [.cat — proxy de operações sobre Series categorical](#section--cat-proxy-de-operacoes-sobre-series-categorical)
+  - [DataSet](#section--dataset-core-dataset)
+  - [Funções do módulo smaug](#section-entry-point-init-lua)
+- [Próximas versões](#section-proximas-versoes)
 
-> **Contrato de status (`smaug_types.h`):** `smaug_status_t` =
-> `SMG_OK (0)` / `SMG_NULL_VALUE` / `SMG_ERR_OOB` / `SMG_ERR_ARGUMENT` /
-> `SMG_ERR_NOMEM`. O engine valida e comunica — não confia que o caller validou.
+</details>
 
----
+Esta página documenta os objetos, métodos e funções usados em Lua.
+Para tipos, headers, status e funções C, consulte a
+[referência do Núcleo C](API_Reference.md).
 
-## Camada C — backend (`include/*.h`, `src/*.c`)
+Índices Lua começam em 1. Use `smaug.Series(...)` e `smaug.DataSet(...)`
+para construir dados, ponto para funções de módulo e dois-pontos para métodos.
+O [guia do usuário](USER_GUIDE.md) explica os conceitos por assunto.
 
-### Lifecycle e acesso (`smaug_core.h`)
+<a id="section-camada-lua-frontend-lua-smaug"></a>
 
-| Função | O que faz |
-|--------|-----------|
-| `smaug_<t>_create(size)` | cria série de `size` elementos, todos NULL |
-| `smaug_<t>_create_with_capacity(size, cap)` | cria com capacidade pré-alocada |
-| `smaug_<t>_create_from_array(arr, len)` | cria a partir de array C, tudo válido |
-| `smaug_<t>_free(s)` | libera a série (NULL-safe) |
-| `smaug_<t>_clone(s)` | cópia profunda independente |
-| `smaug_<t>_view(s, start, len)` | view zero-copy; COW na primeira mutação |
-| `smaug_<t>_get(s, idx, status)` | lê valor + `smaug_status_t*` anulável |
-| `smaug_<t>_set(s, idx, val)` | grava valor → `smaug_status_t`; COW detach se view |
-| `smaug_<t>_set_null(s, idx)` | marca posição como NULL → `smaug_status_t` |
-| `smaug_<t>_is_null(s, idx)` | testa se posição é NULL |
-| `smaug_<t>_append(s, val)` | adiciona ao fim; COW detach se view |
-| `smaug_<t>_append_null(s)` | adiciona NULL ao fim |
-| `smaug_free(ptr)` | libera buffers crus (compare/argsort/bool) — usar SEMPRE esta |
+## Objetos e funções Lua
 
-### Aritmética (`smaug_numeric.h`)
+<a id="section--series-core-series"></a>
 
-| Função | O que faz |
-|--------|-----------|
-| `smaug_<t>_add/sub/mul/div(a, b)` | aritmética série×série (propaga NA) |
-| `smaug_<t>_add/sub/mul/div_scalar(a, k)` | aritmética série×escalar |
-
-`div/0 → null` em f64 e i64. `NaN` só existe como valor presente em f64.
-
-### Reduções (`smaug_numeric.h`)
-
-| Função | Retorno |
-|--------|---------|
-| `smaug_<t>_sum(s, ignore_na)` | f64→double, i64→int64 |
-| `smaug_<t>_mean(s, ignore_na)` | double |
-| `smaug_<t>_min/max(s, ignore_na)` | f64→double, i64→int64, dt→int64 (epoch), bool→uint8+status, str→ptr+len |
-| `smaug_<t>_var/std(s, ignore_na)` | double, amostral (÷ N-1; <2 → NaN) |
-| `smaug_<t>_count_nonnull(s)` | size_t |
-
-### Comparações e ordenação (`smaug_numeric.h`)
-
-| Função | O que faz |
-|--------|-----------|
-| `smaug_<t>_gt/lt/eq/ge/le/ne(s, k, &out_mask)` | → bool array (uint8_t*); liberar c/ `smaug_free` |
-| `smaug_<t>_argsort(s, asc)` | → size_t* (permutação); NULL se há nulos |
-| `smaug_<t>_sort(s, asc)` | → nova série ordenada; NULL se há nulos |
-| `smaug_<t>_take(s, idx, len)` | → nova série com os índices dados |
-| `smaug_<t>_filter(s, mask)` | → nova série onde mask é true |
-
-### Booleano / Kleene (`smaug_bool.h`)
-
-| Função | O que faz |
-|--------|-----------|
-| `smaug_bool_and/or/xor(a, am, b, bm, n, &out)` | lógica de 3 valores |
-| `smaug_bool_not(a, am, n, &out)` | negação Kleene |
-| `smaug_bool_count_true(a, am, n)` | conta trues (NA ignorado) |
-| `smaug_bool_eq/ne(s, threshold, &out_mask)` | comparação com escalar → máscara (NA preservado) |
-| `smaug_bool_any/all(a, am, n)` | agregações (NA ignorado) |
-
-### String (`smaug_string.h`)
-
-Representação offset-based (buffer de bytes + array de offsets). String vazia `""` ≠ NULL.
-
-| Função | O que faz |
-|--------|-----------|
-| `smaug_str_create(size)` | cria série de `size` strings, todas NULL |
-| `smaug_str_create_with_capacity(size, buf_cap)` | cria com buffer pré-alocado |
-| `smaug_str_create_from_array(arr, len)` | cria de `char*` array |
-| `smaug_str_free(s)` | libera (NULL-safe) |
-| `smaug_str_clone(s)` | cópia profunda independente |
-| `smaug_str_get(s, idx, &out_len)` | → ponteiro p/ bytes + comprimento (sem `\0`) |
-| `smaug_str_set(s, idx, str, len)` | grava (realoca buffer via memmove) |
-| `smaug_str_set_null(s, idx)` / `smaug_str_is_null(s, idx)` | nulos |
-| `smaug_str_append(s, str, len)` / `smaug_str_append_null(s)` | adiciona ao fim |
-| `smaug_str_count_nonnull(s)` | size_t |
-| `smaug_str_eq/lt/gt(s, target, target_len, &out_mask)` | → bool array; lexicográfico por bytes |
-| `smaug_str_filter(s, mask)` | → nova série onde mask é true |
-| `smaug_str_take(s, idx, len)` | → nova série com os índices dados |
-| `smaug_str_argsort(s, asc)` | → size_t* (permutação); NULL se há nulos |
-| `smaug_str_sort(s, asc)` | → nova série ordenada |
-
-### I/O — Anel 3 (`smaug_io.h`)
-
-Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
-(checar `->error` antes de usar). Liberar com `smaug_table_free`.
-
-| Função | O que faz |
-|--------|-----------|
-| `smaug_table_free(t)` | libera tabela e todos os recursos (NULL-safe) |
-| `smaug_csv_default_opts()` | opções padrão: sep=`,` header=1 quote=`"` |
-| `smaug_read_csv(path, opts)` | lê CSV de arquivo → `smaug_table_t*` |
-| `smaug_read_csv_mem(buf, len, opts)` | lê CSV de buffer em memória |
-| `smaug_write_csv(path, t, opts)` | escreve CSV em arquivo (0=ok, -1=erro) |
-| `smaug_write_csv_mem(t, opts, &len)` | escreve CSV em buffer alocado; liberar c/ `smaug_free` |
-| `smaug_read_json(path)` | lê JSON de arquivo (array de records) |
-| `smaug_read_json_mem(buf, len)` | lê JSON de buffer em memória |
-| `smaug_write_json(path, t, opts)` | escreve JSON em arquivo |
-| `smaug_write_json_mem(t, opts, &len)` | escreve JSON em buffer alocado |
-
-### Tipos (`smaug_types.h`)
-
-`smaug_mask_t`, `smaug_metadata_t`, `smaug_series_f64_t`, `smaug_series_i64_t`,
-`smaug_series_bool_t`, `smaug_series_str_t`, `smaug_column_t`, `smaug_table_t`.
-
----
-
-## Camada Lua — frontend (`lua/smaug/`)
-
-### `Series` (`core/series/`)
+### `Series`
 
 **Factories:** `Series.new(dtype, size, name)`, `Series.from_table(arr, dtype, name)`,
 `Series.full(n, val)`. `Series.NA` (sentinela de nulo em tabelas).
@@ -268,7 +179,7 @@ Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
 | `:cummin()` / `:cummax()` | mínimo/máximo cumulativo; suporta f64, i64 e datetime |
 | `:diff([periods])` | diferença entre elemento i e i-periods; em datetime retorna `Series<int64>` (ms) |
 | `:shift([periods])` | desloca valores |
-| `:rolling(w):sum/mean/min/max/std/var/count/median/quantile()` ; `:min_periods(p)` | agregação em janela (Ring 0 C; median/quantile em Lua). `min_periods(p)`: emite com >= p não-nulos (janelas parciais); sem ele, exige janela cheia |
+| `:rolling(w):sum/mean/min/max/std/var/count/median/quantile()` ; `:min_periods(p)` | agregação em janela `min_periods(p)`: emite com >= p não-nulos (janelas parciais); sem ele, exige janela cheia |
 | `:expanding([min_periods]):sum/mean/min/max/std/var/count/median()` | janela crescente |
 
 **Matemática vetorizada (resultado sempre float64):**
@@ -288,6 +199,8 @@ mistura com não-numérico (bool/string/datetime) é erro. `/` é **divisão ver
 | `:floordiv(outra)` | divisão inteira truncada → `int64` (`7//2 = 3`); exige int64; `/0` → null |
 
 **Operadores bool** (só em `Series<bool>`): `*`=and, `+`=or, `-`=xor.
+
+<a id="section--str-proxy-de-operacoes-sobre-series-string"></a>
 
 ### `.str` — proxy de operações sobre Series string
 
@@ -325,6 +238,8 @@ mistura com não-numérico (bool/string/datetime) é erro. `/` é **divisão ver
 | `.str:title()` | inicial de cada palavra maiúscula (palavra = letras ASCII) |
 | `.str:swapcase()` | inverte a caixa de cada letra ASCII |
 | `.str:join([sep])` | atalho de `:cat` — concatena não-nulos → string Lua |
+
+<a id="section--dt-proxy-de-operacoes-de-calendario-sobre-series-datetime"></a>
 
 ### `.dt` — proxy de operações de calendário sobre Series datetime
 
@@ -385,6 +300,53 @@ Disponível quando `s._dtype == "datetime"`. Erro claro em qualquer outro dtype.
 | `Series.dt_from_parts(y, m, d, [h], [mi], [s], [ms])` | constrói epoch_ms; `nil` se data inválida |
 | `Series.datetime(size, name)` | factory: `Series.new("datetime", size, name)` |
 
+<a id="section-datetime-migracao-lua"></a>
+
+### Datetime — evolução da API Lua
+
+As mudanças abaixo foram discutidas na revisão da suíte e ainda não foram
+implementadas. A API existente está descrita acima. O
+[contrato datetime](CONTRACT.md#section-perfil-datetime-decisoes-aprovadas-em-2026-09-18)
+e as [regras de detecção e diagnóstico](CONTRACT.md#section-deteccao-de-datas-e-diagnostico-decisoes-da-retomada)
+concentram as decisões normativas; esta seção registra o impacto no Lua.
+
+| Superfície | Mudança planejada |
+|---|---|
+| `.dt:year()` e outros componentes | Preservar o nome; ano negativo válido continua valor, NA original propaga e falha real gera erro orientado |
+| Inferência de strings em Series/DataSet | Examinar a coluna inteira; resolver uma única ordem compatível ou manter texto |
+| Conversão explícita para datetime | Erro por elemento inválido, ambíguo ou conflitante; não transformar falha em NA |
+| `.dt:format()` e conversão para string | Propagar falha de formatação; suportar a saída negativa canônica |
+| Predicados, nomes, `strftime`, `ceil` e `round` | Conferir falhas intermediárias e impedir sua conversão silenciosa em NA |
+| Diagnóstico `DATE_ON_THE_FENCE` | Mensagem aprovada com operação, coluna e posições baseadas em 1; até duas referências em conflito |
+
+**Ainda a decidir:** opção pública de ordem automática/dia-mês/mês-dia;
+comportamento dos helpers `dt_parse`, `dt_from_parts` e `dt_format` que
+hoje retornam nil em determinados erros; eventual conversão tolerante opt-in.
+Não confundir opção omitida com uma ordem explicitamente solicitada.
+
+**Integração interna Lua:**
+
+| Arquivo | Chamadas e impacto |
+|---|---|
+| `lua/smaug/core/series/temporal/_dt.lua` | 11 componentes em lote; predicados de início/fim, bissexto, dias no mês, nomes e strftime usam escalares; next_period usa from_parts legado; ceil/round podem produzir nil que dt_map converte em NA; helpers públicos misturam nil e status |
+| `lua/smaug/core/series/_types.lua` | Descritor datetime liga operações C; set/append de string chamam parse com dayfirst=0 fixo; atualizar fluxo de validação sem inferir por elemento |
+| `lua/smaug/core/series/access/_transform.lua` | Matriz de conversões; astype omite ordem como 0 e trata retorno como ponteiro; distinguir opção omitida de false explícito |
+| `lua/smaug/core/series/window/_cumulative.lua` | diff datetime chama diff_ms_checked; precisa acompanhar assinatura e mensagem |
+| `lua/smaug/core/series/stats/_stat.lua` | Formatação com char[26], retorno ignorado e ffi.string(buf, 25); retirar comprimento fixo incorreto |
+| `lua/smaug/core/series/_factories.lua` | Inferência de strings atualmente resulta em string; ponto de integração da detecção antes de construir/mutar série |
+| `lua/smaug/core/dataset/_core.lua`, `_io_support.lua` | Consomem inferência/construção de séries; manter nome da coluna no diagnóstico |
+| `lua/smaug/io/csv.lua` | Serialização de datetime via astype string; consumidores de leitura precisam de política de detecção coerente |
+| `lua/smaug/core/errors.lua` e helper `check_status` | Descrição de valores e tradução de status; precisam transportar posição/causa sem depender de analisar a frase |
+
+A integração de assinaturas e a posse da memória estão documentadas na
+[referência C](API_Reference.md#section-datetime-migracao-c).
+Verificar componentes e NA, conversão inválida no último elemento, evidência
+inequívoca no fim da coluna, ordens conflitantes e posições das mensagens.
+Suítes afetadas incluem `tests/series/test_dt.lua`, `test_constructors.lua`,
+`test_categorical.lua`, `test_stat.lua` e testes de entrada/saída.
+
+<a id="section-metodos-exclusivos-de-series-bool"></a>
+
 ### Métodos exclusivos de `Series<bool>`
 
 | Método | O que faz |
@@ -393,7 +355,9 @@ Disponível quando `s._dtype == "datetime"`. Erro claro em qualquer outro dtype.
 | `:land(b)` / `:lor(b)` / `:lxor(b)` / `:lnot()` | lógica Kleene |
 | `:describe()` | `{count, nulls, count_true, count_false}` |
 
-### `CategoricalSeries` (`core/series/categorical/_categorical.lua`)
+<a id="section--categoricalseries-core-series-categorical-categorical-lua"></a>
+
+### `CategoricalSeries`
 
 Dtype Tier 2 implementado em Lua puro (sem C backend). Armazenamento via
 dictionary encoding: `_codes` (int 1-based), `_levels` (lista ordenada),
@@ -442,6 +406,8 @@ com `nil` no meio (limitação do `#` do Lua).
 | `:astype(dtype)` | → `string`, `int64`, `float64` (parseia labels), ou clone categorical |
 | `:to_table([na])` | → tabela Lua |
 
+<a id="section--cat-proxy-de-operacoes-sobre-series-categorical"></a>
+
 ### `.cat` — proxy de operações sobre Series categorical
 
 | Método | O que faz |
@@ -453,7 +419,9 @@ com `nil` no meio (limitação do `#` do Lua).
 | `.cat:add_categories(lista)` | adiciona novos labels (idempotente) |
 | `.cat:remove_categories(lista)` | remove labels; referências viram null |
 
-### `DataSet` (`core/dataset/`)
+<a id="section--dataset-core-dataset"></a>
+
+### `DataSet`
 
 **Construção:** `DataSet.new(name)`, `smaug.DataSet({{nome, dados, dtype?}, ...})`.
 
@@ -515,7 +483,7 @@ mantém seu dtype de resultado). Erro se nenhuma coluna numérica.
 | `:isna()` / `:notna()` | máscara de nulidade por coluna (qualquer dtype) → DataSet bool |
 | `:astype({col=dtype})` | conversão por mapa; colunas fora do mapa inalteradas |
 
-**Operações relacionais (Anel 2):**
+**Operações relacionais:**
 
 | Método | O que faz |
 |--------|-----------|
@@ -542,9 +510,9 @@ mantém seu dtype de resultado). Erro se nenhuma coluna numérica.
 | `:melt(id_vars, [value_vars], [var_name], [value_name])` | wide → long |
 | `:stack(col_names)` / `:unstack(index, col, values)` | reshape eixo→linha / linha→eixo |
 | `:explode(col)` | uma linha por elemento da coluna-lista |
-| `:rolling(w):sum/mean/min/max/std/var/count(col)` | janela deslizante por coluna; `:min_periods(p)` antes do agregado p/ janelas parciais (delega à Series → Ring 0) |
+| `:rolling(w):sum/mean/min/max/std/var/count(col)` | janela deslizante por coluna; `:min_periods(p)` antes do agregado p/ janelas parciais |
 
-**I/O (Anel 3):**
+**Entrada e saída:**
 
 | Método | O que faz |
 |--------|-----------|
@@ -553,7 +521,9 @@ mantém seu dtype de resultado). Erro se nenhuma coluna numérica.
 | `:to_json(path, [opts])` | escreve JSON em arquivo |
 | `:to_json_mem([opts])` | → string Lua com o JSON |
 
-### Entry point (`init.lua`)
+<a id="section-entry-point-init-lua"></a>
+
+### Funções do módulo `smaug`
 
 ```lua
 local smaug = require("smaug")
@@ -574,6 +544,8 @@ smaug.join(a, b, on, [how], [suffixes])
 
 ---
 
+<a id="section-proximas-versoes"></a>
+
 ## Próximas versões
 
 Itens documentados em `Roadmap.md`:
@@ -591,3 +563,7 @@ Itens documentados em `Roadmap.md`:
 
 *ORM relacional, query builder e tradução SQL são **Fronteiras encerradas** (ver
 `Roadmap.md`), não itens de roadmap.*
+
+---
+
+[Continuar no guia do usuário](USER_GUIDE.md) · [Consultar a API](API_INDEX.md) · [Início da documentação](README.md)

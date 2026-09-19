@@ -1,16 +1,43 @@
 # Smaug — Roadmap
 
+[Início](README.md) · [Primeiros passos](GETTING_STARTED.md) · [Guia do usuário](USER_GUIDE.md) · [API Reference: Lua](API_INDEX.md) | [Núcleo C](API_Reference.md)
+
+<details>
+<summary>Nesta página</summary>
+
+- [Filosofia](#section-filosofia)
+- [Arquitetura em anéis](#section-arquitetura-em-aneis)
+- [Já entregue (fora da timeline)](#section-ja-entregue-fora-da-timeline)
+- [Índice do concluído](#section-indice-do-concluido)
+- [10. Completude de vetorização (Anel 0)  Fedora](#section-10-completude-de-vetorizacao-anel-0-fedora)
+- [12. Achados menores + débitos antigos  Windows+Fedora](#section-12-achados-menores-debitos-antigos-windows-fedora)
+- [13. Reescrita de exemplos + docstrings  Windows](#section-13-reescrita-de-exemplos-docstrings-windows)
+- [14. VERIFICAÇÃO PONTA A PONTA — porta de entrega  Fedora + Windows](#section-14-verificacao-ponta-a-ponta-porta-de-entrega-fedora-windows)
+  - [14.1 Motor (Anel 0) — leitura linha a linha do C](#section-14-1-motor-anel-0-leitura-linha-a-linha-do-c)
+  - [14.2 Anéis 1–3 — coerência de camada](#section-14-2-aneis-1-3-coerencia-de-camada)
+  - [14.3 Contratos e documentação — a doc descreve o que o código faz](#section-14-3-contratos-e-documentacao-a-doc-descreve-o-que-o-codigo-faz)
+  - [14.4 Verificação executável — as duas plataformas](#section-14-4-verificacao-executavel-as-duas-plataformas)
+  - [14.5 Superfície externa — o que falta para ser usável por terceiros](#section-14-5-superficie-externa-o-que-falta-para-ser-usavel-por-terceiros)
+  - [14.6 Critério de saída](#section-14-6-criterio-de-saida)
+- [15. RELEASE v1.0 (último)  Windows+Fedora](#section-15-release-v1-0-ultimo-windows-fedora)
+
+</details>
+
 **Decisão datetime — 2026-09-18:** aprovados anos completos de `-9999` a `9999`,
 inclusive, com ano zero; UTC quando o offset for omitido e aceitação de frações somente
 quando exatas em milissegundos. Entrada estrita rejeita perda; `astype` converte
 o elemento inconversível em NA. Contrato e critérios de verificação estão em
 `CONTRACT.md`, seção "Perfil datetime". Limites aplicados após normalização
-do offset para UTC. Implementação, validação desses limites e
+do offset para UTC. Anos negativos usam sinal menos e seis dígitos, somente
+ano primeiro e hífens; rejeitar `-000000`, formas abreviadas e segundo `:60`.
+Ano `-1` é valor válido: extração deve separar valor de status pelo padrão
+checked, preservando a saída em falha e `.dt:year()` no Lua.
+Implementação, validação desses limites e
 migração das APIs com sentinelas continuam pendentes; itens históricos abaixo
 não substituem essa decisão.
 
 > Alinhamento documental — 2026-09-18: `CONTRACT.md` define as garantias
-> vigentes; `TEST_SUITE_REWRITE_REVIEW.md` registra as lacunas de verificação.
+> vigentes; [parecer do rework](TEST_SUITE_REWRITE_REVIEW.md) registra as lacunas de verificação.
 > Entradas concluídas e medições abaixo são históricas, não certificação da
 > árvore atual. Em particular, a auditoria refutou exclusões de datetime e
 > reabriu a suficiência das verificações de OOM, parity e cobertura.
@@ -27,6 +54,8 @@ cada item. A descrição arquitetural permanente (Filosofia, Anéis) fica antes 
 timeline.
 
 ---
+
+<a id="section-filosofia"></a>
 
 ## Filosofia
 
@@ -50,6 +79,8 @@ As duas camadas se complementam; nenhuma substitui a outra.
 
 ---
 
+<a id="section-arquitetura-em-aneis"></a>
+
 ## Arquitetura em anéis
 
 O projeto cresce de dentro pra fora. Um anel só expande quando o interior está
@@ -67,6 +98,8 @@ diagrama, regra de decisão e régua de versões.
 
 ---
 
+<a id="section-ja-entregue-fora-da-timeline"></a>
+
 ## Já entregue (fora da timeline)
 
 Resumo enxuto — detalhe histórico no apêndice e no `CHANGELOG`.
@@ -83,6 +116,8 @@ Resumo enxuto — detalhe histórico no apêndice e no `CHANGELOG`.
 ---
 
 ---
+
+<a id="section-indice-do-concluido"></a>
 
 ## Índice do concluído
 
@@ -223,6 +258,8 @@ Legenda de ambiente:
 - **[Windows+Fedora]** toca os dois (C + Lua).
 
 ---
+
+<a id="section-10-completude-de-vetorizacao-anel-0-fedora"></a>
 
 ## 10. Completude de vetorização (Anel 0)  [Fedora]
 
@@ -384,6 +421,8 @@ correto — delegar ao descritor → C — já existe. Subitens 10.5 a 10.9 fech
     remover só quando o último sair, como foi feito com o degrau no 10.3.
   - Vínculo: 12.4; 10.5 Passo A (o `keys.value` permanece; o `encode` é que
     tende a sair).
+<a id="section-12-achados-menores-debitos-antigos-windows-fedora"></a>
+
 ## 12. Achados menores + débitos antigos  [Windows+Fedora]
 
 Vinte e quatro subitens já fecharam (ver índice acima). Restam:
@@ -770,12 +809,16 @@ Vinte e quatro subitens já fecharam (ver índice acima). Restam:
      núcleo único + teste de invariante, em vez de cinco cópias que por acaso
      concordam); 10.2 fatia 2 (`str_between` já consome o núcleo); 12.19
      (listas mantidas à mão).
+<a id="section-13-reescrita-de-exemplos-docstrings-windows"></a>
+
 ## 13. Reescrita de exemplos + docstrings  [Windows]
 
 Doc reflete a API depois que ela para de mudar (itens 1–12).
 
 - 13.1 exemplos README/API_INDEX → forma oficial `smaug.Series({...})`
 - 13.2 docstrings nos métodos públicos de Series e DataSet
+
+<a id="section-14-verificacao-ponta-a-ponta-porta-de-entrega-fedora-windows"></a>
 
 ## 14. VERIFICAÇÃO PONTA A PONTA — porta de entrega  [Fedora + Windows]
 
@@ -785,6 +828,8 @@ O item que decide se o projeto **pode ser entregue**. Não é uma revisão de c�
 
 Cinco frentes. As três primeiras verificam o que existe; as duas últimas
 verificam o que falta para alguém **de fora** conseguir usar.
+
+<a id="section-14-1-motor-anel-0-leitura-linha-a-linha-do-c"></a>
 
 ### 14.1 Motor (Anel 0) — leitura linha a linha do C
 
@@ -805,6 +850,8 @@ que ninguém pensou em testar. Um arquivo por vez, com estas lentes:
 - **Convenções divergentes entre dtypes** para a mesma operação lógica: alocação
   de máscara (dt sempre × f64/i64 condicional), `malloc(0)` vs `malloc(size?:1)`.
 
+<a id="section-14-2-aneis-1-3-coerencia-de-camada"></a>
+
 ### 14.2 Anéis 1–3 — coerência de camada
 
 - Nenhum loop element-wise sobre FFI sobrou no Anel 1 (é o item 10 fechado de fato).
@@ -813,6 +860,8 @@ que ninguém pensou em testar. Um arquivo por vez, com estas lentes:
   guard cru sobrevivendo ao lado deles.
 - Paridade Series ↔ DataSet ↔ CategoricalSeries: o que existe num existe nos
   outros, ou a exceção está registrada em `exceptions.txt`.
+
+<a id="section-14-3-contratos-e-documentacao-a-doc-descreve-o-que-o-codigo-faz"></a>
 
 ### 14.3 Contratos e documentação — a doc descreve o que o código faz
 
@@ -831,6 +880,8 @@ com o eixo verde.
   vencida.
 - `CHANGELOG` com entrada para cada sessão; `Roadmap` sem item fantasma.
 
+<a id="section-14-4-verificacao-executavel-as-duas-plataformas"></a>
+
 ### 14.4 Verificação executável — as duas plataformas
 
 - **Fedora:** `build.sh --all` verde, Valgrind 0 erros em todos os binários,
@@ -844,6 +895,8 @@ com o eixo verde.
   Fedora 12 (falta `test_astype` na lista do `build.ps1`).
 - MANIFEST idêntico nas duas plataformas para a mesma árvore (12.32), com
   procedência apontando o commit certo.
+
+<a id="section-14-5-superficie-externa-o-que-falta-para-ser-usavel-por-terceiros"></a>
 
 ### 14.5 Superfície externa — o que falta para ser usável por terceiros
 
@@ -868,12 +921,16 @@ estes pontos o projeto é excelente e inutilizável por quem não é o autor.
   justifica por coerência arquitetural, não por número. Uma fundação de pipeline
   precisa poder afirmar performance.
 
+<a id="section-14-6-criterio-de-saida"></a>
+
 ### 14.6 Critério de saída
 
 A timeline zera — e a v1.0 ganha o direito de existir — somente se 14.1 a 14.4
 não acharem inconsistência nova **e** 14.5 estiver resolvido ou explicitamente
 adiado com justificativa registrada.
 
+
+<a id="section-15-release-v1-0-ultimo-windows-fedora"></a>
 
 ## 15. RELEASE v1.0 (último)  [Windows+Fedora]
 
@@ -900,3 +957,7 @@ adiado com justificativa registrada.
 - **Frentes diferidas** — `replace({de=para})`, índice/MultiIndex, plotting,
   tipos extras (float32, int32/16/8). Só se caso real justificar.
   (`sum(min_count)` subiu para a timeline, item 5.5.)
+
+---
+
+[Referência do Núcleo C](API_Reference.md) · [Rework da suíte](TEST_SUITE_REWORK.md) · [Início da documentação](README.md)

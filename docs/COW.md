@@ -1,10 +1,29 @@
 # Views e Copy-on-Write
 
+[Início](README.md) · [Primeiros passos](GETTING_STARTED.md) · [Guia do usuário](USER_GUIDE.md) · [API Reference: Lua](API_INDEX.md) | [Núcleo C](API_Reference.md)
+
+<details>
+<summary>Nesta página</summary>
+
+- [Criar uma view de tipo fixo é O(1)](#section-criar-uma-view-de-tipo-fixo-e-o-1)
+- [Leitura reflete o pai](#section-leitura-reflete-o-pai)
+- [Primeira escrita dispara o detach](#section-primeira-escrita-dispara-o-detach)
+- [Views de views](#section-views-de-views)
+- [Falha segura no detach (OOM)](#section-falha-segura-no-detach-oom)
+- [O que dispara o detach](#section-o-que-dispara-o-detach)
+- [O que NÃO dispara o detach](#section-o-que-nao-dispara-o-detach)
+- [Tipos suportados](#section-tipos-suportados)
+- [Resumo do contrato](#section-resumo-do-contrato)
+
+</details>
+
 Uma view é uma janela sobre uma faixa de elementos de uma série.
 Compartilha o buffer do pai até a primeira escrita — aí materializa um buffer
 privado automaticamente. O pai nunca é tocado.
 
 ---
+
+<a id="section-criar-uma-view-de-tipo-fixo-e-o-1"></a>
 
 ## Criar uma view de tipo fixo é O(1)
 
@@ -29,6 +48,8 @@ Neste exemplo numérico, nenhum dado é copiado; apenas a struct é alocada.
 String compartilha bytes e máscara, mas copia offsets: criação O(len).
 
 ---
+
+<a id="section-leitura-reflete-o-pai"></a>
 
 ## Leitura reflete o pai
 
@@ -55,6 +76,8 @@ na revisão da suíte; não se deve inferir garantia universal deste exemplo.
 
 ---
 
+<a id="section-primeira-escrita-dispara-o-detach"></a>
+
 ## Primeira escrita dispara o detach
 
 ```lua
@@ -79,6 +102,8 @@ O detach copia apenas a janela (3 elementos), não o pai inteiro (5 elementos).
 Escritas subsequentes vão direto ao buffer privado — sem nova cópia.
 
 ---
+
+<a id="section-views-de-views"></a>
 
 ## Views de views
 
@@ -108,6 +133,8 @@ O detach afeta apenas a view imediata. `v1` continua sendo view de `ds["vendas"]
 
 ---
 
+<a id="section-falha-segura-no-detach-oom"></a>
+
 ## Falha segura no detach (OOM)
 
 O detach aloca memória. O contrato de falha na API C é:
@@ -120,6 +147,8 @@ Em qualquer caso: pai intacto, view intacta, sistema consistente.
 
 ---
 
+<a id="section-o-que-dispara-o-detach"></a>
+
 ## O que dispara o detach
 
 | operação Lua | C |
@@ -129,6 +158,8 @@ Em qualquer caso: pai intacto, view intacta, sistema consistente.
 | `v:append(val)` | `smaug_f64_append` / `smaug_i64_append` / `smaug_dt_append` / `smaug_bool_append` |
 | `v:append(nil)` | `smaug_f64_append_null` / `smaug_i64_append_null` / `smaug_dt_append_null` / `smaug_bool_append_null` |
 
+<a id="section-o-que-nao-dispara-o-detach"></a>
+
 ## O que NÃO dispara o detach
 
 Leituras e operações que produzem novo objeto não disparam detach da origem:
@@ -136,6 +167,8 @@ Leituras e operações que produzem novo objeto não disparam detach da origem:
 `argsort`, comparações, aritméticas.
 
 ---
+
+<a id="section-tipos-suportados"></a>
 
 ## Tipos suportados
 
@@ -166,6 +199,8 @@ erro orientado.
 
 ---
 
+<a id="section-resumo-do-contrato"></a>
+
 ## Resumo do contrato
 
 1. Criar uma view de tipo fixo é O(1); string é O(len), com cópia de offsets.
@@ -176,3 +211,7 @@ erro orientado.
 5. Após o detach, a view é independente — o pai pode ser liberado sem afetar a view.
 6. Falha de OOM no detach é segura — operação retorna erro, sistema intacto.
 7. Todas as mutações respeitam este contrato uniformemente — sem exceções.
+
+---
+
+[Continuar no guia do usuário](USER_GUIDE.md) · [Consultar a API](API_INDEX.md) · [Início da documentação](README.md)

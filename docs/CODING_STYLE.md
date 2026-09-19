@@ -1,5 +1,17 @@
 # Convenções de escrita do Smaug
 
+[Início](README.md) · [Primeiros passos](GETTING_STARTED.md) · [Guia do usuário](USER_GUIDE.md) · [API Reference: Lua](API_INDEX.md) | [Núcleo C](API_Reference.md)
+
+<details>
+<summary>Nesta página</summary>
+
+- [Nomes](#section-nomes)
+- [Construção e chamadas Lua](#section-construcao-e-chamadas-lua)
+- [Testes](#section-testes)
+- [Checagem de regressões de estilo](#section-checagem-de-regressoes-de-estilo)
+
+</details>
+
 Estas regras se aplicam ao código, aos testes e aos exemplos novos ou revisados.
 A migração dos arquivos existentes é incremental; este documento não declara
 que toda a base já foi convertida.
@@ -12,6 +24,8 @@ Validação desta etapa no Windows (GCC/MinGW e LuaJIT): 13 suítes C e 20 suít
 Lua passaram, totalizando 450.104 verificações, com as mesmas contagens por
 arquivo da execução anterior à migração. Isso inclui stress e propriedades;
 não representa uma nova certificação de ausência de UB ou de vazamentos.
+
+<a id="section-nomes"></a>
 
 ## Nomes
 
@@ -26,6 +40,8 @@ não representa uma nova certificação de ausência de UB ou de vazamentos.
 - Nomes estabelecidos pela linguagem, FFI ou API, como `self`, `ffi`, `int64_t`,
   `__index`, `Series` e `DataSet`, conservam sua grafia. Literais de dados de
   uma letra, como a string `"a"`, não são nomes de variáveis.
+
+<a id="section-construcao-e-chamadas-lua"></a>
 
 ## Construção e chamadas Lua
 
@@ -64,6 +80,8 @@ local datetime_series = smaug.Series({"2026-01-01"}, "datetime")
 local year_series = datetime_series.dt:year()
 ```
 
+<a id="section-testes"></a>
+
 ## Testes
 
 - Nomeie os dados pelo cenário: `nullable_integer_series`, `all_null_series`,
@@ -75,6 +93,8 @@ local year_series = datetime_series.dt:year()
   campos da API ou dados de teste por substituição cega.
 - Ao migrar um arquivo, execute seus testes e confira que nenhum cenário ou
   verificação foi perdido.
+
+<a id="section-checagem-de-regressoes-de-estilo"></a>
 
 ## Checagem de regressões de estilo
 
@@ -90,3 +110,7 @@ da suíte. Construtores especializados permanecem nos testes dedicados às suas
 APIs; os geradores de propriedades também podem pré-alocar séries com tamanho
 calculado em tempo de execução. As demais fixtures preferem os construtores
 chamáveis.
+
+---
+
+[Referência do Núcleo C](API_Reference.md) · [Rework da suíte](TEST_SUITE_REWORK.md) · [Início da documentação](README.md)

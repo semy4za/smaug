@@ -1,14 +1,47 @@
 # Contrato Defensivo — Smaug
 
+[Início](README.md) · [Primeiros passos](GETTING_STARTED.md) · [Guia do usuário](USER_GUIDE.md) · [API Reference: Lua](API_INDEX.md) | [Núcleo C](API_Reference.md)
+
+<details>
+<summary>Nesta página</summary>
+
+- [Ring 1 — Frontend Lua](#section-ring-1-frontend-lua)
+  - [Contrato 1 — promoção segura; nunca narrowing ou adivinhação em silêncio](#section-contrato-1-promocao-segura-nunca-narrowing-ou-adivinhacao-em-silencio)
+  - [Contrato 2 — astype converte por elemento, tolerante a falha](#section-contrato-2-astype-converte-por-elemento-tolerante-a-falha)
+  - [Contrato 3 — fillna preserva o original e segue a validação de entrada](#section-contrato-3-fillna-preserva-o-original-e-segue-a-validacao-de-entrada)
+  - [Contrato 4 — DataSet nunca existe desalinhado](#section-contrato-4-dataset-nunca-existe-desalinhado)
+  - [Contrato 5 — BoolSeries é coluna de primeira classe](#section-contrato-5-boolseries-e-coluna-de-primeira-classe)
+  - [Contrato 6 — filter descarta NA na máscara](#section-contrato-6-filter-descarta-na-na-mascara)
+  - [Contrato 7 — índices são 1-based](#section-contrato-7-indices-sao-1-based)
+  - [Contrato 8 — NA em chave relacional é erro](#section-contrato-8-na-em-chave-relacional-e-erro)
+  - [Contrato 9 — não-finito é valor; ausência é null_mask](#section-contrato-9-nao-finito-e-valor-ausencia-e-null-mask)
+  - [Contrato 10 — guard de fronteira pública se testa; COV-EXCL-BR é para o inalcançável](#section-contrato-10-guard-de-fronteira-publica-se-testa-cov-excl-br-e-para-o-inalcancavel)
+  - [Contrato 11 — o Anel 0 é thread-safe (reentrante)](#section-contrato-11-o-anel-0-e-thread-safe-reentrante)
+- [Ring 0 — Backend C](#section-ring-0-backend-c)
+  - [Princípio: o engine não confia no caller](#section-principio-o-engine-nao-confia-no-caller)
+  - [Códigos de status](#section-codigos-de-status)
+  - [Perfil datetime — decisões aprovadas em 2026-09-18](#section-perfil-datetime-decisoes-aprovadas-em-2026-09-18)
+  - [Detecção de datas e diagnóstico — decisões da retomada](#section-deteccao-de-datas-e-diagnostico-decisoes-da-retomada)
+  - [Mutação pontual (set / set_null) — retorna smaug_status_t](#section-mutacao-pontual-set-set-null-retorna-smaug-status-t)
+  - [Append dinâmico (append / append_null) — retorna int (0 / -1)](#section-append-dinamico-append-append-null-retorna-int-0-1)
+  - [Leitura (get) — Shape 1: valor + status anulável](#section-leitura-get-shape-1-valor-status-anulavel)
+  - [Copy-on-Write em views](#section-copy-on-write-em-views)
+
+</details>
+
 Este documento especifica os contratos de comportamento do Ring 1 (frontend Lua)
 e do Ring 0 (backend C). Um contrato aqui significa: comportamento garantido,
 exigido, e que não muda sem decisão explícita e versionada. O contrato não
 certifica seu cumprimento: evidências e gaps estão em
-`TEST_SUITE_REWRITE_REVIEW.md`. Revisão documental: 2026-09-18.
+[parecer do rework](TEST_SUITE_REWRITE_REVIEW.md). Revisão documental: 2026-09-18.
 
 ---
 
+<a id="section-ring-1-frontend-lua"></a>
+
 ## Ring 1 — Frontend Lua
+
+<a id="section-contrato-1-promocao-segura-nunca-narrowing-ou-adivinhacao-em-silencio"></a>
 
 ### Contrato 1 — promoção segura; nunca narrowing ou adivinhação em silêncio
 
@@ -77,6 +110,8 @@ reconhecimento: `core/int_scalar.lua` (ver Roadmap 9.3).
 
 ---
 
+<a id="section-contrato-2-astype-converte-por-elemento-tolerante-a-falha"></a>
+
 ### Contrato 2 — `astype` converte por elemento, tolerante a falha
 
 ```lua
@@ -101,8 +136,9 @@ true
 3.0
 ```
 
-`astype` para `float64`/`int64`/`string`/`datetime` nunca lança erro por causa de
-um elemento individual. Elementos inconversíveis tornam-se `null` — a série inteira
+`astype` para `float64`/`int64`/`string` não lança erro por causa de
+um elemento individual. Para datetime, a nova conversão explícita é estrita;
+ver a seção de detecção de datas abaixo (implementação pendente). Elementos inconversíveis tornam-se `null` — a série inteira
 não é descartada por um dado ruim. Operações em lote são tolerantes a dados imperfeitos.
 
 **Exceção — `astype("bool")` a partir de numérico é estrito:** aceita só `0`/`1`;
@@ -110,6 +146,8 @@ qualquer outro valor lança erro que orienta para `:map(fn)`. A regra de truthin
 não é imposta silenciosamente — quem quer defini-la usa `map`.
 
 ---
+
+<a id="section-contrato-3-fillna-preserva-o-original-e-segue-a-validacao-de-entrada"></a>
 
 ### Contrato 3 — `fillna` preserva o original e segue a validação de entrada
 
@@ -148,6 +186,8 @@ string ISO em `fillna` continua pendência do Roadmap 12.16.
 
 ---
 
+<a id="section-contrato-4-dataset-nunca-existe-desalinhado"></a>
+
 ### Contrato 4 — `DataSet` nunca existe desalinhado
 
 ```lua
@@ -168,6 +208,8 @@ Toda coluna de um DataSet tem o mesmo número de linhas. Violação é erro
 imediato — não existe estado intermediário desalinhado.
 
 ---
+
+<a id="section-contrato-5-boolseries-e-coluna-de-primeira-classe"></a>
 
 ### Contrato 5 — `BoolSeries` é coluna de primeira classe
 
@@ -197,6 +239,8 @@ ser explícitos por operação. Gaps conhecidos não se tornam suporte por esta 
 
 ---
 
+<a id="section-contrato-6-filter-descarta-na-na-mascara"></a>
+
 ### Contrato 6 — `filter` descarta `NA` na máscara
 
 ```lua
@@ -225,6 +269,8 @@ SP
 
 ---
 
+<a id="section-contrato-7-indices-sao-1-based"></a>
+
 ### Contrato 7 — índices são 1-based
 
 ```lua
@@ -250,6 +296,8 @@ Toda API pública Lua usa índices 1-based (convenção Lua). A conversão
 0-based↔1-based é feita internamente — nunca exposta.
 
 ---
+
+<a id="section-contrato-8-na-em-chave-relacional-e-erro"></a>
 
 ### Contrato 8 — `NA` em chave relacional é erro
 
@@ -285,6 +333,8 @@ composta, `NA` em **qualquer** coluna da chave dispara, nomeando-a. A coluna de
 **valores** não é chave e pode conter `NA` normalmente.
 
 ---
+
+<a id="section-contrato-9-nao-finito-e-valor-ausencia-e-null-mask"></a>
 
 ### Contrato 9 — não-finito é valor; ausência é `null_mask`
 
@@ -334,6 +384,8 @@ Para avisar sem colapsar o Anel 0, o Anel 3 consulta
 `smaug_f64_count_nonfinite` antes de serializar — o C não tem canal de aviso, e
 o `warn` (`core/warn.lua`) é do Lua.
 
+<a id="section-contrato-10-guard-de-fronteira-publica-se-testa-cov-excl-br-e-para-o-inalcancavel"></a>
+
 ### Contrato 10 — guard de fronteira pública se testa; `COV-EXCL-BR` é para o inalcançável
 
 Decorre do princípio acima. Se o engine **não confia no caller**, todo guard de
@@ -349,7 +401,7 @@ gap de teste, não impossibilidade. Limites próximos de `SIZE_MAX` exigem prova
 de domínio e testes dos cálculos sem buffers fictícios ou alocações gigantes.
 Cada exclusão exige condição/ramo, evidência e decisão; não exclui a linha
 inteira. A cobertura bruta permanece visível. O inventário
-`TEST_SUITE_EXCLUSIONS_REVIEW.md` é triagem, não aprovação.
+[inventário de exclusões](TEST_SUITE_EXCLUSIONS_REVIEW.md) é triagem, não aprovação.
 
 **Justificativa não se copia entre dtypes.** Cada uma vale para o código que está
 embaixo dela — e o código diverge.
@@ -418,6 +470,8 @@ o teste produz proteção.
 > opcionais, e curto-circuito de `&&` onde nenhum teste falha pelo lado esquerdo.
 > Achá-los é barato com a implementação fresca e caro semanas depois.
 
+<a id="section-contrato-11-o-anel-0-e-thread-safe-reentrante"></a>
+
 ### Contrato 11 — o Anel 0 é thread-safe (reentrante)
 
 **O Smaug é thread-safe.** Toda função do backend C recebe o que precisa por
@@ -454,7 +508,11 @@ o `qsort` da libc não especifica o seu.
 
 ---
 
+<a id="section-ring-0-backend-c"></a>
+
 ## Ring 0 — Backend C
+
+<a id="section-principio-o-engine-nao-confia-no-caller"></a>
 
 ### Princípio: o engine não confia no caller
 
@@ -470,6 +528,8 @@ validou. Garantias incondicionais:
    não herdam uma garantia de status que sua assinatura não oferece.
 3. **Falha segura.** Em erro não há escrita parcial; leitura devolve sentinela
    documentada e o estado permanece consistente.
+
+<a id="section-codigos-de-status"></a>
 
 ### Códigos de status
 
@@ -492,15 +552,17 @@ enum não significa que todas as APIs já o propaguem: a migração precisa de
 mapa por operação, incluindo APIs legadas e intermediários. Divisão por zero
 tem contrato próprio e não muda implicitamente com esta decisão.
 
-**Decisões ainda abertas:** gramática completa de entrada para anos
-expandidos, migração das assinaturas com sentinela ambígua e garantias de
-lifetime/invalidação de views em mutações do pai. As três escolhas de datetime
-abaixo foram aprovadas; sua implementação e validação permanecem pendentes.
+**Decisões ainda abertas:** detalhes de migração das assinaturas com sentinela
+ambígua e garantias de lifetime/invalidação de views em mutações do pai.
+As escolhas de datetime abaixo foram aprovadas; sua implementação e validação
+permanecem pendentes.
 R02 e R05 registram contraexemplos; comportamento defeituoso não vira esperado.
+
+<a id="section-perfil-datetime-decisoes-aprovadas-em-2026-09-18"></a>
 
 ### Perfil datetime — decisões aprovadas em 2026-09-18
 
-Este perfil fixa as escolhas de domínio, offset omitido e precisão aprovadas
+Este perfil fixa as escolhas de domínio, representação e erro aprovadas
 pelo mantenedor. É contrato a implementar/verificar, não declaração de que o
 parser, formatter e todas as operações atuais já o cumprem.
 
@@ -513,8 +575,8 @@ parser, formatter e todas as operações atuais já o cumprem.
    Texto, construção por componentes e entrada por epoch devem respeitar o
    mesmo domínio. A validação do instante considera o offset normalizado para
    UTC; normalização ou operação que saia da faixa deve falhar explicitamente,
-   sem wrap nem saturação. Conversão tolerante por `astype` produz NA para o
-   elemento fora do domínio. Ano negativo válido é dado, não ausência ou erro.
+   sem wrap nem saturação. Conversão explícita por `astype` deve emitir erro
+   orientado para o elemento fora do domínio. Ano negativo válido é dado, não ausência ou erro.
 2. **Offset omitido significa UTC.** Uma entrada como
    `2026-09-18T14:30:00` representa o mesmo instante que
    `2026-09-18T14:30:00Z`. Data sem horário representa meia-noite UTC.
@@ -524,18 +586,44 @@ parser, formatter e todas as operações atuais já o cumprem.
    armazenamento continua sendo `int64` em milissegundos desde o Unix epoch.
    Fração `.123000` é aceita como 123 ms; `.123456` e `.000001` são rejeitadas
    na entrada estrita, sem truncamento ou arredondamento silencioso.
-   Em `astype("datetime")`, um elemento inconversível por perda de precisão
-   torna-se NA, conforme o Contrato 2; isso não transforma falhas de memória
-   ou de infraestrutura em dados ausentes. Arredondamento/truncamento explícito
+   Em `astype("datetime")`, perda de precisão deve gerar erro orientado;
+   falhas de memória ou de infraestrutura também não viram dados ausentes. Arredondamento/truncamento explícito
    poderá ser proposto separadamente.
+4. **Representação do ano:** anos de `0000` a `9999` usam quatro dígitos;
+   negativos usam sinal menos e seis dígitos, como `-000001` e `-009999`.
+   A nova forma negativa aceita somente ano primeiro e separadores de data
+   com hífens. Rejeitar `-000000`, ano abreviado como `-1` e sufixos BC/AC.
+   Preservar as conveniências existentes para datas positivas, mantendo saída
+   canônica: `YYYY-MM-DDTHH:mm:ss.sssZ` ou `-YYYYYY-MM-DDTHH:mm:ss.sssZ`.
+5. **Segundos de `00` a `59`:** rejeitar segundo intercalar `:60`, sem
+   normalização para o minuto seguinte. Os helpers Lua `dt_parse` e
+   `dt_from_parts` continuam retornando `nil` por entrada inválida;
+   conversão explícita por `astype` deve emitir erro por elemento inválido.
+6. **Valor separado do status:** `-1` é ano válido e não pode sinalizar erro
+   na extração. A API C deve seguir o padrão checked, preservando o parâmetro
+   de saída em falha. Assinatura aprovada na retomada, ainda não implementada:
+   `smaug_status_t smaug_dt_year(int64_t epoch_ms, int *out_year)`.
+   O nome público não terá sufixo `_checked`.
+   No Lua, manter `.dt:year()`: NA de entrada propaga, anos negativos válidos
+   permanecem valores e falhas reais seguem o canal de status/erro Lua.
+   Não converter um ano negativo em NA por um teste de sinal.
+
+**Migração ainda a fechar:** ver [evolução da API C](API_Reference.md#section-datetime-migracao-c)
+e [evolução da API Lua](API_INDEX.md#section-datetime-migracao-lua).
+Foram inventariadas extrações escalares, extrações de
+séries e consumidores C/FFI/Lua; definir assinaturas finais, códigos de status
+por falha e destino das funções legadas antes de alterá-las. A direção checked
+está aprovada; remoção, compatibilidade e cronograma das assinaturas antigas
+não estão decididos. Revisar também os outros componentes de calendário e
+todos os consumidores do formatter (inclusive astype e buffers no Lua), para
+comportar a saída negativa canônica e propagar falhas de formatação.
 
 **Referências de representação:** ISO 8601-1:2019, com emenda de 2022
 ([ISO](https://www.iso.org/standard/70907.html)), e RFC 3339 para intercâmbio
 de timestamps com ano de quatro dígitos
 ([RFC Editor](https://www.rfc-editor.org/info/rfc3339/)). O perfil Smaug não
-declara conformidade integral com essas normas. A gramática de anos expandidos
-e o tratamento de segundos intercalares precisam ser especificados antes dessa
-declaração; a aprovação das três escolhas não decide esses pontos adicionais.
+declara conformidade integral com essas normas. As escolhas de representação
+e segundos acima definem o perfil próprio da biblioteca.
 
 **Evidência exigida na reconstrução:** casos independentes para ano zero,
 anos negativos (incluindo `-1` e `-2`), bissextos e passagem de ano; equivalência
@@ -544,6 +632,82 @@ entre parser, componentes, epoch, formatação e conversão tolerante. Testar am
 os limites inclusivos, um milissegundo fora de cada um e offsets que cruzem
 essas fronteiras. A colisão da sentinela
 `-1` deve ser eliminada por canal de erro distinto, com migração explícita da API.
+Incluir rejeição das grafias negativas proibidas e de `:60`, preservação de
+`out` em falha checked e distinção entre ano `-1` e NA em uma mesma série.
+Preservar a regressão R02: `2023-01-01` pertence à semana ISO 52, sem aceitar
+52 ou 53 como resultados equivalentes.
+
+<a id="section-deteccao-de-datas-e-diagnostico-decisoes-da-retomada"></a>
+
+### Detecção de datas e diagnóstico — decisões da retomada
+
+Contrato aprovado para implementação futura. Mapear APIs e consumidores antes
+de alterar código. A inferência atual de strings no construtor Lua não realiza
+esta detecção de datetime.
+
+- Validar todos os valores não nulos da coluna antes de concluir a conversão.
+  Uma amostra ou prefixo válido não basta para aprovar o restante.
+- Aplicar uma única ordem dia/mês ou mês/dia aos formatos com ano no fim.
+  Uma entrada inequívoca, como `13/02/2026`, pode determinar dia/mês para a
+  coluna, desde que todos os demais valores sejam compatíveis. Assim,
+  `03/04/2026` na mesma coluna significa 3 de abril.
+- Não trocar a ordem por elemento para aceitar entradas conflitantes:
+  `13/02/2026` e `02/13/2026` não admitem uma ordem comum. Formatos com ano
+  primeiro, como `2026-02-13`, podem coexistir com os demais sem impor uma
+  ordem dia/mês. Aparência idêntica não é exigida.
+- Sem configuração explícita ou evidência que resolva a ordem, datas como
+  `03/04/2026` e `05/06/2026` permanecem ambíguas.
+- Na inferência automática, ambiguidade ou valor incompatível mantém a coluna
+  como texto, preservando os valores. Não fabricar NA para concluir a detecção.
+- Na conversão explicitamente solicitada para datetime, valor inválido ou
+  ambíguo gera erro orientado, sem entregar resultado parcial ou transformar
+  falha em NA. NA já presente na entrada continua sendo ausência.
+
+**Diagnóstico dedicado:** `DATE_ON_THE_FENCE`, com a mensagem
+`smaug error - there's a date on the fence`. Identifica ambiguidade de ordem
+ou conflito de ordens entre elementos. Incluir operação, nome da coluna quando
+disponível, índice baseado em 1, valor e orientação para corrigir a entrada ou
+especificar a ordem. Em conflito, apresentar as duas ocorrências que exigem
+ordens incompatíveis. Em Series sem nome, o índice identifica o elemento.
+Arquivo e linha física são incluídos somente quando a origem estiver disponível;
+não confundir índice da linha de dados com linha física de CSV.
+
+Exemplo de diagnóstico na conversão explícita (formato ilustrativo):
+
+```text
+smaug error - there's a date on the fence
+code: DATE_ON_THE_FENCE
+operation: astype("datetime")
+column: "data_pedido"
+row: 7
+value: "03/04/2026"
+
+Could mean 3 April 2026 or 4 March 2026.
+Specify day/month or month/day.
+```
+
+Uma data impossível como `31/02/2026` exige diagnóstico de data inválida,
+não `DATE_ON_THE_FENCE`. O identificador dedicado não implica adicionar um
+novo membro ao enum C: mapear sua representação e transporte C/FFI/Lua no
+trabalho de erros, reaproveitando `SMG_ERR_ARGUMENT` para entrada inválida e
+`SMG_ERR_OVERFLOW` para resultado fora da faixa.
+
+**Atualização da política anterior:** conversão explícita para datetime passa
+a exigir erro por entrada inválida ou ambígua. As menções anteriores deste
+documento a `astype` tolerante descrevem a política anterior; não autorizam NA
+silencioso na nova conversão explícita. A existência e a forma de um modo
+tolerante opt-in, assim como a relação com helpers que retornam `nil`, devem
+ser fechadas na [referência Lua](API_INDEX.md#section-datetime-migracao-lua)
+antes da implementação.
+
+**Verificação exigida:** coluna ambígua inteira; evidência inequívoca no início
+e no fim; ordens conflitantes; data impossível; formatos com ano primeiro
+misturados com ano no fim; NA preexistente; configuração explícita de ordem;
+referências corretas do diagnóstico; preservação integral do texto quando a
+inferência não concluir datetime. Verificar a detecção sem gerar expectativas
+com o próprio parser sob teste.
+
+<a id="section-mutacao-pontual-set-set-null-retorna-smaug-status-t"></a>
 
 ### Mutação pontual (`set` / `set_null`) — retorna `smaug_status_t`
 
@@ -560,10 +724,14 @@ escrever.
 Funções: `f64_set`, `f64_set_null`, `i64_set`, `i64_set_null`, `str_set`,
 `str_set_null`.
 
+<a id="section-append-dinamico-append-append-null-retorna-int-0-1"></a>
+
 ### Append dinâmico (`append` / `append_null`) — retorna `int` (0 / -1)
 
 Convenção mantida. Em views, dispara COW detach antes do grow.
 Falha → `-1`; série permanece consistente.
+
+<a id="section-leitura-get-shape-1-valor-status-anulavel"></a>
 
 ### Leitura (`get`) — Shape 1: valor + status anulável
 
@@ -579,6 +747,8 @@ em erro (`NAN` para f64, `0` para i64) — seguro mesmo ignorando o status.
 | `idx >= size` | sentinela | `SMG_ERR_OOB` |
 | `s == NULL` | sentinela | `SMG_ERR_ARGUMENT` |
 
+<a id="section-copy-on-write-em-views"></a>
+
 ### Copy-on-Write em views
 
 Toda mutação em uma view materializa um buffer privado antes de escrever —
@@ -593,3 +763,7 @@ Cobertura: `float64`, `int64`, `datetime`, `bool` (buffers fixos, view O(1)) e
 não tem view (é Lua puro, sem buffer compartilhável).
 
 Ver `docs/COW.md` para a especificação completa.
+
+---
+
+[Referência do Núcleo C](API_Reference.md) · [Rework da suíte](TEST_SUITE_REWORK.md) · [Início da documentação](README.md)

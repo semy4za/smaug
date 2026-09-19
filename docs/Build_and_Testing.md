@@ -1,9 +1,34 @@
 # Smaug — Compilação e Testes
 
+[Início](README.md) · [Primeiros passos](GETTING_STARTED.md) · [Guia do usuário](USER_GUIDE.md) · [API Reference: Lua](API_INDEX.md) | [Núcleo C](API_Reference.md)
+
+<details>
+<summary>Nesta página</summary>
+
+- [Dependências](#section-dependencias)
+- [Linux — comandos](#section-linux-comandos)
+  - [Suite completa (recomendado)](#section-suite-completa-recomendado)
+  - [Desenvolvimento (sem stress, sem manifest)](#section-desenvolvimento-sem-stress-sem-manifest)
+  - [Só cobertura](#section-so-cobertura)
+  - [Só um teste específico](#section-so-um-teste-especifico)
+- [Windows — MSYS2-UCRT64](#section-windows-msys2-ucrt64)
+- [Estrutura de testes](#section-estrutura-de-testes)
+  - [Testes C (Anel 0 + Anel 3)](#section-testes-c-anel-0-anel-3)
+  - [Testes Lua (Anéis 1+2+3)](#section-testes-lua-aneis-1-2-3)
+  - [Fixtures de dados reais](#section-fixtures-de-dados-reais)
+- [Cobertura (gcov)](#section-cobertura-gcov)
+- [Valgrind](#section-valgrind)
+- [Makefile](#section-makefile)
+- [CMake](#section-cmake)
+
+</details>
+
 **Plataformas suportadas:** Linux (Fedora, Ubuntu) e Windows (MSYS2-UCRT64).
 **Compilador:** GCC ≥ 11. **Runtime:** LuaJIT ≥ 2.0.5.
 
 ---
+
+<a id="section-dependencias"></a>
 
 ## Dependências
 
@@ -19,7 +44,11 @@ No macOS o Valgrind não funciona — use Linux para rodar a suite completa.
 
 ---
 
+<a id="section-linux-comandos"></a>
+
 ## Linux — comandos
+
+<a id="section-suite-completa-recomendado"></a>
 
 ### Suite completa (recomendado)
 
@@ -31,17 +60,23 @@ Executa em sequência: build da `.so`, testes C, stress, testes Lua,
 Valgrind em todos os binários, coverage (gcov), manifest. Aborta no
 primeiro erro.
 
+<a id="section-desenvolvimento-sem-stress-sem-manifest"></a>
+
 ### Desenvolvimento (sem stress, sem manifest)
 
 ```bash
 bash scripts/build.sh
 ```
 
+<a id="section-so-cobertura"></a>
+
 ### Só cobertura
 
 ```bash
 make coverage
 ```
+
+<a id="section-so-um-teste-especifico"></a>
 
 ### Só um teste específico
 
@@ -52,6 +87,8 @@ luajit tests/io/test_csv.lua
 
 ---
 
+<a id="section-windows-msys2-ucrt64"></a>
+
 ## Windows — MSYS2-UCRT64
 
 ```powershell
@@ -59,11 +96,15 @@ scripts/build.ps1
 ```
 
 Detecta automaticamente todos os `.c` em `src/` (incluindo parsers I/O).
-Compila `libsmaug.dll` e todos os testes. Coverage/Valgrind rodam no Fedora.
+Compila `smaug.dll` e todos os testes. Coverage/Valgrind rodam no Fedora.
 
 ---
 
+<a id="section-estrutura-de-testes"></a>
+
 ## Estrutura de testes
+
+<a id="section-testes-c-anel-0-anel-3"></a>
 
 ### Testes C (Anel 0 + Anel 3)
 
@@ -81,6 +122,8 @@ Compila `libsmaug.dll` e todos os testes. Coverage/Valgrind rodam no Fedora.
 | `test_ops_window` | ops de janela (Grupo C): multi_argsort 5 dtypes, rolling deque, cumulativas |
 | `test_allocfail` | OOM em todos os pontos públicos (Anéis 0+3, via `--wrap`); inclui Grupo A/B e datetime |
 | `test_stress` | N=1M, chains, views simultâneas, ciclos |
+
+<a id="section-testes-lua-aneis-1-2-3"></a>
 
 ### Testes Lua (Anéis 1+2+3)
 
@@ -108,6 +151,8 @@ As suítes vivem em subpastas por domínio: `tests/series/`, `tests/dataset/`,
 | `props/test_props.lua` | property-based: invariantes × seeds × casos |
 | `props/test_integration.lua` | integração: reduções avançadas, rank, skew, kurtosis, mad, sem, funções matemáticas |
 
+<a id="section-fixtures-de-dados-reais"></a>
+
 ### Fixtures de dados reais
 
 | Arquivo | Descrição |
@@ -119,6 +164,8 @@ As suítes vivem em subpastas por domínio: `tests/series/`, `tests/dataset/`,
 | `tests/fixtures/cotacoes_SHIB_BRL.json` | 13 records SHIB (floats pequenos: 0.00002492) |
 
 ---
+
+<a id="section-cobertura-gcov"></a>
 
 ## Cobertura (gcov)
 
@@ -145,14 +192,17 @@ flush via FFI instável — cobertura sempre medida no Linux.
 
 ---
 
+<a id="section-valgrind"></a>
+
 ## Valgrind
 
 ```bash
 bash scripts/build.sh --all   # roda Valgrind em todos os binários
 ```
 
-**Estado atual:** clean em todos os binários. Zero leaks, zero reads de
-memória não inicializada, todos os blocos alocados liberados.
+**Registro histórico:** campanhas anteriores registraram execução limpa.
+Isso não certifica a árvore atual. Consulte a revisão da suíte para as
+verificações ainda pendentes.
 
 Bugs encontrados e corrigidos pelo Valgrind:
 - **Anel 3 (sessão inicial):** `smaug_json.c` — `col_names` (array) não liberado
@@ -163,6 +213,8 @@ Bugs encontrados e corrigidos pelo Valgrind:
   de ownership marcada (`col_names[c] = NULL`) e cleanup robusto nos paths de erro.
 
 ---
+
+<a id="section-makefile"></a>
 
 ## Makefile
 
@@ -177,9 +229,15 @@ e emite um aviso — inofensivo para compilação e cobertura.
 
 ---
 
+<a id="section-cmake"></a>
+
 ## CMake
 
 > **⚠️ Bloco desatualizado / decisão pendente.** O CMake não está em uso.
 > O desenvolvimento usa o Makefile no Linux e `scripts/build.ps1`
 > no Windows. O futuro deste bloco depende da decisão sobre portar para
 > Lua 5.4 (ver "Visão de longo prazo" no Roadmap).
+
+---
+
+[Referência do Núcleo C](API_Reference.md) · [Rework da suíte](TEST_SUITE_REWORK.md) · [Início da documentação](README.md)

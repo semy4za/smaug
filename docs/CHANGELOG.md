@@ -1,10 +1,29 @@
 # Changelog — Smaug
 
+[Início](README.md) · [Primeiros passos](GETTING_STARTED.md) · [Guia do usuário](USER_GUIDE.md) · [API Reference: Lua](API_INDEX.md) | [Núcleo C](API_Reference.md)
+
+<details>
+<summary>Navegar por mês</summary>
+
+- [2026-09-01 — Fase 1: -fwrapv no build, ou: como um "bug" virou contrato](#section-2026-09-01-fase-1-fwrapv-no-build-ou-como-um-bug-virou-contrato)
+- [2026-07-27 — Roadmap enxuto: só o que falta, e uma porta de entrega de verdade](#section-2026-07-27-roadmap-enxuto-so-o-que-falta-e-uma-porta-de-entrega-de-verdade)
+- [2026-06-30 — Item 8: Rolling → Ring 0 (motor genérico + min_periods + expanding + DataSet)](#section-2026-06-30-item-8-rolling-ring-0-motor-generico-min-periods-expanding-dataset)
+- [Aritmética numérica: promoção de tipos e divisão verdadeira](#section-aritmetica-numerica-promocao-de-tipos-e-divisao-verdadeira)
+- [2026-05 · endurecimento Anel 0 (frentes A, B, C)](#section-2026-05-endurecimento-anel-0-frentes-a-b-c)
+- [2026-04 · contrato defensivo do C + COW](#section-2026-04-contrato-defensivo-do-c-cow)
+- [2026-03 · fase string completa](#section-2026-03-fase-string-completa)
+- [2026-02 · endurecimento (property-based, cobertura, fillna)](#section-2026-02-endurecimento-property-based-cobertura-fillna)
+- [2026-01 · fases 1–4 (backend C, frontend Lua, DataSet, bool)](#section-2026-01-fases-1-4-backend-c-frontend-lua-dataset-bool)
+
+</details>
+
 Registro de o que mudou e por que, em ordem cronológica reversa.
 Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+<a id="section-2026-09-01-fase-1-fwrapv-no-build-ou-como-um-bug-virou-contrato"></a>
+
 ## 2026-09-01 — Fase 1: `-fwrapv` no build, ou: como um "bug" virou contrato
 
 Primeira sessão de um esforço de endurecimento baseado numa auditoria externa.
@@ -93,6 +112,8 @@ o que `argsort` faz é a correção natural.
 
 ---
 
+<a id="section-2026-07-27-roadmap-enxuto-so-o-que-falta-e-uma-porta-de-entrega-de-verdade"></a>
+
 ## 2026-07-27 — Roadmap enxuto: só o que falta, e uma porta de entrega de verdade
 
 O roadmap tinha 1562 linhas e ~70% delas descreviam trabalho já feito. Um arquivo
@@ -139,6 +160,8 @@ categorical divergiria em silêncio. Vira teste de invariante.
 Nenhum C, nenhum Lua.
 
 ---
+<a id="section-2026-07-29-12-39-corrigido-ordem-total-no-comparador-e-a-colisao-de-numeros"></a>
+
 ## 2026-07-29 — 12.39 corrigido: ordem total no comparador, e a colisão de números
 
 Correção do bug registrado na entrada abaixo. O diagnóstico já estava pronto e
@@ -177,6 +200,8 @@ Mutação verificada: remover a linha da ordem total aborta o teste.
 Falta o selo: Valgrind e Windows.
 
 ---
+<a id="section-2026-07-28-selos-10-4-fatia-a-12-37-e-12-38-fechados-nas-duas-plataformas"></a>
+
 ## 2026-07-28 — selos: 10.4 fatia A, 12.37 e 12.38 fechados nas duas plataformas
 
 Registro dos selos que já haviam passado nos builds mas ficaram sem entrada. Uma
@@ -189,6 +214,8 @@ A rodada foi numa segunda máquina Windows, com o LuaJIT fora do MSYS2
 portabilidade que ninguém tinha testado de propósito.
 
 ---
+<a id="section-2026-07-28-um-nan-na-chave-quebra-o-groupby-inteiro"></a>
+
 ## 2026-07-28 — um NaN na chave quebra o groupby inteiro
 
 Tentativa de implementar o 10.5-B que virou a descoberta de um bug sério, e
@@ -231,6 +258,8 @@ float64 recair no caminho antigo — seria trabalho jogado fora, porque o conser
 12.38 desbloqueia o item inteiro. O protótipo fica registrado como validado.
 
 ---
+<a id="section-2026-07-28-o-mesmo-buraco-do-lado-do-lua-objeto-do-smaug-onde-se-espera-lista"></a>
+
 ## 2026-07-28 — o mesmo buraco do lado do Lua: objeto do Smaug onde se espera lista
 
 Continuação natural da auditoria do 12.37, e apareceu por acidente. Ao avaliar
@@ -268,6 +297,8 @@ eram justamente os que aceitavam calados.
 discriminador de metatable aborta o teste.
 
 ---
+<a id="section-2026-07-28-auditoria-de-fronteiras-publicas-dois-segfaults-achados-e-corrigidos"></a>
+
 ## 2026-07-28 — auditoria de fronteiras públicas: dois segfaults achados e corrigidos
 
 A pergunta "isso bate com nosso contrato?" sobre o `multi_argsort` levou a uma
@@ -309,6 +340,8 @@ Obrigatório, não opcional.
 `test_io_c` 315→319. Cobertura 95,08% de branch-alvo.
 
 ---
+<a id="section-2026-07-28-correcao-o-benchmark-do-10-5-b-media-a-coisa-errada"></a>
+
 ## 2026-07-28 — correção: o benchmark do 10.5-B media a coisa errada
 
 Ao começar a implementar o 10.5-B, o primeiro passo foi verificar como o
@@ -345,6 +378,8 @@ comparador consultar a máscara — mais correto em geral, mas muda o comportame
 Nenhum código de produção tocado.
 
 ---
+<a id="section-2026-07-28-10-4-fatia-a-componentes-de-datetime-e-uma-promessa-que-o-header-nao-cumpre"></a>
+
 ## 2026-07-28 — 10.4 fatia A: componentes de datetime, e uma promessa que o header não cumpre
 
 Os onze componentes (`year`, `month`, `day`, `hour`, `minute`, `second`, `ms`,
@@ -391,6 +426,8 @@ de instanciação; teve de ir nas onze.
 Falta o selo: Valgrind e Windows.
 
 ---
+<a id="section-2026-07-28-selo-fedora-fecha-o-10-3-as-nove-operacoes-no-anel-0"></a>
+
 ## 2026-07-28 — selo Fedora fecha o 10.3: as nove operações no Anel 0
 
 Valgrind 0 erros nos 13 binários. Cobertura em **94.96% de branch-alvo e 98.86% de
@@ -417,6 +454,8 @@ escalares que já existem, `.str` são 28 operações novas mas sem motor de pad
 medido, sem estrutura de dados nova).
 
 ---
+<a id="section-2026-07-28-quanto-custa-um-dtype-novo-e-por-que-a-resposta-ingenua-nao-serve"></a>
+
 ## 2026-07-28 — quanto custa um dtype novo, e por que a resposta ingênua não serve
 
 Começou como um achado de duplicação — a mesma guarda de dtype escrita 25 vezes —
@@ -464,6 +503,8 @@ padrão; o 10.3 não. O motivo foi assinatura divergente — `f64_abs` sem `stat
 Registrado como 12.35, com bloco de design obrigatório. Nenhum código tocado.
 
 ---
+<a id="section-2026-07-28-10-5-b-a-primeira-medicao-de-desempenho-do-projeto-muda-o-item"></a>
+
 ## 2026-07-28 — 10.5-B: a primeira medição de desempenho do projeto muda o item
 
 Bloco de design do único item restante com retrabalho em aberto. Ele estava
@@ -513,6 +554,8 @@ a concatenação em vez de reimplementá-la.
 Nenhum código tocado.
 
 ---
+<a id="section-2026-07-28-auditoria-de-retrabalho-do-item-10-antes-de-reimplementar"></a>
+
 ## 2026-07-28 — auditoria de retrabalho do item 10, antes de reimplementar
 
 Levantamento do que resta no bloco 10 procurando **onde reimplementar criaria
@@ -568,6 +611,8 @@ seria contabilidade desonesta.
 Nenhum código tocado.
 
 ---
+<a id="section-2026-07-27-10-3-fatia-b-abs-round-clip-descem-e-o-degrau-se-aposenta"></a>
+
 ## 2026-07-27 — 10.3 fatia B: abs/round/clip descem, e o degrau se aposenta
 
 As três preservam o dtype, e é por isso que ganharam versão int64 em C. O ponto
@@ -613,6 +658,8 @@ caminho feliz. Fechou em **94.94%**, acima do baseline.
 `test_access` 168→191, `test_ops_edge` 346→381, allocfail 1972→2032.
 
 ---
+<a id="section-2026-07-27-10-2-fechado-e-a-edicao-nao-testada-do-build-ps1-se-provou"></a>
+
 ## 2026-07-27 — 10.2 fechado, e a edição não testada do build.ps1 se provou
 
 Uma rodada no Windows fechou três pendências. A fatia 2 do 10.2 atravessou a ABI
@@ -636,6 +683,8 @@ C, Windows 11 — falta `test_astype` na lista do `build.ps1`. A matriz de
 conversão nunca foi confirmada na ABI do Windows.
 
 ---
+<a id="section-2026-07-27-10-3-fatia-a-as-seis-matematicas-descem-ao-anel-0-por-macro"></a>
+
 ## 2026-07-27 — 10.3 fatia A: as seis matemáticas descem ao Anel 0, por macro
 
 `sin`, `cos`, `tan`, `exp`, `log` e `sqrt` eram seis `self:map(closure)` — loop em
@@ -672,6 +721,8 @@ Fatia B (`abs`/`round`/`clip`) segue aberta: é onde estão as três decisões
 semânticas e o degrau que só sai quando as três descerem.
 
 ---
+<a id="section-2026-07-27-12-34-uma-colacao-so-e-dois-buracos-de-build-que-ela-expos"></a>
+
 ## 2026-07-27 — 12.34: uma colação só, e dois buracos de build que ela expôs
 
 A regra de ordenação de string estava escrita em quatro lugares do C. Agora está
@@ -734,6 +785,8 @@ não há PowerShell no ambiente de desenvolvimento. Mesma situação do
 Windows valida a edição.
 
 ---
+<a id="section-2026-07-27-10-2-fatia-2-between-fecha-nos-quatro-dtypes-e-o-anel-1-para-de-comparar"></a>
+
 ## 2026-07-27 — 10.2 fatia 2: between fecha nos quatro dtypes, e o Anel 1 para de comparar
 
 `datetime` e `string` desceram ao Anel 0, e com isso o `between` deixou de existir
@@ -774,6 +827,8 @@ Fica anotado que o `datetime` não tinha varredura OOM de comparador nenhum — 
 `between` foi a primeira. Lacuna pré-existente, não expandida aqui.
 
 ---
+<a id="section-2026-07-27-selo-fedora-fecha-10-2-fatia-1-12-31-e-12-32"></a>
+
 ## 2026-07-27 — selo Fedora: fecha 10.2 fatia 1, 12.31 e 12.32
 
 Valgrind 0 erros nos 13 binários, incluindo os dois `between` novos e a varredura
@@ -795,6 +850,8 @@ Fica registrado que o Fedora roda **12** binários em C e o Windows **11**: falt
 tocado), mas significa que a matriz de conversão nunca foi confirmada no Windows.
 
 ---
+<a id="section-2026-07-27-roadmap-enxugado-so-o-que-falta-e-uma-porta-de-entrega"></a>
+
 ## 2026-07-27 — Roadmap enxugado: só o que falta, e uma porta de entrega
 
 O Roadmap tinha 1562 linhas e ~1086 delas descreviam trabalho **já concluído** —
@@ -839,6 +896,8 @@ compara string por byte, não por `strcoll`. Vira teste.
 Nenhum código tocado.
 
 ---
+<a id="section-2026-07-27-12-32-um-gerador-de-manifest-so-e-ele-agora-diz-qual-arvore-descreve"></a>
+
 ## 2026-07-27 — 12.32: um gerador de MANIFEST só, e ele agora diz qual árvore descreve
 
 Duas correções que nasceram do mesmo incidente. Um zip veio da máquina Windows
@@ -902,6 +961,8 @@ manifestado.
 Nenhum C, nenhum Lua.
 
 ---
+<a id="section-2026-07-27-12-31-inferencia-de-dtype-passa-a-decidir-por-familia-nao-por-rank"></a>
+
 ## 2026-07-27 — 12.31: inferência de dtype passa a decidir por família, não por rank
 
 Achado na reescrita do Contrato 1: `from_table({1, "x"})` inferia `string`, porque
@@ -939,6 +1000,8 @@ abortar.
 Lua puro, nenhum C tocado.
 
 ---
+<a id="section-2026-07-27-10-2-fatia-1-between-desce-ao-anel-0-f64-i64"></a>
+
 ## 2026-07-27 — 10.2 fatia 1: between desce ao Anel 0 (f64 + i64)
 
 Primeiro item do bloco 10 a sair depois que o 9.3 destravou a fronteira do
@@ -992,6 +1055,8 @@ a métrica subiu para 94.76%, acima do baseline.
 no Fedora), então o selo do item não fechou.
 
 ---
+<a id="section-2026-07-26-9-4-nlargest-nsmallest-devolviam-valor-que-nao-estava-nos-dados"></a>
+
 ## 2026-07-26 — 9.4: nlargest/nsmallest devolviam valor que não estava nos dados
 
 Achado na leitura macro do item 10, olhando o que ainda faz loop em Lua sobre
@@ -1038,6 +1103,8 @@ ramos da mesma função. Agora ambos liberam.
 Lua puro, nenhum C tocado.
 
 ---
+<a id="section-2026-07-26-9-3-fronteira-do-escalar-int-based-comparadores-aritmetica"></a>
+
 ## 2026-07-26 — 9.3: fronteira do escalar int-based (comparadores + aritmética)
 
 O 9.1 tinha curado a *entrada* de int64 (check_value/get_raw), mas os call-sites
@@ -1084,6 +1151,8 @@ recusam, mas essas migraram no 10.6/10.7). Destrava o 10.2: os limites do
 Lua puro, nenhum C tocado.
 
 ---
+<a id="section-2026-07-23-12-15-categoricalseries-rejeita-indice-nao-inteiro"></a>
+
 ## 2026-07-23 — 12.15: CategoricalSeries rejeita índice não-inteiro
 
 Bug de falha-silenciosa: CategoricalSeries:get(1.5) devolvia nil calado, enquanto
@@ -1108,6 +1177,8 @@ projeto, e categorical:get/is_null não tinham teste de índice inválido antes.
 Lua puro, nenhum C tocado.
 
 ---
+<a id="section-2026-07-23-auditoria-do-item-10-classificacao-corrigida-degrau-em-between-abs-round-clip"></a>
+
 ## 2026-07-23 — auditoria do item 10: classificação corrigida + degrau em between/abs/round/clip
 
 Mesma lente da auditoria dos itens 1–11, agora no item 10. Os cinco subitens
@@ -1151,6 +1222,8 @@ _scalar), smaug_bool_select e os pares de astype com bool. Sem risco de int64 �
 Lua puro, nenhum C tocado.
 
 ---
+<a id="section-2026-07-22-auditoria-dos-itens-1-11-correcao-do-7-2a-capacidade-morta"></a>
+
 ## 2026-07-22 — auditoria dos itens 1–11 + correção do 7.2a (capacidade morta)
 
 Auditoria reversa pedida pelo Gui: em vez de confiar na marca [Done], verificar no
@@ -1185,6 +1258,8 @@ temporal/_dt.lua — caminho da época do registro, não erro de trabalho.
 Lua puro, nenhum C tocado. Contadores do resto da suíte idênticos ao baseline.
 
 ---
+<a id="section-2026-07-21-12-30-fase-1-to-csv-mem-to-json-mem-comunicam-a-causa-do-erro"></a>
+
 ## 2026-07-21 — 12.30 Fase 1: to_csv_mem/to_json_mem comunicam a causa do erro
 
 Ataque faseado do 12.30 (contrato de erro de escrita). Fase 1: as duas variantes
@@ -1218,6 +1293,8 @@ fica registrada para a próxima. Eixo 14 segue verde: nenhum estado global
 introduzido.
 
 ---
+<a id="section-2026-07-21-12-20-eixo-03-ampliado-4-frentes-12-30-registrado-review-do-anel-0"></a>
+
 ## 2026-07-21 — 12.20: eixo 03 ampliado (4 frentes) + 12.30 registrado (review do Anel 0)
 
 Pedido explícito antes de tocar em código: revisão profunda do Anel 0, "nunca
@@ -1262,6 +1339,8 @@ retorna só -1 — mesma estrutura idêntica nos dois. Correção não atacada a
 (mudaria assinatura pública), só registrada para decisão futura.
 
 ---
+<a id="section-2026-07-20-12-19-metade-srcs-fontes-c-descobertas-por-glob-nos-3-scripts"></a>
+
 ## 2026-07-20 — 12.19 (metade SRCS): fontes C descobertas por glob nos 3 scripts
 
 Continuação do 12.29. O 12.19 apontava 5 listas duplicadas de SRCS/C_TESTS; o
@@ -1287,6 +1366,8 @@ Verificado que Makefile ($(wildcard)) e coverage (glob) produzem exatamente os 1
 fontes atuais. Cobertura reproduzida: 98.81% linha / 94.71% branch-alvo.
 
 ---
+<a id="section-2026-07-20-12-27-oom-parcial-em-dataset-to-table-nao-vaza-mais-l1"></a>
+
 ## 2026-07-20 — 12.27: OOM parcial em dataset_to_table não vaza mais (L1)
 
 Achado (L1): `dataset_to_table` (io/csv.lua) alocava, por coluna, o nome
@@ -1313,6 +1394,8 @@ Guard permanente em test_csv. Único dos colaterais desta leva com correção de
 comportamento (12.28/12.29 eram auditoria). Lua puro.
 
 ---
+<a id="section-2026-07-20-12-29-descoberta-automatica-de-fontes-c-a3"></a>
+
 ## 2026-07-20 — 12.29: descoberta automática de fontes C (A3)
 
 Achado (A3): o eixo 14 (thread-safety) iterava uma lista fixa de `src/*.c`. Um
@@ -1345,6 +1428,8 @@ permanente". Provado nos dois sentidos: `.c` com global → 🟥 exit 1; limpo �
 Nenhum C ou runtime tocado. `build/SOURCES` é gitignored (efêmero).
 
 ---
+<a id="section-2026-07-20-12-28-eixo-15-abi-layout-sincronia-cdef-header-verificada"></a>
+
 ## 2026-07-20 — 12.28: eixo `15_abi_layout`, sincronia cdef↔header verificada
 
 Achado (A-FFI): o `cdef` do `ffi_loader.lua` replicava à mão o layout das structs
@@ -1384,6 +1469,8 @@ sentidos (pega divergência → exit 1; sincronizado → exit 0). Registrado em
 puramente auditoria.
 
 ---
+<a id="section-2026-07-19-10-5-passo-a-core-keys-lua-chave-de-igualdade-com-int64-exato-l2"></a>
+
 ## 2026-07-19 — 10.5 Passo A: `core/keys.lua`, chave de igualdade com int64 exato (L2)
 
 Achado (L2): o padrão `type(v)..":"..tostring(v)` sobre `series:get(i)`, repetido
@@ -1433,6 +1520,8 @@ no dataset_to_table (L1), sincronia cdef↔header sem verificação (A-FFI), eix
 com lista hardcoded (A3).
 
 ---
+<a id="section-2026-07-14-12-6-12-2-uma-travessia-ffi-por-get"></a>
+
 ## 2026-07-14 — 12.6 + 12.2: uma travessia FFI por `get()`
 
 **12.2:** removida a linha comentada `-- smaug.read_parquet = ...` do
@@ -1492,6 +1581,8 @@ Lua puro. Fedora `--all`: Valgrind 0, parity 14/14, suites de acesso intactas
 (`test_access` 127, `test_dt` 271, `test_str` 272, `constructors` 343).
 
 ---
+<a id="section-2026-07-14-12-3-datetime-no-to-csv-to-json-era-crash-nao-decidir"></a>
+
 ## 2026-07-14 — 12.3: datetime no to_csv/to_json (era crash, não "decidir")
 
 O item pedia *"decidir: fechar ou registrar pós-1.0"*. Reproduzido: **crash**.
@@ -1537,6 +1628,8 @@ string).
 Fedora `--all`: Valgrind 0, linha 98.81%, parity 14/14.
 
 ---
+<a id="section-2026-07-14-12-24-os-select-eram-essenciais-o-item-estava-errado"></a>
+
 ## 2026-07-14 — 12.24: os `select` eram essenciais — o item estava errado
 
 O Gui pediu review antes do código. O review derrubou o item — e o erro era meu.
@@ -1591,6 +1684,8 @@ produz confiança sem base.
 Fedora `--all`: Valgrind 0, parity 14/14.
 
 ---
+<a id="section-2026-07-14-12-23-os-6-guards-essenciais-viram-teste"></a>
+
 ## 2026-07-14 — 12.23: os 6 guards essenciais viram teste
 
 Execução do que a auditoria empírica do 12.18 achou: seis guards de fronteira
@@ -1634,6 +1729,8 @@ Fedora `--all`: Valgrind 0, linha 98.71%, parity 14/14. Sobra o **12.24** (os 7
 redundantes cuja justificativa é falsa) — registrado, não tocado.
 
 ---
+<a id="section-2026-07-14-12-5-o-anel-0-e-thread-safe-contrato-11"></a>
+
 ## 2026-07-14 — 12.5: o Anel 0 é thread-safe (CONTRATO 11)
 
 O registro dizia *"`g_sort_series` global em `ops_str` (single-thread: **sem
@@ -1699,6 +1796,8 @@ threads sem um erro**. Fedora `--all`: Valgrind 0, `test_string` 118, parity
 14/14.
 
 ---
+<a id="section-2026-07-14-12-18-guards-testados-nao-excluidos-contrato-10"></a>
+
 ## 2026-07-14 — 12.18: guards testados, não excluídos (CONTRATO 10)
 
 O item pedia `COV-EXCL-BR` nos guards de `dt_get`/`dt_set`, "alinhando com o
@@ -1747,6 +1846,8 @@ veículo da propagação).
 Fedora `--all`: Valgrind 0, linha 98.76%, branch-alvo 94.77%.
 
 ---
+<a id="section-2026-07-14-12-1-mensagens-de-i-o-no-padrao-smaug-op-razao"></a>
+
 ## 2026-07-14 — 12.1: mensagens de I/O no padrão `smaug: <op> — <razão>`
 
 O registro pedia só tirar o `"smaug"` duplicado. Reproduzindo as 6 mensagens de
@@ -1783,6 +1884,8 @@ ausente quando é buffer, e a simetria reader/writer).
 Fedora `--all`: Valgrind 0, coverage 98.76%/94.70%.
 
 ---
+<a id="section-2026-07-14-12-21-vocabulario-de-nao-finitos-contrato-9-csv-json-ring-0"></a>
+
 ## 2026-07-14 — 12.21: vocabulário de não-finitos (CONTRATO 9) — CSV, JSON, Ring 0
 
 O registro dizia "JSON writer emite `inf`, que é JSON inválido". A revisão pedida
@@ -1842,6 +1945,8 @@ Ring 0 + contrato público. Fedora `--all`: Valgrind 0, coverage 98.73%/94.70%.
 **Windows obrigatório** (símbolo C novo + mudança de parser).
 
 ---
+<a id="section-2026-07-14-12-22-contador-unificado-nas-9-suites-restantes"></a>
+
 ## 2026-07-14 — 12.22: contador unificado nas 9 suites restantes
 
 Generalização do 12.7 (que corrigiu só `test_constructors`). Achado durante o
@@ -1875,6 +1980,8 @@ em falha). Só o número enganava. Total do relato Lua sobe de ~1958 para ~2465.
 Lua puro. Fedora `--all` verde (18 suites, parity 13/13).
 
 ---
+<a id="section-2026-07-14-12-12-chave-desconhecida-com-sugestao-voce-quis-dizer-x"></a>
+
 ## 2026-07-14 — 12.12: chave desconhecida com sugestão ("você quis dizer X?")
 
 **Um diagnóstico errado meu, corrigido pela verificação empírica.** Eu havia
@@ -1918,6 +2025,8 @@ Lua puro. Fedora `--all` verde (Valgrind 0, parity 13/13, 18 suites incluindo
 property-based e integração).
 
 ---
+<a id="section-2026-07-14-12-10-aviso-de-separador-suspeito-no-read-csv-core-warn-lua"></a>
+
 ## 2026-07-14 — 12.10: aviso de separador suspeito no `read_csv` + `core/warn.lua`
 
 Implementado o aviso passivo conforme a decisão já registrada: **não** detectar
@@ -1955,6 +2064,8 @@ em texto livre, e `read_json`). Captura de stderr trocando `io.stderr` pelo stub
 Lua puro. Fedora `--all` verde (Valgrind 0, parity 13/13, 121 arquivos).
 
 ---
+<a id="section-2026-07-14-12-9-core-errors-lua-descricao-segura-em-mensagens-de-erro"></a>
+
 ## 2026-07-14 — 12.9: `core/errors.lua` — descrição segura em mensagens de erro
 
 O registro dizia "`s:iat(i)` despeja a Series inteira no erro". A avaliação
@@ -2001,6 +2112,8 @@ classe inteira: nenhum método de acesso vaza valores).
 Lua puro. Fedora `--all` verde (Valgrind 0, parity 13/13, 120 arquivos).
 
 ---
+<a id="section-2026-07-14-12-11-series-nrows-decisao-de-nao-fazer"></a>
+
 ## 2026-07-14 — 12.11: `Series:nrows()` — decisão de não fazer
 
 O sub-item pedia `methods.nrows = methods.len` na Series ("alias faltando").
@@ -2017,6 +2130,8 @@ conceito. Decisão (Gui): não fazer. Sub-item encerrado sem código; nenhum
 arquivo de código tocado.
 
 ---
+<a id="section-2026-07-14-12-4-dedup-do-tostring-guard-de-unicidade-em-from-codes"></a>
+
 ## 2026-07-14 — 12.4: dedup do `tostring` + guard de unicidade em `from_codes`
 
 O cosmético registrado era `tostring(v)` chamado 2× na normalização de níveis do
@@ -2039,6 +2154,8 @@ neste step (fora de escopo); registrado para varredura própria.
 Lua puro. Fedora `--all` verde (parity 13/13).
 
 ---
+<a id="section-2026-07-14-12-7-contador-de-checks-unificado-em-test-constructors"></a>
+
 ## 2026-07-14 — 12.7: contador de checks unificado em `test_constructors`
 
 O arquivo é 4 suites concatenadas; cada uma redeclarava `local n_ok = 0` +
@@ -2057,6 +2174,8 @@ harness do `build.sh` espera uma linha `OK — N checks...` por suite.
 Lua puro. Fedora `--all` verde (parity 13/13). Headline agora reporta 343.
 
 ---
+<a id="section-2026-07-13-11-ergonomia-repl-display-canonico-tostring-universal"></a>
+
 ## 2026-07-13 — 11: Ergonomia REPL (display canônico + __tostring universal)
 
 Análise profunda comparando com pandas revelou que o item era maior que
@@ -2094,6 +2213,8 @@ guardado por teste no Fedora); o resto é Lua puro ou LuaJIT-interno, e o eixo 1
 é Lua puro.
 
 ---
+<a id="section-2026-07-13-10-8-boolseries-coerencia-de-caminho-com-o-anel-0"></a>
+
 ## 2026-07-13 — 10.8: `BoolSeries` — coerência de caminho com o Anel 0
 
 O achado 2026-07-02 mirava loops Lua no `boolseries.lua`. A leitura do código
@@ -2142,6 +2263,8 @@ property-based (360862 checks), coverage 98.73%/94.69%, parity 12/12.
 fechado de vez — (c) introduz símbolo C novo (ABI/FFI).
 
 ---
+<a id="section-2026-07-09-10-9-fase-b-str-num-unificado-via-cstr"></a>
+
 ## 2026-07-09 — 10.9 Fase B: `str→num` unificado via `_cstr`
 
 `smaug_parse_i64_cstr`/`smaug_parse_f64_cstr` no `smaug_convert`: núcleo de
@@ -2157,6 +2280,8 @@ trailing) em `test_astype` (106 checks). `smaug_convert.c` 100%/100%. Selo Fedor
 (`smaug_convert` é agora a fonte única bidirecional texto↔número).
 
 ---
+<a id="section-2026-07-09-10-9-fase-a-fonte-unica-de-formatacao-num-str"></a>
+
 ## 2026-07-09 — 10.9 Fase A: fonte única de formatação `num→str`
 
 `smaug_fmt_i64`/`smaug_fmt_f64` no `smaug_convert` (agora conversão texto↔número
@@ -2169,6 +2294,8 @@ troca de separador decimal por cima. Teste dirigido `test_fmt_direto`.
 parity 12/12) **+ Windows verde**. Resta a Fase B (`str→num` via `_cstr`).
 
 ---
+<a id="section-2026-07-09-fix-crash-de-heap-cross-runtime-no-i-o-windows"></a>
+
 ## 2026-07-09 — fix: crash de heap cross-runtime no I/O (Windows)
 
 `io/csv.lua` alocava `name`/`columns` da `smaug_table_t` com `ffi.C.malloc`
@@ -2182,6 +2309,8 @@ Verificado limpo sob ASan; varredura confirma que era o único cross-heap do
 projeto. Com isto o Windows fica verde: **10.7 Passo B concluído (Fedora+Windows).**
 
 ---
+<a id="section-2026-07-09-10-7-passo-b-fase-4-rewire-do-astype-ao-anel-0-ffi-abi"></a>
+
 ## 2026-07-09 — 10.7 Passo B Fase 4: rewire do `astype` ao Anel 0 (FFI-ABI)
 
 Religa o `astype` (Series) às 12 primitivas C da matriz `src×dst`; o loop
@@ -2199,6 +2328,8 @@ exatos. Testes: bloco 10.7 troca recusa por conversão exata; +round-trip
 corrigido na entrada acima.
 
 ---
+<a id="section-2026-07-09-10-7-passo-b-fase-3-grupo-b-in-string-num-dt"></a>
+
 ## 2026-07-09 — 10.7 Passo B: Fase 3 (Grupo B-in → string→num/dt)
 
 Fonte única de parsing `smaug_convert.c` (`smaug_parse_i64`/`smaug_parse_f64`):
@@ -2214,6 +2345,8 @@ do CSV, divergindo do oráculo `tonumber` de propósito (*falha visível*).
 (3954/4177). `astype` Lua intacto (rewire na Fase 4).
 
 ---
+<a id="section-2026-07-09-10-7-passo-b-fase-2-grupo-b-out-string"></a>
+
 ## 2026-07-09 — 10.7 Passo B: Fase 2 (Grupo B-out → string)
 
 Três primitivas `→str` no `smaug_astype.c`: `i64→str` (`%lld`, exato — conserta
@@ -2225,6 +2358,8 @@ Global: linha 98.71% (3812/3862), branch-alvo 94.60% (3907/4130). `astype` Lua
 ainda intacto (rewire na Fase 4).
 
 ---
+<a id="section-2026-07-09-10-7-passo-b-fases-0-1-infra-grupo-a-do-astype-no-anel-0"></a>
+
 ## 2026-07-09 — 10.7 Passo B: Fases 0-1 (infra + Grupo A do `astype` no Anel 0)
 
 Início da migração do `astype` para o Anel 0 (matriz `src×dst`). Arquivo dedicado
@@ -2251,6 +2386,8 @@ duplicadas (`SRCS`/`C_TESTS` em Makefile/build.sh/make_coverage.sh) — registra
 como dívida.
 
 ---
+<a id="section-2026-07-09-selo-fedora-all-fecha-10-6-select-e-12-17"></a>
+
 ## 2026-07-09 — selo Fedora `--all`: fecha 10.6 (select) e 12.17
 
 Sessão de validação. `build.sh --all` no Fedora selou os dois pendentes que
@@ -2266,6 +2403,8 @@ Fedora), que vem agora — família seleção/preenchimento por máscara
 Integridade 113/113 SHA256 no MANIFEST.
 
 ---
+<a id="section-2026-07-09-10-6-fechado-teste-int64-2-53-em-ffill-bfill"></a>
+
 ## 2026-07-09 — 10.6 fechado: teste int64 > 2^53 em ffill/bfill
 
 A primitiva (c) da família (`ffill`/`bfill`) já estava no Anel 0 desde o 7.1 —
@@ -2275,6 +2414,8 @@ Fecha o 10.6: seleção/preenchimento por máscara inteiramente no Anel 0.
 Window 116→122 checks. Teste-only.
 
 ---
+<a id="section-2026-07-09-where-mask-ifelse-anel-0-via-select-cond-bool"></a>
+
 ## 2026-07-09 — where/mask/ifelse → Anel 0 via select (cond-bool)
 
 Primitiva (b) ao Anel 0. `select(cond,a,b)` por dtype: cond true→a, senão
@@ -2288,6 +2429,8 @@ Testes: degrau → paridade Anel 0 nas 4 dtypes (selection 48 checks). Windows
 12/12; prévia Ubuntu branch-alvo 94.38→94.49%. Selo Fedora pendente.
 
 ---
+<a id="section-2026-07-09-rename-scripts-windows-build-ps1-scripts-build-ps1"></a>
+
 ## 2026-07-09 — rename: scripts/windows_build.ps1 → scripts/build.ps1
 
 Renomeado o script de build do Windows para `build.ps1`, alinhando com o
@@ -2302,6 +2445,8 @@ rename para que o nome novo nas entradas antigas tenha explicação. Sem mudanç
 funcional no script.
 
 ---
+<a id="section-2026-07-09-12-17-alinha-cov-excl-br-do-dt-coalesce-scalar"></a>
+
 ## 2026-07-09 — 12.17: alinha COV-EXCL-BR do dt_coalesce_scalar
 
 Os guards `if (!self)` (datetime:219) e `if (!r)` (datetime:222) do
@@ -2314,6 +2459,8 @@ Prévia Ubuntu (gcov, sem Valgrind): branch-alvo 94.33→94.38% — os 2 guards 
 de descobertos para excluídos. Selo Fedora `--all` (Valgrind + gcov) pendente.
 
 ---
+<a id="section-2026-07-09-combine-first-anel-0-via-coalesce-serie-serie-null-mask-lado-serie"></a>
+
 ## 2026-07-09 — combine_first → Anel 0 via coalesce série+série (null-mask, lado série)
 
 Segunda metade da natureza null-mask vai ao Anel 0, fechando a primitiva (a) do
@@ -2344,6 +2491,8 @@ Achado registrado (12.17): `dt_coalesce_scalar` (datetime:219/222) sem
 do B.1, a corrigir (não é regressão; contabilidade de branches fecha exata).
 
 ---
+<a id="section-2026-07-08-selo-do-null-mask-escalar-completo-b-1-cov"></a>
+
 ## 2026-07-08 — selo do null-mask escalar completo (B.1.cov)
 
 Fecha a cobertura pendente das primitivas `coalesce_scalar`. O `--all` de
@@ -2360,6 +2509,8 @@ lado escalar da família seleção/preenchimento por máscara está 100% fechado
 próximo: `coalesce` série+série (serve `combine_first`).
 
 ---
+<a id="section-2026-07-07-fillna-anel-0-via-coalesce-scalar-natureza-null-mask-lado-escalar"></a>
+
 ## 2026-07-07 — fillna → Anel 0 via coalesce_scalar (natureza null-mask, lado escalar)
 
 Primeira das três naturezas da família seleção/preenchimento por máscara vai ao
@@ -2390,6 +2541,8 @@ primitivas a fechar (7 `COV-EXCL-BR`, 1 confere `str:227`) — ver 10.6 Passo
 B.1.cov. Selo do null-mask escalar fecha quando a cobertura fechar.
 
 ---
+<a id="section-2026-07-06-10-6-vira-familia-degrau-estendido-a-where-mask-ifelse-combine-first"></a>
+
 ## 2026-07-06 — 10.6 vira família; degrau estendido a where/mask/ifelse/combine_first
 
 A pergunta "isso deveria estar no C?" reenquadrou o 10.6. `fillna` não é uma
@@ -2416,6 +2569,8 @@ seleção por cond-bool com Kleene; propagação à parte), com todos delegando.
 — voltam integradas no desenho da família.
 
 ---
+<a id="section-2026-07-05-10-6-10-7-passo-a-degrau-corrupcao-silenciosa-falha-visivel"></a>
+
 ## 2026-07-05 — 10.6/10.7 Passo A (degrau): corrupção silenciosa → falha visível
 
 Antes de vetorizar `fillna`/`astype` ao Anel 0, um degrau paliativo que troca
@@ -2453,6 +2608,8 @@ o headline subconta). Suíte verde, parity 12/12, selo [Fedora] 2026-07-05
 (Valgrind 0-errors nos 12 binários; coverage inalterado — nenhuma linha C nova).
 
 ---
+<a id="section-2026-07-02-9-2-fechamento-de-cobertura-do-c-novo-pre-selo"></a>
+
 ## 2026-07-02 — 9.2: fechamento de cobertura do C novo (pré-selo)
 
 Checkup pós-9.2 rodou o `--all` em Linux (container, pré-checagem — Fedora
@@ -2497,6 +2654,8 @@ coerência de caminho, design prévio), 11.4 (exibição de i64 > 2^53) e 12.13
 (doc do 9.1 incompleta). Datetime fora do raio (epoch_ms).
 
 ---
+<a id="section-2026-07-01-item-9-contratos-de-fronteira-9-1-int64-2-53-9-2-column-cow-view-de-string"></a>
+
 ## 2026-07-01 — Item 9: Contratos de fronteira (9.1 int64 > 2^53 + 9.2 column COW / view de string)
 
 Fechou os dois contratos de fronteira do item 9. O fio condutor: quem é dono do
@@ -2559,6 +2718,8 @@ API_Reference, API_INDEX, CONTRACT. 9.1 fechou por Windows (Lua-puro); 9.2 é
 [Fedora] (Anel 0 novo) — aguarda `--all` para o selo de cobertura.
 
 ---
+<a id="section-2026-06-30-item-8-rolling-ring-0-motor-generico-min-periods-expanding-dataset"></a>
+
 ## 2026-06-30 — Item 8: Rolling → Ring 0 (motor genérico + min_periods + expanding + DataSet)
 
 Levou a tese de "fonte única" ao rolling. Antes a duplicação era TRIPLA (C /
@@ -2614,6 +2775,8 @@ Nenhum teste dependia do comportamento truncado.
   ao motor genérico (malloc/free de tmp em i64_via_motor) e ao rescan de min/max.
 
 ---
+<a id="section-2026-06-29-item-7-3-rank-em-dt-str-bool-no-ring-0"></a>
+
 ## 2026-06-29 — Item 7.3: rank em dt/str/bool no Ring 0
 
 Último gap de completude do motor (o 7.4 já estava feito). `rank`/`pct_rank`
@@ -2654,6 +2817,8 @@ existiam só em f64/i64; agora todos os ordenáveis (f64/i64/dt/str/bool) têm.
   com contexto global) e às ramificações de método.
 
 ---
+<a id="section-2026-06-29-item-7-2b-min-max-em-dt-str-bool-no-ring-0-7-2-completo"></a>
+
 ## 2026-06-29 — Item 7.2b: min/max em dt/str/bool no Ring 0 (7.2 completo)
 
 Segunda metade do 7.2. Fecha a outra metade da incoerência: `dt:min`/`dt:max`
@@ -2688,6 +2853,8 @@ D7.2-a opção ii). Agora `dt:min == get(dt:argmin)` — coerência total.
   (ponteiro pra dentro do buffer) e às ramificações de status do bool.
 
 ---
+<a id="section-2026-06-29-item-7-2a-argmin-argmax-em-str-bool-dt-no-ring-0"></a>
+
 ## 2026-06-29 — Item 7.2a: argmin/argmax em str/bool/dt no Ring 0
 
 Primeira metade do 7.2. Fecha parte da incoerência `dt:argmin`✓/`dt:min`✗:
@@ -2713,6 +2880,8 @@ que erravam — ganharam a operação.
 - `[Fedora]`: aguarda Valgrind + cobertura para `[Done]`.
 
 ---
+<a id="section-2026-06-29-item-7-1b-shift-com-sinal-no-ring-0-todos-os-dtypes"></a>
+
 ## 2026-06-29 — Item 7.1b: shift com sinal no Ring 0 (todos os dtypes)
 
 Fecha o 7.1. Move o shift inteiro pro C — incluindo o sentido negativo, que
@@ -2743,6 +2912,8 @@ nenhum.
   ramo `|periods|>=size` e ao `str_shift` sob OOM na cobertura.
 
 ---
+<a id="section-2026-06-29-item-7-1a-ffill-bfill-no-ring-0-bool-str-dt"></a>
+
 ## 2026-06-29 — Item 7.1a: ffill/bfill no Ring 0 (bool/str/dt)
 
 Continuação da meta-decisão D7 (item 7 vai pro C, sem fallback). Recorte: o 7.1
@@ -2773,6 +2944,8 @@ bissectar se o Valgrind/cobertura do Fedora acusar algo.
 - `[Fedora]`: aguarda Valgrind + cobertura no Fedora para `[Done]`.
 
 ---
+<a id="section-2026-06-29-item-7-4-bool-eq-ne-no-ring-0"></a>
+
 ## 2026-06-29 — Item 7.4: bool eq/ne no Ring 0
 
 Meta-decisão D7: todo o item 7 vai pro C (Anel 0), Lua só delega, sem fallback —
@@ -2811,7 +2984,11 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
 - Tudo Lua-puro. Testes: Series acesso 25→34, DataSet core 207→212. Docs
   (API_INDEX) atualizados. Parity 12/12. Aguarda Fedora + Windows para `[Done]`.
 
+<a id="section-2026-06-28-item-5-completo-element-wise-transforms-5-2-5-3"></a>
+
 ## 2026-06-28 — Item 5 completo: element-wise + transforms (5.2/5.3)
+
+<a id="section-5-2-element-wise-dataset-mesma-forma"></a>
 
 ### 5.2 element-wise → DataSet mesma forma
 - `df:abs/round/clip/cumsum/cummin/cummax/cumprod`. Helper `map_frame` aplica a
@@ -2819,6 +2996,8 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   **erra** se houver coluna não-numérica, nomeando-a ("selecione as numéricas
   antes"). Contraste com 5.1: reduções mudam a forma → pulam não-numéricas;
   element-wise preserva a forma → não dá pra descartar/passar em silêncio.
+<a id="section-5-3-transforms"></a>
+
 ### 5.3 transforms
 - `df:ffill/bfill/shift` (qualquer dtype), `df:diff` (numérico, D4-i).
 - `df:isna/notna` → DataSet **bool**, todas as colunas. Construído via `is_null`
@@ -2831,7 +3010,11 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   checks. **Item 5 fecha** por equivalência Fedora; follow-up `build.ps1`.
 
 ---
+<a id="section-2026-06-28-item-5-reducoes-dataset-5-1-min-count-5-5-delegacao-groupby-5-4"></a>
+
 ## 2026-06-28 — Item 5: reduções DataSet (5.1), min_count (5.5), delegação GroupBy (5.4)
+
+<a id="section-5-1-reducoes-por-coluna-dataset-1-linha-d1"></a>
 
 ### 5.1 — reduções por coluna → DataSet 1-linha (D1)
 - `df:sum/mean/min/max/std/var/median/prod/quantile/skew/kurtosis/mad/sem/
@@ -2839,10 +3022,14 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   resultado (sum de i64→i64 e mean→f64 convivem — por isso 1-linha, não Series
   posicional; decisão D1). Só colunas numéricas; sem numérica → erro. Helper
   `reduce_frame` delega às reduções da Series (fonte única).
+<a id="section-5-5-min-count-opt-in-em-sum-prod-series-e-dataset"></a>
+
 ### 5.5 — min_count opt-in em sum/prod (Series e DataSet)
 - `Series:sum(ignore_na, min_count)` / `:prod(...)`; `DataSet:sum(min_count)` /
   `:prod(...)`. Default (0) preserva o atual (sum de vazio/all-null = 0).
   `min_count=N` exige N não-nulos, senão NA.
+<a id="section-5-4-groupby-delega-as-reducoes-da-series-elimina-duplicacao"></a>
+
 ### 5.4 — GroupBy delega às reduções da Series (elimina duplicação)
 - `agg_sum/mean/min/max/std/var/median/prod/nunique` deixaram de reimplementar
   inline — agora `col:take(idx):<redução>()`. Behavior-preserving (groupby 60
@@ -2852,7 +3039,11 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   e 5.3 (transforms), pendentes de decisão D4 (não-numéricas).
 
 ---
+<a id="section-2026-06-28-item-5-fundacao-5-0-reconciliacao-de-ddof-em-std-var"></a>
+
 ## 2026-06-28 — Item 5 (fundação 5.0): reconciliação de ddof em std/var
+
+<a id="section-achado-em-sessao-bloqueava-o-item-5"></a>
 
 ### Achado em sessão (bloqueava o item 5)
 - O `ddof` estava **incoerente em três vias**: `Series:std/var` eram populacionais
@@ -2863,6 +3054,8 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
 - Um D2 inicial (alinhar Series→nil em n<2 assumindo amostral) foi tentado e
   **revertido** — partia da premissa errada; os testes "var populacional" pegaram.
   Bom exemplo de "behavior-identical exige prova": a suíte é o guard.
+
+<a id="section-decisao-opcao-a-e-implementacao"></a>
 
 ### Decisão (Opção A) e implementação
 - **Tudo amostral (ddof=1).** C `smaug_f64_var`/`smaug_i64_var`: ÷(n-1), NaN para
@@ -2876,7 +3069,11 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   Linux verde (suíte idêntica fora os 3 valores recalculados).
 
 ---
+<a id="section-2026-06-28-timeline-item-4-na-relacional-unificado-contrato-8"></a>
+
 ## 2026-06-28 — Timeline item 4: NA relacional unificado + Contrato 8
+
+<a id="section-politica-mudanca-de-comportamento-adicao-de-contrato-nao-refatoracao"></a>
 
 ### Política (mudança de comportamento — adição de contrato, não refatoração)
 - **Contrato 8: NA em chave relacional é erro.** Antes, três tratamentos
@@ -2897,6 +3094,8 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   segue genérico. Nenhum C tocado — política mora na camada Lua, mantendo a
   separação de anéis e alinhando o Anel 2 ao Contrato 6.
 
+<a id="section-decisoes-e-achados"></a>
+
 ### Decisões e achados
 - **Os dois pivots:** roadmap nomeou só `pivot_table`; `pivot` tinha o mesmo
   silent-drop. Incluídos ambos (senão a incoerência persistiria).
@@ -2913,6 +3112,8 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   chave_dir}`, não composta. Quirk pré-existente da API de join, fora do escopo
   do item 4. Registro para eventual avaliação futura.
 
+<a id="section-fechamento"></a>
+
 ### Fechamento
 - `[Windows]` Lua-puro, mesma categoria dos itens 2/3 (nenhum C tocado). Build
   Linux verde, parity 12/12. **Mudança de comportamento** + contrato novo, então
@@ -2920,7 +3121,11 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   `build.ps1`.
 
 ---
+<a id="section-2026-06-28-timeline-item-3-bool-view-exposicao-na-camada-lua"></a>
+
 ## 2026-06-28 — Timeline item 3: bool_view (exposição na camada Lua)
+
+<a id="section-exposicao-c-ja-existia-e-estava-testado"></a>
 
 ### Exposição (C já existia e estava testado)
 - **`bool_view` exposto** no descritor bool (`_types.lua`): uma linha
@@ -2943,11 +3148,15 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
 - **COW.md (3.5):** bool → ✅ view / ✅ COW; removidas as frases falsas de
   imutabilidade; bool adicionado às tabelas de funções C.
 
+<a id="section-achado-registrado-10-7"></a>
+
 ### Achado registrado (10.7)
 - `test_constructors.lua` re-declara `local n_ok` por seção e imprime só no fim:
   headline "98 checks" subconta o real (~328 rodam). Cobertura é real (cada
   `check` aborta em falha); só o número engana. Registrado no item 10, não tocado
   (fora de escopo do item 3).
+
+<a id="section-fechamento-done-via-fedora"></a>
 
 ### Fechamento (Done — via Fedora)
 - **Reavaliação de risco:** classifiquei o item como "expõe C, precisa de Windows",
@@ -2960,7 +3169,11 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   o item só não se enquadra nela.
 
 ---
+<a id="section-2026-06-28-fechamento-dos-itens-1-e-2-recuperacao-de-regressao-no-entry-point"></a>
+
 ## 2026-06-28 — Fechamento dos itens 1 e 2 + recuperação de regressão no entry point
+
+<a id="section-itens-fechados"></a>
 
 ### Itens fechados
 - **Item 1 (Done, Fedora):** Valgrind-clean nos 12 binários (`ERROR SUMMARY: 0
@@ -2970,6 +3183,8 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   suprido por validação Fedora (mesmo LuaJIT; parity eixo 09 OK; ponto sensível
   do `_dt.lua` exercitado de fato). Follow-up leve: confirmar com
   `build.ps1`. **Equivalência vale só por ser Lua puro — não é regra.**
+
+<a id="section-incidente-lua-smaug-init-lua-entry-point-sobrescrito"></a>
 
 ### Incidente: `lua/smaug/init.lua` (entry point) sobrescrito
 - Na aplicação do item 2, o orquestrador da Series (`core/series/init.lua`) foi
@@ -2988,7 +3203,11 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   distintos. Se ficarem idênticos, o sintoma é `attempt to index ... 'Series'`.
 
 ---
+<a id="section-2026-06-26-timeline-item-2-sentinela-unico-na-camada-lua"></a>
+
 ## 2026-06-26 — Timeline item 2: sentinela único na camada Lua
+
+<a id="section-refatoracao-consumo-do-central-sem-mudanca-de-comportamento"></a>
 
 ### Refatoração (consumo do central — sem mudança de comportamento)
 - **`_dt.lua` consome o sentinela i64 central** em vez de reinventá-lo. Removidos
@@ -3018,7 +3237,11 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   C (Valgrind n/a) nem cobertura C (gcov n/a).
 
 ---
+<a id="section-2026-06-26-timeline-item-1-fonte-unica-de-nulidade-no-ring-0"></a>
+
 ## 2026-06-26 — Timeline item 1: fonte única de nulidade no Ring 0
+
+<a id="section-refatoracao-interna-sem-mudanca-de-contrato-publico"></a>
 
 ### Refatoração (interna — sem mudança de contrato público)
 - **Centralização da convenção de máscara de nulos em `smaug_types.h`.** Antes,
@@ -3049,10 +3272,16 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   (Valgrind-clean + cobertura) pendente no Fedora, conforme critério `[Fedora]`.
 
 ---
+<a id="section-2026-06-23"></a>
+
 ## 2026-06-23 
 - docs(roadmap): sincroniza métricas reais (cobertura 95.83%, checks por suíte), enxuga Blocos H/E, adiciona Bloco I (fechamento de coerência pré-v1.0) e registra achados da auditoria código-vs-código (dt_view, rank i64, rolling-dup, I3/I4)
 
+<a id="section-2026-06-22-fase-5-cobertura-dos-parsers-correcao-de-double-free-sob-oom"></a>
+
 ## 2026-06-22 — Fase 5: cobertura dos parsers + correção de double-free sob OOM
+
+<a id="section-corrigido"></a>
 
 ### Corrigido
 - **Double-free em `smaug_read_json_mem` sob OOM** (3 sites de limpeza): em
@@ -3067,6 +3296,8 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   bloco antigo já liberado pelo realloc bem-sucedido — `free_record` do caller
   dava double-free. Corrigido atualizando `rec->keys`/`rec->vals` imediatamente
   após cada realloc bem-sucedido. Validado Valgrind-clean (1962 = 1962 frees).
+
+<a id="section-testes-hardening"></a>
 
 ### Testes / Hardening
 - **Harness de allocfail estendido para `calloc` e `strdup`**: `--wrap=malloc,
@@ -3094,8 +3325,12 @@ gap real. Nada suposto; cada par/gap aterrado no fonte.
   excluídas. Novos `COV-EXCL-BR` honestos: `encode_utf8` com cp>0x10FFFF,
   ramos de pureza de inferência de dtype, while-body de deque inalcançável.
 
+<a id="section-2026-06-21-aritmetica-numerica-promocao-de-tipos-e-divisao-verdadeira"></a>
+
 ## 2026-06-21 — Aritmética numérica: promoção de tipos e divisão verdadeira
 
+
+<a id="section-2026-06-20-coerencia-de-construcao-inferencia-universal-de-dtype"></a>
 
 ## 2026-06-20 — Coerência de construção: inferência universal de dtype
 
@@ -3103,6 +3338,8 @@ Implementação da camada Lua das decisões de coerência de API tomadas na
 sessão de design anterior. Tema: a construção a partir de dados infere o
 dtype de forma consistente em todos os pontos de entrada; quando o valor é
 ambíguo, o engine recusa em vez de adivinhar.
+
+<a id="section-adicionado"></a>
 
 ### Adicionado
 
@@ -3114,6 +3351,8 @@ ambíguo, o engine recusa em vez de adivinhar.
   `Series.from_table`/`full`/`__call`, `DataSet.from_columns`/`__call` e
   `Series:map`. Antes a regra estava duplicada (uma cópia no `DataSet.__call`,
   outra implícita no `map`) e divergente.
+
+<a id="section-corrigido-incoerencias-de-construcao"></a>
 
 ### Corrigido — incoerências de construção
 
@@ -3131,6 +3370,8 @@ ambíguo, o engine recusa em vez de adivinhar.
   explícito. Antes falhava — a validação rejeitava o booleano antes de honrar o
   dtype declarado.
 
+<a id="section-decisoes-de-contrato"></a>
+
 ### Decisões de contrato
 
 - **`astype("bool")` numérico é rígido:** aceita apenas `0`→false e `1`→true
@@ -3146,6 +3387,8 @@ comportamento (bool inferido, astype rígido com casos de erro explícitos) e
 novo teste de imutabilidade do `assign` ao substituir coluna. Removida uma
 duplicação acidental de bloco em `test_core.lua`.
 
+<a id="section-docs"></a>
+
 ### Docs
 
 `API_INDEX.md` — `assign` marcado como retornando novo DataSet, consistente
@@ -3153,12 +3396,16 @@ com `filter`/`fillna`/`drop_duplicates`/`rename`.
 
 ---
 
+<a id="section-aritmetica-numerica-promocao-de-tipos-e-divisao-verdadeira"></a>
+
 ## Aritmética numérica: promoção de tipos e divisão verdadeira
 
 Segunda parte da mesma sessão. Tema: operações aritméticas entre numéricos não
 barram o que é matematicamente sem ambiguidade, nem corrompem silenciosamente.
 Toda a mudança é na camada Lua (o despacho de operadores); nenhuma função C mudou
 — a cobertura permaneceu idêntica, confirmando que nenhum caminho novo foi criado.
+
+<a id="section-corrigido-1"></a>
 
 ### Corrigido
 
@@ -3170,6 +3417,8 @@ Toda a mudança é na camada Lua (o despacho de operadores); nenhuma função C 
   `int64` truncando o escalar para `2` (resultado `4` em vez de `5.0`) — corrupção
   silenciosa. Agora o escalar fracionário sobre série int64 promove a série a
   `float64` antes da operação, e o resultado é correto.
+
+<a id="section-decisoes-de-contrato-1"></a>
 
 ### Decisões de contrato
 
@@ -3185,12 +3434,16 @@ Toda a mudança é na camada Lua (o despacho de operadores); nenhuma função C 
 (promoção, `/` float) e bloco dedicado novo cobrindo promoção série×série,
 série×escalar (incl. o caso que antes corrompia), `/` verdadeira e `:floordiv`.
 
+<a id="section-docs-1"></a>
+
 ### Docs
 
 `API_INDEX.md` — documentada a semântica de promoção, `/` verdadeira e o método
 `:floordiv`.
 
 ---
+
+<a id="section-2026-06-17-sincronizacao-dos-scripts-de-build-com-a-estrutura-da-fase-4"></a>
 
 ## 2026-06-17 — Sincronização dos scripts de build com a estrutura da Fase 4
 
@@ -3200,6 +3453,8 @@ A Fase 4 reorganizou os testes em subpastas (`tests/c/`, `tests/series/`,
 acompanharam — continuavam apontando para os arquivos legado na raiz de
 `tests/`. A auditoria revelou dois bugs reais (não apenas cosméticos), além da
 divergência estrutural.
+
+<a id="section-bug-1-so-incompleta-no-build-sh-corrigido"></a>
 
 ### Bug 1 — `.so` incompleta no `build.sh` (corrigido)
 
@@ -3212,6 +3467,8 @@ indefinido. Confirmado por `nm -D` (0 símbolos antes, 10 depois). O Makefile e
 o `build.ps1` (que descobre `src/*.c` por glob) já estavam corretos —
 o bug era exclusivo do `build.sh`.
 
+<a id="section-bug-2-cobertura-cega-em-make-coverage-sh-corrigido"></a>
+
 ### Bug 2 — cobertura cega em `make_coverage.sh` (corrigido)
 
 `make_coverage.sh` não incluía `smaug_ops_window` nos `SRCS` instrumentados nem
@@ -3220,6 +3477,8 @@ Ring 0 na Fase 3 (cumsum, cumprod, cummin, cummax, diff, shift, ffill, bfill,
 argmin, argmax, sorted_nonnull, rank, multi_argsort, rolling) ficavam **fora da
 medição inteira de cobertura** — invisíveis ao gcov. Agora entram na medição do
 Fedora pela primeira vez.
+
+<a id="section-divergencia-estrutural-scripts-realinhados-a-fase-4"></a>
 
 ### Divergência estrutural — scripts realinhados à Fase 4
 
@@ -3244,12 +3503,16 @@ estrutura por domínio:
   reais. Os demais eixos (01–10, 12) e `common.lua` já tinham fallback
   mono↔pasta e não precisaram de mudança.
 
+<a id="section-lixo-removido"></a>
+
 ### Lixo removido
 
 `scripts/parity/PARITY_REPORT.md` — relatório de paridade órfão (gerado em
 14/jun). Os scripts `parity.sh`/`parity.ps1` escrevem em `docs/PARITY_REPORT.md`;
 essa cópia em `scripts/parity/` nunca era regravada e entrava no MANIFEST
 indevidamente. Removida.
+
+<a id="section-legado-da-raiz-removido"></a>
 
 ### Legado da raiz removido
 
@@ -3258,6 +3521,8 @@ raiz de `tests/` tornaram-se órfãos — nenhum script ativo os referenciava.
 Removidos. Teste de fogo antes da remoção: mover todo o legado para fora e rodar
 `build.sh` + `make test` + `make test-stress` — tudo passou apenas com a
 estrutura nova, confirmando zero dependência residual.
+
+<a id="section-validacao"></a>
 
 ### Validação
 
@@ -3274,11 +3539,15 @@ ficam para a sessão de revisão do Roadmap.
 
 ---
 
+<a id="section-2026-06-16-fase-4-reorganizacao-estrutural-series-dataset-tests"></a>
+
 ## 2026-06-16 — Fase 4: reorganização estrutural (series/, dataset/, tests/)
 
 Reorganização dos monolíticos do Ring 1 em módulos coesos e da suíte de testes
 em subpastas por domínio. Zero alteração de comportamento — todas as sessões
 confirmadas por `make test` + `make test-lua` + `parity.sh 12/12`.
+
+<a id="section-ciclo-1-series-lua-4389-linhas-series-16-submodulos"></a>
 
 ### Ciclo 1 — series.lua (4389 linhas) → series/ (16 submódulos)
 
@@ -3312,6 +3581,8 @@ montado progressivamente em `init.lua`. Zero `require` cruzado entre submódulos
 upvalues passados via `I`. `scripts/parity/common.lua` ganhou `read_series_lua()`
 para análise estática de paridade com a estrutura em pasta.
 
+<a id="section-ciclo-2-dataset-lua-2256-linhas-dataset-4-submodulos"></a>
+
 ### Ciclo 2 — dataset.lua (2256 linhas) → dataset/ (4 submódulos)
 
 `lua/smaug/core/dataset.lua` desmembrado em:
@@ -3329,6 +3600,8 @@ dataset/
 Mesmo mecanismo de `I` do Ciclo 1. `I.map_columns` e `I.cell_str` exportados
 por `_core.lua` para uso nos submódulos subsequentes.
 `scripts/parity/common.lua` ganhou `read_dataset_lua()`.
+
+<a id="section-ciclo-3-tests-reorganizacao-28-arquivos-18-suites-em-subpastas"></a>
 
 ### Ciclo 3 — tests/ reorganização (28 arquivos → 18 suítes em subpastas)
 
@@ -3348,6 +3621,8 @@ tests/
 sua concatenação. Path `tests/fixtures/pedidos_digitados.csv` atualizado nos
 testes de I/O.
 
+<a id="section-resultado"></a>
+
 ### Resultado
 
 - `make test` (12 C): PASS
@@ -3356,11 +3631,15 @@ testes de I/O.
 
 ---
 
+<a id="section-2026-06-16-fase-3-grupos-a-b-ring-0-g-1-utf-8-json"></a>
+
 ## 2026-06-16 — Fase 3 Grupos A+B (Ring 0) + G.1 UTF-8 JSON
 
 Início da Fase 3: migração de primitivas Lua puro para Ring 0 (C), guiada
 pelo Bloco G. Duas frentes paralelas nesta sessão: G.1 (bloqueante de release)
 e Grupos A+B do inventário de primitivas.
+
+<a id="section-g-1-decodificacao-utf-8-no-reader-json"></a>
 
 ### G.1 — Decodificação UTF-8 no reader JSON
 
@@ -3382,6 +3661,8 @@ bytes, não codepoints. `test_io_c`: 174 → 190 checks (+16, 8 casos unicode).
 qualquer não-ASCII como `\uXXXX`. Dados brasileiros reais (nomes, cidades com
 acento) produzem escapes rotineiramente. O `'?'` silencioso era bug de
 integridade indetectável em produção.
+
+<a id="section-grupo-a-10-primitivas-o-n-para-ring-0"></a>
 
 ### Grupo A — 10 primitivas O(N) para Ring 0
 
@@ -3407,6 +3688,8 @@ Regra de migração aplicada: todas as funções C registradas nos descritores
 `DTYPES` (`float64` e `int64`) e acessadas via `self._d.fn(self._c)` — nunca
 `C.smaug_f64_fn` diretamente no corpo do método.
 
+<a id="section-grupo-b-sorted-nonnull-e-rank-para-ring-0"></a>
+
 ### Grupo B — sorted_nonnull e rank para Ring 0
 
 Migradas de Lua puro para C:
@@ -3431,10 +3714,14 @@ Grupo B não usa `DTYPES`: as funções retornam ponteiros brutos (`double*`,
 `int64_t*`), não `smaug_series_*_t` — são primitivas de buffer chamadas
 diretamente pelos métodos, não via descritor de dtype.
 
+<a id="section-testes"></a>
+
 ### Testes
 
 `test_ops_window.c` — novo, cobre Grupos A e B: 150 checks.
 ASan+UBSan limpos. `test_allocfail` estável em 1158 verificações.
+
+<a id="section-proximo"></a>
 
 ### Próximo
 
@@ -3447,6 +3734,8 @@ após medição de performance no Windows.
 
 Último sub-bloco do enriquecimento dos núcleos. Com ele, **o Bloco F inteiro
 (F.1–F.6) está fechado**.
+
+<a id="section-adicionado-1"></a>
 
 ### Adicionado
 
@@ -3475,6 +3764,8 @@ após medição de performance no Windows.
 
 `test_duplicates.lua` (74 checks).
 
+<a id="section-docs-2"></a>
+
 ### Docs
 
 `API_INDEX.md` — Eixo 12 mantém 100%: `Series.methods` 90→95, `DataSet.methods`
@@ -3482,7 +3773,11 @@ após medição de performance no Windows.
 
 ---
 
+<a id="section-2026-06-15-bloco-f-5-acesso-e-ergonomia"></a>
+
 ## 2026-06-15 — Bloco F.5 (acesso e ergonomia)
+
+<a id="section-adicionado-2"></a>
 
 ### Adicionado
 
@@ -3512,6 +3807,8 @@ após medição de performance no Windows.
 `test_access.lua` (54 checks), incluindo roundtrip `to_dict→from_dict`, bordas de
 `insert` e erros de acesso.
 
+<a id="section-docs-3"></a>
+
 ### Docs
 
 `API_INDEX.md` — Eixo 12 mantém 100%: `DataSet.methods` 40→46 (`from_dict` é
@@ -3520,7 +3817,11 @@ função de classe, documentada à parte como `from_columns`). Roadmap marca F.5
 
 ---
 
+<a id="section-2026-06-15-portabilidade-de-i-o-blocos-f-3-e-f-4-sync-de-builds"></a>
+
 ## 2026-06-15 — Portabilidade de I/O + Blocos F.3 e F.4 + sync de builds
+
+<a id="section-corrigido-testes-de-i-o-com-path-hardcoded-windows"></a>
 
 ### Corrigido — testes de I/O com path hardcoded (Windows)
 
@@ -3533,6 +3834,8 @@ temporário via `TMPDIR`→`TMP`→`TEMP`→`/tmp`, montando o caminho com separ
 `os.getenv` devolve `""` (truthy em Lua), não `nil`, para variável vazia — o
 helper trata string vazia como ausente, espelhando o `!dir || !*dir` do C.
 Validado em três cenários: fallback `/tmp`, `TEMP` setado, e variável vazia.
+
+<a id="section-adicionado-bloco-f-3-accessor-dt-estendido"></a>
 
 ### Adicionado — Bloco F.3: accessor `.dt` estendido
 
@@ -3557,6 +3860,8 @@ frontend.
 `test_dt_extended.lua` (65 checks), com casos seculares (1900 não-bissexto, 2000
 bissexto), empates de round e meia-noite/meio-dia para `%I`/`%p`.
 
+<a id="section-adicionado-bloco-f-4-accessor-str-tier-c"></a>
+
 ### Adicionado — Bloco F.4: accessor `.str` Tier C
 
 ASCII puro, sem regex, sem Unicode — consistente com Tier A/B. Reaproveita os
@@ -3577,6 +3882,8 @@ helpers `str_map` (→ Series<string>) e `bool_map` (→ Series<bool>) existente
 `test_str_tier_c.lua` (61 checks), incluindo vazias, nulos, não-ASCII em `title`
 (não quebra), e contagem não-sobreposta.
 
+<a id="section-sincronizacao-das-tres-fontes-de-build"></a>
+
 ### Sincronização das três fontes de build
 
 `build.ps1` estava atrás em duas dimensões: faltava `test_datetime_c`
@@ -3586,6 +3893,8 @@ canônico — as três fontes (`Makefile`, `build.sh`, `build.ps1`) agora
 rodam o conjunto idêntico, verificado por diff: 9 binários C plain + allocfail +
 stress, e 26 suítes Lua.
 
+<a id="section-docs-4"></a>
+
 ### Docs
 
 `API_INDEX.md` — Eixo 12 mantém 100%: `SeriesDT:*` 19→33, `StrProxy:*` 15→28.
@@ -3593,9 +3902,13 @@ Roadmap marca F.3 e F.4 `[Done]`.
 
 ---
 
+<a id="section-2026-06-15-completude-de-paridade-blocos-f-1-e-f-2"></a>
+
 ## 2026-06-15 — Completude de paridade + Blocos F.1 e F.2
 
 Sessão de fechamento de lacunas antes de avançar o enriquecimento dos núcleos.
+
+<a id="section-corrigido-checkup-de-build-e-oraculos-de-teste"></a>
 
 ### Corrigido — checkup de build e oráculos de teste
 
@@ -3605,6 +3918,8 @@ que `LUA_TESTS` cobria 8 de 21 suítes (362k+ checks ignorados pelo `make`). As
 duas listas foram completadas e sincronizadas entre `Makefile` e `build.sh`.
 Removido um warning `-Wunused-variable` em `test_io_c.c:315` (`s` capturada e
 nunca usada). Build agora zero-warning também nos binários de teste.
+
+<a id="section-adicionado-completude-de-metodos-em-datetime-e-categorical"></a>
 
 ### Adicionado — completude de métodos em datetime e categorical
 
@@ -3622,6 +3937,8 @@ Decisão: nesta fase de completude, **implementar**, não registrar exceção.
 
 `test_completeness.lua` (93 checks) pina cada comportamento, incluindo nulos e
 erros de bounds.
+
+<a id="section-adicionado-bloco-f-1-pacote-estatistico"></a>
 
 ### Adicionado — Bloco F.1: pacote estatístico
 
@@ -3641,6 +3958,8 @@ erros de bounds.
 - `pct_change` com divisor zero → null (não Inf), por previsibilidade.
 
 `test_stats.lua` (60 checks) com valores de referência calculados à mão.
+
+<a id="section-adicionado-bloco-f-2-pacote-de-predicados"></a>
 
 ### Adicionado — Bloco F.2: pacote de predicados
 
@@ -3664,6 +3983,8 @@ erros de bounds.
 
 `test_predicates.lua` (78 checks).
 
+<a id="section-docs-5"></a>
+
 ### Docs
 
 `API_INDEX.md` atualizado — Eixo 12 (sincronização docs↔código) de 88/97/60/77%
@@ -3673,6 +3994,8 @@ entradas individuais para o checker detectar por nome exato. Roadmap marca F.1
 como `[Done]`.
 
 ---
+
+<a id="section-2026-06-14-decisao-enriquecimento-dos-nucleos-entra-na-v1-0"></a>
 
 ## 2026-06-14 — Decisão: enriquecimento dos núcleos entra na v1.0
 
@@ -3708,7 +4031,11 @@ decisão de não-fazer, e checklist atualizado.
 
 ---
 
+<a id="section-2026-06-14-tier-2-dtypes-bugfix-valgrind-dos-parsers-i-o"></a>
+
 ## 2026-06-14 — Tier 2 dtypes + bugfix Valgrind dos parsers I/O
+
+<a id="section-adicionado-datetime-no-frontend-lua"></a>
 
 ### Adicionado — datetime no frontend Lua
 
@@ -3731,6 +4058,8 @@ a integração com o frontend:
 - `test_datetime.lua` (188 checks): factories, `.dt`, comparações, sort, filter,
   astype, integração DataSet (filter/sort_by/assign/select/head/dropna/describe).
 
+<a id="section-adicionado-categorical-lua-puro"></a>
+
 ### Adicionado — categorical (Lua puro)
 
 `CategoricalSeries` implementado inteiramente em Lua usando dictionary encoding.
@@ -3750,6 +4079,8 @@ Decisão consciente de não criar C backend — o tipo é essencialmente um índ
   `__newindex`, `__call` todos aceitam `CategoricalSeries`. Princípio
   "toda coluna aceita pelo DataSet funciona em toda a API do DataSet".
 - `test_categorical.lua` (199 checks).
+
+<a id="section-corrigido-leaks-nos-parsers-i-o-capturados-pelo-valgrind"></a>
 
 ### Corrigido — leaks nos parsers I/O capturados pelo Valgrind
 
@@ -3781,10 +4112,14 @@ traces apontaram para `smaug_csv.c:227` (strdup de `col_names`) e
 Resultado: Valgrind 100% clean em todos os 9 binários no Fedora. `test_allocfail`
 com 15330 allocs / 15330 frees, `test_stress` com 90751/90751.
 
+<a id="section-corrigido-warning-wtype-limits-no-test-allocfail"></a>
+
 ### Corrigido — warning `-Wtype-limits` no test_allocfail
 
 `t->nrows >= 0` onde `nrows` é `size_t` (unsigned) — sempre verdadeiro.
 Substituído por `1` constante; o check útil (`!t || t->error`) permanece.
+
+<a id="section-decisao-ndjson-adiado-para-pos-1-0"></a>
 
 ### Decisão — NDJSON adiado para pós-1.0
 
@@ -3793,6 +4128,8 @@ infere dtypes por linha. Uma linha com `"a":null` infere `string`, conflitando
 com outra linha com `"a":1` que infere `int64`. Sem schema global declarativo,
 NDJSON é inerentemente frágil para dados com null. Decisão: adiar para o ciclo
 do schema/ORM (v2.0). Registrado em `Roadmap.md`.
+
+<a id="section-cobertura"></a>
 
 ### Cobertura
 
@@ -3803,7 +4140,11 @@ cleanup paths novos — código adicionado mas ainda não exercitado pelo
 
 ---
 
+<a id="section-2026-06-14-f66ba99-anel-3-completo-hardening-i-o"></a>
+
 ## 2026-06-14 · f66ba99 — Anel 3 completo + hardening I/O
+
+<a id="section-adicionado-anel-3-i-o-csv-e-json"></a>
 
 ### Adicionado — Anel 3: I/O CSV e JSON
 
@@ -3835,6 +4176,8 @@ JSON suporta o formato array de records `[{...}, {...}]` com escape completo
 (`\n`, `\t`, `\\`, `\"`, `\uXXXX`) e writer compacto/pretty. `NaN` → `null`
 no JSON (sem representação JSON para NaN).
 
+<a id="section-adicionado-test-io-c-c-174-checks"></a>
+
 ### Adicionado — test_io_c.c (174 checks)
 
 Cobertura C direta dos parsers: CRLF, CR-only, sem newline final, TSV,
@@ -3842,6 +4185,8 @@ sem header, aspas RFC 4180, aspas escapadas, aspas não fechadas, newline
 em campo, NA padrão e customizados, inferência de todos os tipos, linha curta,
 linha com 20 colunas, campo longo > 32 bytes, writer com NaN/sep/quote/sem-header/arquivo,
 JSON completo, roundtrips, erros de arquivo/path inválido.
+
+<a id="section-adicionado-test-io-real-lua-55-checks-com-dados-reais"></a>
 
 ### Adicionado — test_io_real.lua (55 checks) com dados reais
 
@@ -3852,6 +4197,8 @@ Valida leitura, groupby, filter, join e roundtrips sobre dados reais.
 Fixtures de cotações: `cotacoes.csv`, `cotacoes.json`, `cotacoes_USD_BRL.json`,
 `cotacoes_SHIB_BRL.json` — float64 de alta precisão e valores pequenos (SHIB: 0.00002492).
 
+<a id="section-adicionado-allocfail-nos-parsers-i-o-1098-1158-verificacoes"></a>
+
 ### Adicionado — allocfail nos parsers I/O (1098 → 1158 verificações)
 
 9 funções de injeção de falha: `af_csv_read_mem`, `af_csv_read_quoted`,
@@ -3859,6 +4206,8 @@ Fixtures de cotações: `cotacoes.csv`, `cotacoes.json`, `cotacoes_USD_BRL.json`
 `af_json_read_many_records`, `af_json_read_long_string`, `af_json_write`,
 `af_table_free_partial`. Toda falha de malloc em qualquer ponto dos parsers
 resulta em retorno gracioso sem crash.
+
+<a id="section-corrigido-dois-bugs-encontrados-pelo-valgrind"></a>
 
 ### Corrigido — dois bugs encontrados pelo Valgrind
 
@@ -3869,10 +4218,14 @@ de sucesso — 8 bytes por coluna vazavam.
 `strstr` e similares liam além do conteúdo válido. Corrigido: ambos os writers
 adicionam `\0` ao final sem contar em `out_len`.
 
+<a id="section-adicionado-cov-excl-br-nos-parsers"></a>
+
 ### Adicionado — COV-EXCL-BR nos parsers
 
 66 exclusões totais (era 57). Guards de OOM/syscall inalcançáveis via API
 pública nos parsers CSV e JSON documentados com justificativa técnica.
+
+<a id="section-cobertura-1"></a>
 
 ### Cobertura
 
@@ -3880,7 +4233,11 @@ Linha 97.95% (1909/1949). Branch-alvo 92.18% (1981/2149, 66 excluídos).
 
 ---
 
+<a id="section-2026-06-12-ring-1-completo"></a>
+
 ## 2026-06-12 · Ring 1 completo
+
+<a id="section-adicionado-df-mask-indexacao-por-boolseries"></a>
 
 ### Adicionado — `df[mask]` indexação por BoolSeries
 
@@ -3895,6 +4252,8 @@ local ds = smaug.DataSet({
 local adultos = ds[ds.idade:gt(18)]
 ```
 
+<a id="section-adicionado-str-tier-a-completo"></a>
+
 ### Adicionado — `.str` Tier A completo
 
 Accessor `.str` em `Series` do tipo string. 7 métodos + `replace`.
@@ -3908,19 +4267,27 @@ local normalizado = ds.cidade.str:strip():lower()
 Métodos: `len` (→ int64), `lower`, `upper`, `strip`, `replace` (→ string),
 `contains`, `startswith`, `endswith` (→ BoolSeries).
 
+<a id="section-adicionado-comparacoes-ge-le-ne"></a>
+
 ### Adicionado — comparações `ge`/`le`/`ne`
 
 Para f64, i64 e string. Completam o conjunto `gt`/`lt`/`eq`/`ge`/`le`/`ne`.
+
+<a id="section-adicionado-series-map-fn-dtype"></a>
 
 ### Adicionado — `Series:map(fn, dtype?)`
 
 Aplica função Lua elemento a elemento. `nil` retornado → null. Dtype
 inferido do primeiro retorno não-null; tipos mistos → erro com índice.
 
+<a id="section-corrigido-f64-div-0-null-uniforme-com-i64"></a>
+
 ### Corrigido — `f64` div/0 → null (uniforme com i64)
 
 `smaug_f64_div` e `smaug_f64_div_scalar` passam a produzir `null` quando
 o divisor é zero. Comportamento agora uniforme entre f64 e i64.
+
+<a id="section-decisao-broadcasting-rejeitado-para-anel-1"></a>
 
 ### Decisão — Broadcasting rejeitado para Anel 1
 
@@ -3930,12 +4297,18 @@ Removido da dívida técnica; registrado como decisão explícita.
 
 ---
 
+<a id="section-2026-06-11-9807b46"></a>
+
 ## 2026-06-11 · 9807b46
+
+<a id="section-corrigido-test-string-ux-orfa"></a>
 
 ### Corrigido — `test_string_ux()` órfã
 
 30 checks de UX de string estavam escritos mas nunca executados — função
 definida e não chamada. Qualquer máquina reportava 59 checks; o arquivo tinha 90.
+
+<a id="section-corrigido-rodape-do-coverage-md-incompleto"></a>
 
 ### Corrigido — rodapé do COVERAGE.md incompleto
 
@@ -3945,7 +4318,11 @@ o guard. O rodapé agora espelha a aritmética real.
 
 ---
 
+<a id="section-2026-06-10-f73c928"></a>
+
 ## 2026-06-10 · f73c928
+
+<a id="section-adicionado-boolseries-como-coluna-de-primeira-classe"></a>
 
 ### Adicionado — BoolSeries como coluna de primeira classe
 
@@ -3955,6 +4332,8 @@ aceita pelo DataSet deve funcionar em toda a API do DataSet, sem exceções ocul
 
 Corrigido também um bug de precedência no `argsort` (comparador Lua com `and`/`or`
 sem parênteses — resultado silenciosamente errado em certas ordenações).
+
+<a id="section-adicionado-ux-de-string"></a>
 
 ### Adicionado — UX de string
 
@@ -3970,6 +4349,8 @@ local f = s:astype("float64")
 -- f:get(1) == 1.5
 ```
 
+<a id="section-adicionado-api-publica-do-dataset"></a>
+
 ### Adicionado — API pública do DataSet
 
 - `smaug.DataSet({{...}})` via `__call`.
@@ -3980,17 +4361,25 @@ local f = s:astype("float64")
 
 ---
 
+<a id="section-2026-05-endurecimento-anel-0-frentes-a-b-c"></a>
+
 ## 2026-05 · endurecimento Anel 0 (frentes A, B, C)
+
+<a id="section-frente-b-oom-nas-ops"></a>
 
 ### Frente B — OOM nas ops
 
 `test_allocfail` estendido para cobrir todas as ops aritméticas (f64/i64/bool/string).
 579 → 767 → 1098 → 1158 verificações. Valgrind-clean.
 
+<a id="section-milestone-branch-alvo-100-no-nucleo-mc-dc-completo"></a>
+
 ### Milestone — branch-alvo 100% no núcleo (MC/DC completo)
 
 1095/1095 ramos do núcleo cobertos. Jornada: 75.42% → 100.00%.
 19 exclusões `COV-EXCL-BR` com justificativa auditável.
+
+<a id="section-frente-a-guards-de-input"></a>
 
 ### Frente A — guards de input
 
@@ -4004,11 +4393,15 @@ decisões, achados, motivações.
 
 ---
 
+<a id="section-2026-06-16-fase-3-grupos-a-b-ring-0-g-1-utf-8-json-1"></a>
+
 ## 2026-06-16 — Fase 3 Grupos A+B (Ring 0) + G.1 UTF-8 JSON
 
 Início da Fase 3: migração de primitivas Lua puro para Ring 0 (C), guiada
 pelo Bloco G. Duas frentes paralelas nesta sessão: G.1 (bloqueante de release)
 e Grupos A+B do inventário de primitivas.
+
+<a id="section-g-1-decodificacao-utf-8-no-reader-json-1"></a>
 
 ### G.1 — Decodificação UTF-8 no reader JSON
 
@@ -4030,6 +4423,8 @@ bytes, não codepoints. `test_io_c`: 174 → 190 checks (+16, 8 casos unicode).
 qualquer não-ASCII como `\uXXXX`. Dados brasileiros reais (nomes, cidades com
 acento) produzem escapes rotineiramente. O `'?'` silencioso era bug de
 integridade indetectável em produção.
+
+<a id="section-grupo-a-10-primitivas-o-n-para-ring-0-1"></a>
 
 ### Grupo A — 10 primitivas O(N) para Ring 0
 
@@ -4055,6 +4450,8 @@ Regra de migração aplicada: todas as funções C registradas nos descritores
 `DTYPES` (`float64` e `int64`) e acessadas via `self._d.fn(self._c)` — nunca
 `C.smaug_f64_fn` diretamente no corpo do método.
 
+<a id="section-grupo-b-sorted-nonnull-e-rank-para-ring-0-1"></a>
+
 ### Grupo B — sorted_nonnull e rank para Ring 0
 
 Migradas de Lua puro para C:
@@ -4079,10 +4476,14 @@ Grupo B não usa `DTYPES`: as funções retornam ponteiros brutos (`double*`,
 `int64_t*`), não `smaug_series_*_t` — são primitivas de buffer chamadas
 diretamente pelos métodos, não via descritor de dtype.
 
+<a id="section-testes-1"></a>
+
 ### Testes
 
 `test_ops_window.c` — novo, cobre Grupos A e B: 150 checks.
 ASan+UBSan limpos. `test_allocfail` estável em 1158 verificações.
+
+<a id="section-proximo-1"></a>
 
 ### Próximo
 
@@ -4095,6 +4496,8 @@ após medição de performance no Windows.
 
 Último sub-bloco do enriquecimento dos núcleos. Com ele, **o Bloco F inteiro
 (F.1–F.6) está fechado**.
+
+<a id="section-adicionado-3"></a>
 
 ### Adicionado
 
@@ -4123,6 +4526,8 @@ após medição de performance no Windows.
 
 `test_duplicates.lua` (74 checks).
 
+<a id="section-docs-6"></a>
+
 ### Docs
 
 `API_INDEX.md` — Eixo 12 mantém 100%: `Series.methods` 90→95, `DataSet.methods`
@@ -4130,7 +4535,11 @@ após medição de performance no Windows.
 
 ---
 
+<a id="section-2026-06-15-bloco-f-5-acesso-e-ergonomia-1"></a>
+
 ## 2026-06-15 — Bloco F.5 (acesso e ergonomia)
+
+<a id="section-adicionado-4"></a>
 
 ### Adicionado
 
@@ -4160,6 +4569,8 @@ após medição de performance no Windows.
 `test_access.lua` (54 checks), incluindo roundtrip `to_dict→from_dict`, bordas de
 `insert` e erros de acesso.
 
+<a id="section-docs-7"></a>
+
 ### Docs
 
 `API_INDEX.md` — Eixo 12 mantém 100%: `DataSet.methods` 40→46 (`from_dict` é
@@ -4168,7 +4579,11 @@ função de classe, documentada à parte como `from_columns`). Roadmap marca F.5
 
 ---
 
+<a id="section-2026-06-15-portabilidade-de-i-o-blocos-f-3-e-f-4-sync-de-builds-1"></a>
+
 ## 2026-06-15 — Portabilidade de I/O + Blocos F.3 e F.4 + sync de builds
+
+<a id="section-corrigido-testes-de-i-o-com-path-hardcoded-windows-1"></a>
 
 ### Corrigido — testes de I/O com path hardcoded (Windows)
 
@@ -4181,6 +4596,8 @@ temporário via `TMPDIR`→`TMP`→`TEMP`→`/tmp`, montando o caminho com separ
 `os.getenv` devolve `""` (truthy em Lua), não `nil`, para variável vazia — o
 helper trata string vazia como ausente, espelhando o `!dir || !*dir` do C.
 Validado em três cenários: fallback `/tmp`, `TEMP` setado, e variável vazia.
+
+<a id="section-adicionado-bloco-f-3-accessor-dt-estendido-1"></a>
 
 ### Adicionado — Bloco F.3: accessor `.dt` estendido
 
@@ -4205,6 +4622,8 @@ frontend.
 `test_dt_extended.lua` (65 checks), com casos seculares (1900 não-bissexto, 2000
 bissexto), empates de round e meia-noite/meio-dia para `%I`/`%p`.
 
+<a id="section-adicionado-bloco-f-4-accessor-str-tier-c-1"></a>
+
 ### Adicionado — Bloco F.4: accessor `.str` Tier C
 
 ASCII puro, sem regex, sem Unicode — consistente com Tier A/B. Reaproveita os
@@ -4225,6 +4644,8 @@ helpers `str_map` (→ Series<string>) e `bool_map` (→ Series<bool>) existente
 `test_str_tier_c.lua` (61 checks), incluindo vazias, nulos, não-ASCII em `title`
 (não quebra), e contagem não-sobreposta.
 
+<a id="section-sincronizacao-das-tres-fontes-de-build-1"></a>
+
 ### Sincronização das três fontes de build
 
 `build.ps1` estava atrás em duas dimensões: faltava `test_datetime_c`
@@ -4234,6 +4655,8 @@ canônico — as três fontes (`Makefile`, `build.sh`, `build.ps1`) agora
 rodam o conjunto idêntico, verificado por diff: 9 binários C plain + allocfail +
 stress, e 26 suítes Lua.
 
+<a id="section-docs-8"></a>
+
 ### Docs
 
 `API_INDEX.md` — Eixo 12 mantém 100%: `SeriesDT:*` 19→33, `StrProxy:*` 15→28.
@@ -4241,9 +4664,13 @@ Roadmap marca F.3 e F.4 `[Done]`.
 
 ---
 
+<a id="section-2026-06-15-completude-de-paridade-blocos-f-1-e-f-2-1"></a>
+
 ## 2026-06-15 — Completude de paridade + Blocos F.1 e F.2
 
 Sessão de fechamento de lacunas antes de avançar o enriquecimento dos núcleos.
+
+<a id="section-corrigido-checkup-de-build-e-oraculos-de-teste-1"></a>
 
 ### Corrigido — checkup de build e oráculos de teste
 
@@ -4253,6 +4680,8 @@ que `LUA_TESTS` cobria 8 de 21 suítes (362k+ checks ignorados pelo `make`). As
 duas listas foram completadas e sincronizadas entre `Makefile` e `build.sh`.
 Removido um warning `-Wunused-variable` em `test_io_c.c:315` (`s` capturada e
 nunca usada). Build agora zero-warning também nos binários de teste.
+
+<a id="section-adicionado-completude-de-metodos-em-datetime-e-categorical-1"></a>
 
 ### Adicionado — completude de métodos em datetime e categorical
 
@@ -4270,6 +4699,8 @@ Decisão: nesta fase de completude, **implementar**, não registrar exceção.
 
 `test_completeness.lua` (93 checks) pina cada comportamento, incluindo nulos e
 erros de bounds.
+
+<a id="section-adicionado-bloco-f-1-pacote-estatistico-1"></a>
 
 ### Adicionado — Bloco F.1: pacote estatístico
 
@@ -4289,6 +4720,8 @@ erros de bounds.
 - `pct_change` com divisor zero → null (não Inf), por previsibilidade.
 
 `test_stats.lua` (60 checks) com valores de referência calculados à mão.
+
+<a id="section-adicionado-bloco-f-2-pacote-de-predicados-1"></a>
 
 ### Adicionado — Bloco F.2: pacote de predicados
 
@@ -4312,6 +4745,8 @@ erros de bounds.
 
 `test_predicates.lua` (78 checks).
 
+<a id="section-docs-9"></a>
+
 ### Docs
 
 `API_INDEX.md` atualizado — Eixo 12 (sincronização docs↔código) de 88/97/60/77%
@@ -4321,6 +4756,8 @@ entradas individuais para o checker detectar por nome exato. Roadmap marca F.1
 como `[Done]`.
 
 ---
+
+<a id="section-2026-06-14-decisao-enriquecimento-dos-nucleos-entra-na-v1-0-1"></a>
 
 ## 2026-06-14 — Decisão: enriquecimento dos núcleos entra na v1.0
 
@@ -4356,7 +4793,11 @@ decisão de não-fazer, e checklist atualizado.
 
 ---
 
+<a id="section-2026-06-14-tier-2-dtypes-bugfix-valgrind-dos-parsers-i-o-1"></a>
+
 ## 2026-06-14 — Tier 2 dtypes + bugfix Valgrind dos parsers I/O
+
+<a id="section-adicionado-datetime-no-frontend-lua-1"></a>
 
 ### Adicionado — datetime no frontend Lua
 
@@ -4379,6 +4820,8 @@ a integração com o frontend:
 - `test_datetime.lua` (188 checks): factories, `.dt`, comparações, sort, filter,
   astype, integração DataSet (filter/sort_by/assign/select/head/dropna/describe).
 
+<a id="section-adicionado-categorical-lua-puro-1"></a>
+
 ### Adicionado — categorical (Lua puro)
 
 `CategoricalSeries` implementado inteiramente em Lua usando dictionary encoding.
@@ -4398,6 +4841,8 @@ Decisão consciente de não criar C backend — o tipo é essencialmente um índ
   `__newindex`, `__call` todos aceitam `CategoricalSeries`. Princípio
   "toda coluna aceita pelo DataSet funciona em toda a API do DataSet".
 - `test_categorical.lua` (199 checks).
+
+<a id="section-corrigido-leaks-nos-parsers-i-o-capturados-pelo-valgrind-1"></a>
 
 ### Corrigido — leaks nos parsers I/O capturados pelo Valgrind
 
@@ -4429,10 +4874,14 @@ traces apontaram para `smaug_csv.c:227` (strdup de `col_names`) e
 Resultado: Valgrind 100% clean em todos os 9 binários no Fedora. `test_allocfail`
 com 15330 allocs / 15330 frees, `test_stress` com 90751/90751.
 
+<a id="section-corrigido-warning-wtype-limits-no-test-allocfail-1"></a>
+
 ### Corrigido — warning `-Wtype-limits` no test_allocfail
 
 `t->nrows >= 0` onde `nrows` é `size_t` (unsigned) — sempre verdadeiro.
 Substituído por `1` constante; o check útil (`!t || t->error`) permanece.
+
+<a id="section-decisao-ndjson-adiado-para-pos-1-0-1"></a>
 
 ### Decisão — NDJSON adiado para pós-1.0
 
@@ -4441,6 +4890,8 @@ infere dtypes por linha. Uma linha com `"a":null` infere `string`, conflitando
 com outra linha com `"a":1` que infere `int64`. Sem schema global declarativo,
 NDJSON é inerentemente frágil para dados com null. Decisão: adiar para o ciclo
 do schema/ORM (v2.0). Registrado em `Roadmap.md`.
+
+<a id="section-cobertura-2"></a>
 
 ### Cobertura
 
@@ -4451,7 +4902,11 @@ cleanup paths novos — código adicionado mas ainda não exercitado pelo
 
 ---
 
+<a id="section-2026-06-14-f66ba99-anel-3-completo-hardening-i-o-1"></a>
+
 ## 2026-06-14 · f66ba99 — Anel 3 completo + hardening I/O
+
+<a id="section-adicionado-anel-3-i-o-csv-e-json-1"></a>
 
 ### Adicionado — Anel 3: I/O CSV e JSON
 
@@ -4483,6 +4938,8 @@ JSON suporta o formato array de records `[{...}, {...}]` com escape completo
 (`\n`, `\t`, `\\`, `\"`, `\uXXXX`) e writer compacto/pretty. `NaN` → `null`
 no JSON (sem representação JSON para NaN).
 
+<a id="section-adicionado-test-io-c-c-174-checks-1"></a>
+
 ### Adicionado — test_io_c.c (174 checks)
 
 Cobertura C direta dos parsers: CRLF, CR-only, sem newline final, TSV,
@@ -4490,6 +4947,8 @@ sem header, aspas RFC 4180, aspas escapadas, aspas não fechadas, newline
 em campo, NA padrão e customizados, inferência de todos os tipos, linha curta,
 linha com 20 colunas, campo longo > 32 bytes, writer com NaN/sep/quote/sem-header/arquivo,
 JSON completo, roundtrips, erros de arquivo/path inválido.
+
+<a id="section-adicionado-test-io-real-lua-55-checks-com-dados-reais-1"></a>
 
 ### Adicionado — test_io_real.lua (55 checks) com dados reais
 
@@ -4500,6 +4959,8 @@ Valida leitura, groupby, filter, join e roundtrips sobre dados reais.
 Fixtures de cotações: `cotacoes.csv`, `cotacoes.json`, `cotacoes_USD_BRL.json`,
 `cotacoes_SHIB_BRL.json` — float64 de alta precisão e valores pequenos (SHIB: 0.00002492).
 
+<a id="section-adicionado-allocfail-nos-parsers-i-o-1098-1158-verificacoes-1"></a>
+
 ### Adicionado — allocfail nos parsers I/O (1098 → 1158 verificações)
 
 9 funções de injeção de falha: `af_csv_read_mem`, `af_csv_read_quoted`,
@@ -4507,6 +4968,8 @@ Fixtures de cotações: `cotacoes.csv`, `cotacoes.json`, `cotacoes_USD_BRL.json`
 `af_json_read_many_records`, `af_json_read_long_string`, `af_json_write`,
 `af_table_free_partial`. Toda falha de malloc em qualquer ponto dos parsers
 resulta em retorno gracioso sem crash.
+
+<a id="section-corrigido-dois-bugs-encontrados-pelo-valgrind-1"></a>
 
 ### Corrigido — dois bugs encontrados pelo Valgrind
 
@@ -4517,10 +4980,14 @@ de sucesso — 8 bytes por coluna vazavam.
 `strstr` e similares liam além do conteúdo válido. Corrigido: ambos os writers
 adicionam `\0` ao final sem contar em `out_len`.
 
+<a id="section-adicionado-cov-excl-br-nos-parsers-1"></a>
+
 ### Adicionado — COV-EXCL-BR nos parsers
 
 66 exclusões totais (era 57). Guards de OOM/syscall inalcançáveis via API
 pública nos parsers CSV e JSON documentados com justificativa técnica.
+
+<a id="section-cobertura-3"></a>
 
 ### Cobertura
 
@@ -4528,7 +4995,11 @@ Linha 97.95% (1909/1949). Branch-alvo 92.18% (1981/2149, 66 excluídos).
 
 ---
 
+<a id="section-2026-06-12-ring-1-completo-1"></a>
+
 ## 2026-06-12 · Ring 1 completo
+
+<a id="section-adicionado-df-mask-indexacao-por-boolseries-1"></a>
 
 ### Adicionado — `df[mask]` indexação por BoolSeries
 
@@ -4543,6 +5014,8 @@ local ds = smaug.DataSet({
 local adultos = ds[ds.idade:gt(18)]
 ```
 
+<a id="section-adicionado-str-tier-a-completo-1"></a>
+
 ### Adicionado — `.str` Tier A completo
 
 Accessor `.str` em `Series` do tipo string. 7 métodos + `replace`.
@@ -4556,19 +5029,27 @@ local normalizado = ds.cidade.str:strip():lower()
 Métodos: `len` (→ int64), `lower`, `upper`, `strip`, `replace` (→ string),
 `contains`, `startswith`, `endswith` (→ BoolSeries).
 
+<a id="section-adicionado-comparacoes-ge-le-ne-1"></a>
+
 ### Adicionado — comparações `ge`/`le`/`ne`
 
 Para f64, i64 e string. Completam o conjunto `gt`/`lt`/`eq`/`ge`/`le`/`ne`.
+
+<a id="section-adicionado-series-map-fn-dtype-1"></a>
 
 ### Adicionado — `Series:map(fn, dtype?)`
 
 Aplica função Lua elemento a elemento. `nil` retornado → null. Dtype
 inferido do primeiro retorno não-null; tipos mistos → erro com índice.
 
+<a id="section-corrigido-f64-div-0-null-uniforme-com-i64-1"></a>
+
 ### Corrigido — `f64` div/0 → null (uniforme com i64)
 
 `smaug_f64_div` e `smaug_f64_div_scalar` passam a produzir `null` quando
 o divisor é zero. Comportamento agora uniforme entre f64 e i64.
+
+<a id="section-decisao-broadcasting-rejeitado-para-anel-1-1"></a>
 
 ### Decisão — Broadcasting rejeitado para Anel 1
 
@@ -4578,12 +5059,18 @@ Removido da dívida técnica; registrado como decisão explícita.
 
 ---
 
+<a id="section-2026-06-11-9807b46-1"></a>
+
 ## 2026-06-11 · 9807b46
+
+<a id="section-corrigido-test-string-ux-orfa-1"></a>
 
 ### Corrigido — `test_string_ux()` órfã
 
 30 checks de UX de string estavam escritos mas nunca executados — função
 definida e não chamada. Qualquer máquina reportava 59 checks; o arquivo tinha 90.
+
+<a id="section-corrigido-rodape-do-coverage-md-incompleto-1"></a>
 
 ### Corrigido — rodapé do COVERAGE.md incompleto
 
@@ -4593,7 +5080,11 @@ o guard. O rodapé agora espelha a aritmética real.
 
 ---
 
+<a id="section-2026-06-10-f73c928-1"></a>
+
 ## 2026-06-10 · f73c928
+
+<a id="section-adicionado-boolseries-como-coluna-de-primeira-classe-1"></a>
 
 ### Adicionado — BoolSeries como coluna de primeira classe
 
@@ -4603,6 +5094,8 @@ aceita pelo DataSet deve funcionar em toda a API do DataSet, sem exceções ocul
 
 Corrigido também um bug de precedência no `argsort` (comparador Lua com `and`/`or`
 sem parênteses — resultado silenciosamente errado em certas ordenações).
+
+<a id="section-adicionado-ux-de-string-1"></a>
 
 ### Adicionado — UX de string
 
@@ -4618,6 +5111,8 @@ local f = s:astype("float64")
 -- f:get(1) == 1.5
 ```
 
+<a id="section-adicionado-api-publica-do-dataset-1"></a>
+
 ### Adicionado — API pública do DataSet
 
 - `smaug.DataSet({{...}})` via `__call`.
@@ -4628,23 +5123,33 @@ local f = s:astype("float64")
 
 ---
 
+<a id="section-2026-05-endurecimento-anel-0-frentes-a-b-c-1"></a>
+
 ## 2026-05 · endurecimento Anel 0 (frentes A, B, C)
+
+<a id="section-frente-b-oom-nas-ops-1"></a>
 
 ### Frente B — OOM nas ops
 
 `test_allocfail` estendido para cobrir todas as ops aritméticas (f64/i64/bool/string).
 579 → 767 → 1098 → 1158 verificações. Valgrind-clean.
 
+<a id="section-milestone-branch-alvo-100-no-nucleo-mc-dc-completo-1"></a>
+
 ### Milestone — branch-alvo 100% no núcleo (MC/DC completo)
 
 1095/1095 ramos do núcleo cobertos. Jornada: 75.42% → 100.00%.
 19 exclusões `COV-EXCL-BR` com justificativa auditável.
+
+<a id="section-frente-a-guards-de-input-1"></a>
 
 ### Frente A — guards de input
 
 O engine passou a não confiar no caller: toda fronteira pública do C valida
 ponteiro/argumento/índice e comunica o resultado via `smaug_status_t`.
 
+<a id="section-frente-c-semantica-fechada"></a>
+
 ### Frente C — semântica fechada
 
 - Propagação estrita de null: qualquer operando null → resultado null.
@@ -4652,12 +5157,18 @@ ponteiro/argumento/índice e comunica o resultado via `smaug_status_t`.
 
 ---
 
+<a id="section-2026-04-contrato-defensivo-do-c-cow"></a>
+
 ## 2026-04 · contrato defensivo do C + COW
+
+<a id="section-copy-on-write-em-views-f64-i64"></a>
 
 ### Copy-on-Write em views (f64/i64)
 
 Views compartilham o buffer da série pai zero-copy até a primeira escrita.
 Toda mutação materializa um buffer privado; a pai nunca é tocada.
+
+<a id="section-contrato-defensivo-get-shape-1"></a>
 
 ### Contrato defensivo — `get` Shape 1
 
@@ -4666,7 +5177,11 @@ Eliminou a colisão entre índice inválido e valor legítimo.
 
 ---
 
+<a id="section-2026-03-fase-string-completa"></a>
+
 ## 2026-03 · fase string completa
+
+<a id="section-string-como-dtype-de-primeira-classe"></a>
 
 ### String como dtype de primeira classe
 
@@ -4676,13 +5191,19 @@ frontend Lua.
 
 String vazia `""` distinta de NULL. Ordenação lexicográfica por bytes.
 
+<a id="section--test-allocfail-estendido-para-string"></a>
+
 ### `test_allocfail` estendido para string
 
 10 helpers `af_str_*` cobrem cada ponto de alocação. Valgrind-clean.
 
 ---
 
+<a id="section-2026-02-endurecimento-property-based-cobertura-fillna"></a>
+
 ## 2026-02 · endurecimento (property-based, cobertura, fillna)
+
+<a id="section-property-based-tests"></a>
 
 ### Property-based tests
 
@@ -4690,10 +5211,14 @@ String vazia `""` distinta de NULL. Ordenação lexicográfica por bytes.
 Invariantes: clone independente, view compartilha memória, sort é permutação,
 filter↔count_true, astype ida-volta, fillna remove null/preserva NaN, Kleene.
 
+<a id="section--fillna"></a>
+
 ### `fillna`
 
 `Series:fillna(value)` e `DataSet:fillna(value | {col=value})`.
 Sem coerção. Preserva NaN. Original imutável.
+
+<a id="section-contrato-nan-null-fixado"></a>
 
 ### Contrato NaN≠null fixado
 
@@ -4701,26 +5226,38 @@ Sem coerção. Preserva NaN. Original imutável.
 
 ---
 
+<a id="section-2026-01-fases-1-4-backend-c-frontend-lua-dataset-bool"></a>
+
 ## 2026-01 · fases 1–4 (backend C, frontend Lua, DataSet, bool)
+
+<a id="section-dataset"></a>
 
 ### DataSet
 
 Coleção de Series alinhadas. CRUD de colunas com validação de comprimento
 e nome único. `filter`/`sort_by`/`head`/`tail`/`iloc`/`take`/`sample`/`select`.
 
+<a id="section-bool-e-logica-kleene"></a>
+
 ### Bool e lógica Kleene
 
 `Series<bool>` com lógica de três valores. `Series:gt`/`lt`/`eq` → `Series<bool>`.
+
+<a id="section-frontend-lua-series"></a>
 
 ### Frontend Lua (Series)
 
 Despacho por dtype via tabela de descritores. `ffi.gc` para limpeza automática.
 Views read-only com `_parent` para impedir GC da série pai.
 
+<a id="section-backend-c-f64-i64"></a>
+
 ### Backend C (f64 + i64)
 
 Lifecycle, getters/setters, append dinâmico, aritmética, reduções,
 comparações, sort/argsort. Zero warnings (`-Wall -Wextra`).
+
+<a id="section-frente-c-semantica-fechada-1"></a>
 
 ### Frente C — semântica fechada
 
@@ -4729,12 +5266,18 @@ comparações, sort/argsort. Zero warnings (`-Wall -Wextra`).
 
 ---
 
+<a id="section-2026-04-contrato-defensivo-do-c-cow-1"></a>
+
 ## 2026-04 · contrato defensivo do C + COW
+
+<a id="section-copy-on-write-em-views-f64-i64-1"></a>
 
 ### Copy-on-Write em views (f64/i64)
 
 Views compartilham o buffer da série pai zero-copy até a primeira escrita.
 Toda mutação materializa um buffer privado; a pai nunca é tocada.
+
+<a id="section-contrato-defensivo-get-shape-1-1"></a>
 
 ### Contrato defensivo — `get` Shape 1
 
@@ -4743,7 +5286,11 @@ Eliminou a colisão entre índice inválido e valor legítimo.
 
 ---
 
+<a id="section-2026-03-fase-string-completa-1"></a>
+
 ## 2026-03 · fase string completa
+
+<a id="section-string-como-dtype-de-primeira-classe-1"></a>
 
 ### String como dtype de primeira classe
 
@@ -4753,13 +5300,19 @@ frontend Lua.
 
 String vazia `""` distinta de NULL. Ordenação lexicográfica por bytes.
 
+<a id="section--test-allocfail-estendido-para-string-1"></a>
+
 ### `test_allocfail` estendido para string
 
 10 helpers `af_str_*` cobrem cada ponto de alocação. Valgrind-clean.
 
 ---
 
+<a id="section-2026-02-endurecimento-property-based-cobertura-fillna-1"></a>
+
 ## 2026-02 · endurecimento (property-based, cobertura, fillna)
+
+<a id="section-property-based-tests-1"></a>
 
 ### Property-based tests
 
@@ -4767,10 +5320,14 @@ String vazia `""` distinta de NULL. Ordenação lexicográfica por bytes.
 Invariantes: clone independente, view compartilha memória, sort é permutação,
 filter↔count_true, astype ida-volta, fillna remove null/preserva NaN, Kleene.
 
+<a id="section--fillna-1"></a>
+
 ### `fillna`
 
 `Series:fillna(value)` e `DataSet:fillna(value | {col=value})`.
 Sem coerção. Preserva NaN. Original imutável.
+
+<a id="section-contrato-nan-null-fixado-1"></a>
 
 ### Contrato NaN≠null fixado
 
@@ -4778,23 +5335,37 @@ Sem coerção. Preserva NaN. Original imutável.
 
 ---
 
+<a id="section-2026-01-fases-1-4-backend-c-frontend-lua-dataset-bool-1"></a>
+
 ## 2026-01 · fases 1–4 (backend C, frontend Lua, DataSet, bool)
+
+<a id="section-dataset-1"></a>
 
 ### DataSet
 
 Coleção de Series alinhadas. CRUD de colunas com validação de comprimento
 e nome único. `filter`/`sort_by`/`head`/`tail`/`iloc`/`take`/`sample`/`select`.
 
+<a id="section-bool-e-logica-kleene-1"></a>
+
 ### Bool e lógica Kleene
 
 `Series<bool>` com lógica de três valores. `Series:gt`/`lt`/`eq` → `Series<bool>`.
+
+<a id="section-frontend-lua-series-1"></a>
 
 ### Frontend Lua (Series)
 
 Despacho por dtype via tabela de descritores. `ffi.gc` para limpeza automática.
 Views read-only com `_parent` para impedir GC da série pai.
 
+<a id="section-backend-c-f64-i64-1"></a>
+
 ### Backend C (f64 + i64)
 
 Lifecycle, getters/setters, append dinâmico, aritmética, reduções,
 comparações, sort/argsort. Zero warnings (`-Wall -Wextra`).
+
+---
+
+[Referência do Núcleo C](API_Reference.md) · [Rework da suíte](TEST_SUITE_REWORK.md) · [Início da documentação](README.md)

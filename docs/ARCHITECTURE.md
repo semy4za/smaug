@@ -1,5 +1,29 @@
 # Smaug — Arquitetura
 
+[Início](README.md) · [Primeiros passos](GETTING_STARTED.md) · [Guia do usuário](USER_GUIDE.md) · [API Reference: Lua](API_INDEX.md) | [Núcleo C](API_Reference.md)
+
+<details>
+<summary>Nesta página</summary>
+
+- [Princípios](#section-principios)
+- [Modelo de anéis](#section-modelo-de-aneis)
+- [Anel 0 — Núcleo Computacional Done](#section-anel-0-nucleo-computacional-done)
+- [Anel 1 — Abstrações de Dados Done](#section-anel-1-abstracoes-de-dados-done)
+- [Anel 2 — Operações Relacionais Done](#section-anel-2-operacoes-relacionais-done)
+- [Anel 3 — Conectividade / I/O Done — v1.0](#section-anel-3-conectividade-i-o-done-v1-0)
+- [Anel 4 — Persistência Concept](#section-anel-4-persistencia-concept)
+- [Anel 5 — Models Concept](#section-anel-5-models-concept)
+- [Anel 6 — Matrix Concept](#section-anel-6-matrix-concept)
+- [Anel 7 — Tensor Concept](#section-anel-7-tensor-concept)
+- [Anel 8 — Machine Learning Concept](#section-anel-8-machine-learning-concept)
+- [Anel 9 — Interação e Ferramentas Concept](#section-anel-9-interacao-e-ferramentas-concept)
+- [Princípios da Trilha Analítica](#section-principios-da-trilha-analitica)
+- [Régua de versões](#section-regua-de-versoes)
+- [Regra de decisão arquitetural](#section-regra-de-decisao-arquitetural)
+- [Estado da verificação — revisão de 2026-09-18](#section-estado-da-verificacao-revisao-de-2026-09-18)
+
+</details>
+
 Documento de referência para a estrutura conceitual e o modelo de crescimento
 do ecossistema Smaug. Muda raramente — descreve teoria, não entregas.
 
@@ -8,9 +32,11 @@ Para o estado atual de cada anel e as próximas entregas concretas, ver
 
 Revisão documental: 2026-09-18. `[Done]` identifica entrega de funcionalidade,
 não certificação da implementação. O estado da verificação é o da auditoria
-`TEST_SUITE_REWRITE_REVIEW.md`; alegações históricas de cobertura não a substituem.
+[parecer do rework](TEST_SUITE_REWRITE_REVIEW.md); alegações históricas de cobertura não a substituem.
 
 ---
+
+<a id="section-principios"></a>
 
 ## Princípios
 
@@ -35,6 +61,8 @@ Quanto mais próximo do centro, mais conservadora é a evolução esperada.
 Camadas externas podem mudar rapidamente. O núcleo muda com cautela.
 
 ---
+
+<a id="section-modelo-de-aneis"></a>
 
 ## Modelo de anéis
 
@@ -71,6 +99,8 @@ As duas trilhas dependem de 0–3; não dependem uma da outra (Matrix não conhe
 Persistence, e vice-versa).
 
 ---
+
+<a id="section-anel-0-nucleo-computacional-done"></a>
 
 ## Anel 0 — Núcleo Computacional `[Done]`
 
@@ -113,6 +143,8 @@ todas *dentro* do Anel 0 porque são mecanismo, não semântica:
 
 ---
 
+<a id="section-anel-1-abstracoes-de-dados-done"></a>
+
 ## Anel 1 — Abstrações de Dados `[Done]`
 
 Transforma mecanismos do Anel 0 em estruturas semânticas. Define a forma
@@ -130,6 +162,8 @@ como usuários interagem e raciocinam sobre dados.
 **Dependência:** Anel 1 → Anel 0.
 
 ---
+
+<a id="section-anel-2-operacoes-relacionais-done"></a>
 
 ## Anel 2 — Operações Relacionais `[Done]`
 
@@ -153,6 +187,8 @@ de que toda operação da biblioteca retorne DataSet.
 **Dependência:** Anel 2 → Anel 1 → Anel 0.
 
 ---
+
+<a id="section-anel-3-conectividade-i-o-done-v1-0"></a>
 
 ## Anel 3 — Conectividade / I/O `[Done — v1.0]`
 
@@ -188,6 +224,8 @@ DataSet → Conectividade → Destino         (exportar)
 
 ---
 
+<a id="section-anel-4-persistencia-concept"></a>
+
 ## Anel 4 — Persistência `[Concept]`
 
 Trilha de Projeto. Faz dados sobreviverem ao fim do processo. **Não é um banco
@@ -217,6 +255,8 @@ dump do buffer + cabeçalho de schema.
 
 ---
 
+<a id="section-anel-5-models-concept"></a>
+
 ## Anel 5 — Models `[Concept]`
 
 Trilha de Projeto. Camada de schema sobre os dados do próprio Smaug. **Não é ORM
@@ -242,6 +282,8 @@ de nulo, essa informação mora no Model — não em convenção solta. Por isso
 
 ---
 
+<a id="section-anel-6-matrix-concept"></a>
+
 ## Anel 6 — Matrix `[Concept]`
 
 Trilha Analítica. Tipo matricial 2D denso, distinto do `DataSet` heterogêneo.
@@ -265,6 +307,8 @@ dono da estrutura, não da aritmética.
 
 ---
 
+<a id="section-anel-7-tensor-concept"></a>
+
 ## Anel 7 — Tensor `[Concept]`
 
 Trilha Analítica. Generalização N-dimensional do Matrix, e onde mora a máquina
@@ -286,6 +330,8 @@ autograd. Cada um é pré-requisito do seguinte, e cada um é útil sozinho — 
 parar em qualquer ponto com algo que funciona.
 
 ---
+
+<a id="section-anel-8-machine-learning-concept"></a>
 
 ## Anel 8 — Machine Learning `[Concept]`
 
@@ -341,6 +387,8 @@ interoperabilidade direta com Tensor, sem tipo de imagem paralelo.
 
 ---
 
+<a id="section-anel-9-interacao-e-ferramentas-concept"></a>
+
 ## Anel 9 — Interação e Ferramentas `[Concept]`
 
 Mecanismos de interação humana e observabilidade. Interfaces e ferramentas
@@ -362,6 +410,8 @@ BLAS externa, fusão de operações) precisam de medições reproduzíveis; cobe
 de ramos não deve ser apresentada como MC/DC.
 
 ---
+
+<a id="section-principios-da-trilha-analitica"></a>
 
 ## Princípios da Trilha Analítica
 
@@ -423,6 +473,8 @@ disciplina que o projeto já pratica nos anéis internos.
 
 ---
 
+<a id="section-regua-de-versoes"></a>
+
 ## Régua de versões
 
 | Versão | Marco | Critério |
@@ -438,6 +490,8 @@ da Trilha de Projeto e dependem de infra externa.*
 
 ---
 
+<a id="section-regra-de-decisao-arquitetural"></a>
+
 ## Regra de decisão arquitetural
 
 Toda nova funcionalidade deve responder:
@@ -449,11 +503,13 @@ A implementação ocorre nesse anel — nunca mais profundamente do que o necess
 
 ---
 
+<a id="section-estado-da-verificacao-revisao-de-2026-09-18"></a>
+
 ## Estado da verificação — revisão de 2026-09-18
 
 A arquitetura define responsabilidades e garantias exigidas. A auditoria
-`TEST_SUITE_REWRITE_REVIEW.md` registra o alcance das evidências disponíveis;
-o inventário `TEST_SUITE_EXCLUSIONS_REVIEW.md` registra a triagem das exclusões.
+[parecer do rework](TEST_SUITE_REWRITE_REVIEW.md) registra o alcance das evidências disponíveis;
+o inventário [inventário de exclusões](TEST_SUITE_EXCLUSIONS_REVIEW.md) registra a triagem das exclusões.
 Nenhum quadro arquitetural certifica toda a árvore como correta ou selada.
 
 | Área | Evidência e pendência |
@@ -473,3 +529,7 @@ Nenhum quadro arquitetural certifica toda a árvore como correta ou selada.
 Medições devem identificar árvore, plataforma, ferramentas, flags e artefatos.
 Cobertura de ramos não é MC/DC. Dados históricos permanecem históricos até nova
 execução verificável; contagens não são atualizadas por estimativa.
+
+---
+
+[Referência do Núcleo C](API_Reference.md) · [Rework da suíte](TEST_SUITE_REWORK.md) · [Início da documentação](README.md)

@@ -1,9 +1,42 @@
 # Parecer técnico — reconstrução da suíte de verificação do Smaug
 
+[Início](README.md) · [Primeiros passos](GETTING_STARTED.md) · [Guia do usuário](USER_GUIDE.md) · [API Reference: Lua](API_INDEX.md) | [Núcleo C](API_Reference.md)
+
+<details>
+<summary>Nesta página</summary>
+
+- [1. Decisão recomendada](#section-1-decisao-recomendada)
+- [2. Escopo, método e limites desta avaliação](#section-2-escopo-metodo-e-limites-desta-avaliacao)
+- [3. Diagnóstico executivo](#section-3-diagnostico-executivo)
+  - [R01 — Alto: suíte verde aceita erros de resultado](#section-r01-alto-suite-verde-aceita-erros-de-resultado)
+  - [R02 — Alto: duas divergências reais de datetime escapam à suíte](#section-r02-alto-duas-divergencias-reais-de-datetime-escapam-a-suite)
+  - [R03 — Alto: injeção de falhas não comprova toda a promessa de OOM](#section-r03-alto-injecao-de-falhas-nao-comprova-toda-a-promessa-de-oom)
+  - [R04 — Alto: o relatório de cobertura não é um selo confiável da árvore atual](#section-r04-alto-o-relatorio-de-cobertura-nao-e-um-selo-confiavel-da-arvore-atual)
+  - [R05 — Alto: há exclusões comprovadamente incorretas](#section-r05-alto-ha-exclusoes-comprovadamente-incorretas)
+  - [R06 — Alto: parity estático não demonstra suporte, ABI ou reentrância completos](#section-r06-alto-parity-estatico-nao-demonstra-suporte-abi-ou-reentrancia-completos)
+  - [R07 — Alto: executores podem anunciar sucesso sem uma execução completa válida](#section-r07-alto-executores-podem-anunciar-sucesso-sem-uma-execucao-completa-valida)
+  - [R08 — Médio: fixtures e manifest não oferecem toda a rastreabilidade necessária](#section-r08-medio-fixtures-e-manifest-nao-oferecem-toda-a-rastreabilidade-necessaria)
+  - [R09 — Médio: duplicação e contratos contraditórios dificultam escolher o esperado](#section-r09-medio-duplicacao-e-contratos-contraditorios-dificultam-escolher-o-esperado)
+- [4. Como deve ser a nova arquitetura de verificação](#section-4-como-deve-ser-a-nova-arquitetura-de-verificacao)
+  - [4.1 Catálogo rastreável de contratos](#section-4-1-catalogo-rastreavel-de-contratos)
+  - [4.2 Camadas com responsabilidades diferentes](#section-4-2-camadas-com-responsabilidades-diferentes)
+  - [4.3 Oracles e dados](#section-4-3-oracles-e-dados)
+- [5. Destino proposto de toda a suíte atual](#section-5-destino-proposto-de-toda-a-suite-atual)
+- [6. Reconstrução dos 15 eixos parity](#section-6-reconstrucao-dos-15-eixos-parity)
+- [7. Política proposta para cobertura e invariantes](#section-7-politica-proposta-para-cobertura-e-invariantes)
+  - [7.1 Classes obrigatórias](#section-7-1-classes-obrigatorias)
+  - [7.2 Registro e medição](#section-7-2-registro-e-medicao)
+- [8. Ordem de trabalho após aprovação](#section-8-ordem-de-trabalho-apos-aprovacao)
+- [9. Critérios de encerramento — substituem a meta de “mais checks”](#section-9-criterios-de-encerramento-substituem-a-meta-de-mais-checks)
+- [10. Decisões submetidas à aprovação](#section-10-decisoes-submetidas-a-aprovacao)
+- [Anexo — hashes das fixtures observadas](#section-anexo-hashes-das-fixtures-observadas)
+
+</details>
+
 Data: 2026-09-18. Estado: **proposta para aprovação; implementação não iniciada**.
 
-Retomada da sessão: ver [anotações e próximas decisões](TEST_SUITE_SESSION_NOTES.md),
-incluindo as últimas sugestões de datetime acolhidas e ainda não consolidadas.
+Retomada da sessão: ver [estado atual e próximas decisões](TEST_SUITE_REWORK.md),
+incluindo as decisões de datetime acolhidas e consolidadas no contrato.
 
 **Seguimento documental (2026-09-18):** a pedido do mantenedor, foram alinhados
 `CONTRACT.md`, `ARCHITECTURE.md`, `COW.md` e a contextualização histórica de
@@ -15,11 +48,15 @@ os textos atuais. O mantenedor aprovou anos completos de `-9999` a `9999`
 (inclusive, com ano zero), limites após normalização do offset para UTC, UTC
 para offset omitido e rejeição de precisão não representável em milissegundos
 (NA na conversão tolerante). Ver o perfil datetime em `CONTRACT.md`.
-Validação dos limites, gramática de anos expandidos, migração das sentinelas
+Gramática dos anos negativos, rejeição de segundos intercalares e separação
+entre ano e status também foram consolidadas no contrato. Implementação e
+validação dos limites e da gramática, detalhes de migração das sentinelas
 e lifetime/invalidação continuam pendentes. Esta etapa não implementa nem
 valida a nova suíte.
 
 Árvore avaliada: HEAD `9787701`, com alterações locais de padronização já existentes. O commit sozinho não identifica essa árvore modificada. As referências de linha deste parecer são as observadas nesta avaliação.
+
+<a id="section-1-decisao-recomendada"></a>
 
 ## 1. Decisão recomendada
 
@@ -30,6 +67,8 @@ Não recomendo apagar tudo primeiro. Recomendo uma **reescrita completa de respo
 Critério central: um teste precisa distinguir o comportamento correto de um defeito plausível. Executar uma linha, mencionar uma função, não crashar ou aumentar um contador são evidências diferentes e não devem ser apresentadas como equivalentes.
 
 Não há motivo para conservar o número atual de checks, a distribuição dos arquivos ou um percentual histórico. A padronização de escrita já acordada permanece; não será uma nova campanha de renomeação.
+
+<a id="section-2-escopo-metodo-e-limites-desta-avaliacao"></a>
 
 ## 2. Escopo, método e limites desta avaliação
 
@@ -49,7 +88,11 @@ Ambiente diagnóstico: Windows/MSYS2 UCRT64, GCC 16.1.0, LuaJIT 2.1.1779665312. 
 
 **Limites:** esta é uma auditoria diagnóstica e um plano de reconstrução, não a certificação semântica de cada asserção existente. Não foi executada uma nova campanha Linux de cobertura integral, Valgrind, sanitizers, fuzzing ou concorrência. A aprovação deste parecer autoriza o trabalho proposto, não transforma essas verificações pendentes em concluídas.
 
+<a id="section-3-diagnostico-executivo"></a>
+
 ## 3. Diagnóstico executivo
+
+<a id="section-r01-alto-suite-verde-aceita-erros-de-resultado"></a>
 
 ### R01 — Alto: suíte verde aceita erros de resultado
 
@@ -67,12 +110,16 @@ Referências: `tests/props/test_props.lua:101,158,348,407,458`, `tests/dataset/t
 
 Estas mutações provam lacunas nas suítes indicadas, não que todas as outras suítes deixariam escapar o mesmo defeito. `groupby_sum_consistente` e `unique_ordem_aparicao` também precisam verificar completude: seus loops de validação permitem zero iterações se o resultado vier vazio.
 
+<a id="section-r02-alto-duas-divergencias-reais-de-datetime-escapam-a-suite"></a>
+
 ### R02 — Alto: duas divergências reais de datetime escapam à suíte
 
 1. `2023-01-01`: `smaug_dt_week` devolve **53**, mas a semana ISO é **52**. O teste em `tests/c/test_datetime_c.c:838` aceita 52 **ou** 53. A expectativa foi conferida independentemente com `datetime.isocalendar()`; o resultado foi reproduzido em executável recompilado dos fontes atuais.
 2. `smaug_dt_from_parts_checked(-2, 3, 1, 0, 0, 0, 0, &epoch)` retorna `SMG_OK`, produzindo `-62225193600000`. `smaug_dt_year(epoch)` devolve `-2`; `smaug_dt_year_series` produz elemento nulo (`SMG_NULL_VALUE`). O guard `v >= 0` rejeita anos negativos válidos na representação aceita pelo próprio construtor.
 
 A anotação em `src/smaug_datetime.c:645,654` afirma que o ramo falso não acontece. O diagnóstico refuta isso para `year`. A política de anos negativos e a colisão entre ano `-1` e sentinela precisam ser explicitadas; o comentário da implementação não deve decidir sozinho o contrato. A semântica ISO já está prometida no header, portanto devolver sempre 53 na passagem ao ano anterior não é uma expectativa aceitável.
+
+<a id="section-r03-alto-injecao-de-falhas-nao-comprova-toda-a-promessa-de-oom"></a>
 
 ### R03 — Alto: injeção de falhas não comprova toda a promessa de OOM
 
@@ -81,6 +128,8 @@ A anotação em `src/smaug_datetime.c:645,654` afirma que o ramo falso não acon
 Em `tests/c/test_allocfail.c:1725`, `OK(!result || result->error || 1, ...)` é sempre verdadeiro. Em outros cenários, completar sem crash é uma observação legítima de robustez, mas não valida conteúdo, estado ou status e não deve ser contado como se validasse.
 
 A nova campanha deve comprovar: baseline sem falha; número e identidade dos pontos exercitados; falha efetivamente injetada; resultado permitido pelo contrato; preservação do estado; cleanup e possibilidade de uso posterior. Falhar alocação não implica necessariamente falhar a operação: fallback bem-sucedido pode ser válido, desde que verificado. Falhas em rollback podem exigir duas falhas no mesmo cenário; uma única falha por rodada não basta para esse caso.
+
+<a id="section-r04-alto-o-relatorio-de-cobertura-nao-e-um-selo-confiavel-da-arvore-atual"></a>
 
 ### R04 — Alto: o relatório de cobertura não é um selo confiável da árvore atual
 
@@ -98,6 +147,8 @@ Problemas em `scripts/make_coverage.sh`:
 
 Não foi recalculado um novo percentual global nesta avaliação. A primeira entrega deverá produzir uma baseline bruta íntegra, mesmo que fique abaixo da histórica.
 
+<a id="section-r05-alto-ha-exclusoes-comprovadamente-incorretas"></a>
+
 ### R05 — Alto: há exclusões comprovadamente incorretas
 
 Diagnóstico nativo, sem forjar structs inválidas nem acessar ponteiros arbitrários:
@@ -114,7 +165,9 @@ Outras justificativas precisam ser reabertas: OOM “sem injeção” numa campa
 
 Há também candidatos defensáveis: em `smaug_ops_bool.c:48`, após eliminar o caso de falso e exigir ambos válidos, `at && bt` é verdadeiro; em `smaug_str.c:486`, o contexto `len > old_len` com comprimentos não negativos implica `len > 0`. São argumentos locais verificáveis, diferentes de ausência empírica de falhas. Sua aprovação deve apontar o **ramo exato**, não excluir a linha inteira.
 
-O inventário completo das marcações, com triagem e pendências, está em `TEST_SUITE_EXCLUSIONS_REVIEW.md`. A triagem não aprova automaticamente nenhuma exclusão.
+O inventário completo das marcações, com triagem e pendências, está em [EXCLUSIONS.md](TEST_SUITE_EXCLUSIONS_REVIEW.md). A triagem não aprova automaticamente nenhuma exclusão.
+
+<a id="section-r06-alto-parity-estatico-nao-demonstra-suporte-abi-ou-reentrancia-completos"></a>
 
 ### R06 — Alto: parity estático não demonstra suporte, ABI ou reentrância completos
 
@@ -130,6 +183,8 @@ O eixo 15 deve continuar existindo, mas com inventário completo, `sizeof`/alinh
 
 O eixo 14 deve analisar declarações e escopos, tratar dependências e arquivos ausentes como falha, e complementar a inspeção com execução concorrente sobre objetos independentes. Nenhum teste isolado comprova ausência universal de races; a confiança vem da combinação de contrato, revisão, análise e ferramentas adequadas.
 
+<a id="section-r07-alto-executores-podem-anunciar-sucesso-sem-uma-execucao-completa-valida"></a>
+
 ### R07 — Alto: executores podem anunciar sucesso sem uma execução completa válida
 
 - `scripts/build.ps1:142,158,172`: resultado C é decidido pelo texto `PASS`, sem exigir o código de saída do executável. Um processo que imprima `PASS` e termine com erro pode ser aceito nesse caminho.
@@ -141,6 +196,8 @@ O eixo 14 deve analisar declarações e escopos, tratar dependências e arquivos
 - A carga FFI tem fallback para biblioteca instalada. Para testes, precisamos confirmar caminho/hash do artefato do run, não aceitar silenciosamente outra versão.
 
 A reconstrução precisa testar os próprios runners: exit não zero com `PASS`, arquivo ausente, dependência ausente, zero casos, timeout, relatório parcial e cenário deliberadamente errado.
+
+<a id="section-r08-medio-fixtures-e-manifest-nao-oferecem-toda-a-rastreabilidade-necessaria"></a>
 
 ### R08 — Médio: fixtures e manifest não oferecem toda a rastreabilidade necessária
 
@@ -160,6 +217,8 @@ O caso real tem checks úteis, mas roundtrips observam sobretudo dimensões e va
 
 `scripts/make_manifest.sh:65–68` não inclui `.csv`, `.json`, `.txt` ou `.py`: fixtures, exceções parity e o novo verificador de estilo ficam fora desse manifest. `make verify` regenera o manifest e mostra um diff, mas não é um verificador read-only que falha por divergência. Integridade e correção semântica devem continuar métricas separadas.
 
+<a id="section-r09-medio-duplicacao-e-contratos-contraditorios-dificultam-escolher-o-esperado"></a>
+
 ### R09 — Médio: duplicação e contratos contraditórios dificultam escolher o esperado
 
 - `package.path` duplicado em quatro suítes; propriedade `str_filter_reduz` redefinida em `test_props.lua:305,324`, com a primeira definição sobrescrita.
@@ -171,7 +230,11 @@ O caso real tem checks úteis, mas roundtrips observam sobretudo dimensões e va
 
 Antes de escrever expectativas novas, registrar a decisão do projeto quando documentos e implementação discordarem. Nem o código atual nem pandas devem ser escolhidos automaticamente como verdade.
 
+<a id="section-4-como-deve-ser-a-nova-arquitetura-de-verificacao"></a>
+
 ## 4. Como deve ser a nova arquitetura de verificação
+
+<a id="section-4-1-catalogo-rastreavel-de-contratos"></a>
 
 ### 4.1 Catálogo rastreável de contratos
 
@@ -180,6 +243,8 @@ Para cada operação pública e família interna relevante, registrar: identific
 Exemplo de obrigação: “`Series<int64>:add` preserva operandos e retorna resultado exato quando representável; quando não representável, propaga status C pelo FFI e lança erro Lua orientado”. O catálogo precisa distinguir esse contrato de APIs legadas e de divisão por zero. Não assumir que uma política de overflow resolve automaticamente os outros casos.
 
 Um inventário de símbolos ajuda a encontrar omissões, mas não cria expectativas copiando a implementação. O contrato é revisado; os testes o exercitam; o código é comparado com ele.
+
+<a id="section-4-2-camadas-com-responsabilidades-diferentes"></a>
 
 ### 4.2 Camadas com responsabilidades diferentes
 
@@ -196,6 +261,8 @@ Um inventário de símbolos ajuda a encontrar omissões, mas não cria expectati
 
 Compartilhar infraestrutura pequena — bootstrap, assertions, comparadores, diretório temporário e registro de casos — sem compartilhar a lógica de produção que deveria ser desafiada. Helpers também precisam falhar diante de resultados errados.
 
+<a id="section-4-3-oracles-e-dados"></a>
+
 ### 4.3 Oracles e dados
 
 - int64: valores exatos, inclusive `INT64_MIN/MAX`, vizinhos de ±2^53, resultado válido igual à sentinela e overflow em intermediários. Nunca construir o esperado com a mesma operação C sob teste nem converter tudo para `number` Lua.
@@ -205,6 +272,8 @@ Compartilhar infraestrutura pequena — bootstrap, assertions, comparadores, dir
 - Relações: modelo por listas/mapas com cardinalidade e multiplicidade completas; não apenas `nrows > 0` ou “toda linha retornada parece válida”.
 - Comparação com bibliotecas externas: apenas nos contratos compatíveis, versões fixadas e diferenças documentadas. pandas pode auxiliar onde fizer sentido; não deve impor sua política de NA/NaN ou precisão ao Smaug.
 - Fixtures mínimas e sintéticas para diagnóstico; casos reais preservados como integração. Cada fixture precisa de ID, propósito, schema, encoding, hash, procedência, consumidores e esperado independente. Mudança no golden exige revisão; não regenerar o esperado com o Smaug para fazer o teste passar.
+
+<a id="section-5-destino-proposto-de-toda-a-suite-atual"></a>
 
 ## 5. Destino proposto de toda a suíte atual
 
@@ -242,6 +311,8 @@ Cada arquivo abaixo entra na revisão semântica da implementação. A tabela de
 
 A migração manterá `smaug.Series(...)`/`smaug.DataSet(...)`, `from_array` nos casos apropriados, ausência de aliases de construtores e nomes completos em `snake_case`. APIs especializadas continuam sendo exercitadas quando forem o objeto do teste.
 
+<a id="section-6-reconstrucao-dos-15-eixos-parity"></a>
+
 ## 6. Reconstrução dos 15 eixos parity
 
 | Eixo | Destino |
@@ -266,7 +337,11 @@ Estados propostos: **verificado**, **falhou**, **não executado**, **não suport
 
 Falha do mecanismo de verificação deve invalidar o run. Uma hipótese heurística pode continuar consultiva, mas não pode virar verde ou desaparecer se a ferramenta falhar.
 
+<a id="section-7-politica-proposta-para-cobertura-e-invariantes"></a>
+
 ## 7. Política proposta para cobertura e invariantes
+
+<a id="section-7-1-classes-obrigatorias"></a>
 
 ### 7.1 Classes obrigatórias
 
@@ -277,6 +352,8 @@ Falha do mecanismo de verificação deve invalidar o run. Uma hipótese heuríst
 5. **Código morto/redundante:** avaliar simplificação e proteção remanescente. Redundante não significa inalcançável; mutante equivalente não significa teste fraco automaticamente.
 6. **Desconhecido/não demonstrado:** manter visível como pendência; não excluir da métrica só para alcançar meta.
 
+<a id="section-7-2-registro-e-medicao"></a>
+
 ### 7.2 Registro e medição
 
 - Cobertura bruta sempre visível; ajustada é secundária, com exclusões aprovadas e denominador explícito.
@@ -286,6 +363,8 @@ Falha do mecanismo de verificação deve invalidar o run. Uma hipótese heuríst
 - Preservar dados brutos, logs, inventário, flags, versões, hashes e status do run; medição isolada, sem biblioteca instalada como fallback.
 - Sem relatório de sucesso para arquivo ausente, zero fontes/casos, falha de parser ou execução incompleta. Publicação atômica do resultado, mantendo a evidência da falha.
 - MC/DC apenas em condições críticas selecionadas, com ferramenta e versão verificadas; não chamar branch coverage de MC/DC nem estabelecer meta genérica de certificação.
+
+<a id="section-8-ordem-de-trabalho-apos-aprovacao"></a>
 
 ## 8. Ordem de trabalho após aprovação
 
@@ -304,6 +383,8 @@ Perfis propostos: rápido/local, completo, memória/UB, falhas de alocação/I/O
 
 Para UB, incluir build diagnóstico sem depender de `-fwrapv`, com instrumentação apropriada e otimizações relevantes. Não remover a flag nem proclamar UB resolvido só por passar testes. A substituição de APIs legadas ou mudança semântica precisa permanecer explícita no contrato.
 
+<a id="section-9-criterios-de-encerramento-substituem-a-meta-de-mais-checks"></a>
+
 ## 9. Critérios de encerramento — substituem a meta de “mais checks”
 
 - Todos os 33 arquivos atuais e 15 eixos têm mapa de destino; cada cenário retirado possui justificativa. Nenhuma obrigação some durante a migração.
@@ -317,6 +398,8 @@ Para UB, incluir build diagnóstico sem depender de `-fwrapv`, com instrumentaç
 - Relatórios separam execução estrutural, correção funcional, memória/UB, mutação e cumprimento de contratos. Nenhuma dessas dimensões é vendida como prova das demais.
 - Não resta defeito crítico conhecido contra contrato aprovado. Pendências aceitas têm impacto, decisão e próximo passo registrados, sem declaração genérica de “núcleo selado”.
 
+<a id="section-10-decisoes-submetidas-a-aprovacao"></a>
+
 ## 10. Decisões submetidas à aprovação
 
 1. Aprovar o escopo completo e a substituição incremental por famílias, preservando apenas os cenários que tenham proteção demonstrável.
@@ -327,6 +410,8 @@ Para UB, incluir build diagnóstico sem depender de `-fwrapv`, com instrumentaç
 
 **Conclusão:** há material útil para preservar, mas o sistema atual mistura evidências fortes com proxies frágeis e justificativas refutadas. A reconstrução é justificada. O resultado esperado não é uma suíte maior: é uma suíte cujo alcance, limites e capacidade de detectar erros sejam demonstráveis.
 
+<a id="section-anexo-hashes-das-fixtures-observadas"></a>
+
 ## Anexo — hashes das fixtures observadas
 
 | Fixture | SHA-256 |
@@ -336,3 +421,7 @@ Para UB, incluir build diagnóstico sem depender de `-fwrapv`, com instrumentaç
 | cotacoes_SHIB_BRL.json | `ffcdc6b8ef09b638d48a24271b7ac1b319d4e866f25d51c13378818b8eafcfc0` |
 | cotacoes_USD_BRL.json | `9ecec1c7f1d135383688c6567d0fc42dfd9aa602da4301972e2534e351429e4f` |
 | pedidos_digitados.csv | `282f7fca004eda9aa34962345a8b3c3f1561213de5ef15e04b755fbaff83d0a0` |
+
+---
+
+[Referência do Núcleo C](API_Reference.md) · [Rework da suíte](TEST_SUITE_REWORK.md) · [Início da documentação](README.md)
