@@ -30,4 +30,8 @@ textuais, datas e categorias de forma simples e expressiva.
 Seu objetivo é combinar a flexibilidade de Lua com o desempenho de C,
 oferecendo uma base prática para trabalhar com dados do mundo real.
 O projeto está em desenvolvimento, em fase **pré-1.0**, e sua API continua
-evoluindo.
+evoluindo
+
+## Conteúdos
+
+- [License](#license)
