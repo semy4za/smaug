@@ -1,50 +1,21 @@
-# Documentação do Smaug
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./img/title_1-3.svg">
+    <img alt="Smaug Logo" src="./img/title_1-1.svg">
+  </picture>
+</p>
 
-Smaug é uma biblioteca de dados tabulares em Lua, com motor em C e integração
-LuaJIT FFI. Trabalha com Series e DataSet, com tipos numéricos, booleanos,
-strings, datetime e categorias.
 
-<a id="section-primeiros-passos"></a>
+-----------------
+# Smaug: Uma biblioteca de dados tabulares para Lua
 
-## Primeiros passos
+Biblioteca para manipulação e análise de dados tabulares em Lua, com motor em C
+e integração via LuaJIT FFI. Oferece estruturas Series e DataSet, com suporte
+a tipos numéricos, booleanos, strings, datetime e categorias.
 
-Conheça as estruturas de dados, prepare o ambiente e siga um primeiro exemplo.
-
-[Começar com Smaug →](GETTING_STARTED.md)
-
-<a id="section-guia-do-usuario"></a>
-
-## Guia do usuário
-
-Aprenda por assunto: entrada e saída, seleção, dados ausentes, texto,
-categorias, agrupamentos, janelas e datas.
-
-[Abrir o guia do usuário →](USER_GUIDE.md)
-
-<a id="section-referencia-da-api"></a>
-
-## Referência da API
-
-Consulte funções, métodos e assinaturas em duas referências separadas:
-[Lua](API_INDEX.md) para objetos e métodos; [Núcleo C](API_Reference.md) para
-headers, tipos e funções do backend. Na segunda ficam também
-arquitetura, memória, compilação, testes e o rework.
-
-[Consultar a API →](API_INDEX.md) · [Referência C](API_Reference.md)
-
-<a id="section-estado-e-versoes"></a>
-
-## Estado e versões
-
-O projeto está em pré-1.0. Há mudanças de API e contratos aprovados ainda
-pendentes de implementação. O [roadmap](Roadmap.md) registra o planejamento;
-o [changelog](CHANGELOG.md) preserva o histórico. A
-[revisão da suíte](TEST_SUITE_REWORK.md) identifica o trabalho atual.
-
-A organização adapta a [documentação do pandas](https://pandas.pydata.org/docs/)
-em três entradas: primeiros passos, guia do usuário e referência da API.
-O conteúdo de desenvolvimento fica dentro da referência do Núcleo C.
-Os temas foram adaptados à superfície existente do Smaug. Todos os documentos
-manuais permanecem diretamente em `docs/`.
-
-[Licença MIT](../LICENSE)
+| | |
+| --- | --- |
+| Tecnologia | ![Lua](https://img.shields.io/badge/Lua-2C2D72?logo=lua&logoColor=white) ![C](https://img.shields.io/badge/Motor-C-00599C) ![LuaJIT FFI](https://img.shields.io/badge/Integração-LuaJIT%20FFI-blue) |
+| Documentação | [![Documentação](https://img.shields.io/badge/docs-Smaug-blue)](https://github.com/semy4za/smaug/tree/HEAD/docs) |
+| Status | ![Pré-1.0](https://img.shields.io/badge/status-pré--1.0-orange) |
+| Licença | [![Licença MIT](https://img.shields.io/badge/licença-MIT-green)](https://github.com/semy4za/smaug/blob/HEAD/LICENSE) |
