@@ -36,3 +36,8 @@ evoluindo
 
 - [License](#license)
 - [Coverage: 94.95%](COVERAGE.md#coverage-total)
+
+## License
+[Licença MIT](https://github.com/semy4za/smaug/blob/HEAD/LICENSE)
+
+[Go to Top](#conteúdos)
