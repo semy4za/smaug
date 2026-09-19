@@ -601,9 +601,10 @@ parser, formatter e todas as operações atuais já o cumprem.
    conversão explícita por `astype` deve emitir erro por elemento inválido.
 6. **Valor separado do status:** `-1` é ano válido e não pode sinalizar erro
    na extração. A API C deve seguir o padrão checked, preservando o parâmetro
-   de saída em falha. Assinatura aprovada na retomada, ainda não implementada:
-   `smaug_status_t smaug_dt_year(int64_t epoch_ms, int *out_year)`.
-   O nome público não terá sufixo `_checked`.
+   de saída em falha. O padrão foi aprovado para os 11 componentes escalares:
+   retorno de status, resultado por ponteiro e nome público sem `_checked`.
+   As assinaturas estão na [referência C](API_Reference.md#section-decisao-fechada-e-alcance)
+   e ainda não foram implementadas.
    No Lua, manter `.dt:year()`: NA de entrada propaga, anos negativos válidos
    permanecem valores e falhas reais seguem o canal de status/erro Lua.
    Não converter um ano negativo em NA por um teste de sinal.

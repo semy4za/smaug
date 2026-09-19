@@ -786,17 +786,30 @@ normativas estão no [contrato datetime](CONTRACT.md#section-perfil-datetime-dec
 
 ### Decisão fechada e alcance
 
-Assinatura final acordada para a extração escalar de ano:
+Assinaturas finais aprovadas para os 11 componentes escalares, ainda não
+implementadas:
 
 ```c
 smaug_status_t smaug_dt_year(int64_t epoch_ms, int *out_year);
+smaug_status_t smaug_dt_month(int64_t epoch_ms, int *out_month);
+smaug_status_t smaug_dt_day(int64_t epoch_ms, int *out_day);
+smaug_status_t smaug_dt_hour(int64_t epoch_ms, int *out_hour);
+smaug_status_t smaug_dt_minute(int64_t epoch_ms, int *out_minute);
+smaug_status_t smaug_dt_second(int64_t epoch_ms, int *out_second);
+smaug_status_t smaug_dt_ms(int64_t epoch_ms, int *out_ms);
+smaug_status_t smaug_dt_weekday(int64_t epoch_ms, int *out_weekday);
+smaug_status_t smaug_dt_yearday(int64_t epoch_ms, int *out_yearday);
+smaug_status_t smaug_dt_quarter(int64_t epoch_ms, int *out_quarter);
+smaug_status_t smaug_dt_week(int64_t epoch_ms, int *out_week);
 ```
 
-Sem `_checked`. Retorno informa status; `out_year` recebe o ano somente em
-sucesso. Falha preserva a saída; o consumidor deve verificar o status antes de
-ler o resultado. Ano `-1` é válido. `.dt:year()` permanece no Lua.
+Sem `_checked`. Todos validam a entrada e retornam `SMG_OK` em sucesso,
+escrevendo o componente no parâmetro de saída correspondente. Falha preserva
+a saída; o consumidor deve verificar o status antes de ler o resultado.
+Ano `-1` é válido. Os nomes dos métodos `.dt` permanecem no Lua.
 
-A mesma convenção nas outras famílias abaixo é proposta de migração, não
+A convenção está aprovada para os 11 componentes escalares. Nas demais
+famílias abaixo, permanece proposta de migração, não
 aprovação automática de uma reforma de todas as APIs C. Ponteiros de saída
 devem ser válidos e graváveis; verificar NULL não prova a validade de qualquer
 endereço arbitrário fornecido pelo caller.
@@ -812,7 +825,7 @@ e [espelho FFI](../lua/smaug/ffi_loader.lua).
 | APIs | Atual | Destino / decisão necessária |
 |---|---|---|
 | `year` | `int (int64_t)`; header promete -1 em erro | Aprovado: status + `int *out_year`, mesmo nome |
-| `month`, `day`, `hour`, `minute`, `second`, `ms`, `weekday`, `yearday`, `quarter`, `week` | Mesmo formato escalar; sem validação integral do domínio aprovado | Proposto: status + `int *out_value`, mesmo nome; validar epoch e preservar saída |
+| `month`, `day`, `hour`, `minute`, `second`, `ms`, `weekday`, `yearday`, `quarter`, `week` | Mesmo formato escalar; sem validação integral do domínio aprovado | Aprovado: status + saída `int *out_<componente>`, mesmo nome sem sufixo; validar epoch e preservar saída |
 | As 11 variantes `*_series` correspondentes | Ponteiro i64 ou NULL; macro só grava componentes >= 0 | Proposto: status + saída de série e diagnóstico de posição; erro libera resultado parcial, preserva entrada e saída do caller; NA original propaga |
 | `parse(str, len, out_epoch, dayfirst)` | 0/-1; saída só escrita em sucesso; ordem binária | Proposto: status; suportar ano negativo e precisão exata; definir representação explícita de ordem automática/DMY/MDY e diagnóstico |
 | `format(epoch, buffer, capacity)` | 0/-1; exige 26 bytes; snprintf pode truncar em falha | Proposto: status, buffer preservado em falha e constante pública de 28 bytes para saída canônica completa |
@@ -921,13 +934,12 @@ Depois executar suítes C/Lua e verificações de memória adequadas à mudança
 
 ### Decisões restantes, em ordem
 
-1. Aplicar status + saída, sem sufixo, aos outros dez componentes escalares?
-2. Fechar assinatura de saída de série e diagnóstico por chamada.
-3. Fechar a representação C de ordem automática/DMY/MDY. Opções e helpers
+1. Fechar assinatura de saída de série e diagnóstico por chamada.
+2. Fechar a representação C de ordem automática/DMY/MDY. Opções e helpers
    públicos são definidos na [referência Lua](API_INDEX.md#section-datetime-migracao-lua).
-4. Consolidar aliases antigos de aritmética/construção, buffer público e
+3. Consolidar aliases antigos de aritmética/construção, buffer público e
    domínio de intermediários de parse/round/ceil.
-5. Só então implementar por família com regressões, antes dos demais tópicos
+4. Só então implementar por família com regressões, antes dos demais tópicos
    contratuais da reconstrução da suíte. Esta migração não encerra lifetime,
    overflow de outras operações nem revisão geral do núcleo.
 

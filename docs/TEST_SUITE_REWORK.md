@@ -42,9 +42,10 @@ cobertura ou memória.
 
 ## Próxima decisão
 
-Estender aos outros dez componentes de calendário o padrão aprovado para
-`smaug_dt_year`: status no retorno, resultado por ponteiro, sem sufixo
-`_checked`, saída preservada em falha. No Lua, manter `.dt:year()`.
+O padrão dos 11 componentes escalares está aprovado e registrado na
+[referência C](API_Reference.md#section-decisao-fechada-e-alcance).
+O próximo ponto é fechar a saída das operações de série e o diagnóstico
+por chamada, incluindo a posição de uma falha.
 
 Depois, fechar saída de séries e diagnóstico por chamada, opções de ordem de
 data e helpers Lua, compatibilidade e formatação. A lista técnica completa
