@@ -1,6 +1,6 @@
 # Smaug -- MANIFEST de integridade
 # Gerado por scripts/make_manifest.sh (o .ps1 delega a este)
-# Arvore: c7f34db + alteracoes nao commitadas
+# Arvore: 09a1df1 + alteracoes nao commitadas
 # Formato: <sha256>  <linhas>  <caminho>
 #
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
@@ -9,22 +9,23 @@ ed7d63f5177cc7d7fbfee9c7c18ebeb4d6fd7da02680ec7778cfe23be1d15b03      31  ./.git
 d66b9d6d1b2bb00272d0e347f966d34ccdf8e7d58e40c8d94e2aa63a2e09fce3      21  ./LICENSE
 9a59e67b97ff3242805de9ff36da7565a6f8100fd8d69e7c90ecb6a25c3ba792     112  ./Makefile
 43f4e801d9fca633608b9854cb35a0619fcd540dedb226712b0ad954263ae8e2     569  ./docs/API_INDEX.md
-0780d27da5cfffae4e78273c1e208d2fa64769e1f72f235ccf5ecb6ce609d63a    1152  ./docs/API_Reference.md
+aec4654480f635c0ee8a697edc4e151053b805ca91351f0c29a44f395b3adc39    1164  ./docs/API_Reference.md
 52a7b4652c11524025b50b92049fa75e17d09632cbe324d44e82d65a97c26181     535  ./docs/ARCHITECTURE.md
 27439e73be16aee472d78151271463d6dd55ffc414248c1b34350b919facac1f     243  ./docs/Build_and_Testing.md
 1520453956ec903a7730ee00eefd8ab384103d3c8424d0a092fc2feda2cdd294    5371  ./docs/CHANGELOG.md
 823805de06773514ddb6673a558a27002efc378a397f10e6361525ec9d80b692     116  ./docs/CODING_STYLE.md
-4a4e244b3d67c84c65857f3edc372e8b9f06a4375aa9fd74dfe0d13956fc64ee     769  ./docs/CONTRACT.md
-f0cba08fe8e3f27264a36eab4d6c550cce1e77b9990e68d8f83d916f9e909fad     378  ./docs/COVERAGE.md
+8e05c6f8bbf521e3f63e14b8f9413fb15af53bd2433fbc3e573b1e8cbd29d1ed     770  ./docs/CONTRACT.md
+f44a05b876364bdb45979af7fdd89c850393415a3b6653eb6850a58a98b1d2b6     380  ./docs/COVERAGE.md
 7e6baf6917b5228ff850225590ed826a0c42975c1b8b10e475cd1649f4c70ba8     217  ./docs/COW.md
 74a0fe195fbaddded998dca2cd268e21c551f14933e1a5f7dbf3bf308a1fd52f     109  ./docs/GETTING_STARTED.md
-98a2945afdbe05dc42d08879bf8ec798285b8a2ece10e45cdd2c2b9d33ebbb92     955  ./docs/PARITY_REPORT.md
-fb32ac6577ebe02328b0961c859d4961ec48305aad230835a065d8084bc81ac9      50  ./docs/README.md
+e94e2a3f1652987013b1761842c6d9533eceac6b7f37c69039d196a1c406c52e     955  ./docs/PARITY_REPORT.md
+bacb9fc2ed1497910e44e53e9b8be0c77aa9ea3f8430ad60b831be5fd87b4bc2      38  ./docs/README.md
 d0ca444c73b064356743980bb68e9ea708a4dfd1b0d1e00c432e53d1ebbb9767     963  ./docs/Roadmap.md
 9c16665ee26a28cf5e71f5f30c30d0fe1e3bc774b149fda9ffd899c933ee953e     218  ./docs/TEST_SUITE_EXCLUSIONS_REVIEW.md
-9938d92d5f7eb15b96fa4061598d53124ea426993b5f1b65f8aeb8e5db0cc9c1      92  ./docs/TEST_SUITE_REWORK.md
+3bb36977040744306bd2b87d572007d1f41ac729ea38a4b905a1be5f3ea783f6      93  ./docs/TEST_SUITE_REWORK.md
 33d754837578eedad15022c3c2fcbba5b3b0156dac80c9a8a151394b72e03a72     427  ./docs/TEST_SUITE_REWRITE_REVIEW.md
 e6c98e4dd88e3d027f42b21da38efd6ca08554576ae4913dd16c77f1bca0424f     209  ./docs/USER_GUIDE.md
+444fe51f26822d2ff8484b639e7886e0be5863be4bb2470744439a9e40e93c97      20  ./docs/doc_new/readme.md
 1722e1a5806e185b2f934f2a66ec5193cc6ab8dc5a03837be43be80628c8fb86      39  ./include/smaug.h
 6ece9315732efddf7180f7e867ec09888b8f87dfb83e5efeab2ee85752003114      59  ./include/smaug_astype.h
 963e21a0d5b9b1857da7bbe7310a4a9340057fcf7560272f062e4e83727c5da3      40  ./include/smaug_bool.h
@@ -71,7 +72,7 @@ d3ceeed50376fa2fe08c3c5bffc7b1ded8d752f53dec120608296ac59316d459     388  ./lua/
 35162240dbb9fa72e97b7fae1b0634cb013148ee0b825731a4b80e4399ef002d      91  ./lua/smaug/io/json.lua
 ad6d912b3e313515032f4c115c59fe9eeaa590767b713a40b5540086fada2923     249  ./scripts/build.ps1
 dd0891932c49a156471a6899988351b3bcd17903fbc501deef19103b2cf8fdda     314  ./scripts/build.sh
-e41168bcf875c85cacc135dba6c9a60f8cd154207fe81b94f68b0917fcfad4b5     225  ./scripts/make_coverage.sh
+a994fb8d09f3f67798d1a8f0a6f42312e5bbca48be30f54052ddcd1e889232fe     235  ./scripts/make_coverage.sh
 749673189f41c7ae83cd740a2c0936cff276c1904955832e45eaa5a325f935b2      65  ./scripts/make_manifest.ps1
 d421657b2eb8b14a8bd0ed0c1e442f1c3d328b7f3015d07275266d87406fa217      76  ./scripts/make_manifest.sh
 8289de5f0b60a6c61e76e88bfdac4fee3ce795a543654e3fd476d04a43413f28     224  ./scripts/parity/01_dtypes.lua
@@ -138,4 +139,4 @@ cee6ba5f9bd5ff212a9bee7ac6335c568e90d940fd6cf7e472d24eac14e2558a     545  ./test
 0e98ed9a9770f88f9ecd29a367d869aeadc19394cbfd84add9db366cda01f032     751  ./tests/series/test_str.lua
 62cdcabbcd4ddba62923df87eeac47570d5f2ca5762e7caa0f7ad228615e41a1     361  ./tests/series/test_window.lua
 #
-# total de arquivos: 134
+# total de arquivos: 135

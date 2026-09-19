@@ -35,3 +35,4 @@ evoluindo
 ## Conteúdos
 
 - [License](#license)
+- [Coverage: 94.95%](COVERAGE.md#coverage-total)

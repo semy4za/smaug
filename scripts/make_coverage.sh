@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Mede a cobertura do backend C (src/*.c) e gera docs/COVERAGE.md.
+# Mede a cobertura do backend C (src/*.c), gera docs/COVERAGE.md e atualiza
+# o percentual de branch-alvo no link de cobertura de docs/README.md.
 #
 # Como funciona: compila cada src/*.c como um .o instrumentado (--coverage) UMA
 # vez; TODOS os executores de teste linkam contra esses MESMOS .o (mesmos .gcno),
@@ -195,6 +196,8 @@ bpi=$(awk "BEGIN{printf \"%.0f\", $br_pct_alvo}")
     echo "- **Branch-bruto** (todos os ramos): \`$cov_b/$tot_b = ${br_pct}%\` -- $tot_excl ramo(s) excluido(s) com justificativa (ver fim do arquivo)."
     echo "- Agrega TODOS os testes: C diretos (incl. \`test_cow test_io_c\` e \`test_stress\`), Lua (FFI) e \`test_allocfail\` (OOM)."
     echo ""
+    echo '<a id="coverage-total"></a>'
+    echo ""
     echo "| Arquivo | Linhas | Branch-alvo (taken) |"
     echo "| :--- | :--- | :--- |"
     printf "%s" "$rows"
@@ -219,6 +222,13 @@ bpi=$(awk "BEGIN{printf \"%.0f\", $br_pct_alvo}")
         echo "Nenhum."
     fi
 } > "$OUT"
+
+# Usa o mesmo percentual do TOTAL para manter o link sincronizado com o relatorio.
+awk -v pct="$br_pct_alvo" '
+    { sub(/\[Coverage(: [0-9.]+%)?\]\(COVERAGE\.md(#[[:alnum:]_-]+)?\)/,
+          "[Coverage: " pct "%](COVERAGE.md#coverage-total)"); print }
+' docs/README.md > "$COVDIR/README.md"
+cat "$COVDIR/README.md" > docs/README.md
 
 echo "COVERAGE gerado: $OUT"
 echo "  Linha:       $cov_l/$tot_l = ${line_pct}%"
