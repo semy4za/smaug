@@ -1,6 +1,6 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./img/title_1-3.svg">
+    <source media="(prefers-color-scheme: dark)" srcset="./doc_new/img/title_1-3.svg">
     <img alt="Smaug Logo" src="./doc_new/img/title_1-1.svg">
   </picture>
 </p>
