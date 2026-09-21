@@ -11,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-09-19 19:58:42 UTC
+Gerado em: 2026-09-21 19:40:09 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -623,38 +623,38 @@ Heurística conservadora: verifica menção explícita do dtype no corpo da fun�
 
 | operação | f64 | i64 | bool | string | datetime | categorical |
 | :--- | :-: | :-: | :-: | :-: | :-: | :-: |
-| `groupby` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `join` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `concat` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `pivot` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `pivot_table` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `melt` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `stack` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `unstack` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `explode` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
+| `groupby` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `join` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `concat` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `pivot` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `pivot_table` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `melt` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `stack` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `unstack` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `explode` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 | `rolling` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `sort_by` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `filter` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
+| `sort_by` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `filter` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 
 ### GroupBy — agregações
 
 | operação | f64 | i64 | bool | string | datetime | categorical |
 | :--- | :-: | :-: | :-: | :-: | :-: | :-: |
-| `groupby.agg` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `groupby.count` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `groupby.first` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `groupby.last` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `groupby.max` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `groupby.mean` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `groupby.median` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `groupby.min` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `groupby.nunique` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `groupby.prod` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `groupby.quantile` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `groupby.std` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `groupby.sum` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `groupby.transform` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
-| `groupby.var` | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 🟩 |
+| `groupby.agg` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `groupby.count` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `groupby.first` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `groupby.last` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `groupby.max` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `groupby.mean` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `groupby.median` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `groupby.min` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `groupby.nunique` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `groupby.prod` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `groupby.quantile` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `groupby.std` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `groupby.sum` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `groupby.transform` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+| `groupby.var` | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 
 ## Eixo 5 — Paridade I/O por dtype
 
@@ -794,8 +794,8 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 240/240 erros com prefixo `smaug:` (100.0%)
-- `dataset.lua`: 92/92 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 242/242 erros com prefixo `smaug:` (100.0%)
+- `dataset.lua`: 94/94 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
 
@@ -840,18 +840,18 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `series/test_predicates` | 175 | 9 | 61 | 3 | 20 | 2 | — |
 | `series/test_selection` | 73 | 7 | 8 | 6 | 8 | 2 | 1 |
 | `series/test_str` | 273 | 4 | 9 | 1 | 51 | — | — |
-| `series/test_dt` | 263 | 3 | 6 | 2 | 13 | 61 | — |
+| `series/test_dt` | 263 | 3 | 6 | 2 | 14 | 62 | — |
 | `series/test_categorical` | 86 | 5 | 1 | 3 | 5 | 1 | 35 |
 | `dataset/test_core` | 238 | 30 | 33 | 8 | 14 | — | 1 |
 | `dataset/test_relational` | 184 | 15 | 65 | 4 | 34 | — | — |
-| `dataset/test_stat` | 107 | 14 | 18 | 1 | 15 | — | — |
+| `dataset/test_stat` | 117 | 14 | 18 | 1 | 17 | 4 | — |
 | `dataset/test_io_support` | 53 | 4 | 15 | 1 | 7 | — | — |
 | `io/test_csv` | 138 | 3 | 7 | 2 | 11 | 4 | 1 |
 | `io/test_json` | 48 | 4 | 4 | 1 | 2 | 2 | — |
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 88 | 23 | 3 | 2 | 5 | 1 | 1 |
 
-**Total de checks:** 2471
+**Total de checks:** 2481
 
 ### Menções totais por dtype (toda a suite)
 
@@ -860,8 +860,8 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | float64 | 263 |
 | int64 | 350 |
 | bool | 60 |
-| string | 243 |
-| datetime | 83 |
+| string | 246 |
+| datetime | 88 |
 | categorical | 40 |
 
 ## Eixo 12 — Sincronização docs ↔ código
@@ -942,9 +942,9 @@ O `cdef` do `ffi_loader.lua` replica à mão o layout de cada struct dos headers
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 1113
+- 🟩 paridade: 1139
 - ⬜ exceção registrada: 215
-- 🟨 suspeita (revisar): 279
+- 🟨 suspeita (revisar): 253
 - 🟥 inconsistência clara: 15
 
 
