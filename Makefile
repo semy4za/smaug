@@ -48,11 +48,11 @@ LUA_TESTS         = $(LUA_TESTS_CORE) $(LUA_TESTS_SERIES) $(LUA_TESTS_DATASET) $
 WRAP_FLAGS    = -Wl,--wrap=malloc -Wl,--wrap=realloc -Wl,--wrap=calloc -Wl,--wrap=strdup
 
 $(TARGET): $(SRCS) $(HDRS) | build
-        $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(SRCS)
-        @echo "Compilado: $@    -- OK"
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(SRCS)
+	@echo "Compilado: $@    -- OK"
 
 build:
-        mkdir -p build
+	mkdir -p build
 
 # Compila e roda os testes em C (plain + wrap), iterando sobre as listas.
 test: build
@@ -61,52 +61,52 @@ test: build
 		if [ "$$t" = "test_ops_edge" ]; then flags='$(EDGE_CFLAGS)'; else flags='$(TEST_CFLAGS)'; fi; \
 		$(CC) $$flags tests/c/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
 	done
-        @for t in $(C_TEST_WRAP); do \
-                echo "  CC    $$t (--wrap)"; \
-                $(CC) $(TEST_CFLAGS) $(WRAP_FLAGS) tests/c/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
-        done
-        @for t in $(C_TESTS_PLAIN) $(C_TEST_WRAP); do \
-                echo "  RUN   $$t"; ./build/$$t || exit 1; \
-        done
+	@for t in $(C_TEST_WRAP); do \
+	        echo "  CC    $$t (--wrap)"; \
+	        $(CC) $(TEST_CFLAGS) $(WRAP_FLAGS) tests/c/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
+	done
+	@for t in $(C_TESTS_PLAIN) $(C_TEST_WRAP); do \
+	        echo "  RUN   $$t"; ./build/$$t || exit 1; \
+	done
 
 # Compila e roda os testes de stress (N grande; mais lento que make test)
 test-stress: build
-        @for t in $(C_TEST_STRESS); do \
-                echo "  CC    $$t"; \
-                $(CC) $(TEST_CFLAGS) tests/c/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
-        done
-        @for t in $(C_TEST_STRESS); do \
-                echo "  RUN   $$t"; ./build/$$t || exit 1; \
-        done
+	@for t in $(C_TEST_STRESS); do \
+	        echo "  CC    $$t"; \
+	        $(CC) $(TEST_CFLAGS) tests/c/$$t.c $(SRCS) -lm -o build/$$t || exit 1; \
+	done
+	@for t in $(C_TEST_STRESS); do \
+	        echo "  RUN   $$t"; ./build/$$t || exit 1; \
+	done
 
 # Roda todos os testes C sob Valgrind (requer valgrind instalado)
 valgrind: test test-stress
-        @for t in $(C_TESTS_PLAIN) $(C_TEST_WRAP) $(C_TEST_STRESS); do \
-                echo "  VALGRIND $$t"; \
-                valgrind --leak-check=full --error-exitcode=1 ./build/$$t || exit 1; \
-        done
+	@for t in $(C_TESTS_PLAIN) $(C_TEST_WRAP) $(C_TEST_STRESS); do \
+	        echo "  VALGRIND $$t"; \
+	        valgrind --leak-check=full --error-exitcode=1 ./build/$$t || exit 1; \
+	done
 
 # Smoke test do frontend Lua (requer luajit e a .so compilada)
 test-lua: $(TARGET)
-        @for t in $(LUA_TESTS); do \
-                luajit tests/$$t.lua || exit 1; \
-        done
+	@for t in $(LUA_TESTS); do \
+	        luajit tests/$$t.lua || exit 1; \
+	done
 
 # Mede cobertura do backend C e gera docs/COVERAGE.md (requer gcov; só Linux)
 coverage:
-        bash scripts/make_coverage.sh
+	bash scripts/make_coverage.sh
 
 # Gera docs/MANIFEST.txt (sha256 + linhas de cada arquivo versionável)
 manifest:
-        bash scripts/make_manifest.sh
+	bash scripts/make_manifest.sh
 
 # Verifica a árvore atual contra o MANIFEST.txt (detecta perda/divergência)
 verify:
-        @bash scripts/make_manifest.sh >/dev/null
-        @git diff --stat docs/MANIFEST.txt 2>/dev/null || true
-        @echo "MANIFEST regenerado; compare com a versão anterior (git diff) para detectar mudanças."
+	@bash scripts/make_manifest.sh >/dev/null
+	@git diff --stat docs/MANIFEST.txt 2>/dev/null || true
+	@echo "MANIFEST regenerado; compare com a versão anterior (git diff) para detectar mudanças."
 
 clean:
-        rm -rf build
+	rm -rf build
 
 .PHONY : clean test test-stress valgrind test-lua coverage manifest verify
