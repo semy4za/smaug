@@ -63,7 +63,7 @@ O [guia do usuário](USER_GUIDE.md) explica os conceitos por assunto.
 | `:view(start, len)` | view zero-copy COW-gravável |
 | `:take(idx)` / `:head(n)` / `:tail(n)` | seleção → nova Series |
 | `:dropna()` | → nova Series sem NULLs |
-| `:astype(dtype)` | conversão tolerante por elemento (inconversíveis → null); exceto `bool` numérico, que é rígido (só 0/1, resto orienta para `:map`) |
+| `:astype(dtype, name_or_options)` | aceita nome ou `{name=..., dayfirst=false}`; conversão atual tolerante por elemento (inconversíveis → null), exceto `bool` numérico rígido; migração datetime estrita ainda pendente |
 | `:fillna(value)` | nova Series com NULLs→value; NaN intacto |
 | `:to_table([na])` | → tabela Lua |
 | `:sample(n, [seed])` | amostra n elementos sem reposição (par de `DataSet:sample`) |
@@ -313,16 +313,50 @@ concentram as decisões normativas; esta seção registra o impacto no Lua.
 | Superfície | Mudança planejada |
 |---|---|
 | `.dt:year()` e outros componentes | Preservar o nome; ano negativo válido continua valor, NA original propaga e falha real gera erro orientado |
-| Inferência de strings em Series/DataSet | Examinar a coluna inteira; resolver uma única ordem compatível ou manter texto |
-| Conversão explícita para datetime | Erro por elemento inválido, ambíguo ou conflitante; não transformar falha em NA |
+| Inferência de strings em Series/DataSet | Examinar a coluna inteira sob a política de interpretação; manter texto se incompatível |
+| Conversão explícita para datetime | Prioridade aprovada: formato explícito, reconhecimento com ordem configurada, padrão documentado; erro por data impossível ou incompatível com formato solicitado, sem NA silencioso |
 | `.dt:format()` e conversão para string | Propagar falha de formatação; suportar a saída negativa canônica |
 | Predicados, nomes, `strftime`, `ceil` e `round` | Conferir falhas intermediárias e impedir sua conversão silenciosa em NA |
 | Diagnóstico `DATE_ON_THE_FENCE` | Mensagem aprovada com operação, coluna e posições baseadas em 1; até duas referências em conflito |
 
-**Ainda a decidir:** opção pública de ordem automática/dia-mês/mês-dia;
+**Padrão aprovado:** preservar mês/dia (`dayfirst=false`) quando formato e
+ordem não forem informados, sem depender da região do computador. Dia/mês
+continua configurável; ano primeiro mantém sua ordem.
+
+**Formatos iniciais aprovados:** ver o conjunto e suas regras no
+[contrato de interpretação textual](CONTRACT.md#section-deteccao-de-datas-e-diagnostico-decisoes-da-retomada).
+Implementação e validação continuam pendentes.
+
+**Argumento de ordem aprovado:** `dayfirst`, booleano com padrão `false`.
+O helper mantém `Series.dt_parse(str, dayfirst)`:
+
+```lua
+smaug.Series.dt_parse("02/05/2026")        -- 5 de fevereiro
+smaug.Series.dt_parse("02/05/2026", false) -- 5 de fevereiro
+smaug.Series.dt_parse("02/05/2026", true)  -- 2 de maio
+```
+
+Ano primeiro mantém sua ordem. Reconhecer `/` e `-` automaticamente nos
+formatos aprovados, com separadores iguais dentro de cada data. A API inicial
+não acrescenta argumento de formato explícito; essa opção fica para ampliação
+futura, quando terá prioridade sobre `dayfirst`.
+
+**Integração aplicada em 2026-09-21:** `Series:astype("datetime", {dayfirst=true})`
+reutiliza a opção existente. `DataSet:astype({data="datetime"}, {dayfirst=true})`
+encaminha a ordem às colunas string convertidas para datetime, mantendo nomes
+e colunas fora do mapa. Omitir opções ou usar `false` preserva mês/dia.
+`Series.dt_parse`, `Series:astype` e `DataSet:astype` rejeitam `dayfirst`
+não-booleano quando informado. Essa mudança é Lua; não implementa a conversão
+estrita nem altera as assinaturas C. Atualmente, entradas textuais inválidas
+em `astype` ainda viram NA.
+
+**Ainda a decidir:** integração nas demais entradas (construção, set/append e I/O);
+eventual modo automático estrito opt-in
+e revisão dos gatilhos de `DATE_ON_THE_FENCE` segundo a nova prioridade;
 comportamento dos helpers `dt_parse`, `dt_from_parts` e `dt_format` que
 hoje retornam nil em determinados erros; eventual conversão tolerante opt-in.
-Não confundir opção omitida com uma ordem explicitamente solicitada.
+Omitir `dayfirst` equivale a `false` para a interpretação aprovada; não ativa
+inferência automática estrita.
 
 **Integração interna Lua:**
 
@@ -330,7 +364,7 @@ Não confundir opção omitida com uma ordem explicitamente solicitada.
 |---|---|
 | `lua/smaug/core/series/temporal/_dt.lua` | 11 componentes em lote; predicados de início/fim, bissexto, dias no mês, nomes e strftime usam escalares; next_period usa from_parts legado; ceil/round podem produzir nil que dt_map converte em NA; helpers públicos misturam nil e status |
 | `lua/smaug/core/series/_types.lua` | Descritor datetime liga operações C; set/append de string chamam parse com dayfirst=0 fixo; atualizar fluxo de validação sem inferir por elemento |
-| `lua/smaug/core/series/access/_transform.lua` | Matriz de conversões; astype omite ordem como 0 e trata retorno como ponteiro; distinguir opção omitida de false explícito |
+| `lua/smaug/core/series/access/_transform.lua` | Matriz de conversões; astype valida dayfirst booleano e encaminha 0/1; retorno C ainda é ponteiro, migração estrita pendente |
 | `lua/smaug/core/series/window/_cumulative.lua` | diff datetime chama diff_ms_checked; precisa acompanhar assinatura e mensagem |
 | `lua/smaug/core/series/stats/_stat.lua` | Formatação com char[26], retorno ignorado e ffi.string(buf, 25); retirar comprimento fixo incorreto |
 | `lua/smaug/core/series/_factories.lua` | Inferência de strings atualmente resulta em string; ponto de integração da detecção antes de construir/mutar série |
@@ -481,7 +515,7 @@ mantém seu dtype de resultado). Erro se nenhuma coluna numérica.
 | `:diff()` | diferença sucessiva (numérico) |
 | `:ffill()` / `:bfill()` / `:shift([p])` | propagação/deslocamento (qualquer dtype) |
 | `:isna()` / `:notna()` | máscara de nulidade por coluna (qualquer dtype) → DataSet bool |
-| `:astype({col=dtype})` | conversão por mapa; colunas fora do mapa inalteradas |
+| `:astype({col=dtype}, options)` | conversão por mapa; `{dayfirst=false}` opcional para string→datetime; colunas fora do mapa inalteradas |
 
 **Operações relacionais:**
 

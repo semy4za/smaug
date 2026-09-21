@@ -157,9 +157,16 @@ return function(I)
 
     -- 5.3 astype — mapa { coluna = dtype } (D4-A). Colunas fora do mapa seguem
     -- inalteradas (compartilhadas; Series são COW).
-    function methods.astype(self, dtype_map)
+    function methods.astype(self, dtype_map, options)
         if type(dtype_map) ~= "table" then
             error("smaug: astype() espera um mapa { coluna = dtype }", 2)
+        end
+        if options ~= nil and type(options) ~= "table" then
+            error("smaug: astype() opções devem ser uma tabela", 2)
+        end
+        local dayfirst = options and options.dayfirst
+        if dayfirst ~= nil and type(dayfirst) ~= "boolean" then
+            error("smaug: astype() dayfirst deve ser booleano", 2)
         end
         for cname in pairs(dtype_map) do
             if not self:has_column(cname) then
@@ -170,7 +177,11 @@ return function(I)
         for _, name in ipairs(self._col_names) do
             local col    = self._columns[name]
             local target = dtype_map[name]
-            result:add_column(name, target and col:astype(target, name) or col)
+            if target == "datetime" and col._dtype == "string" then
+                result:add_column(name, col:astype(target, {name = name, dayfirst = dayfirst}))
+            else
+                result:add_column(name, target and col:astype(target, name) or col)
+            end
         end
         return result
     end

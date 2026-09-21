@@ -21,9 +21,11 @@
 ## Estado atual
 
 Estamos fechando contratos e a migração das APIs antes de reconstruir a suíte.
-O mapeamento inicial de datetime foi concluído; a implementação não começou.
-As alterações desta etapa são documentais. Não há nova certificação de testes,
-cobertura ou memória.
+O mapeamento inicial de datetime foi concluído. A migração do motor ainda não
+começou; foi aplicada a integração Lua de `dayfirst` em `DataSet:astype` e a
+validação booleana no helper e nas conversões. Validação focada: 283 checks
+de datetime e 136 checks de DataSet passaram, além de `git diff --check`.
+Isso não certifica a suíte inteira, cobertura ou memória.
 
 <a id="section-onde-esta-cada-informacao"></a>
 
@@ -44,11 +46,34 @@ cobertura ou memória.
 
 O padrão dos 11 componentes escalares está aprovado e registrado na
 [referência C](API_Reference.md#section-decisao-fechada-e-alcance).
-O próximo ponto é fechar a saída das operações de série e o diagnóstico
-por chamada, incluindo a posição de uma falha.
+O comportamento das 11 operações de componentes em série foi aprovado em
+2026-09-21 e registrado no [contrato](CONTRACT.md#section-perfil-datetime-decisoes-aprovadas-em-2026-09-18).
+O padrão C dessas 11 funções também está aprovado: status, série por `out`
+somente em sucesso e `error_index` opcional, sem estrutura nova de diagnóstico.
+Está aprovado que o índice apenas transporta a posição do primeiro elemento
+que falhou do C ao Lua: status permanece no C e mensagem é montada no Lua.
+Regra de escrita aprovada: índice escrito apenas em falha de elemento;
+em sucesso ou falha sem posição, fica intocado e não é consultado, sem sentinela.
+A correspondência entre status e validade do índice está aprovada e registrada
+na referência C. A prioridade de interpretação textual foi revista e aprovada
+no contrato: formato explícito, reconhecimento com ordem configurada e padrão
+documentado. Foi aprovado preservar o padrão mês/dia existente, conforme o
+contrato. O conjunto inicial de formatos também está aprovado e registrado
+no contrato. O argumento Lua `dayfirst=false` está aprovado, preservando
+`Series.dt_parse(str, dayfirst)`. A API inicial reconhece `/` e `-` nos
+formatos aprovados, sem argumento de formato explícito; essa opção fica para
+ampliação futura. O próximo ponto é fechar a integração de `dayfirst` nas
+demais entradas, antes de retomar o diagnóstico
+da conversão textual. Modo automático estrito
+opt-in permanece proposta separada.
+Integração Lua aplicada: `DataSet:astype` encaminha `dayfirst` às conversões
+string→datetime; helper e astype validam o booleano. Ver a referência Lua.
+Essa etapa não implementa conversão estrita nem a migração C. As demais
+implementações e validações continuam pendentes; alterações no motor devem
+ficar restritas às correções e à comunicação de erros necessárias.
 
-Depois, fechar saída de séries e diagnóstico por chamada, opções de ordem de
-data e helpers Lua, compatibilidade e formatação. A lista técnica completa
+Depois, fechar opções de ordem de data e helpers Lua, compatibilidade e
+formatação. A lista técnica completa
 fica nas referências [C](API_Reference.md#section-decisoes-restantes-em-ordem)
 e [Lua](API_INDEX.md#section-datetime-migracao-lua).
 

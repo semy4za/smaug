@@ -384,6 +384,9 @@ return function(I)
         if type(str) ~= "string" then
             error("smaug: Series.dt_parse() espera string", 2)
         end
+        if dayfirst ~= nil and type(dayfirst) ~= "boolean" then
+            error("smaug: Series.dt_parse() dayfirst deve ser booleano", 2)
+        end
         local df = dayfirst and 1 or 0
         local ep = ffi.new("int64_t[1]")
         if C.smaug_dt_parse(str, #str, ep, df) ~= 0 then return nil end

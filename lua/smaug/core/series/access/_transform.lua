@@ -226,6 +226,9 @@ return function(I)
         if type(name) == "table" then
             local opts = name
             name = opts.name
+            if opts.dayfirst ~= nil and type(opts.dayfirst) ~= "boolean" then
+                error("smaug: astype() dayfirst deve ser booleano", 2)
+            end
             if opts.dayfirst == true then dayfirst = 1
             elseif opts.dayfirst == false then dayfirst = 0 end
         end

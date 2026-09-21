@@ -302,4 +302,39 @@ do
     check(not pcall(function() return source_dataset_7:astype("float64") end), "5.3 astype: erro se não for mapa")
 end
 
+do
+    local source_dataset = smaug.DataSet({
+        {"date", {"02/05/2026", "02-05-2026", "2026-05-02", smaug.NA}, "string"},
+        {"label", {"a", "b", "c", "d"}, "string"},
+    })
+    for _, options in ipairs({{}, {dayfirst = false}, {dayfirst = true}}) do
+        local converted_dataset = source_dataset:astype({date = "datetime"}, options)
+        local expected_month = options.dayfirst and 5 or 2
+        local expected_day = options.dayfirst and 2 or 5
+        local date_series = converted_dataset:column("date")
+        for row_index = 1, 2 do
+            check(date_series.dt:month():get(row_index) == expected_month, "astype dayfirst: mês com / e -")
+            check(date_series.dt:day():get(row_index) == expected_day, "astype dayfirst: dia com / e -")
+        end
+        check(date_series.dt:month():get(3) == 5 and date_series.dt:day():get(3) == 2,
+              "astype dayfirst: ano primeiro mantém ordem")
+        check(date_series:is_null(4), "astype dayfirst: NA preservado")
+        check(date_series._name == "date", "astype dayfirst: nome preservado")
+        check(rawequal(converted_dataset._columns["label"], source_dataset._columns["label"]),
+              "astype dayfirst: coluna fora do mapa compartilhada")
+    end
+    check(source_dataset:astype({date = "datetime"}):column("date").dt:month():get(1) == 2,
+          "astype dayfirst: opções omitidas usam mês/dia")
+    check(source_dataset:column("date"):get(1) == "02/05/2026", "astype dayfirst: entrada preservada")
+    check(not pcall(function() source_dataset:astype({date = "datetime"}, true) end),
+          "astype dayfirst: rejeita opções não-tabela")
+    for _, invalid_option in ipairs({"false", 0, 1}) do
+        local succeeded, error_message = pcall(function()
+            source_dataset:astype({date = "datetime"}, {dayfirst = invalid_option})
+        end)
+        check(not succeeded and tostring(error_message):find("dayfirst", 1, true) ~= nil,
+              "astype dayfirst: rejeita valor não-booleano")
+    end
+end
+
 print(string.format("OK — %d checks passaram (DataSet: corr/cov, equals, compare, duplicated, drop_duplicates, reduções, transforms)", passed_checks))

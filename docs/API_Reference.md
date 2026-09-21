@@ -808,7 +808,50 @@ escrevendo o componente no parâmetro de saída correspondente. Falha preserva
 a saída; o consumidor deve verificar o status antes de ler o resultado.
 Ano `-1` é válido. Os nomes dos métodos `.dt` permanecem no Lua.
 
-A convenção está aprovada para os 11 componentes escalares. Nas demais
+A convenção está aprovada para os 11 componentes escalares. Para as 11 variantes
+de série, o comportamento foi aprovado em 2026-09-21: resultado completo em
+sucesso; datetime inválido gera erro com posição, sem resultado parcial;
+NA propaga na mesma posição e a entrada permanece intacta. Ver o
+[contrato](CONTRACT.md#section-perfil-datetime-decisoes-aprovadas-em-2026-09-18).
+Padrão mínimo de assinatura aprovado para as 11 variantes, ainda não implementado:
+
+```c
+smaug_status_t smaug_dt_year_series(
+    const smaug_series_dt_t *s,
+    smaug_series_i64_t **out,
+    size_t *error_index
+);
+```
+
+Aplicar os mesmos parâmetros às variantes `month`, `day`, `hour`, `minute`,
+`second`, `ms`, `weekday`, `yearday`, `quarter` e `week`, preservando seus
+nomes `smaug_dt_<componente>_series`. `out` recebe a série completa somente
+em sucesso; `error_index` é opcional e transporta apenas o índice do primeiro
+elemento que falhou na ordem da série. Interromper nessa falha, sem entregar
+resultado parcial; NA não conta como erro. O C usa índice baseado em 0;
+o Lua apresenta posição baseada em 1. O parâmetro não substitui o status:
+o C valida e comunica status/posição, e o Lua monta e apresenta a mensagem.
+Não criar `smaug_dt_diagnostic_t` para essas operações. Quando fornecido,
+`error_index` só é escrito se um elemento falhar. Em sucesso ou falha sem
+posição (argumento inválido ou falta de memória), permanece intocado e o
+consumidor não o consulta. Não usar sentinela como `SIZE_MAX`.
+
+Correspondência aprovada, restrita às 11 extrações de componentes em série:
+
+| Situação | Status | Consultar `error_index`? |
+|---|---|---|
+| Sucesso | `SMG_OK` | Não |
+| Argumento inválido, como ponteiro obrigatório nulo | `SMG_ERR_ARGUMENT` | Não |
+| Falta de memória | `SMG_ERR_NOMEM` | Não |
+| Primeiro datetime fora do domínio permitido | `SMG_ERR_OVERFLOW` | Sim, se fornecido |
+
+Nessa família, `SMG_ERR_OVERFLOW` indica exclusivamente falha no valor de um
+elemento e garante a escrita do índice quando fornecido. O consumidor verifica
+o status antes de consultar a posição. NA não gera erro e continua propagando.
+
+Limitar a mudança ao necessário para corrigir a extração e comunicar erros,
+atualizando C, FFI, consumidores Lua e testes em conjunto.
+Nas demais
 famílias abaixo, permanece proposta de migração, não
 aprovação automática de uma reforma de todas as APIs C. Ponteiros de saída
 devem ser válidos e graváveis; verificar NULL não prova a validade de qualquer
@@ -826,7 +869,7 @@ e [espelho FFI](../lua/smaug/ffi_loader.lua).
 |---|---|---|
 | `year` | `int (int64_t)`; header promete -1 em erro | Aprovado: status + `int *out_year`, mesmo nome |
 | `month`, `day`, `hour`, `minute`, `second`, `ms`, `weekday`, `yearday`, `quarter`, `week` | Mesmo formato escalar; sem validação integral do domínio aprovado | Aprovado: status + saída `int *out_<componente>`, mesmo nome sem sufixo; validar epoch e preservar saída |
-| As 11 variantes `*_series` correspondentes | Ponteiro i64 ou NULL; macro só grava componentes >= 0 | Proposto: status + saída de série e diagnóstico de posição; erro libera resultado parcial, preserva entrada e saída do caller; NA original propaga |
+| As 11 variantes `*_series` correspondentes | Ponteiro i64 ou NULL; macro só grava componentes >= 0 | Aprovado: status + `smaug_series_i64_t **out` escrito somente em sucesso + `size_t *error_index` opcional; sem resultado parcial, entrada intacta e NA propagado |
 | `parse(str, len, out_epoch, dayfirst)` | 0/-1; saída só escrita em sucesso; ordem binária | Proposto: status; suportar ano negativo e precisão exata; definir representação explícita de ordem automática/DMY/MDY e diagnóstico |
 | `format(epoch, buffer, capacity)` | 0/-1; exige 26 bytes; snprintf pode truncar em falha | Proposto: status, buffer preservado em falha e constante pública de 28 bytes para saída canônica completa |
 | `from_parts` / `from_parts_checked` | Sentinela INT64_MIN / status + saída | Proposto: unificar sob `from_parts`, status + saída; validar componentes e domínio |
@@ -892,15 +935,18 @@ Os consumidores e comportamentos Lua ficam na
   `SMG_ERR_OVERFLOW`; falha de alocação: `SMG_ERR_NOMEM`.
 - `DATE_ON_THE_FENCE` identifica ambiguidade/conflito, mantendo a mensagem
   aprovada. Status genérico sozinho não informa causa específica nem posições.
-- Proposta: diagnóstico fornecido pelo caller, sem estado global, contendo
+- Nas 11 extrações de componentes em série, usar status e `error_index`
+  opcional conforme a assinatura aprovada acima, sem estrutura nova.
+- Para conversão textual, proposta: diagnóstico fornecido pelo caller, sem estado global, contendo
   motivo e até duas posições. O Lua acrescenta operação, coluna e descrição
   limitada dos valores; índices C baseados em 0 viram posições Lua baseadas em 1.
   Layout e assinatura ainda precisam ser fechados. Não é necessário alocar
   uma mensagem no C para cada elemento.
 - Saída escalar/buffer/série só publicada após sucesso. Em falha, liberar
-  alocações temporárias. Diagnóstico tem contrato distinto: deve ser preenchido
-  na falha, sem contradizer a preservação do parâmetro de resultado.
-- Para uma série nova, propor saída `smaug_series_i64_t **out_series`: ponteiro
+  alocações temporárias. Nas extrações de componentes, `error_index` é
+  preenchido somente em falha de elemento, conforme a regra acima; essa
+  escrita não contradiz a preservação do parâmetro de resultado.
+- Para as 11 extrações em série, saída aprovada `smaug_series_i64_t **out`: ponteiro
   para a variável que receberá o objeto. Em sucesso, caller assume ownership
   e libera pela função apropriada; em falha, não recebe resultado parcial.
 - Detecção percorre a coluna inteira, guardando apenas evidências necessárias.
@@ -934,7 +980,15 @@ Depois executar suítes C/Lua e verificações de memória adequadas à mudança
 
 ### Decisões restantes, em ordem
 
-1. Fechar assinatura de saída de série e diagnóstico por chamada.
+1. Fechar a integração de `dayfirst` nas entradas Lua e seu transporte ao C,
+   antes de desenhar o diagnóstico da conversão textual. A API inicial
+   reconhece os separadores aprovados sem argumento de formato explícito;
+   essa opção fica para ampliação futura.
+   Prioridade de interpretação, padrão mês/dia e formatos iniciais estão
+   aprovados no contrato.
+   Assinatura,
+   regra de escrita e correspondência dos status de `error_index` estão
+   aprovadas para as 11 extrações de componentes em série.
 2. Fechar a representação C de ordem automática/DMY/MDY. Opções e helpers
    públicos são definidos na [referência Lua](API_INDEX.md#section-datetime-migracao-lua).
 3. Consolidar aliases antigos de aritmética/construção, buffer público e

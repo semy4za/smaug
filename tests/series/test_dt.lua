@@ -815,4 +815,16 @@ end
 -- =====================================================================
 -- Resultado
 -- =====================================================================
+do
+    local source_series = smaug.Series({"02/05/2026"}, "string")
+    for _, invalid_option in ipairs({"false", 0, 1}) do
+        check_error_match(function()
+            smaug.Series.dt_parse("02/05/2026", invalid_option)
+        end, "dayfirst", "dt_parse rejeita dayfirst não-booleano")
+        check_error_match(function()
+            source_series:astype("datetime", {dayfirst = invalid_option})
+        end, "dayfirst", "astype rejeita dayfirst não-booleano")
+    end
+end
+
 print(string.format("OK — %d checks passaram (Series: .dt base + F.3 estendido)", passed_checks))

@@ -608,6 +608,28 @@ parser, formatter e todas as operações atuais já o cumprem.
    No Lua, manter `.dt:year()`: NA de entrada propaga, anos negativos válidos
    permanecem valores e falhas reais seguem o canal de status/erro Lua.
    Não converter um ano negativo em NA por um teste de sinal.
+7. **Extração de componentes em série — comportamento aprovado em 2026-09-21:**
+   nas 11 operações, sucesso entrega o resultado completo. Um datetime inválido
+   causa erro com indicação da posição, sem entregar resultado parcial. NA de
+   entrada permanece NA na mesma posição e a série original permanece intacta.
+   Padrão C aprovado: retorno `smaug_status_t`, resultado por
+   `smaug_series_i64_t **out` escrito somente em sucesso e posição por
+   `size_t *error_index` opcional. Esse parâmetro transporta do C ao Lua
+   apenas o índice do primeiro elemento que falhou, na ordem da série.
+   O status continua comunicando o erro; a montagem e apresentação da
+   mensagem pertencem ao Lua, não ao motor C. NA não conta como falha.
+   Quando fornecido, o índice só é escrito em falha de um elemento. Em
+   sucesso ou falha sem posição (argumento inválido ou falta de memória),
+   permanece intocado e não deve ser consultado pelo consumidor. Não usar
+   sentinela para indicar ausência de posição. Nessas 11 funções,
+   `SMG_ERR_OVERFLOW` indica exclusivamente o primeiro datetime fora do domínio
+   permitido e garante o preenchimento do índice, quando fornecido.
+   `SMG_OK`, `SMG_ERR_ARGUMENT` e `SMG_ERR_NOMEM` não permitem consultar o índice.
+   A tabela de status está na referência C; essa associação é restrita à família.
+   Não introduzir estrutura de diagnóstico
+   para essa família. Ver a assinatura na referência C; implementação e
+   validação pendentes. A mudança fica restrita ao necessário para corrigir
+   a extração e comunicar suas falhas, sem reforma geral das APIs do motor.
 
 **Migração ainda a fechar:** ver [evolução da API C](API_Reference.md#section-datetime-migracao-c)
 e [evolução da API Lua](API_INDEX.md#section-datetime-migracao-lua).
@@ -648,32 +670,87 @@ esta detecção de datetime.
 
 - Validar todos os valores não nulos da coluna antes de concluir a conversão.
   Uma amostra ou prefixo válido não basta para aprovar o restante.
+- **Prioridade de interpretação aprovada em 2026-09-21:** primeiro, respeitar
+  o formato explicitamente informado. Sem formato, reconhecer os formatos
+  suportados, como ISO, usando a ordem dia/mês ou mês/dia configurada para
+  resolver entradas como `02/05/2026`. Sem configuração, usar um padrão
+  documentado e previsível.
+- **Escopo inicial simplificado:** reconhecer `/` e `-` automaticamente nos
+  formatos aprovados, exigindo separadores iguais dentro de cada data.
+  `dayfirst` define a ordem, independentemente do separador. Não exigir nem
+  acrescentar argumento de formato explícito nesta etapa; essa opção fica
+  para ampliação futura. A prioridade de formato acima vale quando tal opção
+  for introduzida, não constitui requisito de implementação da API inicial.
+- **Padrão preservado, aprovado em 2026-09-21:** mês/dia para formatos com
+  ano no fim, equivalente ao `dayfirst=false` existente. Sem formato ou ordem
+  explicitamente informados, `02/05/2026` significa 5 de fevereiro. Dia/mês
+  permanece configurável; formatos com ano primeiro não mudam de ordem.
+  Não depender da região do computador para escolher o padrão. Na API Lua,
+  o argumento aprovado é `dayfirst`, booleano com padrão `false`: omitido ou
+  `false` significa mês/dia; `true` significa dia/mês. Formato explícito tem
+  prioridade sobre esse argumento; ano primeiro mantém sua ordem. O helper
+  `Series.dt_parse(str, dayfirst)` preserva a forma existente. A opção de
+  formato e a integração nas demais entradas ainda precisam ser fechadas.
 - Aplicar uma única ordem dia/mês ou mês/dia aos formatos com ano no fim.
-  Uma entrada inequívoca, como `13/02/2026`, pode determinar dia/mês para a
-  coluna, desde que todos os demais valores sejam compatíveis. Assim,
-  `03/04/2026` na mesma coluna significa 3 de abril.
+  Com dia/mês configurado, `02/05/2026` é 2 de maio e deve converter normalmente.
+  `2026-05-02` identifica a mesma data pelo formato ISO. Uma entrada não é
+  inválida apenas porque outra convenção permitiria interpretá-la de outra forma.
 - Não trocar a ordem por elemento para aceitar entradas conflitantes:
   `13/02/2026` e `02/13/2026` não admitem uma ordem comum. Formatos com ano
   primeiro, como `2026-02-13`, podem coexistir com os demais sem impor uma
   ordem dia/mês. Aparência idêntica não é exigida.
-- Sem configuração explícita ou evidência que resolva a ordem, datas como
-  `03/04/2026` e `05/06/2026` permanecem ambíguas.
-- Na inferência automática, ambiguidade ou valor incompatível mantém a coluna
-  como texto, preservando os valores. Não fabricar NA para concluir a detecção.
-- Na conversão explicitamente solicitada para datetime, valor inválido ou
-  ambíguo gera erro orientado, sem entregar resultado parcial ou transformar
+- Na inferência automática, valor incompatível com a política de interpretação
+  mantém a coluna como texto, preservando os valores. Não fabricar NA para
+  concluir a detecção.
+- Na conversão explicitamente solicitada para datetime, data impossível ou
+  incompatível com o formato solicitado gera erro orientado, sem entregar resultado parcial ou transformar
   falha em NA. NA já presente na entrada continua sendo ausência.
+
+Essa prioridade substitui a regra anterior de recusar conversão explícita
+apenas por falta de evidência para resolver dia/mês. Um modo automático
+estrito, solicitado explicitamente, permanece proposta separada; nele uma
+evidência inequívoca na coluna poderia resolver a ordem. Não aplicar esse
+modo por omissão. Entradas inválidas devem produzir falhas controladas,
+nunca crash do motor.
+
+**Conjunto inicial de formatos aprovado em 2026-09-21:** contrato a
+implementar e verificar; esta lista não certifica o parser atual.
+
+| Família | Exemplos | Regra |
+|---|---|---|
+| Ano primeiro | `2026-05-02`, `2026/05/02` | Ano com 4 dígitos; mês e dia com 2 |
+| Ano no fim | `05/02/2026`, `5/2/2026`, `05-02-2026` | Ano com 4 dígitos; dia e mês com 1 ou 2; mês/dia por padrão, dia/mês configurável |
+| Data com horário | `2026-05-02T14:30:00`, `2026-05-02 14:30:00` | Separador `T` ou espaço; hora, minuto e segundo com 2 dígitos; segundos obrigatórios |
+| Fração após segundos | `.1`, `.123`, `.123000` | Aceitar somente precisão exata em milissegundos, conforme o perfil datetime |
+| Offset após horário | `Z`, `-03:00`, `-0300` | Offset numérico com sinal positivo ou negativo; normalizar para UTC; omissão significa UTC |
+| Ano negativo | `-000001-05-02` | Sinal menos e 6 dígitos; ano primeiro e hífens, conforme o perfil datetime |
+
+Os dois separadores da data devem ser iguais. Data sem horário representa
+meia-noite UTC. As famílias de data podem receber horário, fração e offset
+conforme as regras acima; horário ou offset isolados não representam uma data.
+Data impossível, segundo `60` e conteúdo extra ao final geram erro controlado.
+Um formato explicitamente solicitado deve ser respeitado.
+
+Ficam fora do conjunto inicial, para avaliação em ampliação posterior:
+horário sem segundos (`14:30`), data compacta (`20260502`), ano com dois
+dígitos (`02/05/26`), meses por nome (`2 maio 2026`), AM/PM e fusos nomeados.
+A sintaxe pública para solicitar um formato ainda será definida; a aprovação
+deste conjunto não introduz suporte a uma linguagem arbitrária de formatos.
 
 **Diagnóstico dedicado:** `DATE_ON_THE_FENCE`, com a mensagem
 `smaug error - there's a date on the fence`. Identifica ambiguidade de ordem
-ou conflito de ordens entre elementos. Incluir operação, nome da coluna quando
+ou conflito de ordens entre elementos. Após a revisão da prioridade de
+interpretação, seus gatilhos devem ser revistos: não emitir esse diagnóstico
+para uma data resolvida por formato, ordem configurada ou padrão documentado.
+Incluir operação, nome da coluna quando
 disponível, índice baseado em 1, valor e orientação para corrigir a entrada ou
 especificar a ordem. Em conflito, apresentar as duas ocorrências que exigem
 ordens incompatíveis. Em Series sem nome, o índice identifica o elemento.
 Arquivo e linha física são incluídos somente quando a origem estiver disponível;
 não confundir índice da linha de dados com linha física de CSV.
 
-Exemplo de diagnóstico na conversão explícita (formato ilustrativo):
+Exemplo histórico de diagnóstico por ambiguidade (formato ilustrativo;
+não representa mais a conversão padrão, e o modo estrito ainda é proposta):
 
 ```text
 smaug error - there's a date on the fence
@@ -694,7 +771,9 @@ trabalho de erros, reaproveitando `SMG_ERR_ARGUMENT` para entrada inválida e
 `SMG_ERR_OVERFLOW` para resultado fora da faixa.
 
 **Atualização da política anterior:** conversão explícita para datetime passa
-a exigir erro por entrada inválida ou ambígua. As menções anteriores deste
+a exigir erro por entrada inválida; a revisão de 2026-09-21 resolve a ordem
+por formato, configuração ou padrão, em vez de recusar datas comuns por
+ambiguidade sem contexto. As menções anteriores deste
 documento a `astype` tolerante descrevem a política anterior; não autorizam NA
 silencioso na nova conversão explícita. A existência e a forma de um modo
 tolerante opt-in, assim como a relação com helpers que retornam `nil`, devem
