@@ -228,28 +228,50 @@ DataSet → Conectividade → Destino         (exportar)
 
 ## Anel 4 — Persistência `[Concept]`
 
-Trilha de Projeto. Faz dados sobreviverem ao fim do processo. **Não é um banco
-de dados nem um ORM** — é serialização de estruturas Smaug.
+Trilha de Projeto. Define o formato nativo que faz um trabalho do Smaug
+sobreviver ao fim do processo. **Não é um banco de dados nem um ORM** — é um
+contêiner de projeto que pode guardar dados Smaug, metadados e a receita que os
+produziu.
+
+O formato nativo é o **`.smg`**, com papel semelhante ao de um `.xlsx` dentro do
+Excel: CSV, JSON, Excel, SQL e outros formatos são fontes e destinos; o `.smg`
+preserva o trabalho editável no ecossistema Smaug.
 
 **Responsabilidades:**
-- Formato binário próprio (`.smg`): header (magic, versão, schema) + buffers por
-  coluna + máscara de nulos
-- `df:save("vendas.smg")` / `smaug.load("vendas.smg")`
-- Snapshots
-- Reader defensivo: arquivo truncado/corrompido/versão futura → erro claro, nunca
-  crash (o engine não confia no arquivo, como não confia no caller)
+- Formato binário próprio (`.smg`), versionado e defensivo;
+- Dados materializados: uma ou mais tabelas/DataSets, schema, dtypes, buffers,
+  máscaras de nulos e metadados;
+- Projeto: fontes, etapas de transformação, parâmetros, relacionamentos e,
+  quando fizer sentido, resultados intermediários ou cache;
+- `df:save("vendas.smg")` / `smaug.load("vendas.smg")` para o caso simples, com
+  a mesma base sustentando o salvamento de um projeto completo;
+- Snapshots e migração explícita entre versões do formato;
+- Reader defensivo: arquivo truncado, corrompido ou de versão futura → erro
+  claro, nunca crash (o engine não confia no arquivo, como não confia no caller).
 
-**O que NÃO é (Fronteira encerrada):** ORM relacional, query builder, engine de
-migração estilo Alembic. Quem precisa de banco relacional usa SQLite via Anel 3.
-Persistência aqui responde *"como meu DataSet sobrevive ao processo?"* — não
-*"como modelo estruturas relacionais que evoluem?"*.
+O primeiro formato utilizável pode começar salvando um DataSet com header
+(`magic`, versão e schema) + buffers por coluna + máscara de nulos. O contêiner
+de projeto cresce sobre essa base sem mudar o contrato dos leitores e escritores
+do Anel 3.
 
 **Distinção fundamental:**
 - Conectividade (Anel 3) responde: *como os dados entram e saem?*
-- Persistência (Anel 4) responde: *como um DataSet é serializado e recarregado idêntico?*
+- Persistência (Anel 4) responde: *como o trabalho do Smaug é salvo, reaberto e
+  reproduzido?*
 
-**Reuso:** aproveita os buffers contíguos do Anel 0 — salvar é, no essencial,
-dump do buffer + cabeçalho de schema.
+Exportar um DataSet para `vendas.xlsx` produz uma saída de dados. Salvar
+`vendas.smg` preserva a pipeline, o schema e o estado necessário para continuar
+o trabalho no Smaug Studio ou por API.
+
+**O que NÃO é (Fronteira encerrada):** ORM relacional, query builder ou engine de
+migração estilo Alembic. Quem precisa de banco relacional usa SQLite via Anel 3.
+Models (Anel 5) define schema, validação e CRUD local; a persistência do Model é
+delegada ao `.smg`.
+
+**Reuso:** aproveita os buffers contíguos do Anel 0. A persistência de dados
+materializados começa como dump de buffers + cabeçalho de schema; a persistência
+de projeto adiciona a descrição das fontes, etapas e metadados ao mesmo
+contêiner.
 
 **Dependência:** Anel 4 → Anel 3 → Anel 2 → Anel 1 → Anel 0.
 

@@ -588,7 +588,7 @@ Itens documentados em `Roadmap.md`:
   migração de primitivas para o núcleo, reorganização estrutural, hardening global
   de cobertura, distribuição (LuaRocks), docstrings.
 - **v1.5:** NDJSON (depende de schema), driver de banco (`connect`/`query`/`execute`),
-  SQLite, Excel, Parquet/Arrow (I/O), lazy execution, serialização `.smg` (Anel 4),
+  SQLite, Excel, Parquet/Arrow (I/O), persistência do contêiner nativo `.smg` (Anel 4),
   `.str` Tier D (regex, Unicode-aware), `interpolate`, `cross_join`, `query`/`eval`,
   stable sort.
 - **v2.0:** Models (Anel 5 — schema, validação, CRUD local).
