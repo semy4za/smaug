@@ -47,8 +47,12 @@ O inventário de astype agora distingue os símbolos completos e inclui as três
 variantes checked. Os wrappers legados aparecem sem chamada direta Lua por
 serem preservados para consumidores C.
 
-Próximo ponto datetime: integração de `dayfirst` nas demais entradas e migração
-aprovada dos 11 componentes.
+Retomada de 2026-09-25: antes de integrar `dayfirst`, o mantenedor decidiu auditar
+a inferência de ponta a ponta e discutir problemas estruturais antes de corrigir.
+O [mapeamento de CSV/JSON](IO_REVIEW.md) registra defeitos reproduzidos, decisões
+pendentes e limites da revisão. A auditoria geral ainda não terminou; não houve
+alteração de produção. Após revisão e correções da inferência, retomar integração
+de `dayfirst`/detecção automática e migração aprovada dos 11 componentes.
 Formatter (inclusive saída negativa canônica) e helpers ainda exigem revisão;
 o parser aceitar anos negativos não certifica essas operações.
 

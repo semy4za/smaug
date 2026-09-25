@@ -6,6 +6,7 @@
 <summary>Navegar por mês</summary>
 
 - [2026-09-25 — Epoch numérico estrito e coesão das conversões](#section-2026-09-25-epoch-numerico)
+- [2026-09-25 — Mapeamento de I/O antes da inferência datetime](#section-2026-09-25-revisao-io)
 - [2026-09-25 — Conversão textual estrita para datetime](#section-2026-09-25-astype-datetime-estrito)
 - [2026-09-25 — Correção das falhas relacionais](#section-2026-09-25-correcao-relacional)
 - [2026-09-25 — Reescrita inicial dos testes relacionais](#section-2026-09-25-testes-relacionais)
@@ -24,6 +25,28 @@
 Registro de o que mudou e por que, em ordem cronológica reversa.
 Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
+
+---
+<a id="section-2026-09-25-revisao-io"></a>
+
+## 2026-09-25 — Mapeamento de I/O antes da inferência datetime
+
+Antes de ampliar `dayfirst`, foi acordada a auditoria da inferência completa,
+com discussão gradual dos problemas de organização e lógica. O levantamento
+encontrou decisões locais além de `from_dict`; a frente CSV/JSON foi detalhada
+em [IO_REVIEW.md](IO_REVIEW.md), usando especificações e documentação de
+bibliotecas como referências, mantendo a implementação própria sem dependências.
+
+O script observacional `scripts/audit_io.lua` executa 30 casos. Foram reproduzidos
+desalinhamento de campos JSON, aceitação de sintaxe inválida, truncamento de
+strings e perda de inteiros na ponte C/Lua, entre outros pontos do relatório.
+Decisões de perfil e hipóteses de memória estão separadas dos defeitos reproduzidos.
+Nenhum fonte de produção ou contrato foi alterado.
+
+A build Windows completa passou (13 suítes C, 20 Lua, 15 eixos de paridade),
+mas os casos novos demonstram lacunas. Sem sanitizers ou nova cobertura.
+A auditoria geral de inferência continua aberta. Depois de suas correções,
+retomar `dayfirst`/detecção automática e os 11 componentes datetime.
 
 ---
 <a id="section-2026-09-25-epoch-numerico"></a>
