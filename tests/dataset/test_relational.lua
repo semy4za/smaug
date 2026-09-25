@@ -1,709 +1,563 @@
--- tests/dataset/test_relational.lua
--- GroupBy, concat, join (inner/left/right/outer), groupby estendido
--- (std/var/median/first/last/prod/nunique/quantile/agg/transform/count).
--- Consolida: test_groupby.lua + test_concat.lua + test_join.lua + seção groupby de test_enrich.lua
 -- Rode da raiz: luajit tests/dataset/test_relational.lua
+-- Contratos: docs/CONTRACT.md (NA em chaves; NA != NaN), docs/API_INDEX.md.
+-- Revisão: docs/TEST_SUITE_REWRITE_REVIEW.md, R01/R09 e camada Relacional.
+-- docs/COVERAGE.md mede o backend C no commit 51184cb, não este módulo Lua.
+-- Vazios, máscaras, tipos e ordenação abaixo exercitam a fronteira Lua/C;
+-- não demonstram cobertura de OOM nem substituem uma medição instrumentada.
+--
+-- Migração: os antigos blocos groupby/estendido, concat, join, C8, L2 e
+-- 12.39 foram substituídos pelos casos nomeados abaixo. Resultados completos
+-- substituem checks isolados de tamanho, presença ou ausência de crash.
+-- Pendências de contrato: API_INDEX descreve count como não-nulos e o padrão
+-- de pivot_table como mean; o código conta linhas e usa sum. Aqui count usa
+-- dados completos e pivot_table recebe aggfunc explícito. A sintaxe pública
+-- de join composto também precisa distinguir lista de chaves de {esq, dir}.
 
 package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 
 local smaug = require("smaug")
+local cases = {}
 
-local function approximately_equal(left_value, right_value, tolerance) tolerance = tolerance or 1e-9; return math.abs(left_value - right_value) < tolerance end
-local passed_checks = 0
 local function check(condition, message)
-    if not condition then error("FALHOU: " .. message, 2) end
-    passed_checks = passed_checks + 1
+    if not condition then error(message, 2) end
 end
 
-package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
+local function test(name, callback)
+    cases[#cases + 1] = {name = name, run = callback}
+end
 
-local function approximately_equal_2(left_value, right_value) return math.abs(left_value - right_value) < 1e-9 end
-
--- helper: lê coluna como map key->valor
-local function column_map(dataset, key_column, val_column)
-    local values = {}
-    for row_index = 1, dataset:nrows() do
-        values[tostring(dataset:col(key_column):get(row_index))] = dataset:col(val_column):get(row_index)
+local function expect_error(callback, fragments)
+    local succeeded, message = pcall(callback)
+    check(not succeeded, "era esperado um erro")
+    message = tostring(message)
+    for unused_index, fragment in ipairs(fragments) do
+        check(message:find(fragment, 1, true), "erro sem '" .. fragment .. "': " .. message)
     end
-    return values
 end
 
--- Dataset base
-local source_dataset = smaug.DataSet({
-    {"uf",     {"SP","RJ","SP","MG","SP","RJ"}, "string"},
-    {"vendas", {10,  20,  30,  40,  50,  60},   "int64"},
-    {"custo",  {1.0, 2.0, 3.0, 4.0, 5.0, 6.0}, "float64"},
-})
-
--- ---- count ----
-local count_result = source_dataset:groupby("uf"):count()
-check(count_result:nrows() == 3,                    "count: 3 grupos")
-check(count_result:col("count")._dtype == "int64", "count: dtype int64")
-local count_by_state = column_map(count_result, "uf", "count")
-check(count_by_state["SP"] == 3,                     "count SP=3")
-check(count_by_state["RJ"] == 2,                     "count RJ=2")
-check(count_by_state["MG"] == 1,                     "count MG=1")
-
--- ---- sum (todas as numéricas) ----
-local sum_result = source_dataset:groupby("uf"):sum()
-check(sum_result:nrows() == 3,                    "sum: 3 grupos")
-check(sum_result:has_column("vendas"),            "sum: tem vendas")
-check(sum_result:has_column("custo"),             "sum: tem custo")
-local sales_by_state = column_map(sum_result, "uf", "vendas")
-check(sales_by_state["SP"] == 90,                    "sum SP vendas=90")
-check(sales_by_state["RJ"] == 80,                    "sum RJ vendas=80")
-check(sales_by_state["MG"] == 40,                    "sum MG vendas=40")
-
--- ---- sum (coluna específica) ----
-local sum_result_2 = source_dataset:groupby("uf"):sum("vendas")
-check(sum_result_2:ncols() == 2,                   "sum(col): só uf+vendas")
-check(not sum_result_2:has_column("custo"),        "sum(col): custo excluído")
-
--- ---- mean ----
-local mean_result = source_dataset:groupby("uf"):mean("vendas")
-local mean_by_state = column_map(mean_result, "uf", "vendas")
-check(approximately_equal_2(mean_by_state["SP"], 30.0),            "mean SP=30")
-check(approximately_equal_2(mean_by_state["RJ"], 40.0),            "mean RJ=40")
-check(approximately_equal_2(mean_by_state["MG"], 40.0),            "mean MG=40")
--- mean sempre float64
-check(mean_result:col("vendas")._dtype == "float64", "mean dtype=float64")
-
--- ---- min / max ----
-local minimum_result = source_dataset:groupby("uf"):min("vendas")
-local maximum_result = source_dataset:groupby("uf"):max("vendas")
-local minimum_by_state = column_map(minimum_result, "uf", "vendas")
-local maximum_by_state = column_map(maximum_result, "uf", "vendas")
-check(minimum_by_state["SP"] == 10,                   "min SP=10")
-check(minimum_by_state["RJ"] == 20,                   "min RJ=20")
-check(maximum_by_state["SP"] == 50,                   "max SP=50")
-check(maximum_by_state["RJ"] == 60,                   "max RJ=60")
-
--- ---- múltiplas colunas específicas ----
-local sum_result_3 = source_dataset:groupby("uf"):sum("vendas","custo")
-check(sum_result_3:ncols() == 3,                   "sum(v,c): uf+vendas+custo")
-
--- ---- nulos ignorados nas agregações ----
-local source_dataset_2 = smaug.DataSet({
-    {"cat", {"A","A","B","B"},    "string"},
-    {"val", {10, smaug.NA, 20, 30},     "int64"},
-})
-local sum_result_4 = source_dataset_2:groupby("cat"):sum("val")
-local nullable_sum_by_category = column_map(sum_result_4, "cat", "val")
-check(nullable_sum_by_category["A"] == 10,                    "sum: nulo ignorado A=10")
-check(nullable_sum_by_category["B"] == 50,                    "sum: B=50 (20+30)")
-
-local mean_result_2 = source_dataset_2:groupby("cat"):mean("val")
-local nullable_minimum_by_category = column_map(mean_result_2, "cat", "val")
-check(approximately_equal_2(nullable_minimum_by_category["A"], 10.0),           "mean: nulo ignorado A=10")
-check(approximately_equal_2(nullable_minimum_by_category["B"], 25.0),           "mean: B=25")
-
--- all-null group -> nil (NA na saída)
-local source_dataset_3 = smaug.DataSet({
-    {"cat", {"A","A"},     "string"},
-    {"val", {smaug.NA, smaug.NA},      "int64"},
-})
-local sum_result_5 = source_dataset_3:groupby("cat"):sum("val")
-check(sum_result_5:nrows() == 1,                  "all-null: 1 grupo")
-check(sum_result_5:col("val"):get(1) == 0,        "sum all-null: 0 (soma vazia)")
-
--- ---- chave int64 ----
-local source_dataset_4 = smaug.DataSet({
-    {"ano", {2023,2024,2023,2024}, "int64"},
-    {"val", {10,  20,  30,  40},   "int64"},
-})
-local sum_result_6 = source_dataset_4:groupby("ano"):sum()
-local sum_by_year = column_map(sum_result_6, "ano", "val")
-check(sum_by_year["2023"] == 40,                 "chave int64: 2023=40")
-check(sum_by_year["2024"] == 60,                 "chave int64: 2024=60")
-
--- ---- chave bool ----
-local source_dataset_5 = smaug.DataSet({
-    {"ativo", {true,false,true,false,true}, "bool"},
-    {"val",   {10,  20,  30,  40,  50},    "int64"},
-})
-local sum_result_7 = source_dataset_5:groupby("ativo"):sum()
-check(sum_result_7:nrows() == 2,                   "chave bool: 2 grupos")
-local sum_by_boolean = column_map(sum_result_7, "ativo", "val")
-check(sum_by_boolean["true"]  == 90,               "chave bool: true=90")
-check(sum_by_boolean["false"] == 60,               "chave bool: false=60")
-
--- ---- chave composta ----
-local source_dataset_6 = smaug.DataSet({
-    {"uf",  {"SP","SP","RJ","RJ","SP"}, "string"},
-    {"ano", {2023,2024,2023,2023,2023}, "int64"},
-    {"val", {10,  20,  30,  40,  50},   "int64"},
-})
-local sum_result_8 = source_dataset_6:groupby({"uf","ano"}):sum()
-check(sum_result_8:nrows() == 3,                   "chave composta: 3 grupos")
--- SP2023=60, SP2024=20, RJ2023=70
-local values = {}
-for row_index = 1, sum_result_8:nrows() do
-    local key_series = sum_result_8:col("uf"):get(row_index)..tostring(sum_result_8:col("ano"):get(row_index))
-    values[key_series] = sum_result_8:col("val"):get(row_index)
-end
-check(values["SP2023"] == 60,              "composta SP2023=60")
-check(values["SP2024"] == 20,              "composta SP2024=20")
-check(values["RJ2023"] == 70,              "composta RJ2023=70")
-
-local count_result_2 = source_dataset_6:groupby({"uf","ano"}):count()
-check(count_result_2:nrows() == 3,                   "composta count: 3 grupos")
-check(count_result_2:has_column("count"),            "composta count: coluna count")
-
--- ---- DataSet vazio ----
-local source_dataset_7 = smaug.DataSet({
-    {"uf",  {}, "string"},
-    {"val", {}, "int64"},
-})
-local sum_result_9 = source_dataset_7:groupby("uf"):sum()
-check(sum_result_9:nrows() == 0,                   "vazio: 0 grupos")
-
--- ---- grupo de 1 linha ----
-local source_dataset_8 = smaug.DataSet({
-    {"uf",  {"SP","RJ","MG"}, "string"},
-    {"val", {1,2,3},           "int64"},
-})
-local sum_result_10 = source_dataset_8:groupby("uf"):sum()
-check(sum_result_10:nrows() == 3,                   "grupo 1 linha: 3 grupos")
-
--- ---- erros esperados ----
-local succeeded, unused_error = pcall(function() source_dataset:groupby("xxx") end)
-check(not succeeded,                            "erro: coluna inexistente")
-local succeeded_2, unused_error_2 = pcall(function() source_dataset:groupby(123) end)
-check(not succeeded_2,                           "erro: chave não-string")
-local succeeded_3, unused_error_3 = pcall(function() source_dataset:groupby({}) end)
-check(not succeeded_3,                           "erro: lista vazia")
-
--- chave com nulo -> erro
-local source_dataset_9 = smaug.DataSet({
-    {"uf",  {"SP", smaug.NA, "RJ"}, "string"},
-    {"val", {1,2,3},           "int64"},
-})
-local succeeded_4, unused_error_4 = pcall(function() source_dataset_9:groupby("uf"):count() end)
-check(not succeeded_4,                           "erro: chave com nulo")
-
--- coluna pedida não existe
-local succeeded_5, unused_error_5 = pcall(function() source_dataset:groupby("uf"):sum("inexistente") end)
-check(not succeeded_5,                           "erro: coluna agg inexistente")
-
--- =====================================================================
--- GroupBy estendido (de test_enrich.lua)
--- =====================================================================
-
--- ================================================================
--- GroupBy estendido
--- ================================================================
-
-local source_dataset_10 = smaug.DataSet({
-    {"uf",    {"SP","RJ","SP","MG","RJ","SP"}, "string"},
-    {"v",     {10.0,20.0,30.0,40.0,50.0,20.0},"float64"},
-})
-local grouped_dataset = source_dataset_10:groupby("uf")
-
--- grupos: MG={40}, RJ={20,50}, SP={10,30,20}
-
-local function column(row_values, column_2) return row_values:col(column_2):to_table() end
-
--- std / var
-local standard_deviation_result = grouped_dataset:std("v")
-check(standard_deviation_result:col("v")._dtype == "float64",   "groupby std: float64")
-check(standard_deviation_result:col("v"):is_null(1),            "groupby std MG: NA (n<2)")
-check(approximately_equal_2(standard_deviation_result:col("v"):get(2), 21.213203435596, 1e-9), "groupby std RJ")
-
-local variance_result = grouped_dataset:var("v")
-check(variance_result:col("v"):is_null(1),            "groupby var MG: NA")
-
--- median
-local median_result = grouped_dataset:median("v")
-check(median_result:col("v")._dtype == "float64",   "groupby median: float64")
-check(median_result:col("v"):get(1) == 40.0,        "groupby median MG=40")
-check(median_result:col("v"):get(2) == 35.0,        "groupby median RJ=35")
-check(median_result:col("v"):get(3) == 20.0,        "groupby median SP=20")
-
--- first / last
-local gfirst = grouped_dataset:first("v")
-check(gfirst:col("v"):get(1) == 40.0, "groupby first MG=40")
-check(gfirst:col("v"):get(3) == 10.0, "groupby first SP=10")
-local glast = grouped_dataset:last("v")
-check(glast:col("v"):get(3) == 20.0,  "groupby last SP=20")
-
--- nunique
-local unique_count = grouped_dataset:nunique("v")
-check(unique_count:col("v"):get(1) == 1, "groupby nunique MG=1")
-check(unique_count:col("v"):get(2) == 2, "groupby nunique RJ=2")
-check(unique_count:col("v"):get(3) == 3, "groupby nunique SP=3")
-
--- prod
-local gprod = grouped_dataset:prod("v")
-check(gprod:col("v"):get(1) == 40.0, "groupby prod MG=40")
-check(approximately_equal_2(gprod:col("v"):get(2), 1000.0), "groupby prod RJ=1000")
-check(approximately_equal_2(gprod:col("v"):get(3), 6000.0), "groupby prod SP=6000")
-
--- quantile
-local quantile_result = grouped_dataset:quantile(0.5, "v")
-check(quantile_result:col("v")._dtype == "float64",  "groupby quantile: float64")
-check(approximately_equal_2(quantile_result:col("v"):get(3), 20.0),"groupby q50 SP=20")
-
--- agg
-local agged = grouped_dataset:agg({v={"sum","mean","std"}})
-check(agged:has_column("v_sum"),   "agg: coluna v_sum")
-check(agged:has_column("v_mean"),  "agg: coluna v_mean")
-check(agged:has_column("v_std"),   "agg: coluna v_std")
-check(agged:nrows() == 3,          "agg: 3 grupos")
--- MG sum=40
-local mg_index = nil
-for row_index=1,agged:nrows() do
-    if agged:col("uf"):get(row_index) == "MG" then mg_index = row_index; break end
-end
-check(mg_index ~= nil,               "agg: grupo MG existe")
-check(agged:col("v_sum"):get(mg_index) == 40, "agg v_sum MG=40")
-
--- transform
-local transform_result = grouped_dataset:transform("mean","v")
-check(transform_result:len() == source_dataset_10:nrows(),      "transform: mesmo tamanho do DS")
--- MG na posição 4 do DS original → média do grupo MG = 40
-local mg_pos = nil
-for row_index=1,source_dataset_10:nrows() do
-    if source_dataset_10:col("uf"):get(row_index) == "MG" then mg_pos = row_index; break end
-end
-check(approximately_equal_2(transform_result:get(mg_pos), 40.0), "transform MG=40 (média do grupo)")
-
--- =====================================================================
--- Concat (de test_concat.lua)
--- =====================================================================
-
-local source_dataset_11 = smaug.DataSet({
-    {"uf",  {"SP","RJ"},  "string"},
-    {"val", {10, 20},     "int64"},
-})
-local source_dataset_12 = smaug.DataSet({
-    {"uf",  {"MG","SP"},  "string"},
-    {"val", {30, 40},     "int64"},
-})
-local source_dataset_13 = smaug.DataSet({
-    {"uf",  {"RS"},       "string"},
-    {"val", {50},         "int64"},
-})
-
--- ---- 2 DataSets via smaug.concat ----
-local concatenated_result = smaug.concat({source_dataset_11, source_dataset_12})
-check(concatenated_result:nrows() == 4,                         "concat 2: 4 linhas")
-check(concatenated_result:ncols() == 2,                         "concat 2: 2 colunas")
-check(concatenated_result:col("uf"):get(1) == "SP",             "concat 2: linha 1 uf=SP")
-check(concatenated_result:col("uf"):get(3) == "MG",             "concat 2: linha 3 uf=MG")
-check(concatenated_result:col("val"):get(1) == 10,              "concat 2: linha 1 val=10")
-check(concatenated_result:col("val"):get(4) == 40,              "concat 2: linha 4 val=40")
-check(concatenated_result:col("uf")._dtype == "string",         "concat 2: dtype string preservado")
-check(concatenated_result:col("val")._dtype == "int64",         "concat 2: dtype int64 preservado")
-
--- ---- 3 DataSets ----
-local concatenated_result_2 = smaug.concat({source_dataset_11, source_dataset_12, source_dataset_13})
-check(concatenated_result_2:nrows() == 5,                         "concat 3: 5 linhas")
-check(concatenated_result_2:col("uf"):get(5) == "RS",             "concat 3: linha 5 uf=RS")
-check(concatenated_result_2:col("val"):get(5) == 50,              "concat 3: linha 5 val=50")
-
--- ---- método ds:concat(other) ----
-local concatenated_result_3 = source_dataset_11:concat(source_dataset_12)
-check(concatenated_result_3:nrows() == 4,                         "método concat: 4 linhas")
-check(concatenated_result_3:col("val"):get(2) == 20,              "método concat: val linha 2=20")
-
--- ---- ds:concat({b, c}) ----
-local concatenated_result_4 = source_dataset_11:concat({source_dataset_12, source_dataset_13})
-check(concatenated_result_4:nrows() == 5,                        "método concat lista: 5 linhas")
-
--- ---- independência: mutar resultado não afeta originais ----
-local concatenated_result_5 = smaug.concat({source_dataset_11, source_dataset_12})
-concatenated_result_5:add_column("extra", smaug.Series({1,2,3,4}, "int64"))
-check(not source_dataset_11:has_column("extra"),               "independência: original não alterado")
-
--- ---- com NA ----
-local source_dataset_14 = smaug.DataSet({
-    {"uf",  {"BA"},  "string"},
-    {"val", {smaug.NA},    "int64"},
-})
-local concatenated_result_6 = smaug.concat({source_dataset_11, source_dataset_14})
-check(concatenated_result_6:nrows() == 3,                        "concat com NA: 3 linhas")
-check(concatenated_result_6:col("val"):is_null(3),               "concat com NA: null preservado")
-check(not concatenated_result_6:col("val"):is_null(1),           "concat com NA: não-null intacto")
-
--- ---- float64 ----
-local source_dataset_15 = smaug.DataSet({{"v",{1.5,2.5},"float64"}})
-local source_dataset_16 = smaug.DataSet({{"v",{3.5},     "float64"}})
-local concatenated_result_7 = smaug.concat({source_dataset_15, source_dataset_16})
-check(concatenated_result_7:nrows() == 3,                         "concat float64: 3 linhas")
-check(concatenated_result_7:col("v"):get(3) == 3.5,              "concat float64: valor correto")
-check(concatenated_result_7:col("v")._dtype == "float64",         "concat float64: dtype preservado")
-
--- ---- bool ----
-local source_dataset_17 = smaug.DataSet({{"ok",{true,false},"bool"}})
-local source_dataset_18 = smaug.DataSet({{"ok",{true},      "bool"}})
-local concatenated_result_8 = smaug.concat({source_dataset_17, source_dataset_18})
-check(concatenated_result_8:nrows() == 3,                         "concat bool: 3 linhas")
-check(concatenated_result_8:col("ok"):get(1) == true,             "concat bool: true preservado")
-check(concatenated_result_8:col("ok"):get(2) == false,            "concat bool: false preservado")
-check(concatenated_result_8:col("ok")._dtype == "bool",           "concat bool: dtype preservado")
-
--- ---- DataSet vazio como primeiro ----
-local empty = smaug.DataSet({{"uf",{},"string"},{"val",{},"int64"}})
-local concatenated_result_9 = smaug.concat({empty, source_dataset_11})
-check(concatenated_result_9:nrows() == 2,                         "concat vazio+a: 2 linhas")
-
--- ---- DataSet vazio como segundo ----
-local concatenated_result_10 = smaug.concat({source_dataset_11, empty})
-check(concatenated_result_10:nrows() == 2,                        "concat a+vazio: 2 linhas")
-
--- ---- dois vazios ----
-local concatenated_result_11 = smaug.concat({empty, empty})
-check(concatenated_result_11:nrows() == 0,                        "concat vazio+vazio: 0 linhas")
-
--- ---- um único DataSet (cópia) ----
-local concatenated_result_12 = smaug.concat({source_dataset_11})
-check(concatenated_result_12:nrows() == 2,                         "concat 1 elem: 2 linhas (cópia)")
-check(concatenated_result_12:col("uf"):get(1) == "SP",             "concat 1 elem: valor correto")
-
--- ---- erros esperados ----
-local succeeded_6, unused_error_6 = pcall(function() smaug.concat({}) end)
-check(not succeeded_6,                                 "erro: lista vazia")
-
-local succeeded_7, unused_error_7 = pcall(function() smaug.concat({source_dataset_11, "nao_dataset"}) end)
-check(not succeeded_7,                                 "erro: elemento não-DataSet")
-
--- coluna faltando
-local bad_column = smaug.DataSet({{"outro",{1},"int64"}})
-local succeeded_8, unused_error_8 = pcall(function() smaug.concat({source_dataset_11, bad_column}) end)
-check(not succeeded_8,                                 "erro: coluna faltando")
-
--- dtype incompatível
-local bad_datetime = smaug.DataSet({{"uf",{"X"},"string"},{"val",{1.5},"float64"}})
-local succeeded_9, unused_error_9 = pcall(function() smaug.concat({source_dataset_11, bad_datetime}) end)
-check(not succeeded_9,                                 "erro: dtype incompatível")
-
--- número de colunas diferente
-local bad_nc = smaug.DataSet({{"uf",{"X"},"string"}})
-local succeeded_10, unused_error_10 = pcall(function() smaug.concat({source_dataset_11, bad_nc}) end)
-check(not succeeded_10,                                 "erro: ncols diferente")
-
--- =====================================================================
--- Join (de test_join.lua)
--- =====================================================================
-
-package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
-
--- Datasets base
-local pedidos = smaug.DataSet({
-    {"id",      {1, 2, 3, 4},           "int64"},
-    {"cliente", {"A","B","A","C"},       "string"},
-    {"valor",   {100, 200, 150, 300},    "int64"},
-})
-local clientes = smaug.DataSet({
-    {"cliente", {"A","B","D"},           "string"},
-    {"cidade",  {"SP","RJ","MG"},        "string"},
-})
-
--- ================================================================
--- INNER JOIN
--- ================================================================
-local joined_dataset = pedidos:join(clientes, "cliente")   -- default = inner
-check(joined_dataset:nrows() == 3,                         "inner: 3 linhas (C e D sem match)")
-check(joined_dataset:ncols() == 4,                         "inner: 4 colunas")
-check(joined_dataset:has_column("id"),                     "inner: tem id")
-check(joined_dataset:has_column("cliente"),                "inner: tem cliente")
-check(joined_dataset:has_column("valor"),                  "inner: tem valor")
-check(joined_dataset:has_column("cidade"),                 "inner: tem cidade")
--- A aparece 2x (pedidos 1 e 3)
-local city_names = {}
-for row_index = 1, joined_dataset:nrows() do city_names[row_index] = joined_dataset:col("cidade"):get(row_index) end
-check(city_names[1] == "SP" and city_names[2] == "RJ" and city_names[3] == "SP",
-      "inner: cidades corretas (SP,RJ,SP)")
-check(joined_dataset:col("id"):get(1) == 1,                "inner: id linha 1 = 1")
-check(joined_dataset:col("id"):get(3) == 3,                "inner: id linha 3 = 3 (segundo A)")
--- C (pedido 4) não aparece
-local values_2 = {}; for row_index=1,joined_dataset:nrows() do values_2[joined_dataset:col("id"):get(row_index)] = true end
-check(not values_2[4],                              "inner: pedido 4 (C) excluído")
-
--- how explícito
-local joined_dataset_2 = pedidos:join(clientes, "cliente", "inner")
-check(joined_dataset_2:nrows() == 3,                        "inner explícito: 3 linhas")
-
--- ================================================================
--- LEFT JOIN
--- ================================================================
-local joined_dataset_3 = pedidos:join(clientes, "cliente", "left")
-check(joined_dataset_3:nrows() == 4,                         "left: 4 linhas (todos os pedidos)")
-check(joined_dataset_3:col("cidade"):is_null(4),             "left: cidade NULL para C")
-check(joined_dataset_3:col("cliente"):get(4) == "C",         "left: cliente C na linha 4")
-check(not joined_dataset_3:col("cidade"):is_null(1),         "left: cidade não-null para A")
-check(joined_dataset_3:col("cidade"):get(1) == "SP",         "left: cidade SP para A")
-
--- ================================================================
--- RIGHT JOIN
--- ================================================================
-local joined_dataset_4 = pedidos:join(clientes, "cliente", "right")
-check(joined_dataset_4:nrows() == 4,                         "right: 4 linhas (A×2, B, D)")
--- D aparece com NAs no lado esquerdo
-local date_row = nil
-for row_index = 1, joined_dataset_4:nrows() do
-    if joined_dataset_4:col("cliente"):get(row_index) == "D" then date_row = row_index; break end
-end
-check(date_row ~= nil,                            "right: D presente")
-check(joined_dataset_4:col("id"):is_null(date_row),             "right: id NULL para D")
-check(joined_dataset_4:col("valor"):is_null(date_row),          "right: valor NULL para D")
-
--- ================================================================
--- OUTER JOIN
--- ================================================================
-local joined_dataset_5 = pedidos:join(clientes, "cliente", "outer")
-check(joined_dataset_5:nrows() == 5,                         "outer: 5 linhas (A×2, B, C, D)")
--- C: cidade NULL; D: id e valor NULL
-local count_row, object_date_row = nil, nil
-for row_index = 1, joined_dataset_5:nrows() do
-    local element_value = joined_dataset_5:col("cliente"):get(row_index)
-    if element_value == "C" then count_row = row_index end
-    if element_value == "D" then object_date_row = row_index end
-end
-check(count_row ~= nil,                            "outer: C presente")
-check(object_date_row ~= nil,                          "outer: D presente")
-check(joined_dataset_5:col("cidade"):is_null(count_row),         "outer: cidade NULL para C")
-check(joined_dataset_5:col("id"):is_null(object_date_row),           "outer: id NULL para D")
-
--- ================================================================
--- CHAVES DIFERENTES
--- ================================================================
-local source_dataset_19 = smaug.DataSet({
-    {"id_pedido", {1,2,3},   "int64"},
-    {"val",       {10,20,30}, "int64"},
-})
-local source_dataset_20 = smaug.DataSet({
-    {"id_cliente", {2,3,4},    "int64"},
-    {"desc",       {"b","c","d"}, "string"},
-})
-local joined_dataset_6 = source_dataset_19:join(source_dataset_20, {"id_pedido","id_cliente"}, "inner")
-check(joined_dataset_6:nrows() == 2,                         "chaves diff inner: 2 linhas (2,3)")
-check(joined_dataset_6:has_column("id_pedido"),              "chaves diff: coluna esq presente")
-check(joined_dataset_6:col("val"):get(1) == 20,              "chaves diff: val linha 1 = 20")
-check(joined_dataset_6:col("desc"):get(1) == "b",            "chaves diff: desc linha 1 = b")
-
-local joined_dataset_7 = source_dataset_19:join(source_dataset_20, {"id_pedido","id_cliente"}, "left")
-check(joined_dataset_7:nrows() == 3,                        "chaves diff left: 3 linhas")
-check(joined_dataset_7:col("desc"):is_null(1),              "chaves diff left: desc NULL para id=1")
-
--- ================================================================
--- SUFIXOS
--- ================================================================
-local source_dataset_21 = smaug.DataSet({{"k",{1,2},"int64"},{"nome",{"a","b"},"string"},{"x",{10,20},"int64"}})
-local source_dataset_22 = smaug.DataSet({{"k",{1,2},"int64"},{"nome",{"x","y"},"string"},{"y",{100,200},"int64"}})
-local joined_dataset_8 = source_dataset_21:join(source_dataset_22, "k", "inner")
-check(joined_dataset_8:has_column("nome_left"),              "sufixos: nome_left presente")
-check(joined_dataset_8:has_column("nome_right"),             "sufixos: nome_right presente")
-check(not joined_dataset_8:has_column("nome"),               "sufixos: nome sem sufixo ausente")
-check(joined_dataset_8:has_column("x"),                      "sufixos: x sem sufixo (só em esq)")
-check(joined_dataset_8:has_column("y"),                      "sufixos: y sem sufixo (só em dir)")
-check(joined_dataset_8:col("nome_left"):get(1) == "a",       "sufixos: nome_left valor correto")
-check(joined_dataset_8:col("nome_right"):get(1) == "x",      "sufixos: nome_right valor correto")
-
--- sufixos customizados
-local joined_dataset_9 = source_dataset_21:join(source_dataset_22, "k", "inner", {"_esq","_dir"})
-check(joined_dataset_9:has_column("nome_esq"),              "sufixos custom: nome_esq")
-check(joined_dataset_9:has_column("nome_dir"),              "sufixos custom: nome_dir")
-
--- ================================================================
--- MÚLTIPLOS MATCHES (N para N)
--- ================================================================
-local source_dataset_23 = smaug.DataSet({{"k",{1,1,2},"int64"},{"va",{10,20,30},"int64"}})
-local source_dataset_24 = smaug.DataSet({{"k",{1,1,2},"int64"},{"vb",{100,200,300},"int64"}})
-local joined_dataset_10 = source_dataset_23:join(source_dataset_24, "k", "inner")
--- 1×1 cruzado = 4 linhas para k=1, mais 1 para k=2
-check(joined_dataset_10:nrows() == 5,                         "N×N: 5 linhas (2×2 + 1×1)")
-
--- ================================================================
--- DATASETS VAZIOS
--- ================================================================
-local empty_2 = smaug.DataSet({{"k",{},"int64"},{"v",{},"int64"}})
-local normal = smaug.DataSet({{"k",{1,2},"int64"},{"v",{10,20},"int64"}})
-
-local joined_dataset_11 = empty_2:join(normal, "k", "inner")
-check(joined_dataset_11:nrows() == 0,                        "vazio inner: 0 linhas")
-local joined_dataset_12 = normal:join(empty_2, "k", "inner")
-check(joined_dataset_12:nrows() == 0,                        "inner vazio: 0 linhas")
-local joined_dataset_13 = normal:join(empty_2, "k", "left")
-check(joined_dataset_13:nrows() == 2,                        "left com right vazio: 2 linhas")
-check(joined_dataset_13:col("v_right"):is_null(1),           "left vazio: v_right NULL")
-local joined_dataset_14 = empty_2:join(normal, "k", "outer")
-check(joined_dataset_14:nrows() == 2,                        "outer esq-vazio: 2 linhas (do dir)")
-
--- ================================================================
--- CHAVE INT64
--- ================================================================
-local source_dataset_25 = smaug.DataSet({{"id",{10,20,30},"int64"},{"a",{1,2,3},"int64"}})
-local source_dataset_26 = smaug.DataSet({{"id",{20,30,40},"int64"},{"b",{20,30,40},"int64"}})
-local joined_dataset_15 = source_dataset_25:join(source_dataset_26, "id", "inner")
-check(joined_dataset_15:nrows() == 2,                        "chave int64 inner: 2 linhas")
-check(joined_dataset_15:col("id"):get(1) == 20,              "chave int64: id=20")
-
--- ================================================================
--- ERROS ESPERADOS
--- ================================================================
-local succeeded_11, unused_error_11 = pcall(function() pedidos:join("nao_dataset", "cliente") end)
-check(not succeeded_11,                                 "erro: other não-DataSet")
-
-local succeeded_12, unused_error_12 = pcall(function() pedidos:join(clientes, "inexistente") end)
-check(not succeeded_12,                                 "erro: chave esq inexistente")
-
-local succeeded_13, unused_error_13 = pcall(function() pedidos:join(clientes, {"cliente","inexistente"}) end)
-check(not succeeded_13,                                 "erro: chave dir inexistente")
-
-local succeeded_14, unused_error_14 = pcall(function() pedidos:join(clientes, "cliente", "bad") end)
-check(not succeeded_14,                                 "erro: how inválido")
-
--- =====================================================================
--- Contrato 8 — NA em chave relacional é erro (join/groupby/pivot/pivot_table)
--- =====================================================================
-local function error_message_of(callback)
-    local succeeded_15, error_message = pcall(callback)
-    return (not succeeded_15) and tostring(error_message) or nil
-end
-
--- join: NA na chave simples → erro orientado (não casa NA com NA)
-local left_nullable_key_dataset = smaug.DataSet({{"k", {"x", smaug.NA, "y"}, "string"}, {"v", {1,2,3}, "int64"}})
-local right_key_dataset = smaug.DataSet({{"k", {"x", "y"}, "string"},     {"w", {9,8},    "int64"}})
-local error_message = error_message_of(function() return left_nullable_key_dataset:join(right_key_dataset, "k") end)
-check(error_message ~= nil and error_message:match("join") and error_message:match("'k'") and error_message:match("contém NA")
-      and error_message:match("fillna") and error_message:match("dropna"), "C8 join: erro com mensagem padrão")
-
--- groupby: NA na chave → erro (mensagem padrão, agora menciona fillna)
-local error_message_2 = error_message_of(function() return left_nullable_key_dataset:groupby("k"):count() end)
-check(error_message_2 ~= nil and error_message_2:match("groupby") and error_message_2:match("'k'") and error_message_2:match("contém NA")
-      and error_message_2:match("fillna"), "C8 groupby: erro com mensagem padrão (fillna)")
-
--- pivot e pivot_table: NA no index → erro (não descarta linha em silêncio)
-local source_dataset_27 = smaug.DataSet({
-    {"i", {"a", smaug.NA},   "string"},
-    {"c", {"m", "n"},  "string"},
-    {"v", {1, 2},      "int64"},
-})
-local error_message_3 = error_message_of(function() return source_dataset_27:pivot("i", "c", "v") end)
-check(error_message_3 ~= nil and error_message_3:match("pivot") and error_message_3:match("'i'") and error_message_3:match("contém NA"),
-      "C8 pivot: erro com mensagem padrão")
-local error_message_4 = error_message_of(function() return source_dataset_27:pivot_table("i", "c", "v", "sum") end)
-check(error_message_4 ~= nil and error_message_4:match("pivot_table") and error_message_4:match("'i'") and error_message_4:match("contém NA"),
-      "C8 pivot_table: erro com mensagem padrão")
-
--- NA na COLUNA (não no index) do pivot também dispara
-local source_dataset_28 = smaug.DataSet({
-    {"i", {"a", "b"},  "string"},
-    {"c", {"m", smaug.NA},   "string"},
-    {"v", {1, 2},      "int64"},
-})
-local error_message_5 = error_message_of(function() return source_dataset_28:pivot("i", "c", "v") end)
-check(error_message_5 ~= nil and error_message_5:match("'c'"), "C8 pivot: NA na coluna 'columns' dispara")
-
--- chave COMPOSTA: NA em qualquer coluna da chave dispara, nomeando-a
-local source_dataset_29 = smaug.DataSet({
-    {"k1", {"x", "y"}, "string"},
-    {"k2", {"a", smaug.NA},  "string"},
-    {"v",  {1, 2},     "int64"},
-})
-local error_message_6 = error_message_of(function() return source_dataset_29:groupby({"k1", "k2"}):count() end)
-check(error_message_6 ~= nil and error_message_6:match("'k2'"), "C8 composta: nomeia a coluna culpada (k2)")
--- join valida AMBOS os lados: NA na chave do lado direito (forma {chave_esq, chave_dir})
-local left_valid_key_dataset = smaug.DataSet({{"kl", {"x", "y"}, "string"}, {"v", {1, 2}, "int64"}})
-local right_nullable_key_dataset = smaug.DataSet({{"kr", {"x", smaug.NA},  "string"}, {"w", {9, 8}, "int64"}})
-local error_message_7 = error_message_of(function() return left_valid_key_dataset:join(right_nullable_key_dataset, {"kl", "kr"}) end)
-check(error_message_7 ~= nil and error_message_7:match("'kr'"), "C8 join: valida chave do lado direito (kr)")
-
--- a coluna de VALORES pode conter NA (não é chave) — join com valor NA funciona
-local left_nullable_value_dataset = smaug.DataSet({{"k", {"x", "y"}, "string"}, {"v", {1, smaug.NA}, "int64"}})
-local right_value_dataset = smaug.DataSet({{"k", {"x", "y"}, "string"}, {"w", {9, 8}, "int64"}})
-local succeeded_15 = pcall(function() return left_nullable_value_dataset:join(right_value_dataset, "k") end)
-check(succeeded_15, "C8: NA em coluna de valores (não-chave) não dispara")
-
--- ===================================================================
--- L2: int64 > 2^53 em chave de join/groupby (correção via core/keys).
--- A chave passava por get()→double: dois int64 distintos acima de 2^53
--- colapsavam (join casava errado, groupby fundia grupos) e o valor da
--- chave saía degradado no resultado. keys.encode/value corrigem ambos.
--- ===================================================================
-do
-    local ffi = require("ffi")
-    local exact_double_limit = ffi.new("int64_t", 9007199254740992LL)  -- 2^53
-    local above_double_limit = ffi.new("int64_t", 9007199254740993LL)  -- 2^53 + 1
-
-    -- groupby: a,b,a → 2 grupos (não funde)
-    local sum_result_11 = smaug.DataSet({{"id", {exact_double_limit, above_double_limit, exact_double_limit}, "int64"}, {"v", {1, 10, 100}, "int64"}})
-                   :groupby("id"):sum("v")
-    check(sum_result_11:nrows() == 2, "L2 groupby int64>2^53 não funde grupos")
-    local seen_exact_double_limit, seen_above_double_limit = false, false
-    for row_index = 1, sum_result_11:nrows() do
-        local key_series = sum_result_11:column("id"):get_raw(row_index)
-        if key_series == exact_double_limit then seen_exact_double_limit = true elseif key_series == above_double_limit then seen_above_double_limit = true end
+-- Comparação independente: não usa keys.encode, sort, join ou agregações
+-- do Smaug para construir o esperado. int64 nunca passa por tonumber.
+-- Tolerância é opt-in, somente para resultados estatísticos destas fixtures.
+local function cell_matches(series, row_index, expected, tolerance)
+    if expected == smaug.NA then return series:is_null(row_index) end
+    if series:is_null(row_index) then return false end
+    local actual
+    if series._dtype == "int64" then actual = series:get_raw(row_index)
+    else actual = series:get(row_index) end
+    if type(expected) == "number" and expected ~= expected then
+        return type(actual) == "number" and actual ~= actual
     end
-    check(seen_exact_double_limit and seen_above_double_limit, "L2 groupby preserva valor exato da chave no resultado")
-
-    -- join: ids distintos não casam; iguais casam e preservam valor
-    local left_dataset = smaug.DataSet({{"id", {exact_double_limit}, "int64"}, {"lval", {100}, "int64"}})
-    local different_key_dataset = smaug.DataSet({{"id", {above_double_limit}, "int64"}, {"rval", {200}, "int64"}})
-    check(left_dataset:join(different_key_dataset, "id", "inner"):nrows() == 0, "L2 join ids distintos → 0 linhas")
-    local same_key_dataset = smaug.DataSet({{"id", {exact_double_limit}, "int64"}, {"rval", {200}, "int64"}})
-    local joined_dataset_16 = left_dataset:join(same_key_dataset, "id", "inner")
-    check(joined_dataset_16:nrows() == 1, "L2 join ids iguais → 1 linha")
-    check(joined_dataset_16:column("id"):get_raw(1) == exact_double_limit, "L2 join preserva valor exato da chave")
-end
-
--- ===================================================================
--- 12.39: NaN em chave de agrupamento quebrava a ordem fraca estrita
--- `(a > b) - (a < b)` devolve 0 quando qualquer operando é NaN, então NaN
--- comparava IGUAL A TUDO. Isso torna o comparador inconsistente e o
--- comportamento do qsort INDEFINIDO — não era ordem esquisita, era UB. Um
--- único NaN corrompia o agrupamento das OUTRAS chaves também.
--- Corrigido com ordem TOTAL: NaN ao fim, e NaN igual a NaN (todas as linhas
--- com NaN formam um grupo). NaN é VALOR neste projeto (Contrato 9), então
--- agrupar por ele é legítimo — recusar trocaria erro por erro, a ordem total
--- troca por resultado certo.
--- ===================================================================
-do
-    local nan_value = 0/0
-
-    -- 12.39.1 — o caso medido: 5 grupos para 3 valores, com 1.0 duplicado
-    local source_dataset_30 = smaug.DataSet({ {"k", {1.0, nan_value, 1.0, nan_value, 2.0}, "float64"},
-                               {"v", {10, 20, 30, 40, 50}, "int64"} })
-    local sum_result_11 = source_dataset_30:groupby("k"):sum("v")
-    check(sum_result_11:nrows() == 3, "12.39.1 três valores distintos → três grupos")
-
-    -- as somas provam que o agrupamento é o certo, não só a contagem
-    local key_series, value_series = sum_result_11:column("k"), sum_result_11:column("v")
-    local group_sums = {}
-    for row_index = 1, sum_result_11:nrows() do
-        local element_value = key_series:get(row_index)
-        group_sums[element_value ~= element_value and "nan" or tostring(element_value)] = value_series:get(row_index)
+    if actual == expected then return true end
+    if tolerance and type(actual) == "number" and type(expected) == "number"
+        and math.abs(actual) < math.huge and math.abs(expected) < math.huge then
+        return math.abs(actual - expected) <= tolerance * math.max(1, math.abs(expected))
     end
-    check(group_sums["1"] == 40,   "12.39.1 grupo 1.0 soma 10+30 (não ficou partido)")
-    check(group_sums["2"] == 50,   "12.39.1 grupo 2.0 intacto")
-    check(group_sums["nan"] == 60, "12.39.1 linhas com NaN formam UM grupo (20+40)")
-
-    -- 12.39.2 — NaN não contamina as outras chaves: sem NaN o resultado é o
-    -- mesmo para elas, o que prova que o bug era do comparador e não do dado
-    local clean_dataset = smaug.DataSet({ {"k", {1.0, 1.0, 2.0}, "float64"},
-                                  {"v", {10, 30, 50}, "int64"} })
-    local sum_result_12 = clean_dataset:groupby("k"):sum("v")
-    check(sum_result_12:nrows() == 2 and sum_result_12:column("v"):get(1) == 40,
-          "12.39.2 mesmo resultado para 1.0 com e sem NaN na coluna")
-
-    -- 12.39.3 — ordem total: NaN vai para o fim, de forma determinística
-    local source_dataset_31 = smaug.DataSet({ {"k", {3.0, nan_value, 1.0, nan_value, 2.0}, "float64"},
-                              {"v", {1, 1, 1, 1, 1}, "int64"} })
-    local sum_result_13 = source_dataset_31:groupby("k"):sum("v")
-    local column_result = sum_result_13:column("k")
-    check(sum_result_13:nrows() == 4, "12.39.3 quatro grupos (1, 2, 3, NaN)")
-    check(column_result:get(4) ~= column_result:get(4), "12.39.3 NaN ordena por último")
-    check(sum_result_13:column("v"):get(4) == 2, "12.39.3 os dois NaN no mesmo grupo")
-
-    -- 12.39.4 — join também usa o comparador e passou a casar NaN com NaN
-    local source_dataset_32 = smaug.DataSet({ {"k", {1.0, nan_value, 2.0}, "float64"}, {"x", {1,2,3}, "int64"} })
-    local source_dataset_33 = smaug.DataSet({ {"k", {1.0, nan_value}, "float64"},      {"y", {10,20}, "int64"} })
-    check(source_dataset_32:join(source_dataset_33, "k"):nrows() == 2, "12.39.4 join casa 1.0 e NaN")
-
-    -- 12.39.5 — int64 não tem NaN; o caminho não-float segue idêntico
-    local source_dataset_34 = smaug.DataSet({ {"k", {1, 1, 2}, "int64"}, {"v", {10, 30, 50}, "int64"} })
-    check(source_dataset_34:groupby("k"):sum("v"):nrows() == 2, "12.39.5 int64 intacto")
+    return false
 end
 
-print(string.format("OK — %d checks passaram (DataSet: groupby, concat, join)", passed_checks))
+local function expect_series(series, dtype, values, tolerance)
+    check(series._dtype == dtype, "dtype esperado: " .. dtype .. "; recebido: " .. series._dtype)
+    check(series:len() == #values, "comprimento esperado: " .. #values .. "; recebido: " .. series:len())
+    for row_index, expected in ipairs(values) do
+        check(cell_matches(series, row_index, expected, tolerance),
+            "valor/máscara incorreto na posição " .. row_index .. "; esperado: " .. tostring(expected))
+    end
+end
+
+-- schema = {{nome, dtype, tolerância opcional}, ...}; rows inclui NA explícito.
+-- A comparação sem ordem consome cada linha uma vez: duplicatas não somem
+-- num mapa. Ordem de colunas pode ser omitida em agg (spec é um mapa) e join.
+local function expect_dataset(dataset, schema, rows, unordered_rows, unordered_columns)
+    check(dataset:nrows() == #rows, "linhas esperadas: " .. #rows .. "; recebidas: " .. dataset:nrows())
+    check(dataset:ncols() == #schema, "colunas esperadas: " .. #schema .. "; recebidas: " .. dataset:ncols())
+    local columns = dataset:columns()
+    for column_index, definition in ipairs(schema) do
+        local name, dtype = definition[1], definition[2]
+        check(dataset:has_column(name), "coluna ausente: " .. name)
+        check(dataset:col(name)._dtype == dtype, "dtype incorreto: " .. name)
+        if not unordered_columns then check(columns[column_index] == name, "ordem de colunas: " .. name) end
+    end
+    local consumed = {}
+    for expected_index, expected_row in ipairs(rows) do
+        check(#expected_row == #schema, "fixture com número de células incorreto")
+        local matched = false
+        local first_index = unordered_rows and 1 or expected_index
+        local last_index = unordered_rows and dataset:nrows() or expected_index
+        for actual_index = first_index, last_index do
+            if not consumed[actual_index] then
+                local equal = true
+                for column_index, definition in ipairs(schema) do
+                    if not cell_matches(dataset:col(definition[1]), actual_index,
+                        expected_row[column_index], definition[3]) then
+                        equal = false
+                        break
+                    end
+                end
+                if equal then
+                    consumed[actual_index], matched = true, true
+                    break
+                end
+            end
+        end
+        check(matched, "linha esperada " .. expected_index .. " ausente/incorreta (incluindo multiplicidade)")
+    end
+end
+
+-- GroupBy: seleção de colunas, reduções, broadcast, chaves e precisão.
+
+test("groupby: count, seleção explícita e todas as colunas numéricas", function()
+    local sales = smaug.DataSet({
+        {"state", {"SP", "RJ", "SP", "MG", "SP", "RJ"}, "string"},
+        {"sales", {10, 20, 30, 40, 50, 60}, "int64"},
+        {"cost", {1.5, 2.5, 3.5, 4.5, 5.5, 6.5}, "float64"},
+        {"label", {"a", "b", "c", "d", "e", "f"}, "string"},
+    })
+    local grouped = sales:groupby("state")
+    expect_dataset(grouped:count(), {{"state", "string"}, {"count", "int64"}},
+        {{"MG", 1}, {"RJ", 2}, {"SP", 3}})
+    local sum_schema = {{"state", "string"}, {"sales", "int64"}, {"cost", "float64"}}
+    local sum_rows = {{"MG", 40, 4.5}, {"RJ", 80, 9}, {"SP", 90, 10.5}}
+    expect_dataset(grouped:sum(), sum_schema, sum_rows)
+    expect_dataset(grouped:sum("sales", "cost"), sum_schema, sum_rows)
+    expect_dataset(grouped:sum("sales"), {{"state", "string"}, {"sales", "int64"}},
+        {{"MG", 40}, {"RJ", 80}, {"SP", 90}})
+end)
+
+test("groupby: reduções completas, singleton e valores repetidos", function()
+    -- A={2,8,2}, B={3,7}, C={11}; ordem de entrada difere da ordem dos grupos.
+    local source = smaug.DataSet({
+        {"key", {"B", "A", "C", "A", "B", "A"}, "string"},
+        {"value", {3, 2, 11, 8, 7, 2}, "int64"},
+    })
+    local grouped = source:groupby("key")
+    local reductions = {
+        {"sum", "int64", {12, 10, 11}},
+        {"mean", "float64", {4, 5, 11}},
+        {"min", "int64", {2, 3, 11}},
+        {"max", "int64", {8, 7, 11}},
+        {"var", "float64", {12, 8, smaug.NA}}, -- amostral: divide por n-1
+        {"std", "float64", {math.sqrt(12), math.sqrt(8), smaug.NA}},
+        {"median", "float64", {2, 5, 11}},
+        {"first", "int64", {2, 3, 11}},
+        {"last", "int64", {2, 7, 11}},
+        {"prod", "int64", {32, 21, 11}},
+        {"nunique", "int64", {2, 2, 1}},
+    }
+    for unused_index, reduction in ipairs(reductions) do
+        local name, dtype, expected = unpack(reduction)
+        expect_dataset(grouped[name](grouped, "value"), {{"key", "string"}, {"value", dtype, 1e-12}},
+            {{"A", expected[1]}, {"B", expected[2]}, {"C", expected[3]}})
+    end
+end)
+
+test("groupby: NA ignorado, first/last e grupo totalmente nulo", function()
+    local source = smaug.DataSet({
+        {"key", {"A", "B", "A", "C", "A", "B", "A"}, "string"},
+        {"value", {smaug.NA, smaug.NA, 4, 9, 10, smaug.NA, smaug.NA}, "float64"},
+    })
+    local grouped = source:groupby("key")
+    local reductions = {
+        {"sum", {14, 0, 9}}, {"mean", {7, smaug.NA, 9}},
+        {"min", {4, smaug.NA, 9}}, {"max", {10, smaug.NA, 9}},
+        {"first", {4, smaug.NA, 9}}, {"last", {10, smaug.NA, 9}},
+        {"var", {18, smaug.NA, smaug.NA}},
+        {"std", {math.sqrt(18), smaug.NA, smaug.NA}},
+        {"median", {7, smaug.NA, 9}},
+    }
+    for unused_index, reduction in ipairs(reductions) do
+        local name, expected = reduction[1], reduction[2]
+        expect_dataset(grouped[name](grouped, "value"), {{"key", "string"}, {"value", "float64", 1e-12}},
+            {{"A", expected[1]}, {"B", expected[2]}, {"C", expected[3]}})
+    end
+    expect_dataset(grouped:nunique("value"), {{"key", "string"}, {"value", "int64"}},
+        {{"A", 2}, {"B", 0}, {"C", 1}})
+end)
+
+test("groupby: quantile interpola e trata extremos, singleton e NA", function()
+    local source = smaug.DataSet({
+        {"key", {"A", "A", "A", "B", "C"}, "string"},
+        {"value", {10, smaug.NA, 30, 7, smaug.NA}, "float64"},
+    })
+    local grouped = source:groupby("key")
+    for unused_index, fixture in ipairs({{0, 10}, {0.25, 15}, {0.5, 20}, {1, 30}}) do
+        expect_dataset(grouped:quantile(fixture[1], "value"), {{"key", "string"}, {"value", "float64"}},
+            {{"A", fixture[2]}, {"B", 7}, {"C", smaug.NA}})
+    end
+    for unused_index, invalid in ipairs({-0.1, 1.1, "0.5"}) do
+        expect_error(function() grouped:quantile(invalid, "value") end, {"quantile", "0", "1"})
+    end
+end)
+
+test("groupby: agg verifica todas as células e transform alinha à entrada", function()
+    local source = smaug.DataSet({
+        {"state", {"SP", "RJ", "SP", "MG", "RJ", "SP"}, "string"},
+        {"value", {10, 20, 30, 40, 50, 20}, "float64"},
+    })
+    local grouped = source:groupby("state")
+    expect_dataset(grouped:agg({value = {"sum", "mean", "std"}}),
+        {{"state", "string"}, {"value_sum", "float64"}, {"value_mean", "float64"}, {"value_std", "float64", 1e-12}},
+        {{"MG", 40, 40, smaug.NA}, {"RJ", 70, 35, math.sqrt(450)}, {"SP", 60, 20, 10}}, false, true)
+    expect_dataset(grouped:agg({value = "sum"}), {{"state", "string"}, {"value_sum", "float64"}},
+        {{"MG", 40}, {"RJ", 70}, {"SP", 60}})
+    expect_series(grouped:transform("mean", "value"), "float64", {20, 35, 20, 40, 35, 20})
+    expect_series(grouped:transform("sum", "value"), "float64", {60, 70, 60, 40, 70, 60})
+    expect_series(source:col("value"), "float64", {10, 20, 30, 40, 50, 20})
+    expect_error(function() grouped:agg(123) end, {"agg", "tabela"})
+    expect_error(function() grouped:agg({missing = "sum"}) end, {"agg", "missing"})
+    expect_error(function() grouped:transform("mean", "missing") end, {"transform", "missing"})
+end)
+
+test("groupby: agg rejeita nome de função desconhecido com erro orientado", function()
+    local source = smaug.DataSet({{"key", {"A"}, "string"}, {"value", {1}, "int64"}})
+    expect_error(function() source:groupby("key"):agg({value = "unknown"}) end, {"agg", "desconhecida"})
+end)
+
+test("groupby: transform rejeita nome de função desconhecido com erro orientado", function()
+    local source = smaug.DataSet({{"key", {"A"}, "string"}, {"value", {1}, "int64"}})
+    expect_error(function() source:groupby("key"):transform("unknown", "value") end, {"transform", "desconhecida"})
+end)
+
+test("groupby: chaves int64, bool e composta preservam schema e valores", function()
+    local years = smaug.DataSet({{"year", {2024, 2023, 2024}, "int64"}, {"value", {2, 5, 8}, "int64"}})
+    expect_dataset(years:groupby("year"):sum(), {{"year", "int64"}, {"value", "int64"}}, {{2023, 5}, {2024, 10}})
+    local flags = smaug.DataSet({{"active", {true, false, true}, "bool"}, {"value", {2, 5, 8}, "int64"}})
+    expect_dataset(flags:groupby("active"):sum(), {{"active", "bool"}, {"value", "int64"}}, {{false, 5}, {true, 10}})
+    local source = smaug.DataSet({
+        {"state", {"SP", "SP", "RJ", "RJ", "SP"}, "string"},
+        {"year", {2023, 2024, 2023, 2023, 2023}, "int64"},
+        {"value", {10, 20, 30, 40, 50}, "int64"},
+    })
+    expect_dataset(source:groupby({"state", "year"}):sum(),
+        {{"state", "string"}, {"year", "int64"}, {"value", "int64"}},
+        {{"RJ", 2023, 70}, {"SP", 2023, 60}, {"SP", 2024, 20}})
+    expect_dataset(source:groupby({"state", "year"}):count(),
+        {{"state", "string"}, {"year", "int64"}, {"count", "int64"}},
+        {{"RJ", 2023, 2}, {"SP", 2023, 2}, {"SP", 2024, 1}})
+end)
+
+test("groupby: chaves compostas não colidem com separadores no texto", function()
+    local source = smaug.DataSet({
+        {"first", {"a\1string:b", "a", "a\1string:b"}, "string"},
+        {"second", {"c", "b\1string:c", "c"}, "string"},
+        {"value", {1, 10, 100}, "int64"},
+    })
+    expect_dataset(source:groupby({"first", "second"}):sum("value"),
+        {{"first", "string"}, {"second", "string"}, {"value", "int64"}},
+        {{"a", "b\1string:c", 10}, {"a\1string:b", "c", 101}})
+end)
+
+test("groupby: vazio preserva schema e argumentos inválidos falham", function()
+    local empty = smaug.DataSet({{"key", {}, "string"}, {"value", {}, "int64"}})
+    local grouped = empty:groupby("key")
+    expect_dataset(grouped:sum(), {{"key", "string"}, {"value", "int64"}}, {})
+    expect_dataset(grouped:mean(), {{"key", "string"}, {"value", "float64"}}, {})
+    expect_dataset(grouped:count(), {{"key", "string"}, {"count", "int64"}}, {})
+    expect_series(grouped:transform("mean", "value"), "float64", {})
+    expect_error(function() empty:groupby("missing") end, {"groupby", "missing"})
+    expect_error(function() empty:groupby(123) end, {"groupby", "string"})
+    expect_error(function() empty:groupby({}) end, {"groupby", "pelo menos"})
+    expect_error(function() grouped:sum("missing") end, {"agg", "missing"})
+end)
+
+-- Concat: todas as formas públicas usam o mesmo esperado literal.
+
+test("concat: ordem, dtypes e máscaras em todas as formas de chamada", function()
+    local first = smaug.DataSet({
+        {"text", {"SP", ""}, "string"}, {"integer", {10, smaug.NA}, "int64"},
+        {"real", {1.5, smaug.NA}, "float64"}, {"flag", {true, false}, "bool"},
+    })
+    -- Ordem diferente de colunas: alinhamento deve ser por nome.
+    local second = smaug.DataSet({
+        {"flag", {smaug.NA}, "bool"}, {"real", {3.5}, "float64"},
+        {"integer", {30}, "int64"}, {"text", {smaug.NA}, "string"},
+    })
+    local third = smaug.DataSet({
+        {"text", {"RS"}, "string"}, {"integer", {40}, "int64"},
+        {"real", {4.5}, "float64"}, {"flag", {true}, "bool"},
+    })
+    local schema = {{"text", "string"}, {"integer", "int64"}, {"real", "float64"}, {"flag", "bool"}}
+    local two_rows = {{"SP", 10, 1.5, true}, {"", smaug.NA, smaug.NA, false}, {smaug.NA, 30, 3.5, smaug.NA}}
+    local three_rows = {two_rows[1], two_rows[2], two_rows[3], {"RS", 40, 4.5, true}}
+    expect_dataset(smaug.concat({first, second}), schema, two_rows)
+    expect_dataset(first:concat(second), schema, two_rows)
+    expect_dataset(smaug.concat({first, second, third}), schema, three_rows)
+    expect_dataset(first:concat({second, third}), schema, three_rows)
+    expect_dataset(first, schema, {two_rows[1], two_rows[2]})
+end)
+
+test("concat: vazios e cópia de um único dataset", function()
+    local empty = smaug.DataSet({{"key", {}, "string"}, {"value", {}, "int64"}})
+    local source = smaug.DataSet({{"key", {"a", "b"}, "string"}, {"value", {1, 2}, "int64"}})
+    local schema, rows = {{"key", "string"}, {"value", "int64"}}, {{"a", 1}, {"b", 2}}
+    expect_dataset(smaug.concat({empty, source}), schema, rows)
+    expect_dataset(smaug.concat({source, empty}), schema, rows)
+    expect_dataset(smaug.concat({empty, empty}), schema, {})
+    expect_dataset(smaug.concat({source}), schema, rows)
+    local copy = smaug.concat({source})
+    -- col() devolve uma view protegida por COW. Atualizar o frame exige
+    -- recolocar a coluna alterada pela API pública update_column().
+    local copied_values, copied_keys = copy:col("value"), copy:col("key")
+    copied_values:set(1, 99)
+    copied_keys:set(2, "changed")
+    copy:update_column("value", copied_values)
+    copy:update_column("key", copied_keys)
+    copy:add_column("extra", smaug.Series({5, 6}, "int64"))
+    expect_dataset(source, schema, rows)
+    local source_values = source:col("value")
+    source_values:set(2, 88)
+    source:update_column("value", source_values)
+    expect_series(source:col("value"), "int64", {1, 88})
+    expect_series(copy:col("value"), "int64", {99, 2})
+    expect_series(copy:col("key"), "string", {"a", "changed"})
+end)
+
+test("concat: rejeita lista inválida e cada incompatibilidade de schema", function()
+    local source = smaug.DataSet({{"key", {"a"}, "string"}, {"value", {1}, "int64"}})
+    expect_error(function() smaug.concat({}) end, {"concat", "lista"})
+    expect_error(function() smaug.concat("invalid") end, {"concat", "lista"})
+    expect_error(function() smaug.concat({"invalid"}) end, {"concat", "elemento 1", "DataSet"})
+    expect_error(function() smaug.concat({source, "invalid"}) end, {"concat", "elemento 2", "DataSet"})
+    expect_error(function() source:concat(123) end, {"concat", "DataSet"})
+    local missing = smaug.DataSet({{"key", {"b"}, "string"}, {"other", {2}, "int64"}})
+    expect_error(function() smaug.concat({source, missing}) end, {"concat", "coluna 'value'"})
+    local fewer = smaug.DataSet({{"key", {"b"}, "string"}})
+    expect_error(function() smaug.concat({source, fewer}) end, {"concat", "número de colunas"})
+    local incompatible = smaug.DataSet({{"key", {"b"}, "string"}, {"value", {2.5}, "float64"}})
+    expect_error(function() smaug.concat({source, incompatible}) end, {"concat", "value", "dtype"})
+    expect_dataset(source, {{"key", "string"}, {"value", "int64"}}, {{"a", 1}})
+end)
+
+-- Join: referência por produto cartesiano de listas, sem hashing/keys.encode.
+-- Fixtures são {chave, payload}; o modelo preserva todas as multiplicidades.
+local function reference_join(left_rows, right_rows, how)
+    local result = {}
+    for unused_index, left_row in ipairs(left_rows) do
+        local matched = false
+        for unused_index, right_row in ipairs(right_rows) do
+            if left_row[1] == right_row[1] then
+                result[#result + 1] = {left_row[1], left_row[2], right_row[2]}
+                matched = true
+            end
+        end
+        if not matched and (how == "left" or how == "outer") then
+            result[#result + 1] = {left_row[1], left_row[2], smaug.NA}
+        end
+    end
+    if how == "right" or how == "outer" then
+        for unused_index, right_row in ipairs(right_rows) do
+            local matched = false
+            for unused_index, left_row in ipairs(left_rows) do
+                if left_row[1] == right_row[1] then matched = true; break end
+            end
+            if not matched then result[#result + 1] = {right_row[1], smaug.NA, right_row[2]} end
+        end
+    end
+    return result
+end
+
+local function join_input(rows, payload_name)
+    local keys, payloads = {}, {}
+    for row_index, row in ipairs(rows) do keys[row_index], payloads[row_index] = row[1], row[2] end
+    return smaug.DataSet({{"key", keys, "string"}, {payload_name, payloads, "int64"}})
+end
+
+for unused_index, fixture in ipairs({
+    {name = "1:1", left = {{"B", 20}, {"A", 10}}, right = {{"A", 100}, {"B", 200}}},
+    {name = "1:N", left = {{"A", 10}}, right = {{"A", 100}, {"A", 200}}},
+    {name = "N:1", left = {{"A", 10}, {"A", 20}}, right = {{"A", 100}}},
+    {name = "N:N e linhas idênticas", left = {{"A", 10}, {"A", 10}, {"B", 30}},
+        right = {{"A", 100}, {"A", 200}, {"B", 300}}},
+    {name = "matches e órfãos", left = {{"A", 10}, {"C", 30}, {"A", 20}}, right = {{"A", 100}, {"D", 400}}},
+    {name = "sem match", left = {{"A", 10}}, right = {{"B", 20}}},
+    {name = "esquerda vazia", left = {}, right = {{"A", 10}, {"B", 20}}},
+    {name = "direita vazia", left = {{"A", 10}, {"B", 20}}, right = {}},
+    {name = "ambos vazios", left = {}, right = {}},
+    {name = "NA nos valores", left = {{"A", smaug.NA}, {"B", 2}}, right = {{"A", 9}, {"B", smaug.NA}}},
+}) do
+    for unused_index, how in ipairs({"inner", "left", "right", "outer"}) do
+        test("join: " .. fixture.name .. " / " .. how, function()
+            local left = join_input(fixture.left, "left_value")
+            local right = join_input(fixture.right, "right_value")
+            local expected = reference_join(fixture.left, fixture.right, how)
+            expect_dataset(left:join(right, "key", how),
+                {{"key", "string"}, {"left_value", "int64"}, {"right_value", "int64"}}, expected, true, true)
+            expect_dataset(left, {{"key", "string"}, {"left_value", "int64"}}, fixture.left)
+            expect_dataset(right, {{"key", "string"}, {"right_value", "int64"}}, fixture.right)
+        end)
+    end
+end
+
+test("join: inner por padrão preserva a sequência dos matches", function()
+    local left = join_input({{"B", 20}, {"A", 10}, {"B", 30}}, "left_value")
+    local right = join_input({{"A", 100}, {"B", 200}}, "right_value")
+    expect_dataset(left:join(right, "key"),
+        {{"key", "string"}, {"left_value", "int64"}, {"right_value", "int64"}},
+        {{"B", 20, 200}, {"A", 10, 100}, {"B", 30, 200}})
+end)
+
+test("join: nomes distintos de chave em inner, left e outer", function()
+    local left = smaug.DataSet({{"order_id", {1, 2, 3}, "int64"}, {"value", {10, 20, 30}, "int64"}})
+    local right = smaug.DataSet({{"customer_id", {2, 3, 4}, "int64"}, {"label", {"b", "c", "d"}, "string"}})
+    local schema = {{"order_id", "int64"}, {"value", "int64"}, {"label", "string"}}
+    expect_dataset(left:join(right, {"order_id", "customer_id"}, "inner"), schema, {{2, 20, "b"}, {3, 30, "c"}})
+    expect_dataset(left:join(right, {"order_id", "customer_id"}, "left"), schema,
+        {{1, 10, smaug.NA}, {2, 20, "b"}, {3, 30, "c"}})
+    expect_dataset(left:join(right, {"order_id", "customer_id"}, "outer"), schema,
+        {{1, 10, smaug.NA}, {2, 20, "b"}, {3, 30, "c"}, {4, smaug.NA, "d"}})
+end)
+
+test("join: sufixos resolvem conflitos sem trocar os valores de lado", function()
+    local left = smaug.DataSet({{"key", {1, 2}, "int64"}, {"name", {"a", "b"}, "string"}, {"quantity", {10, 20}, "int64"}})
+    local right = smaug.DataSet({{"key", {1, 2}, "int64"}, {"name", {"x", "y"}, "string"}, {"price", {1.5, 2.5}, "float64"}})
+    for unused_index, suffixes in ipairs({{"_left", "_right"}, {"_esq", "_dir"}}) do
+        expect_dataset(left:join(right, "key", "inner", suffixes),
+            {{"key", "int64"}, {"name" .. suffixes[1], "string"}, {"quantity", "int64"},
+             {"name" .. suffixes[2], "string"}, {"price", "float64"}},
+            {{1, "a", 10, "x", 1.5}, {2, "b", 20, "y", 2.5}})
+    end
+    expect_dataset(left:join(right, "key"),
+        {{"key", "int64"}, {"name_left", "string"}, {"quantity", "int64"}, {"name_right", "string"}, {"price", "float64"}},
+        {{1, "a", 10, "x", 1.5}, {2, "b", 20, "y", 2.5}})
+end)
+
+test("join: argumentos inválidos geram erros orientados", function()
+    local left = join_input({{"A", 1}}, "left_value")
+    local right = join_input({{"A", 2}}, "right_value")
+    expect_error(function() left:join("invalid", "key") end, {"join", "other", "DataSet"})
+    expect_error(function() left:join(right, "missing") end, {"join", "esquerda", "missing"})
+    expect_error(function() left:join(right, {"key", "missing"}) end, {"join", "direita", "missing"})
+    expect_error(function() left:join(right, "key", "invalid") end, {"join", "how"})
+    expect_error(function() left:join(right, 123) end, {"join", "on"})
+end)
+
+-- Regressões L2 e 12.39: esperado literal exato e máscara separada de NaN.
+
+test("int64: groupby e join distinguem vizinhos de 2^53 e preservam chaves", function()
+    local source = smaug.DataSet({
+        {"key", {9007199254740993LL, 9007199254740992LL, 9007199254740993LL}, "int64"},
+        {"value", {1, 10, 100}, "int64"},
+    })
+    expect_dataset(source:groupby("key"):sum("value"), {{"key", "int64"}, {"value", "int64"}},
+        {{9007199254740992LL, 10}, {9007199254740993LL, 101}})
+    local right = smaug.DataSet({{"key", {9007199254740993LL}, "int64"}, {"other", {7}, "int64"}})
+    expect_dataset(source:join(right, "key"), {{"key", "int64"}, {"value", "int64"}, {"other", "int64"}},
+        {{9007199254740993LL, 1, 7}, {9007199254740993LL, 100, 7}})
+    local different = smaug.DataSet({{"key", {9007199254740992LL}, "int64"}})
+    expect_dataset(different:join(right, "key"), {{"key", "int64"}, {"other", "int64"}}, {})
+end)
+
+test("NaN: groupby mantém os grupos finitos e ordena NaN por último", function()
+    local nan_value = 0 / 0
+    local source = smaug.DataSet({
+        {"key", {1, nan_value, 1, nan_value, 2, 3}, "float64"},
+        {"value", {10, 20, 30, 40, 50, 60}, "int64"},
+    })
+    expect_dataset(source:groupby("key"):sum("value"), {{"key", "float64"}, {"value", "int64"}},
+        {{1, 40}, {2, 50}, {3, 60}, {nan_value, 60}})
+    local finite = smaug.DataSet({{"key", {1, 1, 2, 3}, "float64"}, {"value", {10, 30, 50, 60}, "int64"}})
+    expect_dataset(finite:groupby("key"):sum("value"), {{"key", "float64"}, {"value", "int64"}},
+        {{1, 40}, {2, 50}, {3, 60}})
+end)
+
+test("NaN: join casa NaN com NaN sem perder ou inventar pares", function()
+    local nan_value = 0 / 0
+    local left = smaug.DataSet({{"key", {1, nan_value, 2, nan_value}, "float64"}, {"left_value", {1, 2, 3, 4}, "int64"}})
+    local right = smaug.DataSet({{"key", {1, nan_value}, "float64"}, {"right_value", {10, 20}, "int64"}})
+    expect_dataset(left:join(right, "key"), {{"key", "float64"}, {"left_value", "int64"}, {"right_value", "int64"}},
+        {{1, 1, 10}, {nan_value, 2, 20}, {nan_value, 4, 20}})
+end)
+
+-- Pivot: esperado wide literal, incluindo combinações ausentes e valores NA.
+
+test("pivot: conteúdo, schema, ordenação e células ausentes", function()
+    local source = smaug.DataSet({
+        {"item", {"b", "a", "a"}, "string"},
+        {"period", {"feb", "jan", "feb"}, "string"},
+        {"value", {4, 1, smaug.NA}, "int64"},
+    })
+    expect_dataset(source:pivot("item", "period", "value"),
+        {{"item", "string"}, {"feb", "int64"}, {"jan", "int64"}},
+        {{"a", smaug.NA, 1}, {"b", 4, smaug.NA}})
+    expect_dataset(source, {{"item", "string"}, {"period", "string"}, {"value", "int64"}},
+        {{"b", "feb", 4}, {"a", "jan", 1}, {"a", "feb", smaug.NA}})
+end)
+
+test("pivot_table: agrega duplicatas com função explícita", function()
+    local source = smaug.DataSet({
+        {"item", {"b", "a", "a", "a"}, "string"},
+        {"period", {"feb", "jan", "jan", "feb"}, "string"},
+        {"value", {8, 2, 5, 4}, "float64"},
+    })
+    local schema = {{"item", "string"}, {"feb", "float64"}, {"jan", "float64"}}
+    for unused_index, fixture in ipairs({{"sum", 7}, {"mean", 3.5}, {"min", 2}, {"max", 5}, {"first", 2}, {"last", 5}}) do
+        expect_dataset(source:pivot_table("item", "period", "value", fixture[1]), schema,
+            {{"a", 4, fixture[2]}, {"b", 8, smaug.NA}})
+    end
+    expect_dataset(source:pivot_table("item", "period", "value", "count"), schema,
+        {{"a", 1, 2}, {"b", 1, smaug.NA}})
+end)
+
+test("pivot e pivot_table: vazios e argumentos inválidos", function()
+    local empty = smaug.DataSet({{"item", {}, "string"}, {"period", {}, "string"}, {"value", {}, "float64"}})
+    expect_dataset(empty:pivot("item", "period", "value"), {{"item", "string"}}, {})
+    expect_dataset(empty:pivot_table("item", "period", "value", "sum"), {{"item", "string"}}, {})
+    expect_error(function() empty:pivot(123, "period", "value") end, {"pivot", "strings"})
+    for unused_index, names in ipairs({{"missing", "period", "value"}, {"item", "missing", "value"}, {"item", "period", "missing"}}) do
+        expect_error(function() empty:pivot(unpack(names)) end, {"pivot", "missing"})
+        expect_error(function() empty:pivot_table(names[1], names[2], names[3], "sum") end, {"pivot_table", "missing"})
+    end
+    expect_error(function() empty:pivot_table("item", "period", "value", "unknown") end, {"pivot_table", "aggfunc"})
+end)
+
+-- Contrato 8: validar os dois lados e todas as posições de chave; nunca
+-- confundir NA nos valores com NA nas chaves. Mensagens usam busca literal.
+test("NA em chave: groupby simples e ambas as posições da chave composta", function()
+    for unused_index, null_column in ipairs({"first", "second"}) do
+        local first = null_column == "first" and {"a", smaug.NA} or {"a", "b"}
+        local second = null_column == "second" and {"x", smaug.NA} or {"x", "y"}
+        local source = smaug.DataSet({{"first", first, "string"}, {"second", second, "string"}, {"value", {1, 2}, "int64"}})
+        expect_error(function() source:groupby(null_column):count() end,
+            {"groupby", "'" .. null_column .. "'", "contém NA", "fillna", "dropna"})
+        expect_error(function() source:groupby({"first", "second"}):sum() end,
+            {"groupby", "'" .. null_column .. "'", "contém NA", "fillna", "dropna"})
+    end
+end)
+
+test("NA em chave: join valida os dois lados em todos os modos", function()
+    local valid = join_input({{"a", 1}}, "value")
+    local nullable = join_input({{"a", 1}, {smaug.NA, 2}}, "other")
+    for unused_index, how in ipairs({"inner", "left", "right", "outer"}) do
+        expect_error(function() nullable:join(valid, "key", how) end, {"join", "'key'", "contém NA", "fillna", "dropna"})
+        expect_error(function() valid:join(nullable, "key", how) end, {"join", "'key'", "contém NA", "fillna", "dropna"})
+    end
+    local right = smaug.DataSet({{"other_key", {"a", smaug.NA}, "string"}})
+    expect_error(function() valid:join(right, {"key", "other_key"}) end,
+        {"join", "'other_key'", "contém NA", "fillna", "dropna"})
+end)
+
+test("NA em chave: pivot e pivot_table validam index e columns", function()
+    for unused_index, null_column in ipairs({"item", "period"}) do
+        local items = null_column == "item" and {"a", smaug.NA} or {"a", "b"}
+        local periods = null_column == "period" and {"jan", smaug.NA} or {"jan", "feb"}
+        local source = smaug.DataSet({{"item", items, "string"}, {"period", periods, "string"}, {"value", {1, 2}, "int64"}})
+        expect_error(function() source:pivot("item", "period", "value") end,
+            {"pivot", "'" .. null_column .. "'", "contém NA", "fillna", "dropna"})
+        expect_error(function() source:pivot_table("item", "period", "value", "sum") end,
+            {"pivot_table", "'" .. null_column .. "'", "contém NA", "fillna", "dropna"})
+    end
+end)
+
+-- Executar todos os casos revela falhas independentes; qualquer falha deixa
+-- o processo com status não-zero. O resumo conta cenários, não células.
+local failed_cases = 0
+for unused_index, case in ipairs(cases) do
+    local succeeded, message = pcall(case.run)
+    if not succeeded then
+        failed_cases = failed_cases + 1
+        io.stderr:write("FALHOU [" .. case.name .. "]: " .. tostring(message) .. "\n")
+    end
+end
+if failed_cases > 0 then
+    error(string.format("DataSet relacional: %d de %d casos falharam", failed_cases, #cases), 0)
+end
+print(string.format("OK — %d casos passaram (DataSet: groupby, concat, join, pivot)", #cases))

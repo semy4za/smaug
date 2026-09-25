@@ -6,6 +6,7 @@
 <summary>Nesta página</summary>
 
 - [Estado atual](#section-estado-atual)
+- [Retomada relacional — 2026-09-25](#section-retomada-relacional-2026-09-25)
 - [Onde está cada informação](#section-onde-esta-cada-informacao)
 - [Próxima decisão](#section-proxima-decisao)
 - [Sequência do trabalho](#section-sequencia-do-trabalho)
@@ -20,12 +21,91 @@
 
 ## Estado atual
 
-Estamos fechando contratos e a migração das APIs antes de reconstruir a suíte.
+Continuamos fechando contratos e a migração das APIs. Em 2026-09-25, por
+solicitação do mantenedor, foi iniciada a reescrita isolada de
+`tests/dataset/test_relational.lua`; o checkpoint está registrado abaixo.
+Essa frente não conclui a reconstrução geral da suíte.
 O mapeamento inicial de datetime foi concluído. A migração do motor ainda não
 começou; foi aplicada a integração Lua de `dayfirst` em `DataSet:astype` e a
 validação booleana no helper e nas conversões. Validação focada: 283 checks
 de datetime e 136 checks de DataSet passaram, além de `git diff --check`.
 Isso não certifica a suíte inteira, cobertura ou memória.
+
+<a id="section-retomada-relacional-2026-09-25"></a>
+
+## Retomada relacional — 2026-09-25
+
+**Estado: reescrita inicial implementada, validação ainda não concluída.**
+O pedido foi avaliar conteúdo, estrutura e coerência de apenas
+[`test_relational.lua`](../tests/dataset/test_relational.lua), com base no
+[parecer da suíte](TEST_SUITE_REWRITE_REVIEW.md) e no
+[relatório de cobertura](COVERAGE.md). Nenhum fonte de produção foi alterado.
+O mantenedor pediu este registro e uma entrada no changelog para continuar depois.
+
+O arquivo agora tem um único bootstrap, helpers de comparação e casos nomeados
+com escopo próprio. Verifica schema, valores, máscaras e multiplicidades;
+usa esperados literais para agregações/pivot e um modelo independente por
+comparação de listas para join. Os casos antigos de groupby, concat, join,
+rejeição de NA em chaves, precisão int64 e NaN foram reorganizados. Foram
+acrescentados resultados válidos de pivot/pivot_table, matrizes de join nos
+quatro modos, interpolação de quantile e uma colisão de chave composta.
+O executor percorre todos os casos e termina com erro se qualquer um falhar.
+
+### Validação deste checkpoint
+
+- Backend recompilado dos fontes locais com GCC/UCRT64, `-O2 -fwrapv`, em
+  `build/smaug.dll`.
+- `luajit tests/dataset/test_relational.lua`: **66 casos executados,
+  63 passaram e 3 falharam; código de saída 1**. Não apresentar como suíte verde.
+- O verificador `python scripts/check_test_style.py` não aponta violações
+  no arquivo reescrito. A execução global ainda acusa três ocorrências de
+  identificador `_` fora do escopo: duas em `dataset/test_stat.lua` e uma
+  em `series/test_dt.lua`.
+- `git diff --check` passou. Não houve execução da suíte completa, campanha
+  de mutação, sanitizers ou nova medição de cobertura.
+
+Falhas reproduzidas na implementação atual:
+
+| Caso | Esperado | Observado |
+|---|---|---|
+| `groupby: agg rejeita nome de função desconhecido com erro orientado` | Rejeição explícita da função desconhecida | Erro Lua genérico: tentativa de chamar `fn_real`, que é string |
+| `groupby: transform rejeita nome de função desconhecido com erro orientado` | Rejeição explícita da função desconhecida | Erro Lua genérico: tentativa de chamar `fn`, que é string |
+| `groupby: chaves compostas não colidem com separadores no texto` | Dois grupos, somas 10 e 101 | Um único grupo |
+
+Em `agg`/`transform`, a expressão `condição and builtin[nome] or nome`
+mantém a string quando a função não existe, contornando a validação de função
+ausente. Na colisão, as tuplas `("a", "b\1string:c")` e
+`("a\1string:b", "c")` produzem a mesma codificação concatenada; `\1` denota
+o byte 1 em Lua. A fixture distingue as tuplas sem reutilizar `keys.encode`.
+Os testes permanecem ativos e falhando; nenhuma expectativa foi ajustada
+para aceitar esses comportamentos.
+
+### Próximos passos desta frente
+
+1. Revisar e corrigir os três defeitos acima em uma etapa de implementação;
+   o escopo desta sessão ficou no teste e na documentação.
+2. Resolver as divergências de contrato antes de acrescentar expectativas:
+   `groupby:count()` aparece como contagem de não-nulos na referência, mas
+   conta linhas; `pivot_table` documenta padrão `mean`, mas usa `sum`;
+   a documentação promete join composto, enquanto uma lista de duas strings
+   é interpretada como `{chave_esquerda, chave_direita}`. Os testes atuais
+   usam count sem NA nos valores, aggfunc explícito e chaves compostas em
+   groupby; não certificam essas partes ambíguas de join/pivot_table.
+3. Validar os comparadores com contraexemplos e executar mutações controladas:
+   join vazio ou com multiplicidade incorreta, transform identidade,
+   var totalmente NA e perda de máscara. Como o baseline já falha, verificar
+   quais casos novos cada mutação faz falhar, não apenas o status global.
+4. Auditar a correspondência dos cenários antigos com os novos e completar
+   as lacunas restantes, incluindo independência do concat de múltiplas
+   entradas, callbacks e preservação de int64 em colunas de valores.
+5. Após resolver as falhas, executar novamente este arquivo e os checks
+   pertinentes. Só então concluir a migração desta família.
+
+`COVERAGE.md` mede apenas o backend C, no commit `51184cb` de 2026-08-11.
+Seus números não medem a árvore atual nem a cobertura de `_relational.lua`.
+O relatório foi considerado como contexto para fronteiras de tipos, vazios
+e máscaras; não houve alteração dos percentuais, exclusões ou alegação de
+cobertura nova. O parecer histórico e os contratos normativos foram preservados.
 
 <a id="section-onde-esta-cada-informacao"></a>
 

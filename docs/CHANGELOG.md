@@ -5,6 +5,7 @@
 <details>
 <summary>Navegar por mês</summary>
 
+- [2026-09-25 — Reescrita inicial dos testes relacionais](#section-2026-09-25-testes-relacionais)
 - [2026-09-01 — Fase 1: -fwrapv no build, ou: como um "bug" virou contrato](#section-2026-09-01-fase-1-fwrapv-no-build-ou-como-um-bug-virou-contrato)
 - [2026-07-27 — Roadmap enxuto: só o que falta, e uma porta de entrega de verdade](#section-2026-07-27-roadmap-enxuto-so-o-que-falta-e-uma-porta-de-entrega-de-verdade)
 - [2026-06-30 — Item 8: Rolling → Ring 0 (motor genérico + min_periods + expanding + DataSet)](#section-2026-06-30-item-8-rolling-ring-0-motor-generico-min-periods-expanding-dataset)
@@ -20,6 +21,34 @@
 Registro de o que mudou e por que, em ordem cronológica reversa.
 Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
+
+---
+<a id="section-2026-09-25-testes-relacionais"></a>
+
+## 2026-09-25 — Reescrita inicial dos testes relacionais
+
+Reorganizado `tests/dataset/test_relational.lua` a partir do parecer de
+reescrita da suíte: bootstrap único, helpers sem duplicação, cenários nomeados
+e comparação de resultados completos. Join agora confronta todas as linhas
+e multiplicidades com um modelo independente; groupby verifica agregações
+e alinhamento de transform; concat verifica schema, máscaras e conteúdo.
+Preservadas as famílias de regressão de NA, int64 e NaN, com novos cenários
+válidos de pivot/pivot_table e colisão de chaves compostas.
+
+**Checkpoint ainda com falhas:** após recompilar a DLL local, foram executados
+66 casos: 63 passaram e 3 falharam. A nova suíte detecta fusão de tuplas
+distintas contendo separadores de chave e erros Lua genéricos em `agg` e
+`transform` com função desconhecida. Os testes ficam ativos; a implementação
+não foi corrigida nesta sessão. A validação por mutações e a auditoria final
+da migração também continuam pendentes.
+
+O relatório de cobertura foi consultado como evidência histórica do backend C;
+não mede esta reescrita Lua e não foi recalculado. Divergências sobre count,
+o padrão de pivot_table e a sintaxe de join composto ficaram registradas para
+decisão, sem adotar silenciosamente a implementação como contrato.
+
+Detalhes, reprodução e próximos passos em
+[Retomada relacional](TEST_SUITE_REWORK.md#section-retomada-relacional-2026-09-25).
 
 ---
 <a id="section-2026-09-01-fase-1-fwrapv-no-build-ou-como-um-bug-virou-contrato"></a>
