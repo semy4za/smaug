@@ -31,6 +31,84 @@ local function check_error_match(callback, pattern, message)
     end
 end
 
+-- Conversao explicita: diagnostico C -> Lua, NA preservado e entrada intacta.
+do
+    local source = smaug.Series({"1970-01-01", smaug.NA, "1970-01-01T00:00:00.123456Z", "bad"}, "string", "dates")
+    local succeeded, message = pcall(function() source:astype("datetime") end)
+    check(not succeeded, "astype estrito rejeita precisao inexata")
+    for unused_index, fragment in ipairs({"astype", "dates", "índice 3", ".123456", "milissegundos", "dayfirst"}) do
+        check(tostring(message):find(fragment, 1, true) ~= nil, "diagnostico inclui " .. fragment)
+    end
+    check(source:get(1) == "1970-01-01" and source:is_null(2)
+        and source:get(3) == "1970-01-01T00:00:00.123456Z" and source:get(4) == "bad",
+        "falha preserva entrada e mascara")
+    for unused_index, values in ipairs({{}, {smaug.NA, smaug.NA}}) do
+        local converted = smaug.Series(values, "string"):astype("datetime")
+        check(converted:len() == #values, "astype vazio ou todo NA preserva tamanho")
+        for row_index = 1, #values do check(converted:is_null(row_index), "NA nao e erro") end
+    end
+    local exact = smaug.Series({"0000-01-01", "-000001-01-01", "1970-01-01T00:00:00.123000Z"}, "string"):astype("datetime")
+    check(exact:get(1) == -62167219200000 and exact:get(2) == -62198755200000
+        and exact:get(3) == 123, "anos zero/negativo e precisao exata preservados")
+    local conflict = smaug.Series({"13/02/2026", "02/13/2026"}, "string")
+    check_error_match(function() conflict:astype("datetime", {dayfirst = true}) end,
+        "índice 2", "ordem DMY nao troca por elemento")
+    check_error_match(function() conflict:astype("datetime") end,
+        "índice 1", "ordem MDY nao troca por elemento")
+    check_error_match(function()
+        smaug.Series({"9999-12-31T23:59:00-00:01"}, "string"):astype("datetime")
+    end, "fora do domínio", "offset que ultrapassa dominio gera erro orientado")
+    local late_values = {}
+    for row_index = 1, 300 do late_values[row_index] = "1970-01-01" end
+    late_values[300] = "bad"
+    check_error_match(function() smaug.Series(late_values, "string"):astype("datetime") end,
+        "índice 300", "conversao examina alem do prefixo valido")
+    local dataset = smaug.DataSet({{"dates", {"1970-01-01", "bad"}, "string"}, {"value", {10, 20}, "int64"}})
+    check_error_match(function() dataset:astype({dates = "datetime"}) end,
+        'coluna "dates", índice 2', "DataSet informa coluna e posicao")
+    check(dataset:col("dates")._dtype == "string" and dataset:col("dates"):get(2) == "bad"
+        and dataset:col("value"):get(2) == 20, "falha de astype preserva DataSet")
+end
+
+do
+    local valid_epochs = {-377705116800000, 253402300799999, -1, -0.0, 1, smaug.NA}
+    for unused_index, dtype in ipairs({"int64", "float64"}) do
+        local source_series = smaug.Series(valid_epochs, dtype, "epochs")
+        local converted_series = source_series:astype("datetime")
+        check(converted_series:len() == 6 and converted_series._name == "epochs", "epoch preserva tamanho/nome")
+        for row_index = 1, 5 do
+            check(converted_series:get(row_index) == valid_epochs[row_index], "epoch inteiro preservado")
+        end
+        check(converted_series:is_null(6), "epoch NA preservado")
+        for unused_empty_index, values in ipairs({{}, {smaug.NA}}) do
+            local empty_or_null = smaug.Series(values, dtype):astype("datetime")
+            check(empty_or_null:len() == #values and (#values == 0 or empty_or_null:is_null(1)),
+                "epoch vazio e todo NA")
+        end
+        for unused_boundary_index, invalid_epoch in ipairs({-377705116800001, 253402300800000}) do
+            local invalid_series = smaug.Series({0, smaug.NA, invalid_epoch}, dtype, "epochs")
+            check_error_match(function() invalid_series:astype("datetime") end,
+                'coluna "epochs", índice 3', "epoch fora do dominio tem coluna/posicao")
+            check(invalid_series:get(1) == 0 and invalid_series:is_null(2) and invalid_series:get(3) == invalid_epoch,
+                "erro numerico preserva entrada")
+        end
+    end
+    for unused_index, invalid_epoch in ipairs({0.5, -0.5, 0/0, math.huge, -math.huge}) do
+        check_error_match(function() smaug.Series({0, invalid_epoch}, "float64"):astype("datetime") end,
+            "finito e inteiro", "epoch float64 rejeita nao inteiro/nao finito")
+    end
+    local large_integer = smaug.Series({9007199254740993LL}, "int64")
+    check_error_match(function() large_integer:astype("datetime") end, "9007199254740993",
+        "erro descreve int64 exato sem round-trip double")
+    local fractional_series = smaug.Series({3.7, -3.7}, "float64")
+    local integers = fractional_series:astype("int64")
+    check(integers:get(1) == 3 and integers:get(2) == -3, "float64->int64 continua truncando")
+    local dataset = smaug.DataSet({{"epoch", {0, 0.5}, "float64"}, {"label", {"a", "b"}, "string"}})
+    check_error_match(function() dataset:astype({epoch = "datetime"}) end,
+        'coluna "epoch", índice 2', "DataSet encaminha diagnostico de epoch")
+    check(dataset["epoch"]:get(2) == 0.5 and dataset["label"]:get(2) == "b", "DataSet permanece intacto")
+end
+
 local function parse_datetime(iso_timestamp)
     return smaug.Series.dt_parse(iso_timestamp)
 end
@@ -409,10 +487,8 @@ do
           "astype datetime dayfirst=true: 25/12 -> natal")
 
     local sd_default = smaug.Series({"13/06/2026"}, "string")
-    local conv2 = sd_default:astype("datetime")
-
-    check(conv2:is_null(1),
-          "astype datetime default: 13/06 -> null (MM/DD, mês 13 inválido)")
+    check_error_match(function() sd_default:astype("datetime") end, "índice 1",
+          "astype datetime default: mês 13 gera erro com posição")
 
     local sd_name = smaug.Series({"2026-06-13"}, "string")
     local conv3 = sd_name:astype("datetime", "nome_custom")
@@ -463,7 +539,7 @@ do
     local nullable_string_series = smaug.Series({
         "2024-01-15T12:30:00.500Z",
         smaug.NA,
-        "invalido"
+        "1970-01-01"
     }, "string")
 
     local as_dt2 = nullable_string_series:astype("datetime")
@@ -471,7 +547,10 @@ do
     check(as_dt2._dtype == "datetime", "astype str->dt: dtype")
     check(as_dt2:get(1) == reference_epoch, "astype str->dt: parse correto")
     check(as_dt2:is_null(2), "astype str->dt: NA -> null")
-    check(as_dt2:is_null(3), "astype str->dt: inválido -> null")
+    check(as_dt2:get(3) == 0, "astype str->dt: segunda data válida")
+    nullable_string_series:set(3, "invalido")
+    check_error_match(function() nullable_string_series:astype("datetime") end,
+        "índice 3", "astype str->dt: inválido gera erro sem resultado parcial")
 end
 
 -- =====================================================================
@@ -817,7 +896,7 @@ end
 -- =====================================================================
 do
     local source_series = smaug.Series({"02/05/2026"}, "string")
-    for _, invalid_option in ipairs({"false", 0, 1}) do
+    for unused_index, invalid_option in ipairs({"false", 0, 1}) do
         check_error_match(function()
             smaug.Series.dt_parse("02/05/2026", invalid_option)
         end, "dayfirst", "dt_parse rejeita dayfirst não-booleano")

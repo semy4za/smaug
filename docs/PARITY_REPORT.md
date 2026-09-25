@@ -11,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-09-25 13:16:42 UTC
+Gerado em: 2026-09-25 14:18:05 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -522,7 +522,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `view` | 🟩 |  |
 
 
-### dt — 67 funções C
+### dt — 68 funções C
 
 | função C | exposta em Lua? | nota |
 | :--- | :-: | :-: |
@@ -571,6 +571,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `ms_series` | 🟩 |  |
 | `ne` | 🟩 |  |
 | `parse` | 🟩 |  |
+| `parse_checked` | 🟨 |  |
 | `quarter` | 🟩 |  |
 | `quarter_series` | 🟩 |  |
 | `rank` | 🟩 |  |
@@ -595,7 +596,7 @@ Cada função pública do backend C deveria ter caminho no frontend Lua (direto 
 | `yearday_series` | 🟩 |  |
 
 
-### astype — conversão cross-dtype (12 funções C)
+### astype — conversão cross-dtype (15 funções C)
 
 Matriz origem→destino (`smaug_astype.h`); não cabe na tabela por-dtype acima porque o nome carrega dois dtypes, não um.
 
@@ -603,16 +604,19 @@ Matriz origem→destino (`smaug_astype.h`); não cabe na tabela por-dtype acima 
 | :--- | :-: | :-: | :-: |
 | i64 | f64 | `smaug_i64_to_f64` | 🟩 |
 | f64 | i64 | `smaug_f64_to_i64` | 🟩 |
-| i64 | dt | `smaug_i64_to_dt` | 🟩 |
+| i64 | dt | `smaug_i64_to_dt` | 🟨 |
 | dt | i64 | `smaug_dt_to_i64` | 🟩 |
-| f64 | dt | `smaug_f64_to_dt` | 🟩 |
+| f64 | dt | `smaug_f64_to_dt` | 🟨 |
 | dt | f64 | `smaug_dt_to_f64` | 🟩 |
 | i64 | str | `smaug_i64_to_str` | 🟩 |
 | f64 | str | `smaug_f64_to_str` | 🟩 |
 | dt | str | `smaug_dt_to_str` | 🟩 |
 | str | i64 | `smaug_str_to_i64` | 🟩 |
 | str | f64 | `smaug_str_to_f64` | 🟩 |
-| str | dt | `smaug_str_to_dt` | 🟩 |
+| str | dt | `smaug_str_to_dt` | 🟨 |
+| i64 | dt | `smaug_i64_to_dt_checked` | 🟩 |
+| f64 | dt | `smaug_f64_to_dt_checked` | 🟩 |
+| str | dt | `smaug_str_to_dt_checked` | 🟩 |
 
 ## Eixo 4 — Paridade Anel 2 (operações relacionais) por dtype
 
@@ -794,7 +798,7 @@ Backend C deve usar sentinela documentada em retorno de `get`. Frontend Lua deve
 
 ### Mensagens de erro Lua
 
-- `series.lua`: 242/242 erros com prefixo `smaug:` (100.0%)
+- `series.lua`: 243/243 erros com prefixo `smaug:` (100.0%)
 - `dataset.lua`: 94/94 erros com prefixo `smaug:` (100.0%)
 
 ## Eixo 10 — Paridade de lifecycle
@@ -840,7 +844,7 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `series/test_predicates` | 175 | 9 | 61 | 3 | 20 | 2 | — |
 | `series/test_selection` | 73 | 7 | 8 | 6 | 8 | 2 | 1 |
 | `series/test_str` | 273 | 4 | 9 | 1 | 51 | — | — |
-| `series/test_dt` | 263 | 3 | 6 | 2 | 14 | 62 | — |
+| `series/test_dt` | 276 | 7 | 10 | 2 | 23 | 77 | — |
 | `series/test_categorical` | 86 | 5 | 1 | 3 | 5 | 1 | 35 |
 | `dataset/test_core` | 238 | 30 | 33 | 8 | 14 | — | 1 |
 | `dataset/test_relational` | 13 | 42 | 92 | 6 | 75 | — | — |
@@ -851,17 +855,17 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 88 | 23 | 3 | 2 | 5 | 1 | 1 |
 
-**Total de checks:** 2310
+**Total de checks:** 2323
 
 ### Menções totais por dtype (toda a suite)
 
 | dtype | menções |
 | :--- | :-: |
-| float64 | 290 |
-| int64 | 377 |
+| float64 | 294 |
+| int64 | 381 |
 | bool | 62 |
-| string | 287 |
-| datetime | 88 |
+| string | 296 |
+| datetime | 103 |
 | categorical | 40 |
 
 ## Eixo 12 — Sincronização docs ↔ código
@@ -944,7 +948,7 @@ O `cdef` do `ffi_loader.lua` replica à mão o layout de cada struct dos headers
 
 - 🟩 paridade: 1139
 - ⬜ exceção registrada: 215
-- 🟨 suspeita (revisar): 253
+- 🟨 suspeita (revisar): 257
 - 🟥 inconsistência clara: 15
 
 

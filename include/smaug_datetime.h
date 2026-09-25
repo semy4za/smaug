@@ -27,6 +27,11 @@
 #include "smaug_types.h"
 #include <stdbool.h>
 
+/* Limites UTC inclusivos: -009999-01-01 e 9999-12-31T23:59:59.999Z.
+   Usados pelo parser e pelas conversoes estritas para datetime. */
+#define SMAUG_DT_MIN_EPOCH_MS INT64_C(-377705116800000)
+#define SMAUG_DT_MAX_EPOCH_MS INT64_C(253402300799999)
+
 /* ===================== Lifecycle ===================== */
 
 smaug_series_dt_t* smaug_dt_create(size_t size);
@@ -81,6 +86,11 @@ int smaug_dt_append_null(smaug_series_dt_t *s);
    (DD/MM/YYYY vs MM/DD/YYYY), 1 = dia primeiro, 0 = mês primeiro. Formatos
    year-first (YYYY-MM-DD) ignoram dayfirst (ordem não-ambígua). */
 int smaug_dt_parse(const char *str, size_t len, int64_t *epoch_ms, int dayfirst);
+/* Parser estrito: ARGUMENT para texto/opcao invalida (inclui perda de
+   precisao); OVERFLOW para instante UTC fora de -9999..9999. Saida intacta
+   em falha. A entrada legada acima mapeia qualquer falha para -1. */
+smaug_status_t smaug_dt_parse_checked(const char *str, size_t len,
+                                    int64_t *epoch_ms, int dayfirst);
 
 /* Formata epoch_ms como string ISO 8601 UTC no buffer.
    Formato: "YYYY-MM-DDTHH:MM:SS.mmmZ" (25 chars + \0 = 26 bytes).

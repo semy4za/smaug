@@ -815,9 +815,14 @@ static void test_parse_errors_extended(void) {
     /* ms com 1 dígito → pad para 100ms (linha 350) */
     CHECK(smaug_dt_parse("2026-06-13T00:00:00.5Z", 22, &epoch_milliseconds, 0) == 0, "parse: ms 1 dígito");
     CHECK(epoch_milliseconds % 1000 == 500, "parse: ms 1 dígito → 500ms");
-    /* ms com 4 dígitos → só os 3 primeiros contam (linha 346) */
-    CHECK(smaug_dt_parse("2026-06-13T00:00:00.1234Z", 25, &epoch_milliseconds, 0) == 0, "parse: ms 4 dígitos");
-    CHECK(epoch_milliseconds % 1000 == 123, "parse: ms 4 dígitos → 123ms");
+    /* Contrato aprovado: fracao excedente precisa ser exata em ms. */
+    int64_t original_epoch = epoch_milliseconds;
+    CHECK(smaug_dt_parse("2026-06-13T00:00:00.1234Z", 25, &epoch_milliseconds, 0) == -1,
+          "parse: ms inexatos rejeitados");
+    CHECK(epoch_milliseconds == original_epoch, "parse: falha preserva saida");
+    CHECK(smaug_dt_parse("2026-06-13T00:00:00.1230Z", 25, &epoch_milliseconds, 0) == 0,
+          "parse: ms 4 digitos exatos");
+    CHECK(epoch_milliseconds % 1000 == 123, "parse: .1230 representa 123ms");
 }
 
 static void test_format_small_buffer(void) {

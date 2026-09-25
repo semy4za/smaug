@@ -360,136 +360,159 @@ int smaug_dt_append_null(smaug_series_dt_t *s) {
      YYYY-MM-DDTHH:MM:SS-HH:MM
    =================================================================== */
 
-/* Lê exatamente n dígitos decimais de s; escreve valor em *out.
+/* Le exatamente digit_count digitos; escreve o valor em *out.
    Retorna ponteiro após os dígitos, ou NULL em erro. */
-static const char *parse_digits(const char *p, const char *end, int n, int *out) {
-    if (p + n > end) return NULL;
-    int v = 0;
-    for (int i = 0; i < n; i++) {
-        if (p[i] < '0' || p[i] > '9') return NULL;
-        v = v * 10 + (p[i] - '0');
+static const char *parse_digits(const char *cursor, const char *end, int digit_count, int *out) {
+    if (end - cursor < digit_count) return NULL;
+    int value = 0;
+    for (int digit_index = 0; digit_index < digit_count; digit_index++) {
+        if (cursor[digit_index] < '0' || cursor[digit_index] > '9') return NULL;
+        value = value * 10 + (cursor[digit_index] - '0');
     }
-    *out = v;
-    return p + n;
+    *out = value;
+    return cursor + digit_count;
 }
 
 /* Lê 1 ou 2 dígitos (para dia/mês em formato year-last: "5/6/2026" ou
    "05/06/2026"). Para no primeiro não-dígito. Retorna NULL se nenhum dígito. */
-static const char *parse_digits_1or2(const char *p, const char *end, int *out) {
-    if (p >= end || p[0] < '0' || p[0] > '9') return NULL;
-    int v = p[0] - '0';
-    p++;
-    if (p < end && p[0] >= '0' && p[0] <= '9') {
-        v = v * 10 + (p[0] - '0');
-        p++;
+static const char *parse_digits_1or2(const char *cursor, const char *end, int *out) {
+    if (cursor >= end || cursor[0] < '0' || cursor[0] > '9') return NULL;
+    int value = cursor[0] - '0';
+    cursor++;
+    if (cursor < end && cursor[0] >= '0' && cursor[0] <= '9') {
+        value = value * 10 + (cursor[0] - '0');
+        cursor++;
     }
-    *out = v;
-    return p;
+    *out = value;
+    return cursor;
 }
 
-/* Lê a porção de DATA de [p,end), detectando year-first (YYYY-MM-DD) ou
+/* Le a porcao de data, detectando year-first (YYYY-MM-DD) ou
    year-last (DD/MM/YYYY ou MM/DD/YYYY). Para year-last, dayfirst escolhe a
    ordem: 1 = dia primeiro (DD/MM), 0 = mês primeiro (MM/DD). Separador '-' ou
-   '/', consistente. Avança *pp e preenche y/mo/d. Retorna 0 ok, -1 erro. */
-static int parse_date_part(const char **pp, const char *end, int dayfirst,
-                           int *y, int *mo, int *d) {
-    const char *p = *pp;
+   '/', consistente. Avanca *input_cursor e preenche ano/mes/dia.
+   Ano negativo exige seis digitos e hifens. Retorna 0 ok, -1 erro. */
+static int parse_date_part(const char **input_cursor, const char *end, int dayfirst,
+                           int *year, int *month, int *day) {
+    const char *cursor = *input_cursor;
+    if (cursor < end && *cursor == '-') {
+        cursor++;
+        if (!(cursor = parse_digits(cursor, end, 6, year)) || *year == 0) return -1;
+        *year = -*year;
+        if (cursor >= end || *cursor++ != '-') return -1;
+        if (!(cursor = parse_digits(cursor, end, 2, month))) return -1;
+        if (cursor >= end || *cursor++ != '-') return -1;
+        if (!(cursor = parse_digits(cursor, end, 2, day))) return -1;
+        *input_cursor = cursor;
+        return 0;
+    }
     /* tenta year-first: 4 dígitos + separador */
-    if (p + 4 <= end && p[0] >= '0' && p[0] <= '9' && p[1] >= '0' && p[1] <= '9'
-        && p[2] >= '0' && p[2] <= '9' && p[3] >= '0' && p[3] <= '9'
-        && (p[4] == '-' || p[4] == '/')) {
+    if (end - cursor >= 5 && cursor[0] >= '0' && cursor[0] <= '9' && cursor[1] >= '0' && cursor[1] <= '9'
+        && cursor[2] >= '0' && cursor[2] <= '9' && cursor[3] >= '0' && cursor[3] <= '9'
+        && (cursor[4] == '-' || cursor[4] == '/')) {
         /* YYYY<sep>MM<sep>DD — ordem fixa, dayfirst não se aplica */
-        if (!(p = parse_digits(p, end, 4, y)))   return -1;
-        char sep = *p++;
-        if (!(p = parse_digits(p, end, 2, mo)))  return -1;
-        if (p >= end || *p++ != sep)             return -1;
-        if (!(p = parse_digits(p, end, 2, d)))   return -1;
-        *pp = p;
+        if (!(cursor = parse_digits(cursor, end, 4, year)))   return -1;
+        char separator = *cursor++;
+        if (!(cursor = parse_digits(cursor, end, 2, month)))  return -1;
+        if (cursor >= end || *cursor++ != separator)             return -1;
+        if (!(cursor = parse_digits(cursor, end, 2, day)))   return -1;
+        *input_cursor = cursor;
         return 0;
     }
 
     /* year-last: AA<sep>BB<sep>YYYY (1-2 dígitos cada nos dois primeiros).
        AA e BB são dia/mês conforme dayfirst. */
-    int a, b;
-    if (!(p = parse_digits_1or2(p, end, &a)))    return -1;
-    if (p >= end || (*p != '-' && *p != '/'))    return -1;
-    char sep = *p++;
-    if (!(p = parse_digits_1or2(p, end, &b)))    return -1;
-    if (p >= end || *p++ != sep)                 return -1;
-    if (!(p = parse_digits(p, end, 4, y)))       return -1;
-    if (dayfirst) { *d = a; *mo = b; }   /* DD/MM */
-    else          { *mo = a; *d = b; }   /* MM/DD */
-    *pp = p;
+    int first_component, second_component;
+    if (!(cursor = parse_digits_1or2(cursor, end, &first_component)))    return -1;
+    if (cursor >= end || (*cursor != '-' && *cursor != '/'))    return -1;
+    char separator = *cursor++;
+    if (!(cursor = parse_digits_1or2(cursor, end, &second_component)))    return -1;
+    if (cursor >= end || *cursor++ != separator)                 return -1;
+    if (!(cursor = parse_digits(cursor, end, 4, year)))       return -1;
+    if (dayfirst) { *day = first_component; *month = second_component; }   /* DD/MM */
+    else          { *month = first_component; *day = second_component; }   /* MM/DD */
+    *input_cursor = cursor;
     return 0;
 }
 
-int smaug_dt_parse(const char *str, size_t len, int64_t *epoch_ms, int dayfirst) {
-    if (!str || !epoch_ms) return -1;
-    const char *p   = str;
+smaug_status_t smaug_dt_parse_checked(const char *str, size_t len,
+                                    int64_t *epoch_ms, int dayfirst) {
+    if (!str || !epoch_ms || (dayfirst != 0 && dayfirst != 1)) return SMG_ERR_ARGUMENT;
+    const char *cursor   = str;
     const char *end = str + len;
 
-    int y, mo, d, h = 0, mi = 0, sec = 0, ms = 0;
-    if (parse_date_part(&p, end, dayfirst, &y, &mo, &d) != 0) return -1;
-    if (!is_valid_date(y, mo, d))                  return -1;
+    int year, month, day, hour = 0, minute = 0, second = 0, millisecond = 0;
+    if (parse_date_part(&cursor, end, dayfirst, &year, &month, &day) != 0) return SMG_ERR_ARGUMENT;
+    if (!is_valid_date(year, month, day)) return SMG_ERR_ARGUMENT;
 
     /* Hora opcional: T ou ' ' */
-    int tz_sign = 0, tz_h = 0, tz_m = 0;
+    int offset_sign = 0, offset_hour = 0, offset_minute = 0;
 
-    if (p < end && (*p == 'T' || *p == ' ')) {
-        p++;
-        if (!(p = parse_digits(p, end, 2, &h)))   return -1;
-        if (p >= end || *p++ != ':')               return -1;
-        if (!(p = parse_digits(p, end, 2, &mi)))  return -1;
-        if (p >= end || *p++ != ':')               return -1;
-        if (!(p = parse_digits(p, end, 2, &sec))) return -1;
-        if (h > 23 || mi > 59 || sec > 59)        return -1;
+    if (cursor < end && (*cursor == 'T' || *cursor == ' ')) {
+        cursor++;
+        if (!(cursor = parse_digits(cursor, end, 2, &hour)))   return SMG_ERR_ARGUMENT;
+        if (cursor >= end || *cursor++ != ':')             return SMG_ERR_ARGUMENT;
+        if (!(cursor = parse_digits(cursor, end, 2, &minute))) return SMG_ERR_ARGUMENT;
+        if (cursor >= end || *cursor++ != ':')             return SMG_ERR_ARGUMENT;
+        if (!(cursor = parse_digits(cursor, end, 2, &second))) return SMG_ERR_ARGUMENT;
+        if (hour > 23 || minute > 59 || second > 59)       return SMG_ERR_ARGUMENT;
 
         /* milissegundos opcionais */
-        if (p < end && *p == '.') {
-            p++;
-            /* aceita 1–9 dígitos, usa apenas os 3 primeiros */
-            int cnt = 0;
-            int ms_val = 0;
-            while (p < end && *p >= '0' && *p <= '9') {
-                if (cnt < 3) ms_val = ms_val * 10 + (*p - '0');
-                cnt++; p++;
+        if (cursor < end && *cursor == '.') {
+            cursor++;
+            /* Precisao adicional so e aceita se nao perder milissegundos. */
+            const char *fraction_start = cursor;
+            size_t digit_count = 0;
+            int milliseconds = 0;
+            while (cursor < end && *cursor >= '0' && *cursor <= '9') {
+                if (digit_count < 3) milliseconds = milliseconds * 10 + (*cursor - '0');
+                else if (*cursor != '0') return SMG_ERR_ARGUMENT;
+                digit_count++;
+                cursor++;
             }
-            /* pad para ms se menos de 3 dígitos */
-            while (cnt < 3) { ms_val *= 10; cnt++; }
-            ms = ms_val;
+            if (cursor == fraction_start) return SMG_ERR_ARGUMENT;
+            while (digit_count < 3) { milliseconds *= 10; digit_count++; }
+            millisecond = milliseconds;
         }
 
         /* timezone opcional */
-        if (p < end) {
-            if (*p == 'Z') {
-                p++; /* UTC */
-            } else if (*p == '+' || *p == '-') {
-                tz_sign = (*p == '+') ? 1 : -1;
-                p++;
-                if (!(p = parse_digits(p, end, 2, &tz_h))) return -1;
-                if (p < end && *p == ':') p++;
-                if (!(p = parse_digits(p, end, 2, &tz_m))) return -1;
-                if (tz_h > 23 || tz_m > 59) return -1;
+        if (cursor < end) {
+            if (*cursor == 'Z') {
+                cursor++; /* UTC */
+            } else if (*cursor == '+' || *cursor == '-') {
+                offset_sign = (*cursor == '+') ? 1 : -1;
+                cursor++;
+                if (!(cursor = parse_digits(cursor, end, 2, &offset_hour))) return SMG_ERR_ARGUMENT;
+                if (cursor < end && *cursor == ':') cursor++;
+                if (!(cursor = parse_digits(cursor, end, 2, &offset_minute))) return SMG_ERR_ARGUMENT;
+                if (offset_hour > 23 || offset_minute > 59) return SMG_ERR_ARGUMENT;
             }
         }
     }
 
     /* sobra algo no buffer → inválido */
-    if (p != end) return -1;
+    if (cursor != end) return SMG_ERR_ARGUMENT;
 
     int64_t result;
-    if (smaug_dt_from_parts_checked(y, mo, d, h, mi, sec, ms, &result) != SMG_OK)
-        return -1;
+    if (smaug_dt_from_parts_checked(year, month, day, hour, minute, second, millisecond, &result) != SMG_OK)
+        return SMG_ERR_OVERFLOW;
 
     /* subtrai offset de timezone para obter UTC */
-    if (tz_sign != 0) {
-        int64_t tz_offset = ((int64_t)tz_h * 60 + tz_m) * MS_PER_MINUTE;
-        if (smaug_dt_add_ms_checked(result, tz_sign > 0 ? -tz_offset : tz_offset,
-                                    &result) != SMG_OK) return -1;
+    if (offset_sign != 0) {
+        int64_t offset_ms = ((int64_t)offset_hour * 60 + offset_minute) * MS_PER_MINUTE;
+        if (smaug_dt_add_ms_checked(result, offset_sign > 0 ? -offset_ms : offset_ms,
+                                    &result) != SMG_OK) return SMG_ERR_OVERFLOW;
     }
 
+    /* Validar o instante UTC final, nao um intermediario anterior ao offset. */
+    if (result < SMAUG_DT_MIN_EPOCH_MS || result > SMAUG_DT_MAX_EPOCH_MS)
+        return SMG_ERR_OVERFLOW;
     *epoch_ms = result;
-    return 0;
+    return SMG_OK;
+}
+
+int smaug_dt_parse(const char *str, size_t len, int64_t *epoch_ms, int dayfirst) {
+    return smaug_dt_parse_checked(str, len, epoch_ms, dayfirst) == SMG_OK ? 0 : -1;
 }
 
 int smaug_dt_format(int64_t epoch_ms, char *buf, size_t buf_size) {

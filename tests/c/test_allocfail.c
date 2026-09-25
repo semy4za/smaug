@@ -2503,7 +2503,74 @@ static void allocation_failure_multi_argsort_ffi(void) {
     smaug_f64_free(source_series);
 }
 
+static void allocation_failure_strict_datetime(void) {
+    reset(-1);
+    smaug_series_str_t *source = smaug_str_create(2);
+    assert(source);
+    assert(smaug_str_set(source, 1, "1970-01-01", 10) == 0);
+    smaug_series_dt_t *output = NULL;
+    size_t error_index = 77;
+    reset(-1);
+    OK(smaug_str_to_dt_checked(source, 0, &output, &error_index) == SMG_OK,
+       "str->dt baseline sem falha");
+    long total_allocations = allocation_count;
+    smaug_dt_free(output);
+    OK(total_allocations > 0, "str->dt injecao cobre alocacoes reais");
+    for (long allocation_index = 0; allocation_index < total_allocations; allocation_index++) {
+        output = NULL;
+        reset(allocation_index);
+        OK(smaug_str_to_dt_checked(source, 0, &output, &error_index) == SMG_ERR_NOMEM,
+           "str->dt OOM nao vira NA ou erro de elemento");
+        OK(output == NULL && error_index == 77, "OOM preserva out e indice");
+        size_t text_length = 0;
+        const char *text = smaug_str_get(source, 1, &text_length);
+        OK(smaug_str_is_null(source, 0) && text_length == 10 && memcmp(text, "1970-01-01", 10) == 0,
+           "OOM preserva entrada");
+    }
+    reset(-1);
+    smaug_str_free(source);
+}
+
+static void allocation_failure_numeric_datetime(void) {
+    reset(-1);
+    smaug_series_i64_t *integer_source = smaug_i64_create(2);
+    smaug_series_f64_t *real_source = smaug_f64_create(2);
+    smaug_series_dt_t *original_output = smaug_dt_create(1);
+    assert(integer_source && real_source && original_output);
+    smaug_i64_set(integer_source, 1, 123);
+    smaug_f64_set(real_source, 1, 123);
+    for (int source_kind = 0; source_kind < 2; source_kind++) {
+        size_t error_index = 77;
+        smaug_series_dt_t *output = NULL;
+        reset(-1);
+        smaug_status_t status = source_kind == 0
+            ? smaug_i64_to_dt_checked(integer_source, &output, &error_index)
+            : smaug_f64_to_dt_checked(real_source, &output, &error_index);
+        long total_allocations = allocation_count;
+        OK(status == SMG_OK && total_allocations > 0, "numeric->dt baseline aloca e converte");
+        smaug_dt_free(output);
+        for (long allocation_index = 0; allocation_index < total_allocations; allocation_index++) {
+            output = original_output;
+            reset(allocation_index);
+            status = source_kind == 0
+                ? smaug_i64_to_dt_checked(integer_source, &output, &error_index)
+                : smaug_f64_to_dt_checked(real_source, &output, &error_index);
+            OK(status == SMG_ERR_NOMEM, "numeric->dt OOM tem status proprio");
+            OK(output == original_output && error_index == 77, "numeric->dt OOM preserva saidas");
+            OK(smaug_i64_get(integer_source, 1, NULL) == 123 && smaug_i64_is_null(integer_source, 0)
+               && smaug_f64_get(real_source, 1, NULL) == 123 && smaug_f64_is_null(real_source, 0),
+               "numeric->dt OOM preserva entradas");
+        }
+    }
+    reset(-1);
+    smaug_dt_free(original_output);
+    smaug_i64_free(integer_source);
+    smaug_f64_free(real_source);
+}
+
 int main(void) {
+    allocation_failure_numeric_datetime();
+    allocation_failure_strict_datetime();
     allocation_failure_float64_create();
     allocation_failure_float64_create_from_array();
     allocation_failure_float64_clone();

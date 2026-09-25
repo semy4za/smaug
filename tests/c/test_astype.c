@@ -54,12 +54,11 @@ static void test_exatidao_2e53(void) {
        "dt->i64 preserva 2^53+1 EXATO (nao 9007199254740992)");
     OK(smaug_i64_is_null(row_index, 1), "dt->i64 propaga null");
 
-    /* i64 -> dt: ida e volta pelo mesmo valor grande, exato. */
+    /* i64 -> dt: o dominio aprovado exclui 2^53+1; nao arredondar para aceitar. */
     smaug_series_i64_t *integer_series = smaug_i64_create(1);
     smaug_i64_set(integer_series, 0, TWO53_PLUS_1);
     smaug_series_dt_t *to_datetime_series = smaug_i64_to_dt(integer_series);
-    OK(smaug_dt_get(to_datetime_series, 0, NULL) == TWO53_PLUS_1,
-       "i64->dt preserva 2^53+1 EXATO");
+    OK(to_datetime_series == NULL, "i64->dt rejeita 2^53+1 fora do dominio");
 
     smaug_dt_free(source_series); smaug_i64_free(row_index); smaug_i64_free(integer_series); smaug_dt_free(to_datetime_series);
 }
@@ -87,11 +86,9 @@ static void test_float64_int64_edge(void) {
     OK(smaug_i64_is_null(row_index, 6), "f64->i64 -1e300 -> null (fora do range)");
     OK(smaug_i64_is_null(row_index, 7), "f64->i64 origem nula -> null");
 
-    /* mesma politica no destino datetime */
+    /* Destino datetime tem contrato estrito: fracao nao e truncada. */
     smaug_series_dt_t *to_datetime_series = smaug_f64_to_dt(floating_point_series);
-    OK(smaug_dt_get(to_datetime_series, 0, NULL) == 3, "f64->dt 3.7 -> 3 epoch");
-    OK(smaug_dt_is_null(to_datetime_series, 2), "f64->dt NaN -> null");
-    OK(smaug_dt_is_null(to_datetime_series, 5), "f64->dt 1e300 -> null (fora do range)");
+    OK(to_datetime_series == NULL, "f64->dt rejeita fracao sem resultado parcial");
 
     smaug_f64_free(floating_point_series); smaug_i64_free(row_index); smaug_dt_free(to_datetime_series);
 }
@@ -217,13 +214,13 @@ static void test_inbound_conversions(void) {
     OK(smaug_f64_is_null(source_series_3, 6), "str->f64 'abc' -> null");
     OK(smaug_f64_is_null(source_series_3, 7), "str->f64 origem nula -> null");
 
-    /* str -> dt: ISO + falha->null + null propaga. */
-    const char *text_values_3[] = {"1970-01-01","abc",NULL};
+    /* str -> dt: ISO + null propaga; invalidos sao testados como erro abaixo. */
+    const char *text_values_3[] = {"1970-01-01","1970-01-02",NULL};
     smaug_series_str_t *source_series_4 = make_string(text_values_3, 3);
     smaug_series_dt_t *source_series_5 = smaug_str_to_dt(source_series_4, 0);
     OK(source_series_5 != NULL, "str->dt retorna serie");
     OK(smaug_dt_get(source_series_5, 0, NULL) == 0, "str->dt '1970-01-01' -> epoch 0");
-    OK(smaug_dt_is_null(source_series_5, 1), "str->dt 'abc' -> null");
+    OK(smaug_dt_get(source_series_5, 1, NULL) == 86400000, "str->dt dia seguinte");
     OK(smaug_dt_is_null(source_series_5, 2), "str->dt origem nula -> null");
 
     /* dayfirst propagado: '01/02/2003' muda conforme o flag. */
@@ -291,7 +288,185 @@ static void test_fmt_direto(void) {
     OK(smaug_fmt_f64(right_values, sizeof(right_values), -INFINITY) == 4 && strcmp(right_values, "-inf") == 0, "fmt_f64 -inf -> -inf");
 }
 
+static void test_strict_datetime(void) {
+    const char *values[] = {"1970-01-01", NULL, "invalid", "also invalid"};
+    smaug_series_str_t *source = make_string(values, 4);
+    smaug_series_dt_t *original_output = smaug_dt_create(1);
+    smaug_series_dt_t *output = original_output;
+    size_t error_index = 77;
+    OK(smaug_str_to_dt_checked(source, 0, &output, &error_index) == SMG_ERR_ARGUMENT,
+       "str->dt invalido retorna status");
+    OK(output == original_output && error_index == 2, "falha preserva out e aponta primeiro erro apos NA");
+    OK(smaug_str_to_dt(source, 0) == NULL, "ABI legada tambem rejeita resultado parcial");
+    OK(smaug_str_to_dt_checked(source, 0, &output, NULL) == SMG_ERR_ARGUMENT,
+       "indice opcional");
+    size_t text_length = 0;
+    const char *original_text = smaug_str_get(source, 2, &text_length);
+    OK(text_length == 7 && memcmp(original_text, "invalid", 7) == 0
+       && smaug_str_is_null(source, 1), "entrada e mascara preservadas");
+    error_index = 77;
+    OK(smaug_str_to_dt_checked(NULL, 0, &output, &error_index) == SMG_ERR_ARGUMENT,
+       "self obrigatorio");
+    OK(smaug_str_to_dt_checked(source, 0, NULL, &error_index) == SMG_ERR_ARGUMENT,
+       "out obrigatorio");
+    OK(smaug_str_to_dt_checked(source, 2, &output, &error_index) == SMG_ERR_ARGUMENT,
+       "dayfirst somente 0 ou 1");
+    OK(output == original_output && error_index == 77, "argumentos invalidos preservam saidas");
+    smaug_dt_free(original_output);
+    smaug_str_free(source);
+
+    const char *valid_values[] = {NULL, "1970-01-01", "1970-01-01T00:00:00.123000Z"};
+    source = make_string(valid_values, 3);
+    output = NULL;
+    OK(smaug_str_to_dt_checked(source, 0, &output, &error_index) == SMG_OK, "conversao integral valida");
+    OK(error_index == 77 && output->size == 3 && smaug_dt_is_null(output, 0)
+       && smaug_dt_get(output, 1, NULL) == 0 && smaug_dt_get(output, 2, NULL) == 123,
+       "sucesso preserva indice, NA e milissegundos exatos");
+    smaug_dt_free(output);
+    smaug_str_free(source);
+    source = smaug_str_create(0);
+    OK(smaug_str_to_dt_checked(source, 0, &output, &error_index) == SMG_OK
+       && output->size == 0 && error_index == 77, "vazio e sucesso sem posicao de erro");
+    smaug_dt_free(output);
+    smaug_str_free(source);
+
+    const struct { const char *text; int64_t expected; } valid[] = {
+        {"0000-01-01", -62167219200000LL}, {"-000001-01-01", -62198755200000LL},
+        {"-009999-01-01T00:00:00.000Z", -377705116800000LL},
+        {"9999-12-31T23:59:59.999Z", 253402300799999LL},
+        {"-009999-01-01T01:00:00+0100", -377705116800000LL},
+        {"9999-12-31T22:59:59.999-01:00", 253402300799999LL},
+        {"1970/01/01 03:00:00+03:00", 0}, {"01-02-1970", 86400000},
+        {"1970-01-01T00:00:00.1", 100}, {"1970-01-01T00:00:00.12Z", 120},
+        {"1970-01-01T00:00:00.1230000000Z", 123},
+    };
+    for (size_t case_index = 0; case_index < sizeof(valid) / sizeof(valid[0]); case_index++) {
+        int64_t epoch_ms = 17;
+        OK(smaug_dt_parse_checked(valid[case_index].text, strlen(valid[case_index].text), &epoch_ms, 0) == SMG_OK
+           && epoch_ms == valid[case_index].expected, valid[case_index].text);
+    }
+    const char *invalid[] = {"", "1970", "1970-01", "1970-02-30", "1900-02-29",
+        "-000000-01-01", "-1-01-01", "-000001/01/01", "1970-01/01",
+        "1970-01-01T00:00:60Z", "1970-01-01T00:00:00.Z",
+        "1970-01-01T00:00:00.123456Z", "1970-01-01T00:00:00.000001Z",
+        "1970-01-01T00:00", "1970-01-01junk"};
+    for (size_t case_index = 0; case_index < sizeof(invalid) / sizeof(invalid[0]); case_index++) {
+        int64_t epoch_ms = 17;
+        OK(smaug_dt_parse_checked(invalid[case_index], strlen(invalid[case_index]), &epoch_ms, 0) == SMG_ERR_ARGUMENT
+           && epoch_ms == 17, invalid[case_index]);
+    }
+    const char *outside[] = {"-009999-01-01T00:00:59.999+00:01",
+        "9999-12-31T23:59:00.000-00:01", "-010000-01-01"};
+    for (size_t case_index = 0; case_index < sizeof(outside) / sizeof(outside[0]); case_index++) {
+        const char *overflow_values[] = {NULL, "1970-01-01", outside[case_index]};
+        source = make_string(overflow_values, 3);
+        output = NULL;
+        error_index = 77;
+        OK(smaug_str_to_dt_checked(source, 0, &output, &error_index) == SMG_ERR_OVERFLOW
+           && output == NULL && error_index == 2, "dominio UTC comunica status e posicao");
+        smaug_str_free(source);
+    }
+    /* Buffer exato sem terminador: o parser deve respeitar len. */
+    const char short_text[4] = {'1', '9', '7', '0'};
+    int64_t epoch_ms = 17;
+    OK(smaug_dt_parse_checked(short_text, sizeof(short_text), &epoch_ms, 0) == SMG_ERR_ARGUMENT
+       && epoch_ms == 17, "buffer curto nao exige terminador");
+}
+
+static void test_numeric_datetime(void) {
+    const int64_t valid_values[] = {-377705116800000LL, 253402300799999LL, -1, 0, 1};
+    smaug_series_i64_t *integers = smaug_i64_create(6);
+    smaug_series_f64_t *reals = smaug_f64_create(6);
+    for (size_t row_index = 0; row_index < 5; row_index++) {
+        smaug_i64_set(integers, row_index, valid_values[row_index]);
+        smaug_f64_set(reals, row_index, (double)valid_values[row_index]);
+    }
+    smaug_series_dt_t *integer_output = NULL;
+    smaug_series_dt_t *real_output = NULL;
+    size_t error_index = 77;
+    OK(smaug_i64_to_dt_checked(integers, &integer_output, &error_index) == SMG_OK,
+       "i64->dt aceita limites inclusivos e epoch negativo");
+    OK(smaug_f64_to_dt_checked(reals, &real_output, &error_index) == SMG_OK,
+       "f64->dt aceita inteiros exatos inclusive limites");
+    OK(integer_output->size == 6 && real_output->size == 6 && error_index == 77,
+       "sucesso preserva indice e tamanho");
+    for (size_t row_index = 0; row_index < 5; row_index++) {
+        OK(smaug_dt_get(integer_output, row_index, NULL) == valid_values[row_index]
+           && smaug_dt_get(real_output, row_index, NULL) == valid_values[row_index], "epoch exato");
+    }
+    OK(smaug_dt_is_null(integer_output, 5) && smaug_dt_is_null(real_output, 5), "NA preservado");
+    smaug_dt_free(integer_output);
+    smaug_dt_free(real_output);
+    smaug_i64_free(integers);
+    smaug_f64_free(reals);
+
+    integers = smaug_i64_create(4);
+    reals = smaug_f64_create(4);
+    smaug_i64_set(integers, 0, 0);
+    smaug_f64_set(reals, 0, 0);
+    smaug_i64_set(integers, 3, INT64_MAX);
+    smaug_f64_set(reals, 3, INFINITY);
+    smaug_series_dt_t *original_output = smaug_dt_create(1);
+    const int64_t invalid_integers[] = {-377705116800001LL, 253402300800000LL, INT64_MIN, INT64_MAX, TWO53_PLUS_1};
+    for (size_t case_index = 0; case_index < sizeof(invalid_integers) / sizeof(invalid_integers[0]); case_index++) {
+        smaug_i64_set(integers, 2, invalid_integers[case_index]);
+        integer_output = original_output;
+        error_index = 77;
+        OK(smaug_i64_to_dt_checked(integers, &integer_output, &error_index) == SMG_ERR_OVERFLOW
+           && error_index == 2 && integer_output == original_output, "i64 erro preserva out e aponta primeiro invalido");
+        OK(smaug_i64_get(integers, 2, NULL) == invalid_integers[case_index]
+           && smaug_i64_is_null(integers, 1), "i64 falha preserva entrada");
+    }
+    const struct { double value; smaug_status_t status; } invalid_reals[] = {
+        {0.5, SMG_ERR_ARGUMENT}, {-0.5, SMG_ERR_ARGUMENT}, {0x1p-1074, SMG_ERR_ARGUMENT},
+        {NAN, SMG_ERR_ARGUMENT}, {INFINITY, SMG_ERR_ARGUMENT}, {-INFINITY, SMG_ERR_ARGUMENT},
+        {-377705116800001.0, SMG_ERR_OVERFLOW}, {253402300800000.0, SMG_ERR_OVERFLOW},
+        {1e300, SMG_ERR_OVERFLOW}, {-1e300, SMG_ERR_OVERFLOW},
+    };
+    for (size_t case_index = 0; case_index < sizeof(invalid_reals) / sizeof(invalid_reals[0]); case_index++) {
+        smaug_f64_set(reals, 2, invalid_reals[case_index].value);
+        real_output = original_output;
+        error_index = 77;
+        OK(smaug_f64_to_dt_checked(reals, &real_output, &error_index) == invalid_reals[case_index].status
+           && error_index == 2 && real_output == original_output, "f64 distingue precisao e dominio sem publicar out");
+        double unchanged = smaug_f64_get(reals, 2, NULL);
+        OK((unchanged == invalid_reals[case_index].value || (isnan(unchanged) && isnan(invalid_reals[case_index].value)))
+           && smaug_f64_is_null(reals, 1), "f64 falha preserva valor e mascara");
+    }
+    error_index = 77;
+    OK(smaug_i64_to_dt_checked(NULL, &integer_output, &error_index) == SMG_ERR_ARGUMENT
+       && smaug_i64_to_dt_checked(integers, NULL, &error_index) == SMG_ERR_ARGUMENT,
+       "i64 argumentos obrigatorios");
+    OK(smaug_f64_to_dt_checked(NULL, &real_output, &error_index) == SMG_ERR_ARGUMENT
+       && smaug_f64_to_dt_checked(reals, NULL, &error_index) == SMG_ERR_ARGUMENT,
+       "f64 argumentos obrigatorios");
+    OK(error_index == 77 && real_output == original_output && integer_output == original_output,
+       "falha de chamada nao escreve saidas");
+    OK(smaug_i64_to_dt_checked(integers, &integer_output, NULL) == SMG_ERR_OVERFLOW
+       && smaug_f64_to_dt_checked(reals, &real_output, NULL) == SMG_ERR_OVERFLOW,
+       "indice opcional em falha numerica");
+    smaug_dt_free(original_output);
+    smaug_i64_free(integers);
+    smaug_f64_free(reals);
+    for (size_t element_count = 0; element_count <= 2; element_count += 2) {
+        integers = smaug_i64_create(element_count);
+        reals = smaug_f64_create(element_count);
+        OK(smaug_i64_to_dt_checked(integers, &integer_output, NULL) == SMG_OK
+           && smaug_f64_to_dt_checked(reals, &real_output, NULL) == SMG_OK,
+           "vazio e todo NA sao validos sem indice");
+        OK(integer_output->size == element_count && real_output->size == element_count
+           && smaug_dt_count_nonnull(integer_output) == 0 && smaug_dt_count_nonnull(real_output) == 0,
+           "vazio e todo NA preservam conteudo");
+        smaug_dt_free(integer_output);
+        smaug_dt_free(real_output);
+        smaug_i64_free(integers);
+        smaug_f64_free(reals);
+    }
+}
+
 int main(void) {
+    test_numeric_datetime();
+    test_strict_datetime();
     test_convert_direto();
     test_fmt_direto();
     test_basic_conversions();

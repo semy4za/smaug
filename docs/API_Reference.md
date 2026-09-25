@@ -870,7 +870,7 @@ e [espelho FFI](../lua/smaug/ffi_loader.lua).
 | `year` | `int (int64_t)`; header promete -1 em erro | Aprovado: status + `int *out_year`, mesmo nome |
 | `month`, `day`, `hour`, `minute`, `second`, `ms`, `weekday`, `yearday`, `quarter`, `week` | Mesmo formato escalar; sem validação integral do domínio aprovado | Aprovado: status + saída `int *out_<componente>`, mesmo nome sem sufixo; validar epoch e preservar saída |
 | As 11 variantes `*_series` correspondentes | Ponteiro i64 ou NULL; macro só grava componentes >= 0 | Aprovado: status + `smaug_series_i64_t **out` escrito somente em sucesso + `size_t *error_index` opcional; sem resultado parcial, entrada intacta e NA propagado |
-| `parse(str, len, out_epoch, dayfirst)` | 0/-1; saída só escrita em sucesso; ordem binária | Proposto: status; suportar ano negativo e precisão exata; definir representação explícita de ordem automática/DMY/MDY e diagnóstico |
+| `parse(str, len, out_epoch, dayfirst)` / `parse_checked` | Parser estrito compartilhado; legado 0/-1, checked com status; ano negativo, precisão exata e domínio UTC implementados | Migração global de assinaturas e eventual ordem automática continuam pendentes |
 | `format(epoch, buffer, capacity)` | 0/-1; exige 26 bytes; snprintf pode truncar em falha | Proposto: status, buffer preservado em falha e constante pública de 28 bytes para saída canônica completa |
 | `from_parts` / `from_parts_checked` | Sentinela INT64_MIN / status + saída | Proposto: unificar sob `from_parts`, status + saída; validar componentes e domínio |
 | `diff_ms` / `diff_ms_checked` | Sentinela INT64_MIN / status + saída | Proposto: unificar sob `diff_ms`; validar os dois instantes; resultado é duração int64, não datetime |
@@ -909,9 +909,9 @@ Conversões de [smaug_astype.h](../include/smaug_astype.h) e
 
 | APIs | Atual | Trabalho necessário |
 |---|---|---|
-| `smaug_str_to_dt` | Ponteiro/NULL; falha de parse vira NA; ordem por dayfirst | Conversão explícita estrita; validar coluna inteira, diagnosticar ambiguidade/conflito e retornar posição/causa |
-| `smaug_i64_to_dt` | Copia epochs sem validar faixa aprovada | Validar elementos não nulos e falhar com posição |
-| `smaug_f64_to_dt` | Trunca; valores inconversíveis viram NA | Fechar precisão numérica e rejeição estrita; não herdar truncamento silencioso |
+| `smaug_str_to_dt` / `smaug_str_to_dt_checked` | Conversão textual estrita implementada; checked retorna status e primeira posição inválida; legado retorna NULL em falha | Diagnóstico dedicado de conflito/ordem automática continua separado |
+| `smaug_i64_to_dt` / `smaug_i64_to_dt_checked` | Validação estrita do domínio; cópia int64 exata; checked informa posição | Implementado; saída apenas em sucesso |
+| `smaug_f64_to_dt` / `smaug_f64_to_dt_checked` | Rejeita NaN/inf/fração e valores fora do domínio; checked informa posição | Implementado; valida antes do cast, sem truncamento |
 | `smaug_dt_to_i64`, `smaug_dt_to_f64` | Cópia/conversão numérica | Conferir domínio e nulidade; duração e epoch não têm o mesmo contrato |
 | `smaug_dt_to_str` | Ignora status do formatter; buffer local 40 bytes | Propagar falha e liberar resultado parcial; buffer já comporta 28 bytes |
 
@@ -931,13 +931,62 @@ Os consumidores e comportamentos Lua ficam na
 
 ### Diagnóstico, status e memória
 
+**Conversão textual e numérica implementada em 2026-09-25:**
+
+```c
+smaug_status_t smaug_dt_parse_checked(
+    const char *str, size_t len, int64_t *epoch_ms, int dayfirst);
+smaug_status_t smaug_str_to_dt_checked(
+    const smaug_series_str_t *self, int dayfirst,
+    smaug_series_dt_t **out, size_t *error_index);
+smaug_status_t smaug_i64_to_dt_checked(
+    const smaug_series_i64_t *self, smaug_series_dt_t **out, size_t *error_index);
+smaug_status_t smaug_f64_to_dt_checked(
+    const smaug_series_f64_t *self, smaug_series_dt_t **out, size_t *error_index);
+```
+
+As entradas checked são adicionais; as assinaturas legadas permanecem.
+`smaug_dt_parse` delega ao parser checked e traduz qualquer falha para -1.
+`smaug_str_to_dt` delega à conversão checked e retorna NULL em qualquer falha,
+inclusive texto inválido: a ABI foi preservada, a tolerância antiga foi retirada.
+Atualizar DLL e frontend em conjunto para disponibilizar os novos símbolos.
+
+Os wrappers numéricos de ponteiro também delegam às variantes checked e retornam
+NULL em qualquer falha. A faixa UTC tem fonte única no header datetime:
+`SMAUG_DT_MIN_EPOCH_MS`/`SMAUG_DT_MAX_EPOCH_MS`, inclusivos. Para float64,
+NaN/inf geram `SMG_ERR_ARGUMENT`; finito fora da faixa gera `SMG_ERR_OVERFLOW`;
+fração dentro da faixa gera `SMG_ERR_ARGUMENT`. O cast só ocorre após validar.
+Todos os inteiros do domínio datetime são representáveis exatamente em double.
+Int64 é validado diretamente, sem round-trip por double.
+
+O parser retorna `SMG_ERR_ARGUMENT` para sintaxe/data/opção inválida ou perda
+de precisão e `SMG_ERR_OVERFLOW` para instante UTC fora do domínio. Escreve
+o epoch somente em sucesso. O domínio é validado após normalizar o offset.
+
+Nas três conversões de série, `self`/`out` são obrigatórios; na textual,
+`dayfirst` é 0 ou 1.
+Argumentos de chamada inválidos retornam `SMG_ERR_ARGUMENT` sem escrever saídas.
+**Com esses argumentos válidos**, `SMG_ERR_ARGUMENT`/`SMG_ERR_OVERFLOW` indicam
+falha no primeiro elemento não nulo inválido e escrevem `error_index` opcional
+(base 0). Essa precondição distingue falha de chamada de falha de elemento;
+não aplicar aqui a tabela exclusiva das 11 extrações. O frontend garante a
+precondição antes de consultar o índice. `SMG_ERR_NOMEM` e `SMG_OK` preservam
+o índice. Não há sentinela nem estrutura de diagnóstico nesta etapa.
+
+`*out` só é escrito em sucesso; o caller assume ownership e libera com
+`smaug_dt_free`. Falha libera o resultado temporário, preserva a entrada e
+não entrega série parcial. NA propaga. A ordem é única na série (`dayfirst`),
+sem detecção automática ou diagnóstico `DATE_ON_THE_FENCE` nesta etapa.
+
+**Direção das etapas restantes:**
+
 - Entrada inválida: `SMG_ERR_ARGUMENT`; resultado fora da faixa:
   `SMG_ERR_OVERFLOW`; falha de alocação: `SMG_ERR_NOMEM`.
 - `DATE_ON_THE_FENCE` identifica ambiguidade/conflito, mantendo a mensagem
   aprovada. Status genérico sozinho não informa causa específica nem posições.
 - Nas 11 extrações de componentes em série, usar status e `error_index`
   opcional conforme a assinatura aprovada acima, sem estrutura nova.
-- Para conversão textual, proposta: diagnóstico fornecido pelo caller, sem estado global, contendo
+- Para futuro diagnóstico dedicado de conflito, proposta: diagnóstico fornecido pelo caller, sem estado global, contendo
   motivo e até duas posições. O Lua acrescenta operação, coluna e descrição
   limitada dos valores; índices C baseados em 0 viram posições Lua baseadas em 1.
   Layout e assinatura ainda precisam ser fechados. Não é necessário alocar
@@ -980,8 +1029,9 @@ Depois executar suítes C/Lua e verificações de memória adequadas à mudança
 
 ### Decisões restantes, em ordem
 
-1. Fechar a integração de `dayfirst` nas entradas Lua e seu transporte ao C,
-   antes de desenhar o diagnóstico da conversão textual. A API inicial
+1. Fechar a integração de `dayfirst` nas demais entradas Lua e seu transporte ao C.
+   `astype` textual estrito já usa status/saída/primeira posição inválida desde
+   2026-09-25, conforme a seção de diagnóstico. A API inicial
    reconhece os separadores aprovados sem argumento de formato explícito;
    essa opção fica para ampliação futura.
    Prioridade de interpretação, padrão mês/dia e formatos iniciais estão

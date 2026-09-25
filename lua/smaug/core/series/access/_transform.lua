@@ -28,21 +28,25 @@ return function(I)
     -- =====================================================================
     -- astype: matriz de conversão src×dst delegada ao Anel 0 (10.7 Passo B).
     -- Tabela explícita [src][dst] -> primitiva C (diagonal usa clone; pares
-    -- com bool/categorical ficam no Anel 1 até 10.8). str->dt recebe dayfirst.
+    -- com bool/categorical ficam no Anel 1 até 10.8). Retorno por ponteiro.
     -- =====================================================================
     local ASTYPE_C = {
         int64    = { float64  = C.smaug_i64_to_f64,
-                     string   = C.smaug_i64_to_str,
-                     datetime = C.smaug_i64_to_dt  },
+                     string   = C.smaug_i64_to_str },
         float64  = { int64    = C.smaug_f64_to_i64,
-                     string   = C.smaug_f64_to_str,
-                     datetime = C.smaug_f64_to_dt  },
+                     string   = C.smaug_f64_to_str },
         string   = { int64    = C.smaug_str_to_i64,
-                     float64  = C.smaug_str_to_f64,
-                     datetime = C.smaug_str_to_dt  },
+                     float64  = C.smaug_str_to_f64 },
         datetime = { int64    = C.smaug_dt_to_i64,
                      float64  = C.smaug_dt_to_f64,
                      string   = C.smaug_dt_to_str  },
+    }
+
+    -- Destino datetime retorna status + saida; nao mistura contratos na matriz.
+    local ASTYPE_DATETIME_C = {
+        int64 = C.smaug_i64_to_dt_checked,
+        float64 = C.smaug_f64_to_dt_checked,
+        string = C.smaug_str_to_dt_checked,
     }
 
     -- =====================================================================
@@ -218,99 +222,132 @@ return function(I)
     -- astype
     -- =====================================================================
 
-    -- astype(dtype): converte a série para outro dtype. Tolerante por elemento:
-    -- inconversíveis → null. Nunca descarta a série inteira.
+    local function convert_to_datetime(source_series, conversion, dayfirst, output_name)
+        local output = ffi.new("smaug_series_dt_t *[1]")
+        local error_index = ffi.new("size_t[1]")
+        local source_dtype = source_series._dtype
+        local status
+        if source_dtype == "string" then
+            status = conversion(source_series._c, dayfirst, output, error_index)
+        else
+            status = conversion(source_series._c, output, error_index)
+        end
+        -- Argumentos de chamada validos: ARGUMENT/OVERFLOW sao de elemento.
+        -- Sucesso e NOMEM nao autorizam ler error_index.
+        if status == I.SMG_ERR_ARGUMENT or status == I.SMG_ERR_OVERFLOW then
+            local row_index = tonumber(error_index[0]) + 1
+            local column_context = output_name and (" na coluna " .. Err.describe(output_name)) or ""
+            local value
+            if source_dtype == "int64" then value = source_series:get_raw(row_index)
+            else value = source_series:get(row_index) end
+            local reason
+            local guidance
+            if status == I.SMG_ERR_OVERFLOW then
+                reason = "instante UTC fora do domínio datetime (-9999 a 9999)"
+            elseif source_dtype == "string" then
+                reason = "data inválida, formato incompatível ou precisão não exata em milissegundos"
+            else
+                reason = "epoch deve ser finito e inteiro em milissegundos"
+            end
+            if source_dtype == "string" then guidance = "; revise a entrada e a opção dayfirst"
+            else guidance = "; informe milissegundos inteiros dentro do domínio datetime" end
+            error("smaug: astype('datetime')" .. column_context .. ", índice " .. row_index
+                .. ", valor " .. Err.describe(value) .. ": " .. reason .. guidance, 3)
+        end
+        I.check_status(status, "astype('datetime')", 4)
+        return wrap(output[0], "datetime", output_name)
+    end
+
+    -- Conversao explicita para datetime e estrita, sem resultado parcial.
     function methods.astype(self, dtype, name)
         -- 3º argumento: string = name (retrocompat) | tabela = {name=, dayfirst=}
         local dayfirst = 0
         if type(name) == "table" then
-            local opts = name
-            name = opts.name
-            if opts.dayfirst ~= nil and type(opts.dayfirst) ~= "boolean" then
+            local options = name
+            name = options.name
+            if options.dayfirst ~= nil and type(options.dayfirst) ~= "boolean" then
                 error("smaug: astype() dayfirst deve ser booleano", 2)
             end
-            if opts.dayfirst == true then dayfirst = 1
-            elseif opts.dayfirst == false then dayfirst = 0 end
+            if options.dayfirst == true then dayfirst = 1
+            elseif options.dayfirst == false then dayfirst = 0 end
         end
 
         -- categorical é Lua puro — não está em DTYPES, mas é suportado
         if dtype == "categorical" then
-            local Cat = Series.Categorical
-            if not Cat then
+            local categorical_type = Series.Categorical
+            if not categorical_type then
                 error("smaug: astype 'categorical' — CategoricalSeries não disponível", 2)
             end
-            local vals = {}
-            local n    = self:len()
-            for i = 1, n do
-                local v = self:get(i)
-                vals[i] = v ~= nil and tostring(v) or NA
+            local values = {}
+            local length = self:len()
+            for row_index = 1, length do
+                local value = self:get(row_index)
+                values[row_index] = value ~= nil and tostring(value) or NA
             end
-            return Cat.from_table(vals, name or self._name)
+            return categorical_type.from_table(values, name or self._name)
         end
         if not DTYPES[dtype] then
             error("smaug: dtype desconhecido " .. Err.describe(dtype), 2)
         end
 
-        local src = self._dtype
+        local source_dtype = self._dtype
 
         -- Zona 1 — mesmo dtype: clone (Anel 0). Sem round-trip por get():
         -- int64 > 2^53 preservado exato (o degrau some).
-        if src == dtype then
+        if source_dtype == dtype then
             return wrap(self._d.clone(self._c), dtype, name or self._name)
         end
 
-        -- Zona 2 — matriz C (src×dst entre int64/float64/string/datetime).
-        local row  = ASTYPE_C[src]
-        local conv = row and row[dtype]
-        if conv then
-            local r
-            if src == "string" and dtype == "datetime" then
-                r = conv(self._c, dayfirst)
-            else
-                r = conv(self._c)
-            end
-            return wrap(r, dtype, name or self._name)
+        if dtype == "datetime" and ASTYPE_DATETIME_C[source_dtype] then
+            return convert_to_datetime(self, ASTYPE_DATETIME_C[source_dtype], dayfirst, name or self._name)
+        end
+
+        -- Zona 2 — conversoes C com retorno por ponteiro.
+        local conversions = ASTYPE_C[source_dtype]
+        local conversion = conversions and conversions[dtype]
+        if conversion then
+            return wrap(conversion(self._c), dtype, name or self._name)
         end
 
         -- Zona 3 — cantos datetime<->bool: sem semântica natural, erro limpo.
-        if (src == "bool" and dtype == "datetime")
-        or (src == "datetime" and dtype == "bool") then
-            error("smaug: astype " .. src .. "->" .. dtype ..
+        if (source_dtype == "bool" and dtype == "datetime")
+        or (source_dtype == "datetime" and dtype == "bool") then
+            error("smaug: astype " .. source_dtype .. "->" .. dtype ..
                   " não suportado; use :map(fn) para definir a regra", 2)
         end
 
         -- Zona 4 — pares com bool (bool<->int64/float64/string): Anel 1 até 10.8.
         -- Loop reduzido: só os ramos que envolvem bool.
-        local n   = self:len()
-        local out = Series.new(dtype, n, name or self._name)
-        for i = 1, n do
-            local v = self:get(i)
-            if v == nil then
-                out:set_null(i)
-            elseif src == "bool" then          -- bool -> int64/float64/string
+        local length = self:len()
+        local result_series = Series.new(dtype, length, name or self._name)
+        for row_index = 1, length do
+            local value = self:get(row_index)
+            if value == nil then
+                result_series:set_null(row_index)
+            elseif source_dtype == "bool" then          -- bool -> int64/float64/string
                 if dtype == "string" then
-                    out:set(i, tostring(v))
+                    result_series:set(row_index, tostring(value))
                 elseif dtype == "int64" then
-                    out:set(i, v and 1 or 0)
+                    result_series:set(row_index, value and 1 or 0)
                 else -- float64
-                    out:set(i, v and 1.0 or 0.0)
+                    result_series:set(row_index, value and 1.0 or 0.0)
                 end
             else                                -- int64/float64/string -> bool
-                if src == "string" then
-                    if v == "true" then out:set(i, true)
-                    elseif v == "false" then out:set(i, false)
-                    else out:set_null(i) end
+                if source_dtype == "string" then
+                    if value == "true" then result_series:set(row_index, true)
+                    elseif value == "false" then result_series:set(row_index, false)
+                    else result_series:set_null(row_index) end
                 else  -- int64/float64 -> bool: rígido, só 0/1 (H.6.5.a)
-                    if v == 0 or v == 1 then
-                        out:set(i, v == 1)
+                    if value == 0 or value == 1 then
+                        result_series:set(row_index, value == 1)
                     else
-                        error("smaug: astype('bool'): valor " .. Err.describe(v) .. " no índice "
-                              .. i .. " não é 0/1; use :map(fn) para definir a regra", 2)
+                        error("smaug: astype('bool'): valor " .. Err.describe(value) .. " no índice "
+                              .. row_index .. " não é 0/1; use :map(fn) para definir a regra", 2)
                     end
                 end
             end
         end
-        return out
+        return result_series
     end
 
     -- =====================================================================

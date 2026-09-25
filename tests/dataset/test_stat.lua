@@ -307,7 +307,7 @@ do
         {"date", {"02/05/2026", "02-05-2026", "2026-05-02", smaug.NA}, "string"},
         {"label", {"a", "b", "c", "d"}, "string"},
     })
-    for _, options in ipairs({{}, {dayfirst = false}, {dayfirst = true}}) do
+    for unused_index, options in ipairs({{}, {dayfirst = false}, {dayfirst = true}}) do
         local converted_dataset = source_dataset:astype({date = "datetime"}, options)
         local expected_month = options.dayfirst and 5 or 2
         local expected_day = options.dayfirst and 2 or 5
@@ -328,7 +328,7 @@ do
     check(source_dataset:column("date"):get(1) == "02/05/2026", "astype dayfirst: entrada preservada")
     check(not pcall(function() source_dataset:astype({date = "datetime"}, true) end),
           "astype dayfirst: rejeita opções não-tabela")
-    for _, invalid_option in ipairs({"false", 0, 1}) do
+    for unused_index, invalid_option in ipairs({"false", 0, 1}) do
         local succeeded, error_message = pcall(function()
             source_dataset:astype({date = "datetime"}, {dayfirst = invalid_option})
         end)

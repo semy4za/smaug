@@ -24,16 +24,16 @@
        string    | ->i64 (2t)   ->f64        (clone)       ->dt
        datetime  | ->i64        ->f64        ->str         (clone)
 
-   Contrato (herdado do astype Lua, o oraculo): inconversivel -> null,
-   a serie inteira nunca e descartada por um dado ruim. Implementado em
+   Conversoes para datetime sao estritas: preservam NA e falham sem resultado
+   parcial. Os demais pares mantem seus contratos. Implementado em
    src/smaug_astype.c.
    =================================================================== */
 
 #include "smaug_core.h"
 
 /* ---------- Grupo A: conversoes entre arrays diretos (i64/f64/dt) ----------
-   Retorno NULL apenas em self==NULL (contrato) ou OOM. Inconversivel por
-   elemento (NaN/inf/fora-do-range em ->i64/->dt) vira null, nunca erro. */
+   float64->int64 trunca e converte inconversiveis em NA.
+   ->datetime valida dominio/precisao e retorna NULL em qualquer falha. */
 smaug_series_f64_t *smaug_i64_to_f64(const smaug_series_i64_t *self);
 smaug_series_i64_t *smaug_f64_to_i64(const smaug_series_f64_t *self);
 smaug_series_dt_t  *smaug_i64_to_dt (const smaug_series_i64_t *self);
@@ -50,10 +50,26 @@ smaug_series_str_t *smaug_dt_to_str (const smaug_series_dt_t  *self);
 
 /* Grupo B-in (string -> {int64, float64, datetime}): parsing rigido via
    smaug_convert (rejeita trailing/vazio/overflow; i64 sem hex, f64 com
-   hex/inf/nan). Inconversivel -> null. str->dt recebe `dayfirst` (0/1),
-   propagado do Anel 1 — excecao de assinatura. */
+   hex/inf/nan). Inconversivel -> null somente nas conversoes numericas. */
 smaug_series_i64_t *smaug_str_to_i64(const smaug_series_str_t *self);
 smaug_series_f64_t *smaug_str_to_f64(const smaug_series_str_t *self);
 smaug_series_dt_t  *smaug_str_to_dt (const smaug_series_str_t *self, int dayfirst);
+/* Conversoes estritas para datetime. self/out obrigatorios; dayfirst 0 ou 1
+   na variante textual. int64 deve estar no dominio; float64 deve tambem ser
+   finito e integral. NaN/inf/fracao -> ARGUMENT; finito fora da faixa -> OVERFLOW.
+   A faixa datetime inteira e representavel exatamente em double (< 2^53).
+   SMG_OK publica *out (caller libera com smaug_dt_free); falhas preservam *out.
+   SMG_ERR_NOMEM e argumento de chamada invalido preservam error_index.
+   Com argumentos de chamada validos, ARGUMENT/OVERFLOW indicam falha de
+   elemento e escrevem seu primeiro indice (base 0) em error_index, se != NULL.
+   Sucesso preserva error_index. NA propaga; entrada nunca e alterada.
+   Os wrappers legados delegam aqui e retornam NULL em qualquer falha. */
+smaug_status_t smaug_i64_to_dt_checked(const smaug_series_i64_t *self,
+                                     smaug_series_dt_t **out, size_t *error_index);
+smaug_status_t smaug_f64_to_dt_checked(const smaug_series_f64_t *self,
+                                     smaug_series_dt_t **out, size_t *error_index);
+smaug_status_t smaug_str_to_dt_checked(const smaug_series_str_t *self,
+                                     int dayfirst, smaug_series_dt_t **out,
+                                     size_t *error_index);
 
 #endif /* SMAUG_ASTYPE_H */

@@ -137,9 +137,12 @@ true
 ```
 
 `astype` para `float64`/`int64`/`string` não lança erro por causa de
-um elemento individual. Para datetime, a nova conversão explícita é estrita;
-ver a seção de detecção de datas abaixo (implementação pendente). Elementos inconversíveis tornam-se `null` — a série inteira
-não é descartada por um dado ruim. Operações em lote são tolerantes a dados imperfeitos.
+um elemento individual: nesses pares, elementos inconversíveis tornam-se `null`.
+Para datetime, a conversão explícita é estrita a partir de string, int64 e
+float64 (implementada em 2026-09-25). Epoch numérico deve ser finito, inteiro
+em milissegundos e estar no domínio de -9999 a 9999; não há truncamento.
+Texto inválido gera erro com posição, sem resultado parcial ou NA fabricado;
+NA já presente na entrada continua sendo ausência. Ver a seção de detecção abaixo.
 
 **Exceção — `astype("bool")` a partir de numérico é estrito:** aceita só `0`/`1`;
 qualquer outro valor lança erro que orienta para `:map(fn)`. A regra de truthiness
@@ -565,6 +568,12 @@ R02 e R05 registram contraexemplos; comportamento defeituoso não vira esperado.
 Este perfil fixa as escolhas de domínio, representação e erro aprovadas
 pelo mantenedor. É contrato a implementar/verificar, não declaração de que o
 parser, formatter e todas as operações atuais já o cumprem.
+
+Seguimento de 2026-09-25: parser textual e `astype` para datetime implementam
+o domínio UTC, ano negativo e precisão exata descritos abaixo. A conversão
+explícita textual ou numérica falha com posição e preserva NA/entrada.
+Formatter, componentes e outras entradas ainda têm migração pendente; a implementação
+parcial não certifica essas outras entradas e operações.
 
 1. **Anos de `-9999` a `9999`, inclusive, incluindo zero.** Calendário gregoriano
    proléptico com numeração astronômica: ano `0` corresponde a 1 a.C., ano `-1`

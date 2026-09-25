@@ -499,6 +499,7 @@ ffi.cdef([[
 
     /* Parsing / formatação */
     int smaug_dt_parse(const char *str, size_t len, int64_t *epoch_ms, int dayfirst);
+    smaug_status_t smaug_dt_parse_checked(const char *str, size_t len, int64_t *epoch_ms, int dayfirst);
     int smaug_dt_format(int64_t epoch_ms, char *buf, size_t buf_size);
 
     /* Componentes calendário */
@@ -627,6 +628,9 @@ ffi.cdef([[
     smaug_series_i64_t* smaug_str_to_i64(const smaug_series_str_t *self);
     smaug_series_f64_t* smaug_str_to_f64(const smaug_series_str_t *self);
     smaug_series_dt_t*  smaug_str_to_dt (const smaug_series_str_t *self, int dayfirst);
+    smaug_status_t smaug_str_to_dt_checked(const smaug_series_str_t *self, int dayfirst, smaug_series_dt_t **out, size_t *error_index);
+    smaug_status_t smaug_i64_to_dt_checked(const smaug_series_i64_t *self, smaug_series_dt_t **out, size_t *error_index);
+    smaug_status_t smaug_f64_to_dt_checked(const smaug_series_f64_t *self, smaug_series_dt_t **out, size_t *error_index);
 ]])
 
 -- Nome do arquivo da lib conforme o SO.

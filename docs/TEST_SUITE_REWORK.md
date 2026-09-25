@@ -25,11 +25,32 @@ Continuamos fechando contratos e a migração das APIs. Em 2026-09-25, por
 solicitação do mantenedor, foi iniciada a reescrita isolada de
 `tests/dataset/test_relational.lua`; o checkpoint está registrado abaixo.
 Essa frente não conclui a reconstrução geral da suíte.
-O mapeamento inicial de datetime foi concluído. A migração do motor ainda não
-começou; foi aplicada a integração Lua de `dayfirst` em `DataSet:astype` e a
-validação booleana no helper e nas conversões. Validação focada: 283 checks
-de datetime e 136 checks de DataSet passaram, além de `git diff --check`.
-Isso não certifica a suíte inteira, cobertura ou memória.
+Em 2026-09-25, a conversão explícita string/int64/float64→datetime passou a ser estrita no
+C/Lua, com status e primeira posição inválida, preservando NA e a entrada.
+O parser compartilhado agora valida precisão exata em ms, anos zero/negativos
+e domínio UTC após offset. Assinaturas legadas foram preservadas com wrappers;
+novas entradas checked estão documentadas nas referências C e Lua. Epoch
+numérico exige milissegundos inteiros, finitos e no domínio. O parser e as
+conversões compartilham limites; o Lua separa a matriz checked da matriz de
+ponteiros e concentra o diagnóstico em um helper. Nomes e comentários dos
+conversores C e do parser foram revisados conforme o padrão de escrita.
+
+Validação: build Windows completa com `-SkipManifest` passou (13 suítes C,
+20 Lua, 15 scripts de paridade), incluindo 193 checks de astype C, 532 de
+datetime C, 2162 de falha de alocação e 356 de datetime Lua. Astype C também
+passou com `-O2 -fwrapv`. `git diff --check` passou. O guard de estilo passou
+nos 33 arquivos de teste após corrigir as três ocorrências de `_`.
+Não houve sanitizers, Valgrind
+ou nova medição de cobertura. O relatório de paridade é um indicador lexical:
+o novo `parse_checked` aparece sem chamada direta Lua porque é consumido no C.
+O inventário de astype agora distingue os símbolos completos e inclui as três
+variantes checked. Os wrappers legados aparecem sem chamada direta Lua por
+serem preservados para consumidores C.
+
+Próximo ponto datetime: integração de `dayfirst` nas demais entradas e migração
+aprovada dos 11 componentes.
+Formatter (inclusive saída negativa canônica) e helpers ainda exigem revisão;
+o parser aceitar anos negativos não certifica essas operações.
 
 <a id="section-retomada-relacional-2026-09-25"></a>
 
@@ -166,12 +187,12 @@ no contrato. O argumento Lua `dayfirst=false` está aprovado, preservando
 `Series.dt_parse(str, dayfirst)`. A API inicial reconhece `/` e `-` nos
 formatos aprovados, sem argumento de formato explícito; essa opção fica para
 ampliação futura. O próximo ponto é fechar a integração de `dayfirst` nas
-demais entradas, antes de retomar o diagnóstico
-da conversão textual. Modo automático estrito
+demais entradas. A conversão textual estrita com primeira posição inválida
+foi implementada em 2026-09-25. Modo automático estrito
 opt-in permanece proposta separada.
 Integração Lua aplicada: `DataSet:astype` encaminha `dayfirst` às conversões
 string→datetime; helper e astype validam o booleano. Ver a referência Lua.
-Essa etapa não implementa conversão estrita nem a migração C. As demais
+O seguimento C/Lua implementou a conversão textual estrita. As demais
 implementações e validações continuam pendentes; alterações no motor devem
 ficar restritas às correções e à comunicação de erros necessárias.
 

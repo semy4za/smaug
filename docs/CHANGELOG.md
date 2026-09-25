@@ -5,6 +5,8 @@
 <details>
 <summary>Navegar por mês</summary>
 
+- [2026-09-25 — Epoch numérico estrito e coesão das conversões](#section-2026-09-25-epoch-numerico)
+- [2026-09-25 — Conversão textual estrita para datetime](#section-2026-09-25-astype-datetime-estrito)
 - [2026-09-25 — Correção das falhas relacionais](#section-2026-09-25-correcao-relacional)
 - [2026-09-25 — Reescrita inicial dos testes relacionais](#section-2026-09-25-testes-relacionais)
 - [2026-09-01 — Fase 1: -fwrapv no build, ou: como um "bug" virou contrato](#section-2026-09-01-fase-1-fwrapv-no-build-ou-como-um-bug-virou-contrato)
@@ -22,6 +24,76 @@
 Registro de o que mudou e por que, em ordem cronológica reversa.
 Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
+
+---
+<a id="section-2026-09-25-epoch-numerico"></a>
+
+## 2026-09-25 — Epoch numérico estrito e coesão das conversões
+
+`astype("datetime")` de int64/float64 agora valida o domínio UTC completo.
+Float64 exige milissegundos inteiros e finitos: fração, NaN e infinito geram
+erro com posição; valor finito fora da faixa gera erro de domínio. Int64 é
+validado e descrito no erro sem passar por double. NA, entrada e saída em
+falha seguem o contrato da conversão textual; OOM não vira NA.
+
+Adicionadas variantes checked numéricas e mantidos wrappers de ponteiro/NULL.
+O truncamento de float64→int64 permanece próprio dessa conversão. Expectativas
+antigas de truncamento/NA em float64→datetime e aceitação de 2^53+1 como epoch
+foram substituídas pelas regras aprovadas; regressões de precisão na saída
+datetime→int64 foram mantidas, pois essa saída ainda não foi migrada.
+
+Revisão de coesão: limites do domínio têm fonte única no header datetime;
+as conversões C mantêm loops tipados; a matriz Lua separa retorno por ponteiro
+de status/saída e compartilha o diagnóstico datetime. Nomes dos conversores,
+parser e corpo de astype foram padronizados, com comentários alinhados ao
+comportamento atual. Corrigidas as três ocorrências de `_` nos testes.
+O inventário de paridade passou a contar variantes `_checked` e comparar
+símbolos completos, sem confundir uma chamada checked com seu wrapper.
+
+Validação: build Windows completa com código 0 (13 suítes C, 20 Lua e
+15 scripts de paridade); 193 checks astype C, 532 datetime C, 2162 alocação,
+356 datetime Lua. Astype C também passou com `-O2 -fwrapv`. Guard de estilo:
+33 arquivos aprovados; checagem adicional de nomes nos conversores C/parser
+aprovada; `git diff --check` passou. Sem nova cobertura ou Valgrind/sanitizers.
+
+Próximas etapas: `dayfirst` nas demais entradas, componentes e formatter.
+Construção/set/append/I/O ainda não estão certificados pelo contrato estrito
+apenas por compartilharem parte dessas primitivas.
+
+---
+<a id="section-2026-09-25-astype-datetime-estrito"></a>
+
+## 2026-09-25 — Conversão textual estrita para datetime
+
+`Series:astype("datetime")` e `DataSet:astype` deixaram de converter texto
+inválido em NA. O C retorna status e primeira posição inválida; o Lua informa
+operação, coluna, índice baseado em 1, valor e orientação. NA original propaga,
+falha preserva a entrada e não publica resultado parcial. OOM segue o canal
+de erro de memória, sem posição de elemento.
+
+Adicionadas `smaug_dt_parse_checked` e `smaug_str_to_dt_checked`. As assinaturas
+legadas permanecem com wrappers; `smaug_str_to_dt` passa a retornar NULL em
+qualquer falha, inclusive parse. DLL e frontend devem ser atualizados juntos.
+O parser compartilhado aplica o perfil aprovado: ano zero/negativo, frações
+exatas em ms e domínio UTC de -9999 a 9999 após offset. `dayfirst` permanece
+uma escolha única para a coluna. Não foi introduzida inferência automática.
+
+Regressões cobrem erro após NA, erro no fim da série, entrada intacta, diagnósticos
+Lua em Series/DataSet, argumentos C, saída preservada, OOM, formatos,
+precisão e limites UTC. Expectativas antigas de texto inválido→NA e truncamento
+de `.1234` foram substituídas pelas regras aprovadas; `.1230` continua aceita.
+
+Build Windows completa (`scripts/build.ps1 -SkipManifest`) com código 0:
+13 suítes C e 20 Lua passaram; os 15 scripts de paridade executaram sem erro.
+Contagens focadas: 148 checks de astype C, 532 datetime C, 2142 falhas de
+alocação e 310 datetime Lua. `git diff --check` passou. O guard de estilo
+continua apontando as três ocorrências anteriores. Sem nova cobertura ou
+verificação por sanitizers/Valgrind.
+
+Permanecem pendentes entradas numéricas, `dayfirst` nas demais entradas,
+formatter e migração dos componentes. A validação do parser compartilhado
+também alcança seus consumidores existentes, mas não torna toda entrada
+de construção/I/O estrita: cada consumidor mantém sua política de falha.
 
 ---
 <a id="section-2026-09-25-correcao-relacional"></a>

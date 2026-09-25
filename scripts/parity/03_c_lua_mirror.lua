@@ -73,15 +73,18 @@ end
 -- ===================================================================
 do
     local rows = {}
-    local n = 0
-    for origem, destino in hdr_astype:gmatch("smaug_([%w]+)_to_([%w]+)%s*%(") do
-        n = n + 1
-        local fname = "smaug_" .. origem .. "_to_" .. destino
-        local found_in_lua = series:find(fname, 1, true) ~= nil
+    local function_count = 0
+    for source_dtype, destination_suffix in hdr_astype:gmatch("smaug_([%w]+)_to_([%w_]+)%s*%(") do
+        function_count = function_count + 1
+        local destination_dtype = destination_suffix:gsub("_checked$", "")
+        local function_name = "smaug_" .. source_dtype .. "_to_" .. destination_suffix
+        -- Contar variantes checked e exigir simbolo inteiro: uma referencia
+        -- ao checked nao significa que o frontend chama o wrapper legado.
+        local found_in_lua = series:find("%f[%w_]" .. function_name .. "%f[^%w_]") ~= nil
         local status = found_in_lua and "🟩" or "🟨"
-        rows[#rows+1] = { origem, destino, "`"..fname.."`", status }
+        rows[#rows+1] = { source_dtype, destination_dtype, "`"..function_name.."`", status }
     end
-    local section = "\n### astype — conversão cross-dtype (" .. n .. " funções C)\n\n"
+    local section = "\n### astype — conversão cross-dtype (" .. function_count .. " funções C)\n\n"
         .. "Matriz origem→destino (`smaug_astype.h`); não cabe na tabela por-dtype "
         .. "acima porque o nome carrega dois dtypes, não um.\n\n"
     local header = { "origem", "destino", "função C", "exposta em Lua?" }

@@ -63,7 +63,7 @@ O [guia do usuário](USER_GUIDE.md) explica os conceitos por assunto.
 | `:view(start, len)` | view zero-copy COW-gravável |
 | `:take(idx)` / `:head(n)` / `:tail(n)` | seleção → nova Series |
 | `:dropna()` | → nova Series sem NULLs |
-| `:astype(dtype, name_or_options)` | aceita nome ou `{name=..., dayfirst=false}`; conversão atual tolerante por elemento (inconversíveis → null), exceto `bool` numérico rígido; migração datetime estrita ainda pendente |
+| `:astype(dtype, name_or_options)` | aceita nome ou `{name=..., dayfirst=false}`; string/int64/float64→datetime estrito com posição do erro; epoch exige ms inteiros no domínio; demais pares mantêm seus contratos (incluindo bool numérico rígido) |
 | `:fillna(value)` | nova Series com NULLs→value; NaN intacto |
 | `:to_table([na])` | → tabela Lua |
 | `:sample(n, [seed])` | amostra n elementos sem reposição (par de `DataSet:sample`) |
@@ -304,8 +304,8 @@ Disponível quando `s._dtype == "datetime"`. Erro claro em qualquer outro dtype.
 
 ### Datetime — evolução da API Lua
 
-As mudanças abaixo foram discutidas na revisão da suíte e ainda não foram
-implementadas. A API existente está descrita acima. O
+As mudanças abaixo foram discutidas na revisão da suíte. A conversão textual e numérica
+estrita foi implementada em 2026-09-25; as demais etapas seguem pendentes. O
 [contrato datetime](CONTRACT.md#section-perfil-datetime-decisoes-aprovadas-em-2026-09-18)
 e as [regras de detecção e diagnóstico](CONTRACT.md#section-deteccao-de-datas-e-diagnostico-decisoes-da-retomada)
 concentram as decisões normativas; esta seção registra o impacto no Lua.
@@ -325,7 +325,9 @@ continua configurável; ano primeiro mantém sua ordem.
 
 **Formatos iniciais aprovados:** ver o conjunto e suas regras no
 [contrato de interpretação textual](CONTRACT.md#section-deteccao-de-datas-e-diagnostico-decisoes-da-retomada).
-Implementação e validação continuam pendentes.
+Implementados no parser compartilhado em 2026-09-25: anos zero/negativos,
+frações exatas em milissegundos e domínio UTC de -9999 a 9999, além das
+conveniências positivas existentes. Isso não conclui formatter ou componentes.
 
 **Argumento de ordem aprovado:** `dayfirst`, booleano com padrão `false`.
 O helper mantém `Series.dt_parse(str, dayfirst)`:
@@ -346,9 +348,24 @@ reutiliza a opção existente. `DataSet:astype({data="datetime"}, {dayfirst=true
 encaminha a ordem às colunas string convertidas para datetime, mantendo nomes
 e colunas fora do mapa. Omitir opções ou usar `false` preserva mês/dia.
 `Series.dt_parse`, `Series:astype` e `DataSet:astype` rejeitam `dayfirst`
-não-booleano quando informado. Essa mudança é Lua; não implementa a conversão
-estrita nem altera as assinaturas C. Atualmente, entradas textuais inválidas
-em `astype` ainda viram NA.
+não-booleano quando informado.
+
+**Conversão textual estrita aplicada em 2026-09-25:** `astype("datetime")`
+a partir de string percorre os valores não nulos até o primeiro erro. Sucesso
+entrega a série completa; falha não entrega resultado parcial nem fabrica NA.
+O erro inclui operação, nome da coluna quando disponível, posição baseada em 1,
+descrição limitada do valor e orientação sobre entrada/dayfirst. O C comunica
+status e posição; o Lua monta a mensagem. OOM segue o erro de memória sem
+consultar posição. NA original propaga e a entrada permanece intacta.
+
+Datas impossíveis, formatos incompatíveis e frações não exatas em ms geram
+erro de entrada; instantes UTC fora do domínio geram erro de domínio. Não há
+inferência ou troca de ordem por elemento: `dayfirst` vale para toda a conversão.
+`int64`→datetime valida o domínio sem passar por double; `float64`→datetime
+exige valor finito e inteiro em ms no mesmo domínio, sem truncar. A mensagem
+preserva int64 exato mesmo fora de 2^53. `dayfirst` só interpreta texto.
+`float64`→`int64` continua seguindo seu contrato tolerante com truncamento.
+O helper `dt_parse` mantém número/nil, mas usa o mesmo parser corrigido.
 
 **Ainda a decidir:** integração nas demais entradas (construção, set/append e I/O);
 eventual modo automático estrito opt-in
@@ -364,7 +381,7 @@ inferência automática estrita.
 |---|---|
 | `lua/smaug/core/series/temporal/_dt.lua` | 11 componentes em lote; predicados de início/fim, bissexto, dias no mês, nomes e strftime usam escalares; next_period usa from_parts legado; ceil/round podem produzir nil que dt_map converte em NA; helpers públicos misturam nil e status |
 | `lua/smaug/core/series/_types.lua` | Descritor datetime liga operações C; set/append de string chamam parse com dayfirst=0 fixo; atualizar fluxo de validação sem inferir por elemento |
-| `lua/smaug/core/series/access/_transform.lua` | Matriz de conversões; astype valida dayfirst booleano e encaminha 0/1; retorno C ainda é ponteiro, migração estrita pendente |
+| `lua/smaug/core/series/access/_transform.lua` | Conversões para datetime usam matriz checked separada e helper único de diagnóstico; outros pares usam matriz com retorno por ponteiro |
 | `lua/smaug/core/series/window/_cumulative.lua` | diff datetime chama diff_ms_checked; precisa acompanhar assinatura e mensagem |
 | `lua/smaug/core/series/stats/_stat.lua` | Formatação com char[26], retorno ignorado e ffi.string(buf, 25); retirar comprimento fixo incorreto |
 | `lua/smaug/core/series/_factories.lua` | Inferência de strings atualmente resulta em string; ponto de integração da detecção antes de construir/mutar série |
