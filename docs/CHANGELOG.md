@@ -5,6 +5,7 @@
 <details>
 <summary>Navegar por mês</summary>
 
+- [2026-09-25 — Correção das falhas relacionais](#section-2026-09-25-correcao-relacional)
 - [2026-09-25 — Reescrita inicial dos testes relacionais](#section-2026-09-25-testes-relacionais)
 - [2026-09-01 — Fase 1: -fwrapv no build, ou: como um "bug" virou contrato](#section-2026-09-01-fase-1-fwrapv-no-build-ou-como-um-bug-virou-contrato)
 - [2026-07-27 — Roadmap enxuto: só o que falta, e uma porta de entrega de verdade](#section-2026-07-27-roadmap-enxuto-so-o-que-falta-e-uma-porta-de-entrega-de-verdade)
@@ -21,6 +22,28 @@
 Registro de o que mudou e por que, em ordem cronológica reversa.
 Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
+
+---
+<a id="section-2026-09-25-correcao-relacional"></a>
+
+## 2026-09-25 — Correção das falhas relacionais
+
+Corrigidos os três defeitos revelados pela reescrita: `groupby:agg` e
+`groupby:transform` rejeitam funções desconhecidas com erro orientado, inclusive
+em datasets vazios, e chaves compostas deixam de fundir tuplas que contêm o
+separador no texto. Join e groupby compartilham um helper que delimita cada
+componente pelo comprimento de sua codificação. Callbacks seguem aceitos.
+
+Os 66 casos existentes passaram; duas regressões adicionais cobrem argumentos
+inválidos em dados vazios/não vazios e callbacks com índices de grupo, totalizando
+**68 casos relacionais**. A build Windows (`scripts/build.ps1 -SkipManifest`)
+terminou com código 0: **13 suítes C, 20 suítes Lua e 15 eixos de paridade**
+passaram. `git diff --check` passou. O guard de estilo ainda acusa somente as
+três ocorrências preexistentes em `test_stat.lua` e `test_dt.lua`.
+
+A campanha de mutações, a auditoria de migração e as divergências de contrato
+continuam pendentes. Uma concatenação equivalente em `dataset/_stat.lua` ficou
+registrada para revisão da família de duplicatas no ponto de retomada.
 
 ---
 <a id="section-2026-09-25-testes-relacionais"></a>

@@ -217,6 +217,36 @@ test("groupby: transform rejeita nome de função desconhecido com erro orientad
     expect_error(function() source:groupby("key"):transform("unknown", "value") end, {"transform", "desconhecida"})
 end)
 
+test("groupby: funções inválidas são rejeitadas também sem grupos", function()
+    for unused_index, values in ipairs({{}, {1}}) do
+        local source = smaug.DataSet({
+            {"key", #values == 0 and {} or {"A"}, "string"}, {"value", values, "int64"},
+        })
+        local grouped = source:groupby("key")
+        for unused_invalid_index, invalid in ipairs({"unknown", 42, false}) do
+            expect_error(function() grouped:agg({value = invalid}) end, {"agg", "desconhecida"})
+            expect_error(function() grouped:transform(invalid, "value") end, {"transform", "desconhecida"})
+        end
+    end
+end)
+
+test("groupby: agg e transform aceitam callbacks com índices do grupo", function()
+    local source = smaug.DataSet({
+        {"key", {"B", "A", "B"}, "string"}, {"value", {10, 20, 30}, "float64"},
+    })
+    local function weighted_sum(series, row_indices)
+        local total = 0
+        for unused_index, row_index in ipairs(row_indices) do
+            total = total + series:get(row_index) * row_index
+        end
+        return total
+    end
+    local grouped = source:groupby("key")
+    expect_dataset(grouped:agg({value = weighted_sum}), {{"key", "string"}, {"value", "float64"}},
+        {{"A", 40}, {"B", 100}})
+    expect_series(grouped:transform(weighted_sum, "value"), "float64", {100, 40, 100})
+end)
+
 test("groupby: chaves int64, bool e composta preservam schema e valores", function()
     local years = smaug.DataSet({{"year", {2024, 2023, 2024}, "int64"}, {"value", {2, 5, 8}, "int64"}})
     expect_dataset(years:groupby("year"):sum(), {{"year", "int64"}, {"value", "int64"}}, {{2023, 5}, {2024, 10}})

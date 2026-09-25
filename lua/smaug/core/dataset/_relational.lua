@@ -88,15 +88,19 @@ return function(I)
     -- =====================================================================
     -- Join helpers
     -- =====================================================================
-    -- join_key: chave de igualdade de N colunas para a posição `row`.
+    -- relational_key: chave de igualdade de N colunas para uma posição.
     -- Delega a keys.encode (fonte única): int64 preserva via get_raw, os demais
     -- via get, sempre com prefixo de tipo. Antes usava um key_to_str local sobre
     -- col:get(row) — que degradava int64 > 2^53 e fundia linhas no join (L2).
-    local function join_key(col_list, row)
-        if #col_list == 1 then return keys.encode(col_list[1], row) end
+    local function relational_key(columns, row_index)
+        if #columns == 1 then return keys.encode(columns[1], row_index) end
         local parts = {}
-        for _, c in ipairs(col_list) do parts[#parts+1] = keys.encode(c, row) end
-        return table.concat(parts, "\1")
+        for column_index, column in ipairs(columns) do
+            local encoded = keys.encode(column, row_index)
+            -- O tamanho delimita cada componente, mesmo com separadores no texto.
+            parts[column_index] = #encoded .. ":" .. encoded
+        end
+        return table.concat(parts)
     end
 
     -- Política de NA em chave relacional (Contrato 8): NA = ausência que não
@@ -215,14 +219,14 @@ return function(I)
         local nl, nr = self:nrows(), other:nrows()
         local hash = {}
         for i = 1, nr do
-            local k = join_key(right_key_cols, i)
+            local k = relational_key(right_key_cols, i)
             if hash[k] then hash[k][#hash[k]+1] = i else hash[k] = {i} end
         end
 
         local pairs_idx     = {}
         local right_matched = {}
         for i = 1, nl do
-            local k = join_key(left_key_cols, i)
+            local k = relational_key(left_key_cols, i)
             local matches = hash[k]
             if matches then
                 for _, j in ipairs(matches) do
@@ -292,18 +296,11 @@ return function(I)
     end
 
     -- Agrupamento: separa COMPARAÇÃO de VALOR (fonte única = keys).
-    -- group_encode → string canônica de igualdade (int64 preserva via get_raw);
+    -- relational_key → string canônica de igualdade (int64 preserva via get_raw);
     -- é o que decide se duas linhas caem no mesmo grupo. Antes, get_key/keys_eq
     -- comparavam valores via get(), degradando int64 > 2^53 e fundindo grupos (L2).
     -- group_value → o valor exato, guardado como chave do grupo para reconstruir
     -- a coluna no resultado (usar get aqui degradaria o int64 grande no resultado).
-    local function group_encode(key_cols, row)
-        if #key_cols == 1 then return keys.encode(key_cols[1], row) end
-        local parts = {}
-        for _, c in ipairs(key_cols) do parts[#parts+1] = keys.encode(c, row) end
-        return table.concat(parts, "\1")
-    end
-
     local function group_value(key_cols, row)
         if #key_cols == 1 then return keys.value(key_cols[1], row) end
         local k = {}
@@ -368,11 +365,11 @@ return function(I)
         local groups = {}
         local n = ds:nrows()
         if n == 0 then return groups end
-        local cur_enc = group_encode(key_cols, perm[1])
+        local cur_enc = relational_key(key_cols, perm[1])
         local cur_key = group_value(key_cols, perm[1])
         local cur_idx = { perm[1] }
         for i = 2, n do
-            local enc = group_encode(key_cols, perm[i])
+            local enc = relational_key(key_cols, perm[i])
             if enc == cur_enc then
                 cur_idx[#cur_idx+1] = perm[i]
             else
@@ -595,14 +592,15 @@ return function(I)
             if type(fns) ~= "table" then fns = {fns} end
             local src = ds:_raw_column(cname)
             for _, fn in ipairs(fns) do
-                local fn_real = type(fn) == "string" and builtin[fn] or fn
-                if not fn_real then
+                local aggregation_function = fn
+                if type(fn) == "string" then aggregation_function = builtin[fn] end
+                if type(aggregation_function) ~= "function" then
                     error("smaug: groupby:agg() — função desconhecida "..Err.describe(fn), 2)
                 end
                 local out_name = type(fn) == "string" and (cname.."_"..fn) or cname
                 local vals = {}
                 for gi, g in ipairs(groups) do
-                    local v = fn_real(src, g.idx)
+                    local v = aggregation_function(src, g.idx)
                     vals[gi] = (v ~= nil) and v or NA
                 end
                 result:add_column(out_name, Series.from_table(vals, "float64", out_name))
@@ -621,8 +619,9 @@ return function(I)
             std=agg_std, var=agg_var, median=agg_median,
             first=agg_first, last=agg_last, prod=agg_prod,
         }
-        local fn = type(fn_name) == "string" and builtin[fn_name] or fn_name
-        if not fn then
+        local aggregation_function = fn_name
+        if type(fn_name) == "string" then aggregation_function = builtin[fn_name] end
+        if type(aggregation_function) ~= "function" then
             error("smaug: groupby:transform() — função desconhecida "..Err.describe(fn_name), 2)
         end
         local src  = ds:_raw_column(col_name)
@@ -630,7 +629,7 @@ return function(I)
         local vals = {}
         for i = 1, n do vals[i] = NA end
         for _, g in ipairs(groups) do
-            local agg_val = fn(src, g.idx)
+            local agg_val = aggregation_function(src, g.idx)
             for _, i in ipairs(g.idx) do vals[i] = agg_val end
         end
         return Series.from_table(vals, "float64", col_name)

@@ -35,7 +35,8 @@ Isso não certifica a suíte inteira, cobertura ou memória.
 
 ## Retomada relacional — 2026-09-25
 
-**Estado: reescrita inicial implementada, validação ainda não concluída.**
+**Estado: reescrita inicial implementada; os três defeitos do checkpoint foram
+corrigidos no seguimento abaixo. A auditoria da migração ainda não foi concluída.**
 O pedido foi avaliar conteúdo, estrutura e coerência de apenas
 [`test_relational.lua`](../tests/dataset/test_relational.lua), com base no
 [parecer da suíte](TEST_SUITE_REWRITE_REVIEW.md) e no
@@ -80,10 +81,32 @@ o byte 1 em Lua. A fixture distingue as tuplas sem reutilizar `keys.encode`.
 Os testes permanecem ativos e falhando; nenhuma expectativa foi ajustada
 para aceitar esses comportamentos.
 
+### Seguimento — correção dos três defeitos (2026-09-25)
+
+`agg` e `transform` agora resolvem nomes com uma condição explícita e validam
+o tipo da função antes da execução, inclusive quando não há grupos. Callbacks
+continuam aceitos. O helper comum de join/groupby delimita componentes pelo
+comprimento da chave codificada, eliminando a ambiguidade do separador textual.
+A sintaxe pública de join não foi alterada.
+
+A suíte relacional passou com **68 casos**: os 66 anteriores e duas regressões
+para funções inválidas em dados vazios/não vazios e callbacks com índices de
+grupo. O verificador de estilo não acusa o arquivo alterado; persistem as três
+ocorrências históricas de `_` em outros testes.
+
+Build Windows completa com `scripts/build.ps1 -SkipManifest`: código 0,
+13 suítes C (incluindo stress), 20 suítes Lua e 15 eixos de paridade passaram.
+`git diff --check` passou. Não houve nova medição de cobertura, sanitizers ou
+campanha de mutações; a migração desta família ainda requer a auditoria abaixo.
+
+A busca por consumidores também encontrou concatenação com `\1` em
+`dataset/_stat.lua` (chave de linha). Essa ocorrência permanece para revisão
+da família de duplicatas; não está coberta por esta correção relacional.
+
 ### Próximos passos desta frente
 
-1. Revisar e corrigir os três defeitos acima em uma etapa de implementação;
-   o escopo desta sessão ficou no teste e na documentação.
+1. Correção dos três defeitos acima concluída no seguimento; preservar as
+   regressões ao continuar a auditoria.
 2. Resolver as divergências de contrato antes de acrescentar expectativas:
    `groupby:count()` aparece como contagem de não-nulos na referência, mas
    conta linhas; `pivot_table` documenta padrão `mean`, mas usa `sum`;
@@ -98,8 +121,8 @@ para aceitar esses comportamentos.
 4. Auditar a correspondência dos cenários antigos com os novos e completar
    as lacunas restantes, incluindo independência do concat de múltiplas
    entradas, callbacks e preservação de int64 em colunas de valores.
-5. Após resolver as falhas, executar novamente este arquivo e os checks
-   pertinentes. Só então concluir a migração desta família.
+5. Após as etapas restantes de contrato, mutação e auditoria, executar novamente
+   este arquivo e os checks pertinentes. Só então concluir a migração desta família.
 
 `COVERAGE.md` mede apenas o backend C, no commit `51184cb` de 2026-08-11.
 Seus números não medem a árvore atual nem a cobertura de `_relational.lua`.
