@@ -62,7 +62,7 @@ trap 'rm -f "$tmp"' EXIT
     printf "%s  %6s  %s\n" "$h" "$n" "$f"
     total=$((total+1))
   done < <("$FIND" . -type f \
-            \( -name '*.c' -o -name '*.h' -o -name '*.lua' -o -name '*.md' \
+            \( -name '*.c' -o -name '*.h' -o -name '*.lua' -o -name '*.py' -o -name '*.md' \
                -o -name 'Makefile' -o -name '*.ps1' -o -name '*.sh' \
                -o -name '.gitattributes' -o -name '.gitignore' \
                -o -name '.env.example' -o -name 'LICENSE' \) \

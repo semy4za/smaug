@@ -61,6 +61,35 @@ acordo do seguimento. Em 2026-09-26, foram aprovadas a ordem das colunas por
 primeira aparição e a validação de sintaxe com consumo completo do documento:
 erro com posição e motivo, sem DataSet parcial. Implementação pendente;
 a discussão continua com preservação de valores e limites de representação.
+Seguimento de 2026-09-26 no Linux: os 30 casos observacionais de I/O foram
+reexecutados e 8 casos focados compararam a tabela C com a API Lua; os mesmos
+tokens foram lidos pelo Python 3.14.7. Confirmados NUL truncado, perda de int64
+na ponte e saturação no parser; reproduzido token longo de valor 1 convertido
+em 1e62. Evidências, referências reconferidas e políticas ainda abertas estão
+na seção de verificação Linux de `IO_REVIEW.md`. Sem correções de produção.
+Seguimento aprovado: preservar NUL em valores e nomes de colunas CSV/JSON,
+sem restrição de rejeição. Percurso dos nomes inspecionado e truncamento na
+leitura/escrita reproduzido; representação pública de comprimento e migração
+C/FFI ainda por definir. Contrato registrado, implementação pendente.
+Recorte posterior aceito: comprimento dos nomes em `smaug_column_t` e seus
+consumidores, metadata separada. `IO_REVIEW.md` detalha proposta de identificador
+escalar de ABI consultado no loader antes do acesso a estruturas; símbolo ausente
+foi reproduzido por sondagem protegida no Linux. Mecanismo ainda não implementado.
+O desenho de ABI foi aprovado no seguimento. Mais 11 casos CSV reproduziram
+inferência e reconhecimento de NA por prefixo anterior ao NUL, inclusive
+colisões entre marcadores configurados. `na_values` também precisa de transporte
+de comprimento; evidências e recomendação estão em `IO_REVIEW.md`.
+Revisão do core/FFI e duas leituras independentes delimitaram as correções pelos
+anéis: mecanismo de parsing no Anel 0; inferência/dialeto no Anel 3; FFI como
+tradução. Probe C de 28 cenários executado sob Valgrind sem erro de memória
+reportado no percurso normal, mas com defeitos semânticos reproduzidos.
+Saída NULL causa SIGSEGV nos quatro parsers em sondagens isoladas. ASan/UBSan
+não linkaram por runtimes ausentes. Critérios de aceitação, lacunas dos testes
+e políticas numéricas abertas estão registrados em `IO_REVIEW.md`.
+Seguimento de solidez do núcleo: `CORE_ARITHMETIC_REVIEW.md` registra verificação
+independente dos quatro helpers i64 checked, 30.712 chamadas sem divergência
+e cinco mutações detectadas pelo novo oráculo Python. Sem alteração de produção
+ou nova medição de coverage; escopo estritamente aritmético do Anel 0.
 A auditoria geral ainda não terminou; não houve
 alteração de produção. Após revisão e correções da inferência, retomar integração
 de `dayfirst`/detecção automática e migração aprovada dos 11 componentes.

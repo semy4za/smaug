@@ -19,6 +19,54 @@ Este inventário transcreve todas as justificativas e faz uma triagem. Não cert
 
 <a id="section-classes-de-triagem"></a>
 
+## Rechecagem dirigida no Linux — 2026-09-26
+
+O mantenedor pediu conferir a solidez das defesas do núcleo, usando coverage
+como mapa, e questionou justificativas que podem não corresponder à proteção
+real. A verificação cruzou relatório, gerador, core e testes, mantendo a
+separação dos anéis. Esta seção não substitui a triagem histórica nem declara
+que todas as marcações foram reauditadas.
+
+- **Defesa incorreta, confirmada na árvore atual:** `smaug_dt_year_series`
+  aplica `v >= 0`, descrito como defesa em profundidade e ramo negativo
+  inalcançável (`src/smaug_datetime.c:668,677`). Reproduzido pelo FFI existente:
+  construir ano -2/mês 3/dia 1 com `smaug_dt_from_parts_checked` retorna SMG_OK;
+  `smaug_dt_set` também. A escalar devolve -2 e a série devolve SMG_NULL_VALUE.
+  O ramo é alcançável com entrada válida e descarta um ano válido. Confirma
+  atualmente o achado histórico COV-066/067; migração dos componentes permanece
+  pendente, não corrigida nesta rodada.
+- **Asserção sem poder de rejeição:** `test_allocfail.c:1726` contém
+  `!read_csv_memory_result || read_csv_memory_result->error || 1`. A expressão
+  sempre é verdadeira; execução e cleanup podem detectar crash, mas esse CHECK
+  não prova diagnóstico correto nem ausência de resultado parcial. É teste de
+  I/O (Anel 3), não evidência sobre aritmética do Anel 0.
+- **Cobertura total não detecta defesa ausente:** `smaug_convert.c` consta com
+  100% de linhas e branch-alvo, mas probes atuais reproduzem prefixo anterior
+  ao NUL aceito por API de slice e SIGSEGV com `out=NULL`. Os guards que não
+  existem não entram no denominador. Detalhes em `IO_REVIEW.md` e no novo
+  `scripts/audit_numeric_parse.c`.
+- **Exclusão por comentário, sem prova pelo gerador:** `make_coverage.sh`
+  desconta os ramos não executados de linhas com `COV-EXCL-BR`. Isso mede a
+  fórmula definida, mas não verifica a justificativa nem seleciona um ramo
+  específico da linha. A marcação "OOM sem injeção" continua sendo lacuna
+  de teste, não impossibilidade, conforme Contrato 10.
+- **Rótulo excede a medição:** o gerador imprime "padrão SQLite/avionica" e
+  "MC/DC", embora conte branches tomados do gcov. Não há, nesse cálculo,
+  evidência da independência das condições exigida para alegar MC/DC.
+  Os números brutos e ajustados são distintos e devem continuar visíveis.
+
+Os problemas acima não tornam todas as defesas falsas. Precisam ser separados
+em implementação incorreta, asserção insuficiente, exclusão sem prova e ausência
+de guard. Não foram alterados o relatório gerado, o gerador, as marcações ou
+os fontes de produção. A revisão de 2026-09-18 já classificava sete marcações
+como refutadas; essa contagem é histórica, não uma medição nova desta rodada.
+
+Seguimento positivo no mesmo dia: os quatro helpers aritméticos checked foram
+comparados com um oráculo de inteiros de precisão arbitrária: 30.712 chamadas
+sem divergência e cinco mutações compiláveis detectadas pelo novo oráculo.
+Escopo, reprodução e limites em [Verificação aritmética do core](CORE_ARITHMETIC_REVIEW.md).
+Isso não recalcula coverage nem certifica o restante do núcleo.
+
 ## Classes de triagem
 
 | Classe | Marcações |

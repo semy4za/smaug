@@ -361,6 +361,15 @@ Estado por formato:
 
 Vocabulário do CSV, deliberado:
 
+**NUL em valores e nomes — decisão aprovada em 2026-09-26, implementação
+de I/O pendente:** byte NUL é conteúdo válido, distinto de string vazia e NA.
+CSV e JSON devem preservá-lo em valores e nomes de colunas, na leitura e escrita,
+sem truncamento. JSON usa o escape `\u0000`; NUL literal não escapado permanece
+inválido na sintaxe JSON. CSV preserva o byte como extensão do dialeto do Smaug
+em relação à RFC 4180. Nomes `a` e `a\0b` são distintos em associação e
+desambiguação. A regra de campo vazio/NA abaixo permanece. Ver `IO_REVIEW.md`
+para evidências, migração da fronteira C/Lua e limitações atuais.
+
 - **saída:** ausência → campo vazio; `NaN` → `nan`; `±inf` → `inf`/`-inf`.
 - **entrada (`BUILTIN_NA`):** `""`, `NA`, `null`, `N/A`, `NULL`. **`nan`/`NaN`
   não estão aqui** — são valores, via `strtod` (que aceita todas as grafias,

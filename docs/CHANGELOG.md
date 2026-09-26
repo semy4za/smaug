@@ -27,6 +27,30 @@ Uma entrada por sessão de trabalho. Foco no que não é óbvio pelo diff:
 decisões, achados, motivações.
 
 ---
+
+## 2026-09-26 — Verificação de preservação de valores no Linux
+
+Seguimento: revisão das defesas e exclusões de cobertura, respeitando os anéis.
+Registrados critérios do core, sondagem numérica sob Valgrind e limitações
+do ambiente (ASan/UBSan não linkaram). Rechecado ano negativo descartado pelo
+guard dos componentes datetime. Helpers i64 checked passaram por 30.712 chamadas
+contra oráculo independente e cinco mutações foram detectadas em cópias
+temporárias. Detalhes em `CORE_ARITHMETIC_REVIEW.md` e no inventário de exclusões;
+sem novas alterações de produção ou atualização dos percentuais de cobertura.
+
+Retomada da revisão de I/O, sem alteração de produção. Reconstruída a biblioteca
+compartilhada ausente com `make`; reexecutados os 30 casos de `audit_io.lua`.
+Novo `scripts/audit_io_values.lua` observa 8 casos diretamente no C e pela API
+Lua. Comparação com Python 3.14.7 e consulta às referências documentadas estão
+registradas em `IO_REVIEW.md`, separando resultados de políticas ainda abertas.
+
+Confirmados truncamento por NUL, perda de inteiros na ponte C/Lua e saturação
+de inteiros fora da faixa no parser JSON. Um token longo de valor exato 1
+produz 1e62 devido ao corte em 63 bytes antes da conversão. Até INT64_MAX,
+preservado no C, chega como INT64_MIN no Lua. Scripts são observacionais,
+não testes de aprovação; sem nova suíte completa, cobertura ou sanitizers.
+
+---
 <a id="section-2026-09-25-revisao-io"></a>
 
 ## 2026-09-25 — Mapeamento de I/O antes da inferência datetime
