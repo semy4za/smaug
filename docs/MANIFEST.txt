@@ -1,6 +1,6 @@
 # Smaug -- MANIFEST de integridade
 # Gerado por scripts/make_manifest.sh (o .ps1 delega a este)
-# Arvore: 74ca682 + alteracoes nao commitadas
+# Arvore: 31c4cfd + alteracoes nao commitadas
 # Formato: <sha256>  <linhas>  <caminho>
 #
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
@@ -15,18 +15,18 @@ b111d430370dd6d91e0ca78a59c49024cf09311b61d6ef2771c456de28fec8aa     557  ./docs
 dddeabbb5aea9e591435f07a97f5ad29662602f1fd214f7ac5a3acc7abfbf05f    5518  ./docs/CHANGELOG.md
 823805de06773514ddb6673a558a27002efc378a397f10e6361525ec9d80b692     116  ./docs/CODING_STYLE.md
 b9a747cd47ea151b98450610f7e0a37a1b5f9feb7645c9e41572e75fb31c3ae7     858  ./docs/CONTRACT.md
-f44a05b876364bdb45979af7fdd89c850393415a3b6653eb6850a58a98b1d2b6     380  ./docs/COVERAGE.md
+dba0d2650cd703dd9eebf3633bc2cb8431a5fbee5f5fdb5202fd8f9be370154a     433  ./docs/COVERAGE.md
 7e6baf6917b5228ff850225590ed826a0c42975c1b8b10e475cd1649f4c70ba8     217  ./docs/COW.md
 74a0fe195fbaddded998dca2cd268e21c551f14933e1a5f7dbf3bf308a1fd52f     109  ./docs/GETTING_STARTED.md
-7a711bc1aa01050e3336b024ceef394ebd8ceeec9612db781e4b310710771a35     143  ./docs/IO_REVIEW.md
-bbec8639c52ae896560b97f28a413a39daa628437fefe505c2d8892427fad493     959  ./docs/PARITY_REPORT.md
-394ad4f3425b6de2c7d64745c8ccb5bae203bc2d36d21a935ea0a0751818ee0a      42  ./docs/README.md
+84d1d1b655fb3eac251815480c3d2d59bdd7094ef580e529d4a6e866ba4a4e3e     256  ./docs/IO_REVIEW.md
+2c992b0085040a73432719604176c6f446aff32b8b45b9327d2973172d73b6de     959  ./docs/PARITY_REPORT.md
+c04292cd954b3cb2480a122b7b1f5f365130b5142f19aec9a2b11edd5f7b6934      43  ./docs/README.md
 d0ca444c73b064356743980bb68e9ea708a4dfd1b0d1e00c432e53d1ebbb9767     963  ./docs/Roadmap.md
 9c16665ee26a28cf5e71f5f30c30d0fe1e3bc774b149fda9ffd899c933ee953e     218  ./docs/TEST_SUITE_EXCLUSIONS_REVIEW.md
-f07feb33fd5b15a9b9233d1ce4e677c4b3d9d0f98e4eef995e4b1252a4588e5b     246  ./docs/TEST_SUITE_REWORK.md
+489d00f1c4361edfde9b876975f90b4d159d8e3f070b00955727c6a673cb5610     257  ./docs/TEST_SUITE_REWORK.md
 33d754837578eedad15022c3c2fcbba5b3b0156dac80c9a8a151394b72e03a72     427  ./docs/TEST_SUITE_REWRITE_REVIEW.md
 e6c98e4dd88e3d027f42b21da38efd6ca08554576ae4913dd16c77f1bca0424f     209  ./docs/USER_GUIDE.md
-444fe51f26822d2ff8484b639e7886e0be5863be4bb2470744439a9e40e93c97      20  ./docs/doc_new/readme.md
+672bf21a6d8e959f48a24a314514677bd946b8f1fd8e5951bd77f65d11d7227f      20  ./docs/doc_new/readme.md
 1722e1a5806e185b2f934f2a66ec5193cc6ab8dc5a03837be43be80628c8fb86      39  ./include/smaug.h
 e7562c7cf6a0c4710bd5c069e304cb8640f126e5f4e6c83e63f8086fe7b3c065      75  ./include/smaug_astype.h
 963e21a0d5b9b1857da7bbe7310a4a9340057fcf7560272f062e4e83727c5da3      40  ./include/smaug_bool.h
