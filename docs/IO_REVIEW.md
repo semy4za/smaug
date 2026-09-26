@@ -2,7 +2,9 @@
 
 ## Estado e escopo
 
-Mapeamento para discussão, sem alterações de produção ou de contratos.
+Mapeamento e registro das decisões discutidas, sem alterações de produção.
+Os acordos sobre organização dos registros estão registrados abaixo;
+as demais políticas continuam pendentes.
 Referência local: commit `b34766c`. CSV e JSON continuam implementações próprias,
 sem novas dependências. Bibliotecas externas foram consultadas como referências
 de comportamento, não como código a importar nem como especificação do Smaug.
@@ -30,10 +32,116 @@ Depois da revisão/correção da inferência, permanecem na ordem acordada:
   conversão numérica e adaptação de objetos. Possui extensões e escolhas próprias,
   como nomes repetidos e números não finitos; seus padrões não são automaticamente
   adotados. Não é um oráculo estrito universal de conformidade JSON.
+- [Lua CJSON](https://www.kyne.au/~mark/software/lua-cjson-manual.html): representa
+  `null` com `cjson.null`; aceita NaN, infinito e hexadecimal na leitura por padrão,
+  com configuração para desabilitar essa tolerância. Serve como referência Lua,
+  sem adotar automaticamente suas extensões.
+- [dkjson](https://dkolf.de/dkjson-lua/documentation): permite escolher a
+  representação de `null` na decodificação, inclusive `json.null`; o padrão é
+  `nil`. Essa escolha importa para preservar campos explicitamente nulos.
+- [pandas: lista de dicionários](https://pandas.pydata.org/docs/user_guide/dsintro.html#from-a-list-of-dicts):
+  a construção de DataFrame sem seleção explícita de colunas incorpora campos
+  de registros posteriores e representa células ausentes como valores faltantes.
+  Referência de adaptação tabular, não regra da gramática JSON.
 
 O perfil atual do Smaug lê arrays de objetos com células escalares. JSON aninhado,
 valores escalares no topo e arrays de arrays não precisam ser implementados apenas
 porque existem na especificação geral: rejeição explícita pode delimitar o perfil.
+
+## Decisão aprovada — associação por nome e união de campos
+
+Na retomada após o rebase, o mantenedor aprovou o seguinte comportamento para
+a leitura de arrays de objetos sem schema explícito:
+
+- Associar cada valor pelo nome da chave, independentemente da posição no objeto.
+- Formar as colunas pela união dos campos encontrados nos registros, incluindo
+  campos que só aparecem depois do primeiro objeto.
+- Preencher com NA as células de registros sem aquele campo, inclusive as linhas
+  anteriores à primeira ocorrência de uma coluna nova.
+
+Por exemplo, `[{"id":1,"nome":"Ana"},{"nome":"Bia","id":2,"idade":30}]`
+deve conservar os pares nome/valor e incluir `idade`, com NA na primeira linha
+e 30 na segunda. A associação por nome decorre da semântica JSON; a união dos
+campos e o preenchimento com NA são decisões da adaptação para DataSet,
+com referência no comportamento documentado do pandas.
+
+Esta decisão ainda não foi implementada. A nomeação de colunas repetidas foi
+aprovada no seguimento abaixo, assim como o tratamento de `null` e de textos
+semelhantes a marcadores de ausência. A ordem de descoberta das colunas e a
+validação sintática foram aprovadas no seguimento de 2026-09-26. Permanecem
+abertas a inferência de dtype e uma futura API com schema explícito.
+
+## Decisão aprovada — nomes únicos automaticamente, seguindo pandas
+
+O mantenedor confirmou como referência a nomeação de cabeçalhos repetidos do
+[pandas.read_csv](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html):
+manter a primeira ocorrência e acrescentar sufixos `.1`, `.2` e assim por diante
+às repetições, sem reordenar as colunas durante a desambiguação. Exemplo:
+`id, id, nome, id` resulta em `id, id.1, nome, id.2`.
+
+Foi explicitado que nomes repetidos não devem fazer a importação falhar. Se um
+nome gerado também colidir, a desambiguação deve continuar até obter um nome
+livre, preservando todas as colunas e seus valores, sem sobrescrever nem
+descartar ocorrências. A convenção aprovada usa ponto, conforme a referência
+do pandas. A regra é aplicada à adaptação tabular do Smaug; não é uma afirmação
+de que `pandas.read_json` renomeia chaves JSON repetidas dessa forma.
+
+Na leitura JSON, repetir uma chave em objetos diferentes continua identificando
+a mesma coluna; essa repetição entre registros não gera sufixo. Ocorrências
+repetidas dentro de um mesmo objeto devem ser preservadas em colunas distintas.
+A implementação deve manter a correspondência dessas colunas entre registros,
+inclusive quando já existem chaves com sufixos no documento.
+
+Implementação pendente. Validar os casos de colisão contra a referência do
+pandas e acrescentar regressões de preservação dos valores e de associação
+entre registros.
+
+## Decisão aprovada — nulidade e texto literal
+
+Na conversão de JSON para DataSet:
+
+- Campo ausente no registro corresponde a NA.
+- Valor JSON `null` corresponde a NA.
+- Strings `""`, `"null"` e `"NA"` permanecem texto válido, sem conversão para NA.
+
+A máscara de nulidade do DataSet representa tanto a ausência de campo quanto
+o `null` explícito. Essa adaptação não conserva a distinção entre as duas formas
+na tabela resultante; o texto entre aspas continua distinto de ambas.
+A política de marcadores textuais do leitor CSV não se aplica automaticamente
+ao leitor JSON.
+
+Inspeção dos fontes: `parse_value` já distingue tokens `null` de strings;
+o preenchimento das séries já usa a máscara para valores nulos. O alinhamento
+por posição ainda impede certificar campos ausentes em registros heterogêneos.
+A correção deve preservar essa separação de tokens e cobrir os três textos
+acima, junto de `null` e campo ausente, em regressões com máscara e conteúdo.
+Não houve nova execução de testes nesta etapa de discussão.
+
+## Decisão aprovada — ordem das colunas e validação sintática (2026-09-26)
+
+As colunas seguem a ordem da primeira aparição no documento: começar pelos
+campos do primeiro registro e acrescentar campos novos ao final. A nomeação
+automática de repetições preserva essa ordem. O preenchimento continua usando
+a correspondência dos campos, independentemente da posição no registro.
+Exemplo: `[{"id":1,"nome":"Ana"},{"idade":30,"nome":"Bia","id":2}]`
+produz as colunas `id`, `nome`, `idade`, nessa ordem.
+
+A leitura deve validar a sintaxe JSON e consumir o documento completo,
+permitindo apenas os espaços em branco previstos pela gramática depois do
+valor final. Entradas malformadas devem retornar erro com posição e motivo,
+sem entregar um DataSet parcial. Entre as regressões necessárias estão:
+
+- Fechamento ausente de array, objeto ou string.
+- Vírgula ausente ou final indevida.
+- Escape inválido ou caractere de controle literal dentro de uma string.
+- Número com gramática inválida, como `01` ou `1.`.
+- Conteúdo não permitido após o documento.
+
+Nomes repetidos seguem a desambiguação aprovada; não são motivo para rejeitar
+a importação. A regra de erro acima trata da sintaxe. Limites de representação
+numérica, comprimento de strings, BOM, validação de UTF-8 e surrogates isolados
+ainda precisam do tratamento específico registrado nas pendências da revisão.
+Implementação e testes dessas correções continuam pendentes.
 
 ## Organização atual
 
@@ -69,7 +177,7 @@ Os identificadores abaixo correspondem aos rótulos do script.
 | Área / casos | Observado | Classificação / trabalho |
 |---|---|---|
 | JSON J01–J02 | Chaves reordenadas trocam valores; campo ausente desloca valor para outra coluna | Defeito confirmado: alinhar por nome antes da inferência |
-| JSON J03 | Campo novo depois do primeiro objeto é descartado | Decidir schema: união de campos ou rejeição explícita; evitar descarte silencioso |
+| JSON J03 | Campo novo depois do primeiro objeto é descartado | União de campos aprovada para leitura sem schema explícito, com NA nas células ausentes; implementação pendente |
 | JSON J04–J07 | Aceita falta de `]`, lixo após documento, ausência de vírgula e vírgula final | Defeito de validação sintática; revisar estados e consumo completo |
 | JSON J08, J17 | Aceita `\q` e quebra literal dentro de string | Defeito de validação de escapes/controles |
 | JSON J09, W01 | `a\u0000b` vira `a`; writer gera escape correto, reader perde o restante | Defeito de preservação de comprimento, também no roundtrip |
@@ -83,7 +191,7 @@ Os identificadores abaixo correspondem aos rótulos do script.
 | CSV C09 | `"NA"` vira ausência mesmo entre aspas | Política de NA existente, não erro de sintaxe; discutir representação de texto literal |
 | CSV C10 | Mistura `true` e `1` permanece texto | Política de fallback do I/O; não confundir com coerção bool→número |
 | J13, C06, B01 | C preserva `9007199254740993`; API Lua devolve `9007199254740992` | Defeito confirmado na ponte comum, em `tonumber` antes de reconstruir Series |
-| JSON J14 / CSV C07 | Nomes duplicados são rejeitados só ao adicionar coluna no Lua | Falha tardia; revisar contrato, diagnóstico e cleanup, inclusive API C |
+| JSON J14 / CSV C07 | Nomes duplicados são rejeitados só ao adicionar coluna no Lua | Nomeação automática com sufixos como no pandas aprovada para a frente JSON; implementar sem perder valores nem falhar por colisão. Revisar também contrato CSV e cleanup, inclusive API C |
 | JSON J15 | Objeto aninhado é rejeitado | Restrição atual de perfil; não classificar como funcionalidade obrigatória |
 
 Verificação adicional direta no C para J12: `9223372036854775808` retorna
@@ -127,10 +235,15 @@ em mudança de contrato do projeto.
 
 ## Ordem proposta para discussão e trabalho
 
-1. Fechar organização de registros: campos JSON por nome; política para campos
-   novos/ausentes/duplicados; linhas CSV com largura divergente.
-2. Fechar perfil sintático e tolerâncias, com rejeição orientada para entradas
-   fora do perfil. Separar isso da inferência de dtype.
+1. Organização JSON por nome, união dos campos, nomeação automática de colunas
+   repetidas como no pandas e política de nulidade aprovados: campo ausente e
+   `null` viram NA; `""`, `"null"` e `"NA"` permanecem texto. Ordem por primeira
+   aparição também aprovada. Pendem linhas CSV com largura divergente ou nomes
+   duplicados; implementar após a discussão das políticas restantes.
+2. Validação da sintaxe JSON e consumo completo aprovados, com erro indicando
+   posição e motivo, sem DataSet parcial. Implementação pendente; completar
+   políticas específicas de codificação e limites sem confundir sintaxe com
+   inferência de dtype.
 3. Corrigir preservação de valores: comprimento de strings, limites numéricos,
    exatidão C/Lua; revisar cleanup e falhas de alocação nos caminhos envolvidos.
 4. Concluir o mapa da inferência Lua e I/O: `from_dict`, `full`, mapas normal e

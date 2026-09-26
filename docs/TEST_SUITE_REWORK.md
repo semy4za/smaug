@@ -50,7 +50,18 @@ serem preservados para consumidores C.
 Retomada de 2026-09-25: antes de integrar `dayfirst`, o mantenedor decidiu auditar
 a inferência de ponta a ponta e discutir problemas estruturais antes de corrigir.
 O [mapeamento de CSV/JSON](IO_REVIEW.md) registra defeitos reproduzidos, decisões
-pendentes e limites da revisão. A auditoria geral ainda não terminou; não houve
+aprovadas e pendentes, além dos limites da revisão. Na retomada após o rebase,
+foi aprovada a associação JSON por nome, com união dos campos e NA nas células
+de registros sem aquele campo, para leitura sem schema explícito. Também foi
+aprovada a nomeação automática de colunas repetidas como no leitor CSV do pandas
+(`id`, `id.1`, `id.2`), sem reordenar, perder valores ou falhar por colisão de
+nomes; continuar a desambiguação até obter nomes livres. Campo ausente e `null`
+explícito viram NA; strings `""`, `"null"` e `"NA"` permanecem texto, conforme
+acordo do seguimento. Em 2026-09-26, foram aprovadas a ordem das colunas por
+primeira aparição e a validação de sintaxe com consumo completo do documento:
+erro com posição e motivo, sem DataSet parcial. Implementação pendente;
+a discussão continua com preservação de valores e limites de representação.
+A auditoria geral ainda não terminou; não houve
 alteração de produção. Após revisão e correções da inferência, retomar integração
 de `dayfirst`/detecção automática e migração aprovada dos 11 componentes.
 Formatter (inclusive saída negativa canônica) e helpers ainda exigem revisão;
