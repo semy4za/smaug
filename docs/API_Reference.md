@@ -2,80 +2,10 @@
 
 [Início](README.md) · [Primeiros passos](GETTING_STARTED.md) · [Guia do usuário](USER_GUIDE.md) · [API Reference: Lua](API_INDEX.md) | [Núcleo C](API_Reference.md)
 
-<details>
-<summary>Nesta página</summary>
-
-- [Mapa de headers (qual #include usar)](#section-mapa-de-headers-qual-include-usar)
-- [Tipos](#section-tipos)
-  - [smaug_mask_t](#section--smaug-mask-t)
-  - [smaug_metadata_t](#section--smaug-metadata-t)
-  - [smaug_series_f64_t / smaug_series_i64_t](#section--smaug-series-f64-t-smaug-series-i64-t)
-- [Lifecycle](#section-lifecycle)
-- [Getters / Setters](#section-getters-setters)
-- [Append dinâmico](#section-append-dinamico)
-- [Aritméticas](#section-aritmeticas)
-- [Reduções](#section-reducoes)
-- [Comparações](#section-comparacoes)
-- [Ordenação](#section-ordenacao)
-- [Utilitários](#section-utilitarios)
-- [Operações Boolean (BoolSeries)](#section-operacoes-boolean-boolseries)
-- [Strings (smaug_str_*)](#section-strings-smaug-str)
-  - [Lifecycle](#section-lifecycle-1)
-  - [Acesso e mutação](#section-acesso-e-mutacao)
-  - [Comparações](#section-comparacoes-1)
-  - [Filtro e ordenação](#section-filtro-e-ordenacao)
-- [Diferenças do int64 (i64)](#section-diferencas-do-int64-i64)
-- [Views e Copy-on-Write](#section-views-e-copy-on-write)
-- [Gerenciamento de memória — resumo](#section-gerenciamento-de-memoria-resumo)
-- [Problemas conhecidos](#section-problemas-conhecidos)
-- [Anel 3 — I/O (smaug_io.h)](#section-anel-3-i-o-smaug-io-h)
-  - [smaug_table_t — struct intermediária](#section--smaug-table-t-struct-intermediaria)
-  - [CSV](#section-csv)
-  - [JSON](#section-json)
-  - [Ciclo de vida](#section-ciclo-de-vida)
-- [Anel 0 — Datetime (smaug_datetime.h)](#section-anel-0-datetime-smaug-datetime-h)
-  - [Lifecycle](#section-lifecycle-2)
-  - [Acesso](#section-acesso)
-  - [Parsing / formatação ISO 8601](#section-parsing-formatacao-iso-8601)
-  - [Extração de componentes (operam em epoch_ms escalar; retornam -1 em erro)](#section-extracao-de-componentes-operam-em-epoch-ms-escalar-retornam-1-em-erro)
-  - [Construção e aritmética](#section-construcao-e-aritmetica)
-  - [Comparações, ordenação e seleção](#section-comparacoes-ordenacao-e-selecao)
-- [Datetime — evolução da API C](#section-datetime-migracao-c)
-  - [Decisão fechada e alcance](#section-decisao-fechada-e-alcance)
-  - [Núcleo de calendário: assinaturas e mudanças](#section-nucleo-de-calendario-assinaturas-e-mudancas)
-  - [Outras entradas e operações datetime](#section-outras-entradas-e-operacoes-datetime)
-  - [Consumidores C e fronteira FFI](#section-consumidores-a-migrar)
-  - [Diagnóstico, status e memória](#section-diagnostico-status-e-memoria)
-  - [Compatibilidade e validação da futura migração](#section-compatibilidade-e-validacao-da-futura-migracao)
-  - [Decisões restantes, em ordem](#section-decisoes-restantes-em-ordem)
-- [Catálogo rápido de funções C](#section-camada-c-backend-include-h-src-c)
-  - [Lifecycle e acesso (smaug_core.h)](#section-lifecycle-e-acesso-smaug-core-h)
-  - [Aritmética (smaug_numeric.h)](#section-aritmetica-smaug-numeric-h)
-  - [Reduções (smaug_numeric.h)](#section-reducoes-smaug-numeric-h)
-  - [Comparações e ordenação (smaug_numeric.h)](#section-comparacoes-e-ordenacao-smaug-numeric-h)
-  - [Booleano / Kleene (smaug_bool.h)](#section-booleano-kleene-smaug-bool-h)
-  - [String (smaug_string.h)](#section-string-smaug-string-h)
-  - [I/O — Anel 3 (smaug_io.h)](#section-i-o-anel-3-smaug-io-h)
-  - [Tipos (smaug_types.h)](#section-tipos-smaug-types-h)
-- [Desenvolvimento do núcleo C](#section-desenvolvimento-do-nucleo-c)
-  - [Contribuir com o projeto](#section-contribuir-com-o-projeto)
-  - [Preparar o ambiente](#section-preparar-o-ambiente)
-  - [Contribuir com o código](#section-contribuir-com-o-codigo)
-  - [Internals e memória](#section-internals-e-memoria)
-  - [Testes e investigação de regressões](#section-testes-e-investigacao-de-regressoes)
-  - [Contribuir com a documentação](#section-contribuir-com-a-documentacao)
-  - [Manutenção e versões](#section-manutencao-e-versoes)
-
-</details>
-
-Referência do contrato público do backend C. Todas as funções numéricas existem
-em duas variantes, `f64` (`double`) e `i64` (`int64_t`), com estruturas e
-semântica análogas. As diferenças de int64 estão na seção final.
-
-**Status:** todas as funções abaixo estão **implementadas** para f64 e i64
-(`smaug_core.c` + `smaug_ops_f64.c` + `smaug_ops_i64.c`), mais as operações
-booleanas (`smaug_ops_bool.c`) e o tipo `string` Tier 1
-(`smaug_str.c` + `smaug_ops_str.c`).
+Referência do backend C. As famílias f64 e i64 têm diferenças de assinatura,
+precisão e falha; não deduzir uma assinatura pela outra. As tabelas descrevem
+a API existente, enquanto a seção de evolução datetime distingue assinaturas
+aprovadas ainda por implementar. Verificação e pendências: [roadmap](Roadmap.md).
 
 <a id="section-mapa-de-headers-qual-include-usar"></a>
 
@@ -92,6 +22,11 @@ cobre o que você usa, ou o umbrella `smaug.h` para tudo:
 | `smaug_numeric.h` | Aritmética, reduções, comparações, ordenação, take/filter/count (f64+i64). | `smaug_core.h` |
 | `smaug_bool.h` | Operações booleanas Kleene. | `smaug_types.h` |
 | `smaug_string.h` | Tipo `string`: lifecycle, acesso, comparações, filter/take/sort. | `smaug_types.h` |
+| `smaug_datetime.h` | Tipo `datetime`: epoch ms, parser, calendário e operações temporais. | `smaug_types.h` |
+| `smaug_ops_window.h` | Janelas, rolling e operações de ordenação múltipla. | `smaug_core.h`, `smaug_string.h` |
+| `smaug_io.h` | Tabelas intermediárias e leitura/escrita CSV/JSON. | `smaug_types.h` |
+| `smaug_astype.h` | Conversões entre dtypes. | `smaug_core.h` |
+| `smaug_convert.h` | Parsing/formatação numérica e textual de baixo nível. | headers C padrão |
 | `smaug.h` | **Umbrella** — inclui os de operação. | todos acima |
 
 > O antigo `smaug_math.h` foi **removido** (o nome "math" não refletia o
@@ -121,7 +56,7 @@ Bitmask de 1 byte por elemento. Array paralelo aos dados.
 ```c
 typedef struct {
     const char *name;        /* nome da coluna, ex: "salario" */
-    const char *dtype;       /* "float64", "int64" */
+    const char *dtype;       /* "float64", "int64", "bool", "string", "datetime" */
     bool is_view;            /* true se é uma view (não dona da memória) */
     bool external_alloc;     /* true se não deve liberar data/null_mask */
 } smaug_metadata_t;
@@ -146,6 +81,8 @@ typedef struct {
 
 Invariantes: `size <= capacity` sempre; `data` e `null_mask` têm o mesmo
 tamanho (`capacity`); posições em `[size, capacity)` são lixo não-inicializado.
+`smaug_series_bool_t`, `smaug_series_str_t` e `smaug_series_dt_t` vivem no
+mesmo header e têm contratos de lifecycle próprios descritos nas seções abaixo.
 
 ---
 
@@ -169,9 +106,10 @@ Pontos críticos:
   `append`. Popular uma série do zero exige um loop de `set`.
 - **`free` respeita `external_alloc`.** Se `true` (caso das views), não libera
   `data`/`null_mask`, apenas o struct. Sempre libera o struct em si.
-- **Views não podem sobreviver à série-pai.** A view aponta para a memória da
-  pai; liberar a pai antes invalida a view (use-after-free). Modificar via view
-  modifica a pai. Se precisar de independência, use `clone`.
+- **Views ainda compartilhadas dependem dos buffers do pai.** Liberar o pai
+  antes invalida a view. Mutar a view dispara detach e preserva o pai; após
+  detach ela é independente. Realocação do pai exige cuidados próprios:
+  consulte [COW](COW.md), sem presumir estabilidade de ponteiros.
 
 ```c
 /* Padrão de uso */
@@ -278,6 +216,49 @@ a+b = [11.0, NA, NA ]
 
 ---
 
+<a id="section-parsing-formatacao-escalares"></a>
+
+## Parsing e formatação de escalares (`smaug_convert.h`)
+
+Estas funções são utilitários C sem estado. A variante com `(ptr, len)` valida
+o slice completo, rejeita NUL dentro do comprimento declarado e não exige
+terminador externo. A variante `_cstr` exige uma C-string terminada e não impõe
+limite artificial de comprimento. As variantes `_status` retornam `SMG_OK` ou
+uma causa explícita (`SMG_ERR_ARGUMENT`, `SMG_ERR_SYNTAX`,
+`SMG_ERR_OVERFLOW`, `SMG_ERR_UNDERFLOW` ou `SMG_ERR_NOMEM`); em falha,
+preservam o destino. Os wrappers sem `_status` mantêm 1/0 por compatibilidade.
+O core usa ponto decimal, rejeita whitespace e consome toda a entrada. i64
+aceita decimal e hexadecimal inteiro; f64 aceita decimal, hexadecimal com
+expoente binário opcional e `nan`/`inf`/`infinity`.
+
+```c
+smaug_status_t smaug_parse_i64_status(const char *s, size_t len, int64_t *out);
+smaug_status_t smaug_parse_f64_status(const char *s, size_t len, double *out);
+smaug_status_t smaug_parse_i64_cstr_status(const char *s, int64_t *out);
+smaug_status_t smaug_parse_f64_cstr_status(const char *s, double *out);
+int smaug_parse_i64(const char *s, size_t len, int64_t *out); /* legado 1/0 */
+int smaug_parse_f64(const char *s, size_t len, double *out); /* legado 1/0 */
+int smaug_parse_i64_cstr(const char *s, int64_t *out);         /* legado 1/0 */
+int smaug_parse_f64_cstr(const char *s, double *out);          /* legado 1/0 */
+size_t smaug_fmt_i64(char *buf, size_t cap, int64_t value);
+size_t smaug_fmt_f64(char *buf, size_t cap, double value);
+```
+
+Subnormais representáveis têm sucesso, inclusive quando a libc sinaliza
+`ERANGE`; texto não zero que arredonda para zero retorna `SMG_ERR_UNDERFLOW`,
+e overflow retorna `SMG_ERR_OVERFLOW`, inclusive saturação em DBL_MAX com
+`ERANGE`. Sintaxe inválida prevalece sobre overflow de prefixo. O parser
+preserva o modo de arredondamento do caller. Consumidores CSV podem usar a variante
+`_cstr` quando o campo já estiver terminado. Os formatadores usam ponto decimal fixo, normalizam não finitos para
+`nan`/`inf` e preservam zero negativo. Capacidade inclui o NUL (32 bytes bastam
+para i64/f64); retorno positivo é comprimento efetivamente escrito, sem NUL.
+Retorno zero indica falha de argumento/capacidade ou falha operacional,
+sem alterar os bytes do destino. Não há modo de consulta de tamanho.
+No POSIX, locale da thread é temporariamente selecionado e restaurado;
+no Windows, a rotina de formatação recebe locale explícito. Não modificam o
+locale global ou arredondamento do caller. Roundtrip f64 verificado em
+FE_TONEAREST; outros modos seguem a libc sem garantia adicional de roundtrip.
+
 <a id="section-reducoes"></a>
 
 ## Reduções
@@ -285,6 +266,7 @@ a+b = [11.0, NA, NA ]
 | Função | f64 retorna | i64 retorna |
 |--------|-------------|-------------|
 | `sum(s, ignore_na)` | `double` | `int64_t` |
+| `prod` | `smaug_f64_prod(s, ignore_na)` → `double` | `smaug_i64_prod(s, ignore_na, status*)` → `int64_t` |
 | `mean(s, ignore_na)` | `double` | `double` |
 | `min(s, ignore_na)` | `double` | `int64_t` |
 | `max(s, ignore_na)` | `double` | `int64_t` |
@@ -304,10 +286,13 @@ Regra do `ignore_na`:
 `groupby`. `mean` de série vazia ou só-nulos → NAN.
 `min`/`max` retornam NAN (f64) ou `INT64_MIN` (i64) se nenhum elemento válido.
 
-> ⚠️ **Sentinela ambíguo no i64.** Como `INT64_MIN` é um inteiro válido, uma
-> série cujo `sum`/`min`/`max` legitimamente dê `INT64_MIN` é indistinguível do
-> caso de erro. O frontend Lua deve chamar `count_nonnull()` antes (ou usar
-> `ignore_na = true`) quando essa ambiguidade importar.
+**Status e sentinelas i64:** `smaug_i64_sum_checked(s, ignore_na, status*)`
+retorna 0 com `SMG_ERR_ARGUMENT` para série NULL, 0 com `SMG_ERR_OVERFLOW`
+em overflow e `INT64_MIN` com `SMG_NULL_VALUE` ao encontrar NA sem ignorá-lo.
+Vazio ou tudo NA ignorado soma 0 com `SMG_OK`. O wrapper `sum` descarta status;
+contar não-nulos ou usar `ignore_na=true` não detecta overflow. `min`/`max`
+ainda exigem conferir presença de valores e política de NA para distinguir a
+sentinela de um resultado válido. Produto i64 também possui canal de status.
 
 ---
 
@@ -347,8 +332,9 @@ smaug_free(out);
 | `argsort(s, ascending)` | `size_t*` / NULL | índices que ordenam; **NULL se a série tem qualquer nulo** |
 | `sort(s, ascending)` | série / NULL | série nova ordenada (usa `argsort` + `take`) |
 
-Não sabem posicionar NA, então falham se houver nulos. Filtre antes (futuro
-`dropna`). O `size_t*` de `argsort` é alocado — o caller libera.
+Não sabem posicionar NA, então falham se houver nulos. Remova os nulos antes de
+chamar a API C. O `size_t*` de `argsort` é alocado — o caller libera com
+`smaug_free`.
 
 ---
 
@@ -364,9 +350,43 @@ Não sabem posicionar NA, então falham se houver nulos. Filtre antes (futuro
 
 ---
 
-<a id="section-operacoes-boolean-boolseries"></a>
+<a id="section-janelas-e-ordenacao-multipla"></a>
 
-## Operações Boolean (BoolSeries)
+## Janelas e ordenação múltipla (`smaug_ops_window.h`)
+
+`smaug_multi_argsort` e `smaug_multi_argsort_ffi` produzem uma permutação
+estável de índices C 0-based. Todas as colunas de chave precisam ter o mesmo
+`nrows` e posições válidas. Essas são precondições do caller: o C não valida
+os tamanhos nem as máscaras das colunas. `cols == NULL`, `ncols == 0`,
+`nrows == 0` ou falta de memória retornam `NULL`. O array retornado é liberado com
+`smaug_free`.
+
+As operações rolling recebem `window >= 1` e `min_periods`. Com
+`min_periods == 0`, as primeiras `window - 1` posições são nulas. Com
+`min_periods >= 1`, janelas parciais iniciais podem emitir resultados quando
+atingem esse número de valores válidos. Nulos dentro da janela são ignorados e uma
+janela sem valores válidos permanece nula. `std`/`var` são amostrais e ficam
+indefinidas com menos de dois valores válidos. No i64, `sum`/`min`/`max`/`count`
+retornam séries i64 e `mean`/`std`/`var` retornam séries f64; `sum_checked`
+comunica overflow por `smaug_status_t`.
+
+```c
+size_t *smaug_multi_argsort(const smaug_sort_col_t *cols,
+                             size_t ncols, size_t nrows);
+smaug_series_f64_t *smaug_f64_rolling_sum(const smaug_series_f64_t *s,
+                                          size_t window, size_t min_periods);
+smaug_series_i64_t *smaug_i64_rolling_sum_checked(const smaug_series_i64_t *s,
+                                                   size_t window, size_t min_periods,
+                                                   smaug_status_t *status);
+```
+
+As assinaturas completas e os códigos de dtype (`SMAUG_COL_*`) estão no
+header; a superfície Lua correspondente é `DataSet:rolling` e permanece
+dependente da auditoria de consumidores em R6.
+
+<a id="section-operacoes-boolean-raw-series-bool"></a>
+
+## Operações Boolean (arrays raw e `Series<bool>`)
 
 As comparações (`gt`/`lt`/`eq`) devolvem um par **(valores `uint8_t*`, máscara
 `smaug_mask_t*`)** de mesmo comprimento — não um `smaug_series_*_t`. Valores:
@@ -398,10 +418,11 @@ bool   smaug_bool_all(const uint8_t *a, const smaug_mask_t *am, size_t n);
   `any` = existe algum válido true; `all` = todos os válidos são true (NA
   pulado); `all` de vazio = `true` (vacuamente verdadeiro).
 
-No frontend, a classe `BoolSeries` (`lua/smaug/core/boolseries.lua`) possui
-esses arrays via `ffi.gc(ptr, free)` e expõe `:land/:lor/:lxor/:lnot`,
-`:count_true/:any/:all`, e os operadores `*` (and), `+` (or), `-` (xor).
-`Series:filter(bool_series)` usa os valores como máscara de `smaug_*_filter`.
+No frontend atual, a superfície pública é `Series<bool>`, com os métodos
+`:land/:lor/:lxor/:lnot`, `:count_true/:any/:all` e os operadores `*` (and),
+`+` (or), `-` (xor). Os arrays raw acima permanecem uma API C legada; não há
+uma classe `lua/smaug/core/boolseries.lua`. `Series:filter` aceita a série bool
+como máscara e a camada Lua converte o resultado para a operação do dtype.
 
 ---
 
@@ -495,12 +516,12 @@ uint8_t* smaug_str_gt(const smaug_series_str_t *s, const char *target, size_t ta
 
 ## Diferenças do int64 (`i64`)
 
-A API i64 é idêntica em forma à f64, trocando `double` por `int64_t`. Diferenças
-semânticas:
+A API i64 compartilha operações com f64, mas tem canais checked e assinaturas
+próprias. Diferenças semânticas:
 
-- `sum`, `min`, `max` retornam `int64_t` (não `double`). Com `ignore_na=false`
-  e algum nulo — ou série vazia/só-nulos — retornam **`INT64_MIN`** como
-  sentinela (ver aviso de ambiguidade na seção Reduções).
+- `sum`, `min`, `max` retornam `int64_t`. A soma checked distingue erro via
+  status e soma vazia vale 0; min/max sem valores usam `INT64_MIN`.
+  Ver detalhes e nulidade na seção Reduções.
 - `mean`, `var`, `std` retornam `double` — a média de inteiros pode ser
   fracionária; nunca truncar implicitamente. Usam NAN como sentinela.
 - `div` (série e escalar) é **divisão inteira** (trunca). Divisão por zero vira
@@ -549,12 +570,12 @@ O pai nunca é modificado. Para a especificação completa, ver `docs/COW.md`.
 
 | Operação | Quem aloca | Responsabilidade do caller |
 |----------|-----------|----------------------------|
-| `create`, `clone`, `create_from_array` | Smaug | chamar `free` |
-| `add`/`sub`/`mul`/`div`, `*_scalar`, `sort`, `take`, `filter` | Smaug | `free` o resultado |
-| `view` | Smaug | **não** liberar enquanto a série-pai existir |
-| `gt`/`lt`/`eq` | Smaug | `free` no array `uint8_t*` (e no `out_mask`) |
-| `argsort` | Smaug | `free` no `size_t*` |
-| `smaug_bool_*` (and/or/xor/not) | Smaug | `free` no array `uint8_t*` (e no `out_mask`) |
+| `create`, `clone`, `create_from_array` | Smaug | destrutor `smaug_<dtype>_free` |
+| `add`/`sub`/`mul`/`div`, `*_scalar`, `sort`, `take`, `filter` | Smaug | destrutor do dtype do resultado |
+| `view` | Smaug | destrutor do dtype; manter buffers do pai válidos enquanto compartilhar |
+| `gt`/`lt`/`eq` | Smaug | `smaug_free` no array `uint8_t*` e no `out_mask` |
+| `argsort` | Smaug | `smaug_free` no `size_t*` |
+| bool raw (and/or/xor/not) | Smaug | `smaug_free` nos arrays; API struct usa destrutor bool |
 
 No frontend Lua, use `ffi.gc(ptr, C.smaug_f64_free)` para automatizar a limpeza
 dos structs de série.
@@ -570,20 +591,12 @@ dos structs de série.
    `s->data` era atualizado mas `s->capacity` não — série inconsistente. Agora,
    em falha do `null_mask`, o `data` é encolhido de volta para o `capacity`
    antigo, preservando o invariante (ambos os buffers sempre com `capacity`
-   elementos). Coberto por `tests/test_alloc.c`.
+   elementos). Coberto por `tests/c/test_alloc.c`.
 
 2. **Convenção de `0xFF`/`0x00` vs `1`/`0`.** As máscaras de null usam
    `0xFF`/`0x00`, mas `gt`/`lt`/`eq` devolvem `1`/`0` no array booleano.
    `filter` checa `if (mask[i])`, então funciona, mas é uma inconsistência de
    convenção — documentar ou unificar.
-
-3. **`alloc_result` em `smaug_ops_f64.c` usa `extern` para declarar
-   `smaug_f64_create`** em vez de só incluir o header. Funciona, mas o ideal é
-   confiar no include.
-
-4. **`memset(s->data, 0.0, ...)`** (caso aparecer em algum reimplemento): o
-   `0.0` vira `int(0)`; correto em IEEE 754, mas gera warning com `-Wall`. Use
-   `memset(s->data, 0, ...)`.
 
 ---
 
@@ -624,7 +637,7 @@ Verificar `t->error != NULL` antes de usar. Liberar sempre com `smaug_table_free
 
 ```c
 smaug_csv_opts_t smaug_csv_default_opts(void);
-/* sep=',', header=1, quote='"', na={"","NA","null","N/A","nan","NaN","NULL"} */
+/* sep=',', header=1, quote='"', na={"","NA","null","N/A","NULL"} */
 
 smaug_table_t* smaug_read_csv(const char *path, const smaug_csv_opts_t *opts);
 smaug_table_t* smaug_read_csv_mem(const char *buf, size_t len,
@@ -634,8 +647,10 @@ smaug_csv_write_opts_t smaug_csv_write_default_opts(void);
 int   smaug_write_csv(const char *path, const smaug_table_t *t,
                       const smaug_csv_write_opts_t *opts);
 char* smaug_write_csv_mem(const smaug_table_t *t,
-                           const smaug_csv_write_opts_t *opts, size_t *out_len);
-/* buffer retornado terminado em \0; liberar com smaug_free */
+                           const smaug_csv_write_opts_t *opts,
+                           size_t *out_len, char **err_out);
+/* buffer retornado terminado em \0; liberar com smaug_free.
+   err_out recebe uma causa duplicada em erro, quando fornecido. */
 ```
 
 **Inferência de tipo:** cada coluna testada em ordem `bool → int64 → float64 → string`.
@@ -655,8 +670,10 @@ smaug_table_t* smaug_read_json_mem(const char *buf, size_t len);
 int   smaug_write_json(const char *path, const smaug_table_t *t,
                        const smaug_json_write_opts_t *opts);
 char* smaug_write_json_mem(const smaug_table_t *t,
-                            const smaug_json_write_opts_t *opts, size_t *out_len);
-/* NaN → null no JSON. Escapes: \n \t \\ \" \uXXXX para controles. */
+                            const smaug_json_write_opts_t *opts,
+                            size_t *out_len, char **err_out);
+/* NaN → null no JSON. Escapes: \n \t \\ \" \uXXXX para controles.
+   err_out recebe uma causa duplicada em erro, quando fornecido. */
 ```
 
 <a id="section-ciclo-de-vida"></a>
@@ -676,7 +693,8 @@ Propriedade: `smaug_table_t*` possui seus recursos. O frontend Lua chama
 
 ## Anel 0 — Datetime (`smaug_datetime.h`)
 
-Dtype Tier 2 implementado em C puro. Armazenamento: `int64_t` representando
+Implementado no backend C (Anel 0) e
+consumido pelo frontend Lua. Armazenamento: `int64_t` representando
 **epoch em milissegundos UTC**. Calendário Gregoriano proléptico, sem
 dependência de timezone (UTC no armazenamento, apresentação local é do caller).
 
@@ -716,7 +734,8 @@ Sentinela em erro/null no `get`: `INT64_MIN` (igual `i64`).
 ### Parsing / formatação ISO 8601
 
 ```c
-int smaug_dt_parse(const char *str, size_t len, int64_t *epoch_ms);
+int smaug_dt_parse(const char *str, size_t len, int64_t *epoch_ms, int dayfirst);
+/* dayfirst: 1 para DD/MM/YYYY, 0 para MM/DD/YYYY; formatos year-first ignoram. */
 /* Aceita: "YYYY-MM-DD", "YYYY-MM-DDTHH:MM:SS[.mmm][Z|±HH:MM]". */
 /* Retorna 0 em sucesso, -1 em formato inválido. epoch_ms escrito só em sucesso. */
 
@@ -1026,243 +1045,18 @@ ano negativo; status verificado por todos os consumidores; semana ISO R02.
 Depois executar suítes C/Lua e verificações de memória adequadas à mudança.
 
 <a id="section-decisoes-restantes-em-ordem"></a>
+### Integração pendente
 
-### Decisões restantes, em ordem
+A ordem de execução e o estado da migração estão em [R5](Roadmap.md#r5).
+As assinaturas aprovadas e os consumidores acima permanecem como referência
+técnica; propostas de outras famílias não são aprovadas por analogia.
 
-1. Fechar a integração de `dayfirst` nas demais entradas Lua e seu transporte ao C.
-   `astype` textual estrito já usa status/saída/primeira posição inválida desde
-   2026-09-25, conforme a seção de diagnóstico. A API inicial
-   reconhece os separadores aprovados sem argumento de formato explícito;
-   essa opção fica para ampliação futura.
-   Prioridade de interpretação, padrão mês/dia e formatos iniciais estão
-   aprovados no contrato.
-   Assinatura,
-   regra de escrita e correspondência dos status de `error_index` estão
-   aprovadas para as 11 extrações de componentes em série.
-2. Fechar a representação C de ordem automática/DMY/MDY. Opções e helpers
-   públicos são definidos na [referência Lua](API_INDEX.md#section-datetime-migracao-lua).
-3. Consolidar aliases antigos de aritmética/construção, buffer público e
-   domínio de intermediários de parse/round/ceil.
-4. Só então implementar por família com regressões, antes dos demais tópicos
-   contratuais da reconstrução da suíte. Esta migração não encerra lifetime,
-   overflow de outras operações nem revisão geral do núcleo.
+## Desenvolvimento
 
+As tabelas acima são a referência de assinaturas; não manter um segundo
+catálogo abreviado. Cabeçalhos públicos estão em include/ e implementações em
+src/. Compare ambos ao mudar a referência.
 
-<a id="section-camada-c-backend-include-h-src-c"></a>
-
-## Catálogo rápido de funções C
-
-> Convenção: `<t>` = `f64` ou `i64`. Índices em C são 0-based; no Lua, 1-based.
-
-> **Contrato de status (`smaug_types.h`):** `smaug_status_t` =
-> `SMG_OK (0)` / `SMG_NULL_VALUE` / `SMG_ERR_OOB` / `SMG_ERR_ARGUMENT` /
-> `SMG_ERR_NOMEM` / `SMG_ERR_OVERFLOW`. O engine valida e comunica — não confia que o caller validou.
-
-
-<a id="section-lifecycle-e-acesso-smaug-core-h"></a>
-
-### Lifecycle e acesso (`smaug_core.h`)
-
-| Função | O que faz |
-|--------|-----------|
-| `smaug_<t>_create(size)` | cria série de `size` elementos, todos NULL |
-| `smaug_<t>_create_with_capacity(size, cap)` | cria com capacidade pré-alocada |
-| `smaug_<t>_create_from_array(arr, len)` | cria a partir de array C, tudo válido |
-| `smaug_<t>_free(s)` | libera a série (NULL-safe) |
-| `smaug_<t>_clone(s)` | cópia profunda independente |
-| `smaug_<t>_view(s, start, len)` | view zero-copy; COW na primeira mutação |
-| `smaug_<t>_get(s, idx, status)` | lê valor + `smaug_status_t*` anulável |
-| `smaug_<t>_set(s, idx, val)` | grava valor → `smaug_status_t`; COW detach se view |
-| `smaug_<t>_set_null(s, idx)` | marca posição como NULL → `smaug_status_t` |
-| `smaug_<t>_is_null(s, idx)` | testa se posição é NULL |
-| `smaug_<t>_append(s, val)` | adiciona ao fim; COW detach se view |
-| `smaug_<t>_append_null(s)` | adiciona NULL ao fim |
-| `smaug_free(ptr)` | libera buffers crus (compare/argsort/bool) — usar SEMPRE esta |
-
-<a id="section-aritmetica-smaug-numeric-h"></a>
-
-### Aritmética (`smaug_numeric.h`)
-
-| Função | O que faz |
-|--------|-----------|
-| `smaug_<t>_add/sub/mul/div(a, b)` | aritmética série×série (propaga NA) |
-| `smaug_<t>_add/sub/mul/div_scalar(a, k)` | aritmética série×escalar |
-
-`div/0 → null` em f64 e i64. `NaN` só existe como valor presente em f64.
-
-<a id="section-reducoes-smaug-numeric-h"></a>
-
-### Reduções (`smaug_numeric.h`)
-
-| Função | Retorno |
-|--------|---------|
-| `smaug_<t>_sum(s, ignore_na)` | f64→double, i64→int64 |
-| `smaug_<t>_mean(s, ignore_na)` | double |
-| `smaug_<t>_min/max(s, ignore_na)` | f64→double, i64→int64, dt→int64 (epoch), bool→uint8+status, str→ptr+len |
-| `smaug_<t>_var/std(s, ignore_na)` | double, amostral (÷ N-1; <2 → NaN) |
-| `smaug_<t>_count_nonnull(s)` | size_t |
-
-<a id="section-comparacoes-e-ordenacao-smaug-numeric-h"></a>
-
-### Comparações e ordenação (`smaug_numeric.h`)
-
-| Função | O que faz |
-|--------|-----------|
-| `smaug_<t>_gt/lt/eq/ge/le/ne(s, k, &out_mask)` | → bool array (uint8_t*); liberar c/ `smaug_free` |
-| `smaug_<t>_argsort(s, asc)` | → size_t* (permutação); NULL se há nulos |
-| `smaug_<t>_sort(s, asc)` | → nova série ordenada; NULL se há nulos |
-| `smaug_<t>_take(s, idx, len)` | → nova série com os índices dados |
-| `smaug_<t>_filter(s, mask)` | → nova série onde mask é true |
-
-<a id="section-booleano-kleene-smaug-bool-h"></a>
-
-### Booleano / Kleene (`smaug_bool.h`)
-
-| Função | O que faz |
-|--------|-----------|
-| `smaug_bool_and/or/xor(a, am, b, bm, n, &out)` | lógica de 3 valores |
-| `smaug_bool_not(a, am, n, &out)` | negação Kleene |
-| `smaug_bool_count_true(a, am, n)` | conta trues (NA ignorado) |
-| `smaug_bool_eq/ne(s, threshold, &out_mask)` | comparação com escalar → máscara (NA preservado) |
-| `smaug_bool_any/all(a, am, n)` | agregações (NA ignorado) |
-
-<a id="section-string-smaug-string-h"></a>
-
-### String (`smaug_string.h`)
-
-Representação offset-based (buffer de bytes + array de offsets). String vazia `""` ≠ NULL.
-
-| Função | O que faz |
-|--------|-----------|
-| `smaug_str_create(size)` | cria série de `size` strings, todas NULL |
-| `smaug_str_create_with_capacity(size, buf_cap)` | cria com buffer pré-alocado |
-| `smaug_str_create_from_array(arr, len)` | cria de `char*` array |
-| `smaug_str_free(s)` | libera (NULL-safe) |
-| `smaug_str_clone(s)` | cópia profunda independente |
-| `smaug_str_get(s, idx, &out_len)` | → ponteiro p/ bytes + comprimento (sem `\0`) |
-| `smaug_str_set(s, idx, str, len)` | grava (realoca buffer via memmove) |
-| `smaug_str_set_null(s, idx)` / `smaug_str_is_null(s, idx)` | nulos |
-| `smaug_str_append(s, str, len)` / `smaug_str_append_null(s)` | adiciona ao fim |
-| `smaug_str_count_nonnull(s)` | size_t |
-| `smaug_str_eq/lt/gt(s, target, target_len, &out_mask)` | → bool array; lexicográfico por bytes |
-| `smaug_str_filter(s, mask)` | → nova série onde mask é true |
-| `smaug_str_take(s, idx, len)` | → nova série com os índices dados |
-| `smaug_str_argsort(s, asc)` | → size_t* (permutação); NULL se há nulos |
-| `smaug_str_sort(s, asc)` | → nova série ordenada |
-
-<a id="section-i-o-anel-3-smaug-io-h"></a>
-
-### I/O — Anel 3 (`smaug_io.h`)
-
-Fronteira `smaug_table_t`: toda função de leitura produz `smaug_table_t*`
-(checar `->error` antes de usar). Liberar com `smaug_table_free`.
-
-| Função | O que faz |
-|--------|-----------|
-| `smaug_table_free(t)` | libera tabela e todos os recursos (NULL-safe) |
-| `smaug_csv_default_opts()` | opções padrão: sep=`,` header=1 quote=`"` |
-| `smaug_read_csv(path, opts)` | lê CSV de arquivo → `smaug_table_t*` |
-| `smaug_read_csv_mem(buf, len, opts)` | lê CSV de buffer em memória |
-| `smaug_write_csv(path, t, opts)` | escreve CSV em arquivo (0=ok, -1=erro) |
-| `smaug_write_csv_mem(t, opts, &len)` | escreve CSV em buffer alocado; liberar c/ `smaug_free` |
-| `smaug_read_json(path)` | lê JSON de arquivo (array de records) |
-| `smaug_read_json_mem(buf, len)` | lê JSON de buffer em memória |
-| `smaug_write_json(path, t, opts)` | escreve JSON em arquivo |
-| `smaug_write_json_mem(t, opts, &len)` | escreve JSON em buffer alocado |
-
-<a id="section-tipos-smaug-types-h"></a>
-
-### Tipos (`smaug_types.h`)
-
-`smaug_mask_t`, `smaug_metadata_t`, `smaug_series_f64_t`, `smaug_series_i64_t`,
-`smaug_series_bool_t`, `smaug_series_str_t`, `smaug_column_t`, `smaug_table_t`.
-
----
-
-<a id="section-desenvolvimento-do-nucleo-c"></a>
-
-## Desenvolvimento do núcleo C
-
-<a id="section-contribuir-com-o-projeto"></a>
-
-### Contribuir com o projeto
-
-Antes de alterar uma API C, consulte o [catálogo do núcleo](#section-camada-c-backend-include-h-src-c), o
-[contrato](CONTRACT.md) e o [roadmap](Roadmap.md). Uma proposta deve distinguir
-comportamento atual, decisão aprovada e implementação validada.
-
-<a id="section-preparar-o-ambiente"></a>
-
-### Preparar o ambiente
-
-Siga [Compilação e testes](Build_and_Testing.md) para GCC, LuaJIT, Linux e
-Windows. Os comandos partem da raiz do repositório.
-
-<a id="section-contribuir-com-o-codigo"></a>
-
-### Contribuir com o código
-
-As [convenções de escrita](CODING_STYLE.md) definem nomes, chamadas e testes.
-A [arquitetura](ARCHITECTURE.md) define as responsabilidades das camadas.
-A [referência C](API_Reference.md) detalha os contratos de uso do núcleo.
-
-<a id="section-internals-e-memoria"></a>
-
-### Internals e memória
-
-Leia [Arquitetura](ARCHITECTURE.md), [Contrato](CONTRACT.md) e
-[Copy-on-Write](COW.md) antes de alterar ownership, views ou falhas de alocação.
-Mudanças de assinatura precisam atualizar header, implementação, FFI e todos
-os consumidores; a [migração datetime](#section-datetime-migracao-c) detalha esse trabalho.
-
-<a id="section-testes-e-investigacao-de-regressoes"></a>
-
-### Testes e investigação de regressões
-
-[Compilação e testes](Build_and_Testing.md) descreve como executar as ferramentas.
-O [rework da suíte](TEST_SUITE_REWORK.md) concentra o ponto de parada atual.
-O [parecer](TEST_SUITE_REWRITE_REVIEW.md) documenta defeitos e critérios de
-encerramento; o [inventário de exclusões](TEST_SUITE_EXCLUSIONS_REVIEW.md)
-rastreia justificativas de cobertura.
-
-<a id="section-contribuir-com-a-documentacao"></a>
-
-### Contribuir com a documentação
-
-A navegação segue [primeiros passos](GETTING_STARTED.md),
-[guia por temas](USER_GUIDE.md), [referência Lua](API_INDEX.md) e [Núcleo C](API_Reference.md),
-como na [documentação do pandas](https://pandas.pydata.org/docs/development/index.html).
-Os arquivos permanecem planos em `docs/`.
-
-| Informação | Lugar |
-|---|---|
-| Introdução e primeiro exemplo | Primeiros passos |
-| Explicação de um assunto e caminho de leitura | Guia do usuário |
-| Método, assinatura e parâmetros | Referência da API |
-| Garantia normativa e decisão aprovada | Contrato; COW para memória compartilhada |
-| Proposta técnica ainda aberta | Seção do assunto na referência Lua ou C correspondente |
-| Defeito observado e evidência | Parecer e inventário |
-| Ponto de parada | Rework da suíte |
-| Planejamento e histórico | Roadmap e changelog |
-
-Atualize a fonte responsável e adicione links nos guias. Conteúdo Lua pertence
-à referência Lua; conteúdo C pertence à referência C. Não criar mapas ou arquivos
-paralelos por funcionalidade nem replicar decisões em notas de sessão. Cada documento tem navegação principal e sumário local;
-ao mudar uma seção, confira seus links e âncoras.
-
-`COVERAGE.md`, `PARITY_REPORT.md` e `MANIFEST.txt` são artefatos gerados:
-não editar manualmente nem reorganizar seus conteúdos. Devem refletir a
-execução que os produziu. Eles não foram regenerados nesta reorganização.
-
-<a id="section-manutencao-e-versoes"></a>
-
-### Manutenção e versões
-
-O [roadmap](Roadmap.md) registra entregas e critérios para v1.0.
-O [changelog](CHANGELOG.md) preserva o histórico, inclusive decisões superadas.
-O contrato e as decisões atuais têm precedência sobre relatos históricos.
-
-
----
-
-[Referência do Núcleo C](API_Reference.md) · [Rework da suíte](TEST_SUITE_REWORK.md) · [Início da documentação](README.md)
+Consulte [compilação/testes](Build_and_Testing.md), [convenções](CODING_STYLE.md),
+[contrato](CONTRACT.md), [arquitetura](ARCHITECTURE.md) e [COW](COW.md).
+Sequência de trabalho e checkpoint: [roadmap](Roadmap.md#checkpoint).

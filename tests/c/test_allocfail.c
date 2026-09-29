@@ -1,3 +1,6 @@
+#ifndef _WIN32
+#define _GNU_SOURCE
+#endif
 /* tests/test_allocfail.c
  *
  * Teste de falha de alocação (Fase 1.6 — endurecimento, padrão SQLite).
@@ -25,9 +28,37 @@
 #include "../include/smaug_ops_window.h"
 #include "../include/smaug_datetime.h"
 #include <assert.h>
+#include <locale.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifndef _WIN32
+extern locale_t __real_uselocale(locale_t);
+static int fail_locale_install = 0;
+
+locale_t __wrap_uselocale(locale_t selected_locale) {
+    if (fail_locale_install && selected_locale != (locale_t)0) {
+        fail_locale_install = 0;
+        errno = EINVAL;
+        return (locale_t)0;
+    }
+    return __real_uselocale(selected_locale);
+}
+
+extern locale_t __real_newlocale(int, const char *, locale_t);
+static long locale_failure_index = -1;
+static long locale_call_count = 0;
+
+locale_t __wrap_newlocale(int category, const char *name, locale_t base) {
+    if (locale_call_count++ == locale_failure_index) {
+        errno = ENOMEM;
+        return (locale_t)0;
+    }
+    return __real_newlocale(category, name, base);
+}
+#endif
 
 /* ---- interceptação de malloc/realloc ---------------------------------- */
 extern void *__real_malloc(size_t);
@@ -37,26 +68,43 @@ extern char *__real_strdup(const char *);
 extern void  free(void *);
 
 static long failure_allocation_index = -1;   /* índice da alocação que deve falhar (-1 = nenhuma) */
+static long injected_failures = 0;
 static long allocation_count   = 0;    /* alocações já vistas nesta rodada */
 
 void *__wrap_malloc(size_t element_count) {
-    if (allocation_count++ == failure_allocation_index) return NULL;
+    if (allocation_count++ == failure_allocation_index) {
+        injected_failures++;
+        return NULL;
+    }
     return __real_malloc(element_count);
 }
 void *__wrap_realloc(void *pointer, size_t element_count) {
-    if (allocation_count++ == failure_allocation_index) return NULL;
+    if (allocation_count++ == failure_allocation_index) {
+        injected_failures++;
+        return NULL;
+    }
     return __real_realloc(pointer, element_count);
 }
 void *__wrap_calloc(size_t element_count, size_t size) {
-    if (allocation_count++ == failure_allocation_index) return NULL;
+    if (allocation_count++ == failure_allocation_index) {
+        injected_failures++;
+        return NULL;
+    }
     return __real_calloc(element_count, size);
 }
 char *__wrap_strdup(const char *text_value) {
-    if (allocation_count++ == failure_allocation_index) return NULL;
+    if (allocation_count++ == failure_allocation_index) {
+        injected_failures++;
+        return NULL;
+    }
     return __real_strdup(text_value);
 }
 
-static void reset(long fail_at) { failure_allocation_index = fail_at; allocation_count = 0; }
+static void reset(long fail_at) {
+    failure_allocation_index = fail_at;
+    allocation_count = 0;
+    injected_failures = 0;
+}
 
 /* contador de checagens (cada iteração do loop é uma verificação) */
 static long passed_checks = 0;
@@ -1712,25 +1760,52 @@ static void sanity_no_fail(void) {
 #define MAX_IO_ALLOCS 64
 
 /* CSV — leitura: todos os pontos de malloc no tokenizador e no parser */
-static void allocation_failure_csv_read_memory(void) {
-    /* CSV simples com todos os dtypes para exercitar todas as alocações */
-    const char *text_value = "i,f,b,s\n1,1.5,true,hello\n2,2.5,false,world\n";
-    size_t csv_length  = strlen(text_value);
-    reset(-1);
-    for (long allocation_index = 0; allocation_index < MAX_IO_ALLOCS; allocation_index++) {
-        reset(allocation_index);
-        smaug_table_t *read_csv_memory_result = smaug_read_csv_mem(text_value, csv_length, NULL);
-        if (read_csv_memory_result) {
-            /* pode ter succedido ou retornado tabela com erro */
-            OK(!read_csv_memory_result || read_csv_memory_result->error || 1, "csv_read_mem: sem crash");
-            smaug_table_free(read_csv_memory_result);
-        }
+static void check_csv_mixed_values(const smaug_table_t *table) {
+    OK(table != NULL && table->error == NULL && table->ncols == 4 && table->nrows == 2,
+       "CSV misto: tabela completa");
+    OK(table->columns[0].i64 != NULL && table->columns[1].f64 != NULL
+       && table->columns[2].boolcol != NULL && table->columns[3].str != NULL,
+       "CSV misto: tipos preservados");
+    const char *expected_strings[] = {"hello", "world"};
+    for (size_t row_index = 0; row_index < 2; row_index++) {
+        OK(!smaug_i64_is_null(table->columns[0].i64, row_index)
+           && table->columns[0].i64->data[row_index] == (int64_t)row_index + 1,
+           "CSV misto: valor e máscara i64");
+        OK(!smaug_f64_is_null(table->columns[1].f64, row_index)
+           && table->columns[1].f64->data[row_index] == (double)row_index + 1.5,
+           "CSV misto: valor e máscara f64");
+        OK(!smaug_bool_is_null(table->columns[2].boolcol, row_index)
+           && table->columns[2].boolcol->data[row_index] == (row_index == 0),
+           "CSV misto: valor e máscara bool");
+        const smaug_series_str_t *strings = table->columns[3].str;
+        OK(!smaug_str_is_null(strings, row_index)
+           && strings->offsets[row_index + 1] - strings->offsets[row_index] == 5
+           && memcmp(strings->buffer + strings->offsets[row_index],
+                     expected_strings[row_index], 5) == 0,
+           "CSV misto: bytes, comprimento e máscara string");
     }
-    /* sem falha: deve suceder */
+}
+
+static void allocation_failure_csv_read_memory(void) {
+    const char *text = "i,f,b,s\n1,1.5,true,hello\n2,2.5,false,world\n";
     reset(-1);
-    smaug_table_t *read_csv_memory_result = smaug_read_csv_mem(text_value, csv_length, NULL);
-    OK(read_csv_memory_result && !read_csv_memory_result->error && read_csv_memory_result->nrows == 2, "csv_read_mem: sucesso sem falha");
-    smaug_table_free(read_csv_memory_result);
+    smaug_table_t *table = smaug_read_csv_mem(text, strlen(text), NULL);
+    long total_allocations = allocation_count;
+    check_csv_mixed_values(table);
+    smaug_table_free(table);
+    for (long allocation_index = 0; allocation_index < total_allocations; allocation_index++) {
+        reset(allocation_index);
+        table = smaug_read_csv_mem(text, strlen(text), NULL);
+        OK(injected_failures == 1 && (table == NULL || table->error != NULL),
+           "CSV misto: falha atingida não entrega resultado parcial");
+        smaug_table_free(table);
+    }
+    reset(total_allocations);
+    table = smaug_read_csv_mem(text, strlen(text), NULL);
+    OK(injected_failures == 0, "CSV misto: ultrapassou último ponto de falha");
+    check_csv_mixed_values(table);
+    smaug_table_free(table);
+    reset(-1);
 }
 
 /* CSV — leitura com aspas RFC 4180 (exercita realloc dentro do tokenizador) */
@@ -1750,23 +1825,40 @@ static void allocation_failure_csv_read_quoted(void) {
 
 /* CSV — leitura com muitas linhas (exercita realloc do vetor de rows) */
 static void allocation_failure_csv_read_many_rows(void) {
-    /* 100 linhas — força o realloc de rows[] (começa com cap=64) */
-    char *text_value = malloc(8192);
-    assert(text_value);
-    int write_position = sprintf(text_value, "v\n");
-    for (int row_index = 0; row_index < 100; row_index++) write_position += sprintf(text_value + write_position, "%d\n", row_index);
-    size_t csv_length = (size_t)write_position;
-
-    for (long allocation_index = 0; allocation_index < MAX_IO_ALLOCS; allocation_index++) {
-        reset(allocation_index);
-        smaug_table_t *read_csv_memory_result = smaug_read_csv_mem(text_value, csv_length, NULL);
-        if (read_csv_memory_result) { smaug_table_free(read_csv_memory_result); }
+    char text[512];
+    size_t length = 2;
+    memcpy(text, "v\n", length);
+    for (size_t row_index = 0; row_index < 100; row_index++) {
+        int written = snprintf(text + length, sizeof(text) - length, "%zu\n", row_index);
+        OK(written > 0 && (size_t)written < sizeof(text) - length, "fixture CSV cabe no buffer");
+        length += (size_t)written;
     }
     reset(-1);
-    smaug_table_t *read_csv_memory_result = smaug_read_csv_mem(text_value, csv_length, NULL);
-    OK(read_csv_memory_result && !read_csv_memory_result->error && read_csv_memory_result->nrows == 100, "csv_read_many_rows: sucesso");
-    smaug_table_free(read_csv_memory_result);
-    free(text_value);  /* liberar sem wrap */
+    smaug_table_t *table = smaug_read_csv_mem(text, length, NULL);
+    long total_allocations = allocation_count;
+    OK(table != NULL && table->error == NULL && table->nrows == 100
+       && table->ncols == 1 && table->columns[0].i64 != NULL, "CSV 100 linhas: baseline");
+    smaug_table_free(table);
+    /* Mede todos os pontos: o teto antigo de 64 não alcançava o realloc de rows. */
+    for (long allocation_index = 0; allocation_index < total_allocations; allocation_index++) {
+        reset(allocation_index);
+        table = smaug_read_csv_mem(text, length, NULL);
+        OK(injected_failures == 1 && (table == NULL || table->error != NULL),
+           "CSV 100 linhas: cada OOM atingido aborta sem tabela parcial");
+        smaug_table_free(table);
+    }
+    reset(total_allocations);
+    table = smaug_read_csv_mem(text, length, NULL);
+    OK(injected_failures == 0 && table != NULL && table->error == NULL
+       && table->nrows == 100 && table->ncols == 1 && table->columns[0].i64 != NULL,
+       "CSV 100 linhas: recuperação após falhas");
+    for (size_t row_index = 0; row_index < 100; row_index++) {
+        OK(!smaug_i64_is_null(table->columns[0].i64, row_index)
+           && table->columns[0].i64->data[row_index] == (int64_t)row_index,
+           "CSV 100 linhas: ordem, valor e máscara");
+    }
+    smaug_table_free(table);
+    reset(-1);
 }
 
 /* CSV — leitura sem header: nomes sintéticos "colN" via strdup de buffer local
@@ -2568,7 +2660,192 @@ static void allocation_failure_numeric_datetime(void) {
     smaug_f64_free(real_source);
 }
 
+static void allocation_failure_numeric_parser(void) {
+    char long_token[301];
+    memset(long_token, '0', sizeof(long_token) - 1);
+    long_token[sizeof(long_token) - 2] = '1';
+    long_token[sizeof(long_token) - 1] = '\0';
+    double output = 77.0;
+    reset(0);
+    OK(smaug_parse_f64_status(long_token, strlen(long_token), &output) == SMG_ERR_NOMEM
+       && output == 77.0, "token longo: OOM preserva saída");
+    reset(-1);
+    OK(smaug_parse_f64_status(long_token, strlen(long_token), &output) == SMG_OK
+       && output == 1.0, "token longo: sucesso após OOM");
+
+    smaug_series_str_t *source = smaug_str_create(1);
+    OK(source != NULL, "cria origem para astype OOM");
+    OK(smaug_str_set(source, 0, long_token, strlen(long_token)) == 0, "prepara token longo");
+    reset(-1);
+    smaug_series_f64_t *result = smaug_str_to_f64(source);
+    long total_allocations = allocation_count;
+    OK(result != NULL && result->data[0] == 1.0, "astype longo sem falha");
+    smaug_f64_free(result);
+    for (long allocation_index = 0; allocation_index < total_allocations; allocation_index++) {
+        reset(allocation_index);
+        result = smaug_str_to_f64(source);
+        OK(injected_failures == 1 && result == NULL,
+           "astype propaga cada OOM efetivamente injetado, inclusive cópia do token");
+        OK(source->size == 1 && !smaug_str_is_null(source, 0)
+           && memcmp(source->buffer, long_token, strlen(long_token)) == 0,
+           "astype OOM preserva origem");
+    }
+    reset(-1);
+#ifndef _WIN32
+    locale_call_count = 0;
+    locale_failure_index = 0;
+    output = 77.0;
+    OK(smaug_parse_f64_status(long_token, strlen(long_token), &output) == SMG_ERR_NOMEM
+       && output == 77.0, "locale OOM libera token longo e preserva saída");
+    locale_call_count = 0;
+    OK(smaug_str_to_f64(source) == NULL, "astype não transforma locale OOM em NA");
+    const char *csv = "value,other\n1.5,2.5\n";
+    for (long failure_index = 0; failure_index < 4; failure_index++) {
+        locale_call_count = 0;
+        locale_failure_index = failure_index;
+        smaug_table_t *table = smaug_read_csv_mem(csv, strlen(csv), NULL);
+        OK(table != NULL && table->error != NULL && strcmp(table->error, "OOM") == 0,
+           "CSV propaga locale OOM na inferência e no preenchimento");
+        smaug_table_free(table);
+    }
+    locale_failure_index = -1;
+#endif
+    reset(-1);
+    result = smaug_str_to_f64(source);
+    OK(result != NULL && !smaug_f64_is_null(result, 0) && result->data[0] == 1.0,
+       "astype volta a converter após falhas");
+    smaug_f64_free(result);
+    smaug_str_free(source);
+}
+
+static void allocation_failure_csv_long_string(void) {
+    char text[4103];
+    memcpy(text, "value\n", 6);
+    memset(text + 6, 'x', 4096);
+    text[4102] = '\n';
+    reset(-1);
+    smaug_table_t *table = smaug_read_csv_mem(text, sizeof(text), NULL);
+    long total_allocations = allocation_count;
+    OK(table != NULL && table->error == NULL && table->nrows == 1 && table->ncols == 1
+       && table->columns[0].str != NULL, "CSV string longa: baseline");
+    smaug_table_free(table);
+    for (long allocation_index = 0; allocation_index < total_allocations; allocation_index++) {
+        reset(allocation_index);
+        table = smaug_read_csv_mem(text, sizeof(text), NULL);
+        OK(injected_failures == 1 && (table == NULL || table->error != NULL),
+           "CSV string longa: setter OOM não entrega célula parcial");
+        smaug_table_free(table);
+    }
+    reset(total_allocations);
+    table = smaug_read_csv_mem(text, sizeof(text), NULL);
+    OK(injected_failures == 0 && table != NULL && table->error == NULL
+       && table->nrows == 1 && table->ncols == 1 && table->columns[0].str != NULL,
+       "CSV string longa: recuperação");
+    const smaug_series_str_t *strings = table->columns[0].str;
+    OK(!smaug_str_is_null(strings, 0) && strings->offsets[1] - strings->offsets[0] == 4096
+       && memcmp(strings->buffer + strings->offsets[0], text + 6, 4096) == 0,
+       "CSV string longa: bytes completos e máscara após recuperação");
+    smaug_table_free(table);
+    reset(-1);
+}
+
+static void allocation_failure_csv_long_decimal(void) {
+    char csv[310];
+    memcpy(csv, "value\n", 6);
+    memset(csv + 6, '0', 300);
+    memcpy(csv + 306, "1,5\n", 4);
+    smaug_csv_opts_t options = smaug_csv_default_opts();
+    options.sep = ';';
+    options.decimal = ',';
+    reset(-1);
+    smaug_table_t *table = smaug_read_csv_mem(csv, sizeof(csv), &options);
+    long total_allocations = allocation_count;
+    OK(table != NULL && table->error == NULL && table->ncols == 1
+       && table->columns[0].f64 != NULL && table->columns[0].f64->data[0] == 1.5,
+       "CSV decimal customizado aceita token maior que 256 bytes");
+    smaug_table_free(table);
+    for (long allocation_index = 0; allocation_index < total_allocations; allocation_index++) {
+        reset(allocation_index);
+        table = smaug_read_csv_mem(csv, sizeof(csv), &options);
+        OK(injected_failures == 1 && (table == NULL || table->error != NULL),
+           "CSV longo: OOM atingido não muda dtype nem fabrica NA");
+        smaug_table_free(table);
+    }
+    reset(total_allocations);
+    table = smaug_read_csv_mem(csv, sizeof(csv), &options);
+    OK(injected_failures == 0 && table != NULL && table->error == NULL
+       && table->columns[0].f64 != NULL && !smaug_f64_is_null(table->columns[0].f64, 0)
+       && table->columns[0].f64->data[0] == 1.5,
+       "CSV longo recupera e sucede após último ponto de alocação");
+    smaug_table_free(table);
+    reset(-1);
+}
+
+static void allocation_failure_numeric_formatting(void) {
+#ifndef _WIN32
+    reset(-1);
+    locale_failure_index = -1;
+    const char *csv = "value\n1.5\n2.5\n";
+    smaug_table_t *table = smaug_read_csv_mem(csv, strlen(csv), NULL);
+    OK(table != NULL && table->error == NULL && table->columns[0].f64 != NULL,
+       "formatter OOM: origem válida");
+    locale_t original_locale = uselocale((locale_t)0);
+    char output[32];
+    memset(output, '#', sizeof(output));
+    locale_call_count = 0;
+    locale_failure_index = 0;
+    OK(smaug_fmt_f64(output, sizeof(output), 1.5) == 0 && output[0] == '#'
+       && output[31] == '#', "formatter locale OOM preserva saída");
+    locale_failure_index = -1;
+    fail_locale_install = 1;
+    OK(smaug_fmt_f64(output, sizeof(output), 1.5) == 0 && output[0] == '#'
+       && !fail_locale_install && uselocale((locale_t)0) == original_locale,
+       "formatter falha na instalação preserva locale e saída");
+    for (long failure_index = 0; failure_index < 2; failure_index++) {
+        locale_failure_index = failure_index;
+        locale_call_count = 0;
+        OK(smaug_f64_to_str(table->columns[0].f64) == NULL
+           && locale_call_count == failure_index + 1,
+           "astype saída não transforma formatter OOM em string vazia");
+        locale_call_count = 0;
+        size_t length = 77;
+        char *error = NULL;
+        char *serialized = smaug_write_csv_mem(table, NULL, &length, &error);
+        OK(serialized == NULL && length == 77 && error != NULL
+           && strstr(error, "formatar") != NULL && locale_call_count == failure_index + 1,
+           "CSV formatter OOM aborta sem publicar comprimento");
+        free(error);
+        locale_call_count = 0;
+        error = NULL;
+        serialized = smaug_write_json_mem(table, NULL, &length, &error);
+        OK(serialized == NULL && length == 77 && error != NULL
+           && strstr(error, "formatar") != NULL && locale_call_count == failure_index + 1,
+           "JSON formatter OOM aborta sem publicar comprimento");
+        free(error);
+    }
+    locale_failure_index = 0;
+    locale_call_count = 0;
+    const char *mixed_json = "[{\"value\":1.5},{\"value\":\"text\"}]";
+    smaug_table_t *mixed_table = smaug_read_json_mem(mixed_json, strlen(mixed_json));
+    OK(mixed_table != NULL && mixed_table->error != NULL && locale_call_count == 1,
+       "JSON misto: falha ao formatar número não vira string vazia");
+    smaug_table_free(mixed_table);
+    locale_failure_index = -1;
+    OK(uselocale((locale_t)0) == original_locale, "formatter falhas preservam locale da thread");
+    smaug_series_str_t *converted = smaug_f64_to_str(table->columns[0].f64);
+    OK(converted != NULL && converted->size == 2 && converted->buffer_len == 6
+       && memcmp(converted->buffer, "1.52.5", 6) == 0,
+       "formatter recuperação depois de OOM");
+    smaug_str_free(converted);
+    smaug_table_free(table);
+#endif
+}
+
 int main(void) {
+    allocation_failure_numeric_formatting();
+    allocation_failure_numeric_parser();
+    allocation_failure_csv_long_decimal();
+    allocation_failure_csv_long_string();
     allocation_failure_numeric_datetime();
     allocation_failure_strict_datetime();
     allocation_failure_float64_create();

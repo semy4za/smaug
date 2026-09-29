@@ -2,27 +2,6 @@
 
 [Início](README.md) · [Primeiros passos](GETTING_STARTED.md) · [Guia do usuário](USER_GUIDE.md) · [API Reference: Lua](API_INDEX.md) | [Núcleo C](API_Reference.md)
 
-<details>
-<summary>Nesta página</summary>
-
-- [Dependências](#section-dependencias)
-- [Linux — comandos](#section-linux-comandos)
-  - [Suite completa (recomendado)](#section-suite-completa-recomendado)
-  - [Desenvolvimento (sem stress, sem manifest)](#section-desenvolvimento-sem-stress-sem-manifest)
-  - [Só cobertura](#section-so-cobertura)
-  - [Só um teste específico](#section-so-um-teste-especifico)
-- [Windows — MSYS2-UCRT64](#section-windows-msys2-ucrt64)
-- [Estrutura de testes](#section-estrutura-de-testes)
-  - [Testes C (Anel 0 + Anel 3)](#section-testes-c-anel-0-anel-3)
-  - [Testes Lua (Anéis 1+2+3)](#section-testes-lua-aneis-1-2-3)
-  - [Fixtures de dados reais](#section-fixtures-de-dados-reais)
-- [Cobertura (gcov)](#section-cobertura-gcov)
-- [Valgrind](#section-valgrind)
-- [Makefile](#section-makefile)
-- [CMake](#section-cmake)
-
-</details>
-
 **Plataformas suportadas:** Linux (Fedora, Ubuntu) e Windows (MSYS2-UCRT64).
 **Compilador:** GCC ≥ 11. **Runtime:** LuaJIT ≥ 2.0.5.
 
@@ -57,16 +36,19 @@ bash scripts/build.sh --all
 ```
 
 Executa em sequência: build da `.so`, testes C, stress, testes Lua,
-Valgrind em todos os binários, coverage (gcov), manifest. Aborta no
-primeiro erro.
+Valgrind, coverage (gcov), parity e manifest. Ferramentas ausentes podem
+causar skips; parity é indicador e não barra o build. Conferir etapas e códigos
+de saída, não apenas a mensagem final. Correções dos executores: [R6](Roadmap.md#r6).
 
 <a id="section-desenvolvimento-sem-stress-sem-manifest"></a>
 
 ### Desenvolvimento (sem stress, sem manifest)
 
 ```bash
-bash scripts/build.sh
+bash scripts/build.sh --skip-stress --skip-manifest
 ```
+
+Sem flags, build.sh inclui stress, Lua, parity e regeneração do manifesto.
 
 <a id="section-so-cobertura"></a>
 
@@ -120,7 +102,8 @@ Compila `smaug.dll` e todos os testes. Coverage/Valgrind rodam no Fedora.
 | `test_io_c` | parsers CSV/JSON: CRLF, aspas RFC 4180, NA, inferência, UTF-8 `\uXXXX`, roundtrips |
 | `test_datetime_c` | datetime C: lifecycle, parse ISO 8601, componentes calendário, aritmética, comparações, sort, COW, datas negativas, bissextos |
 | `test_ops_window` | ops de janela (Grupo C): multi_argsort 5 dtypes, rolling deque, cumulativas |
-| `test_allocfail` | OOM em todos os pontos públicos (Anéis 0+3, via `--wrap`); inclui Grupo A/B e datetime |
+| `test_astype` | conversões por dtype, falhas e precisão |
+| `test_allocfail` | injeção de OOM via `--wrap`; enumeração completa e rollback ainda em auditoria |
 | `test_stress` | N=1M, chains, views simultâneas, ciclos |
 
 <a id="section-testes-lua-aneis-1-2-3"></a>
@@ -132,6 +115,7 @@ As suítes vivem em subpastas por domínio: `tests/series/`, `tests/dataset/`,
 
 | Arquivo | O que cobre |
 |---------|-------------|
+| `core/test_keys.lua` / `core/test_collation.lua` | codificação de chaves e colação |
 | `series/test_constructors.lua` | Series f64/i64/bool: construtores, aritmética, lifecycle, map, astype |
 | `series/test_access.lua` | acesso, edge cases, fillna |
 | `series/test_reduce.lua` | reduções, valores especiais f64 (NaN, ±Inf) |
@@ -178,14 +162,13 @@ bash scripts/make_coverage.sh
 Agrega: testes C diretos, `test_allocfail` (via `--wrap`) e testes Lua (via FFI).
 Resultado gerado em `docs/COVERAGE.md`.
 
-**Métricas (Fedora, gcov):** linha e branch-alvo com exclusões `COV-EXCL-BR`
-documentadas — geradas em `docs/COVERAGE.md`, nunca cravadas aqui. A meta de
-≥95% branch-alvo foi atingida na campanha de hardening; o que resta nos parsers
-são branches de inputs malformados muito específicos (rendimento decrescente).
-
-**Critério `COV-EXCL-BR`:** ramo inalcançável via API pública com justificativa
-técnica auditável. Exemplos: overflow de `SIZE_MAX`, guard de realloc-shrink,
-invariante matemática, OOM de syscall sem injeção de falha.
+O relatório identifica a árvore medida; não certifica a árvore atual. Branches
+não são MC/DC. Exclusões exigem prova do ramo específico: OOM sem injeção não
+é impossibilidade, e overflow de tamanho precisa ser analisado por operação.
+Ver [inventário](TEST_SUITE_EXCLUSIONS_REVIEW.md) e [R6](Roadmap.md#r6).
+O script usa listas próprias, omite headers executáveis e pode perder resultados
+de gcov; essas limitações estão abertas. Também substitui temporariamente a
+biblioteca em build/ e a remove ao final: recompile antes de usar a API depois.
 
 **Plataforma autoritativa:** Linux (Fedora/Ubuntu). O `.gcda` no Windows tem
 flush via FFI instável — cobertura sempre medida no Linux.
@@ -204,15 +187,8 @@ bash scripts/build.sh --all   # roda Valgrind em todos os binários
 Isso não certifica a árvore atual. Consulte a revisão da suíte para as
 verificações ainda pendentes.
 
-Bugs encontrados e corrigidos pelo Valgrind:
-- **Anel 3 (sessão inicial):** `smaug_json.c` — `col_names` (array) não liberado
-  no caminho de sucesso. Writers CSV/JSON — buffer retornado sem terminador `\0`.
-- **Anel 3 (sessão de hardening):** ambos os parsers — `strdup`s de `col_names`
-  vazavam quando OOM acontecia depois do strdup (calloc de `dtypes`, alocação
-  de `tbl`, falha de `smaug_X_create` no loop final). Corrigido com transferência
-  de ownership marcada (`col_names[c] = NULL`) e cleanup robusto nos paths de erro.
-
----
+Correções históricas estão no [changelog](CHANGELOG.md). Registrar comando,
+árvore, binários e limitações de cada nova campanha.
 
 <a id="section-makefile"></a>
 
@@ -229,15 +205,4 @@ e emite um aviso — inofensivo para compilação e cobertura.
 
 ---
 
-<a id="section-cmake"></a>
-
-## CMake
-
-> **⚠️ Bloco desatualizado / decisão pendente.** O CMake não está em uso.
-> O desenvolvimento usa o Makefile no Linux e `scripts/build.ps1`
-> no Windows. O futuro deste bloco depende da decisão sobre portar para
-> Lua 5.4 (ver "Visão de longo prazo" no Roadmap).
-
----
-
-[Referência do Núcleo C](API_Reference.md) · [Rework da suíte](TEST_SUITE_REWORK.md) · [Início da documentação](README.md)
+CMake não participa dos comandos mantidos nesta página.

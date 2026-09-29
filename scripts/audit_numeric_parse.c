@@ -4,6 +4,7 @@
  */
 #include "smaug_convert.h"
 #include <inttypes.h>
+#include <locale.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -16,6 +17,16 @@ typedef struct {
 #define PARSE_CASE(label, source) {label, source, sizeof(source) - 1}
 
 int main(int argument_count, char **arguments) {
+    /* Only this standalone observational process changes its locale. */
+    if (argument_count == 3 && strcmp(arguments[1], "--locale") == 0) {
+        if (setlocale(LC_NUMERIC, arguments[2]) == NULL) {
+            fprintf(stderr, "Unavailable numeric locale: %s\n", arguments[2]);
+            return 2;
+        }
+        printf("LC_NUMERIC=%s\n", setlocale(LC_NUMERIC, NULL));
+    } else if (argument_count != 1 && argument_count != 2) {
+        return 2;
+    }
     if (argument_count == 2) {
         if (strcmp(arguments[1], "--null-output-i64") == 0)
             return smaug_parse_i64("1", 1, NULL);
@@ -30,6 +41,14 @@ int main(int argument_count, char **arguments) {
         PARSE_CASE("space-only", " "),
         PARSE_CASE("leading-space", " 1"),
         PARSE_CASE("trailing-space", "1 "),
+        PARSE_CASE("plus-sign", "+12"),
+        PARSE_CASE("leading-zeroes", "0012"),
+        PARSE_CASE("fraction-only", ".5"),
+        PARSE_CASE("trailing-dot", "1."),
+        PARSE_CASE("exponent", "1e+2"),
+        PARSE_CASE("hex-integer", "0x10"),
+        PARSE_CASE("nan-payload", "nan(payload)"),
+        PARSE_CASE("infinity-long", "Infinity"),
         PARSE_CASE("sign-only", "+"),
         PARSE_CASE("nul-only", "\0"),
         PARSE_CASE("embedded-nul", "123\0abc"),
@@ -41,6 +60,8 @@ int main(int argument_count, char **arguments) {
         PARSE_CASE("i64-underflow", "-9223372036854775809"),
         PARSE_CASE("float-overflow", "1e400"),
         PARSE_CASE("float-underflow", "1e-400"),
+        PARSE_CASE("decimal-dot", "1.5"),
+        PARSE_CASE("decimal-comma", "1,5"),
         PARSE_CASE("minimum-normal", "0x1p-1022"),
         PARSE_CASE("minimum-subnormal-hex", "0x1p-1074"),
         PARSE_CASE("minimum-subnormal-decimal", "4.9406564584124654e-324"),

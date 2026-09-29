@@ -90,32 +90,38 @@ static int is_na(const char *s, const char **na_values, size_t na_count) {
     return 0;
 }
 
-/* try_i64/try_f64: wrappers finos sobre o núcleo _cstr do smaug_convert
-   (fonte única de parsing). Zero cópia no caso comum — o campo do CSV já
-   vem null-terminado. O _cstr trata s==NULL e "" (vazio). */
-static int try_i64(const char *s, int64_t *out) {
-    return smaug_parse_i64_cstr(s, out);
-}
-
-static int try_f64(const char *s, double *out, char decimal) {
-    /* decimal customizado (ex.: ','): strtod só entende '.', então troca-se
-       o caractere decimal por '.' numa cópia local e delega ao _cstr. Se
-       decimal == '.', vai direto ao _cstr sem cópia (zero overhead comum).
-       Um '.' literal onde decimal é ',' é inválido — rejeitado abaixo. */
-    if (decimal != '.') {
-        if (!s) return 0; /* COV-EXCL-BR: s nunca é NULL — origem é row[c] ou "" literal */
-        char buf[64];
-        size_t n = strlen(s);
-        if (n >= sizeof(buf)) return 0;  /* número absurdamente longo → não-float; vazio é tratado pelo _cstr */
-        for (size_t i = 0; i < n; i++) {
-            if (s[i] == decimal)      buf[i] = '.';
-            else if (s[i] == '.')     return 0;  /* '.' onde decimal é ',' → inválido */
-            else                      buf[i] = s[i];
-        }
-        buf[n] = '\0';
-        return smaug_parse_f64_cstr(buf, out);
+/* O leitor adapta o separador; o core mantém gramática e diagnósticos. */
+static smaug_status_t parse_csv_f64(const char *text, double *output, char decimal) {
+    if (!text || !output) {
+        return SMG_ERR_ARGUMENT;
     }
-    return smaug_parse_f64_cstr(s, out);
+    if (decimal == '.') {
+        return smaug_parse_f64_cstr_status(text, output);
+    }
+    if (strchr(text, '.')) {
+        return SMG_ERR_SYNTAX;
+    }
+    size_t length = strlen(text);
+    if (length == SIZE_MAX) {
+        return SMG_ERR_NOMEM;
+    }
+    char local_buffer[256];
+    char *buffer = local_buffer;
+    if (length >= sizeof(local_buffer)) {
+        buffer = malloc(length + 1);
+        if (!buffer) {
+            return SMG_ERR_NOMEM;
+        }
+    }
+    for (size_t position = 0; position < length; position++) {
+        buffer[position] = text[position] == decimal ? '.' : text[position];
+    }
+    buffer[length] = '\0';
+    smaug_status_t status = smaug_parse_f64_cstr_status(buffer, output);
+    if (buffer != local_buffer) {
+        free(buffer);
+    }
+    return status;
 }
 
 static int try_bool(const char *s, uint8_t *out) {
@@ -178,242 +184,347 @@ static char *next_field(const char *buf, size_t len, size_t *pos,
 /* ===================================================================
    Parser principal: coleta todos os tokens e depois constrói séries
    =================================================================== */
-smaug_table_t *smaug_read_csv_mem(const char *buf, size_t len,
-                                    const smaug_csv_opts_t *opts) {
-    /* Fronteira publica valida (principio do Anel 0). buf NULL com len > 0 e
-       chamada invalida -- antes disto o parser dereferenciava e segfaltava.
-       len == 0 com buf NULL e legitimo (entrada vazia), e continua valendo.
-       A contraparte de escrita (smaug_write_csv_mem) ja validava; a leitura
-       nao. Achado 2026-07-28 na auditoria de fronteiras. */
-    if (!buf && len > 0) return NULL;
+static void free_csv_fields(char **fields, size_t field_count) {
+    for (size_t field_index = 0; field_index < field_count; field_index++) {
+        free(fields[field_index]);
+    }
+    free(fields);
+}
 
-    smaug_csv_opts_t def = smaug_csv_default_opts();
-    if (!opts) opts = &def;
-    char sep   = opts->sep   ? opts->sep   : ',';   /* fallback defensivo: caller pode zerar o campo (ver test_csv_opts_zero_sep_quote) */
-    char quote = opts->quote ? opts->quote : '"';  /* fallback defensivo: idem (ver test_csv_opts_zero_sep_quote) */
-    char decimal = opts->decimal ? opts->decimal : '.';  /* fallback defensivo: campo zerado → '.' */
-    const char **nav = opts->na_values;
-    size_t nc = nav ? opts->na_count : 0;
+static void free_csv_rows(char ***rows, size_t *row_sizes, size_t row_count) {
+    for (size_t row_index = 0; row_index < row_count; row_index++) {
+        free_csv_fields(rows[row_index], row_sizes[row_index]);
+    }
+    free(rows);
+    free(row_sizes);
+}
+
+smaug_table_t *smaug_read_csv_mem(const char *buffer, size_t length,
+                                  const smaug_csv_opts_t *options) {
+    if (!buffer && length > 0) {
+        return NULL;
+    }
+    smaug_csv_opts_t default_options = smaug_csv_default_opts();
+    if (!options) {
+        options = &default_options;
+    }
+    /* Campos zerados preservam os defaults da API. */
+    char separator = options->sep ? options->sep : ',';
+    char quote = options->quote ? options->quote : '"';
+    char decimal = options->decimal ? options->decimal : '.';
+    const char **na_values = options->na_values;
+    size_t na_count = na_values ? options->na_count : 0;
 
     /* H.5.c: separador de campo e decimal iguais tornam o parsing ambíguo
        ("3,14" com sep=',' decimal=',' seria dois campos). Erro que orienta. */
-    if (sep == decimal)
+    if (separator == decimal) {
         return make_error("separador de campo e decimal não podem "
                           "ser o mesmo caractere (ex.: sep=';' com decimal=',')");
-
-    if (len == 0) return make_error("entrada vazia");   /* neutro: serve path e buffer (12.1) */
-
-    /* --- Passo 1: tokenizar tudo em um vetor plano de strings --- */
-    /* rows_tok[r] = array de campos da linha r (inclui header se houver) */
-    size_t row_cap = 64;
-    char ***rows = malloc(row_cap * sizeof(char **));
-    size_t *row_sizes = malloc(row_cap * sizeof(size_t));
-    if (!rows || !row_sizes) { free(rows); free(row_sizes); return make_error("OOM"); } /* COV-EXCL-BR: OOM de malloc inicial */
-    size_t n_rows = 0;
-
-    size_t pos = 0;
-    while (pos < len) {
-        /* pula linhas completamente vazias */
-        if (buf[pos] == '\n' || (buf[pos] == '\r' && (pos+1>=len || buf[pos+1]=='\n'))) {
-            if (buf[pos] == '\r') pos++;
-            pos++;
-            continue;
-        }
-        /* ler linha */
-        size_t field_cap = 16;
-        char **fields = malloc(field_cap * sizeof(char *));
-        if (!fields) goto oom; /* COV-EXCL-BR: OOM de malloc de fields */
-        size_t n_fields = 0;
-        int eol = 0;
-        while (!eol) {
-            char *f = next_field(buf, len, &pos, sep, quote, &eol);
-            if (!f) { for(size_t k=0;k<n_fields;k++)free(fields[k]); free(fields); goto oom; }
-            if (n_fields >= field_cap) {
-                field_cap *= 2;
-                char **tmp = realloc(fields, field_cap * sizeof(char*));
-                if (!tmp) { free(f); for(size_t k=0;k<n_fields;k++)free(fields[k]); free(fields); goto oom; } /* COV-EXCL-BR: OOM de realloc de fields — coberto pelo allocfail */
-                fields = tmp;
-            }
-            fields[n_fields++] = f;
-        }
-        if (n_rows >= row_cap) {
-            row_cap *= 2;
-            char ***tr = realloc(rows, row_cap * sizeof(char**));
-            size_t *ts = realloc(row_sizes, row_cap * sizeof(size_t));
-            if (!tr || !ts) { for(size_t k=0;k<n_fields;k++)free(fields[k]); free(fields); goto oom; } /* COV-EXCL-BR: OOM de realloc de rows — coberto pelo allocfail */
-            rows = tr; row_sizes = ts;
-        }
-        rows[n_rows] = fields;
-        row_sizes[n_rows] = n_fields;
-        n_rows++;
     }
 
-    if (n_rows == 0) {
-        free(rows); free(row_sizes);
+    if (length == 0) {
+        return make_error("entrada vazia");
+    }
+
+    /* --- Passo 1: tokenizar tudo em um vetor plano de strings --- */
+    /* Cada linha possui seus campos; o header, se houver, também está em rows. */
+    size_t row_capacity = 64;
+    char ***rows = malloc(row_capacity * sizeof(char **));
+    size_t *row_sizes = malloc(row_capacity * sizeof(size_t));
+    if (!rows || !row_sizes) {
+        free(rows);
+        free(row_sizes);
+        return make_error("OOM");
+    }
+    size_t row_count = 0;
+
+    size_t position = 0;
+    while (position < length) {
+        /* Pula linhas completamente vazias. */
+        if (buffer[position] == '\n' || (buffer[position] == '\r' &&
+            (position + 1 >= length || buffer[position + 1] == '\n'))) {
+            if (buffer[position] == '\r') {
+                position++;
+            }
+            position++;
+            continue;
+        }
+        size_t field_capacity = 16;
+        char **fields = malloc(field_capacity * sizeof(char *));
+        if (!fields) {
+            goto oom_cleanup;
+        }
+        size_t field_count = 0;
+        int end_of_line = 0;
+        while (!end_of_line) {
+            char *field = next_field(buffer, length, &position, separator, quote, &end_of_line);
+            if (!field) {
+                free_csv_fields(fields, field_count);
+                goto oom_cleanup;
+            }
+            if (field_count >= field_capacity) {
+                if (field_capacity > SIZE_MAX / sizeof(char *) / 2) {
+                    free(field);
+                    free_csv_fields(fields, field_count);
+                    goto oom_cleanup;
+                }
+                field_capacity *= 2;
+                char **resized_fields = realloc(fields, field_capacity * sizeof(char *));
+                if (!resized_fields) {
+                    free(field);
+                    free_csv_fields(fields, field_count);
+                    goto oom_cleanup;
+                }
+                fields = resized_fields;
+            }
+            fields[field_count++] = field;
+        }
+        if (row_count >= row_capacity) {
+            if (row_capacity > SIZE_MAX / sizeof(char **) / 2 ||
+                row_capacity > SIZE_MAX / sizeof(size_t) / 2) {
+                free_csv_fields(fields, field_count);
+                goto oom_cleanup;
+            }
+            row_capacity *= 2;
+            char ***resized_rows = realloc(rows, row_capacity * sizeof(char **));
+            if (!resized_rows) {
+                free_csv_fields(fields, field_count);
+                goto oom_cleanup;
+            }
+            /* O primeiro realloc pode mover o buffer mesmo se o segundo falhar. */
+            rows = resized_rows;
+            size_t *resized_sizes = realloc(row_sizes, row_capacity * sizeof(size_t));
+            if (!resized_sizes) {
+                free_csv_fields(fields, field_count);
+                goto oom_cleanup;
+            }
+            row_sizes = resized_sizes;
+        }
+        rows[row_count] = fields;
+        row_sizes[row_count] = field_count;
+        row_count++;
+    }
+
+    if (row_count == 0) {
+        free(rows);
+        free(row_sizes);
         return make_error("sem linhas de dados");
     }
 
-    size_t header_row = opts->header ? 1 : 0;
-    size_t n_cols = rows[0] ? row_sizes[0] : 0; /* COV-EXCL-BR: rows[0] nunca NULL — n_rows>0 garante alocação */
-    if (n_cols == 0) goto cleanup_empty; /* COV-EXCL-BR: next_field sempre produz >=1 campo por linha */
-    size_t data_rows = (n_rows > header_row) ? n_rows - header_row : 0;
+    size_t header_row = options->header ? 1 : 0;
+    size_t column_count = row_sizes[0];
+    if (column_count == 0) {
+        free_csv_rows(rows, row_sizes, row_count);
+        return make_error("sem colunas");
+    }
+    size_t data_rows = row_count - header_row;
 
-    /* nomes das colunas */
-    char **col_names = malloc(n_cols * sizeof(char *));
-    if (!col_names) goto oom_cleanup;
-    /* zera antes de strdup para permitir cleanup parcial seguro */
-    for (size_t c = 0; c < n_cols; c++) col_names[c] = NULL;
-    if (opts->header) {
-        for (size_t c = 0; c < n_cols; c++) {
-            const char *src = (c < row_sizes[0]) ? rows[0][c] : ""; /* COV-EXCL-BR: c<n_cols<=row_sizes[0] por construção */
-            col_names[c] = strdup(src);
-            if (!col_names[c]) {
-                for (size_t k = 0; k < c; k++) free(col_names[k]);
-                free(col_names);
-                goto oom_cleanup;
+    char **column_names = calloc(column_count, sizeof(char *));
+    if (!column_names) {
+        goto oom_cleanup;
+    }
+    for (size_t column_index = 0; column_index < column_count; column_index++) {
+        if (options->header) {
+            column_names[column_index] = strdup(rows[0][column_index]);
+        } else {
+            char generated_name[32];
+            int name_length = snprintf(generated_name, sizeof(generated_name),
+                                       "col%zu", column_index);
+            if (name_length < 0 || (size_t)name_length >= sizeof(generated_name)) {
+                free_csv_fields(column_names, column_count);
+                free_csv_rows(rows, row_sizes, row_count);
+                return make_error("column name formatting failed");
             }
+            column_names[column_index] = strdup(generated_name);
         }
-    } else {
-        for (size_t c = 0; c < n_cols; c++) {
-            char tmp[32]; snprintf(tmp, sizeof(tmp), "col%zu", c);
-            col_names[c] = strdup(tmp);
-            if (!col_names[c]) {
-                for (size_t k = 0; k < c; k++) free(col_names[k]);
-                free(col_names);
-                goto oom_cleanup;
-            }
+        if (!column_names[column_index]) {
+            free_csv_fields(column_names, column_count);
+            goto oom_cleanup;
         }
     }
 
     /* --- Passo 2: inferência de dtype --- */
-    int *dtypes = calloc(n_cols, sizeof(int));
+    int *dtypes = calloc(column_count, sizeof(int));
     if (!dtypes) {
-        for (size_t c = 0; c < n_cols; c++) free(col_names[c]);
-        free(col_names);
+        free_csv_fields(column_names, column_count);
         goto oom_cleanup;
     }
-    for (size_t r = 0; r < data_rows; r++) {
-        char **row = rows[r + header_row];
-        size_t rsz = row_sizes[r + header_row];
-        for (size_t c = 0; c < n_cols; c++) {
-            const char *s = (c < rsz) ? row[c] : "";
-            if (is_na(s, nav, nc)) continue;
-            int64_t vi; double vd; uint8_t vb;
-            int cand;
-            if      (try_bool(s, &vb)) cand = DT_BOOL;
-            else if (try_i64(s, &vi))  cand = DT_I64;
-            else if (try_f64(s, &vd, decimal))  cand = DT_F64;
-            else                        cand = DT_STR;
-            dtypes[c] = dtype_upgrade(dtypes[c], cand);
-            if (dtypes[c] == DT_STR) continue;
+    smaug_table_t *table = NULL;
+    for (size_t row_index = 0; row_index < data_rows; row_index++) {
+        char **row = rows[row_index + header_row];
+        size_t row_size = row_sizes[row_index + header_row];
+        for (size_t column_index = 0; column_index < column_count; column_index++) {
+            const char *text = (column_index < row_size) ? row[column_index] : "";
+            if (is_na(text, na_values, na_count)) {
+                continue;
+            }
+            int64_t integer_value;
+            double real_value;
+            uint8_t bool_value;
+            int candidate;
+            if (try_bool(text, &bool_value)) {
+                candidate = DT_BOOL;
+            } else if (smaug_parse_i64_cstr_status(text, &integer_value) == SMG_OK) {
+                candidate = DT_I64;
+            } else {
+                smaug_status_t status = parse_csv_f64(text, &real_value, decimal);
+                if (status == SMG_ERR_NOMEM || status == SMG_ERR_ARGUMENT) {
+                    table = make_error(status == SMG_ERR_NOMEM
+                        ? "OOM" : "invalid numeric argument");
+                    goto done;
+                }
+                candidate = status == SMG_OK ? DT_F64 : DT_STR;
+            }
+            dtypes[column_index] = dtype_upgrade(dtypes[column_index], candidate);
         }
     }
-    for (size_t c = 0; c < n_cols; c++)
-        if (dtypes[c] == DT_UNKNOWN) dtypes[c] = DT_STR;
+    for (size_t column_index = 0; column_index < column_count; column_index++) {
+        if (dtypes[column_index] == DT_UNKNOWN) {
+            dtypes[column_index] = DT_STR;
+        }
+    }
 
     /* --- Passo 3: alocar e preencher séries --- */
-    smaug_table_t *t = calloc(1, sizeof(smaug_table_t));
-    if (!t) {
-        for (size_t c = 0; c < n_cols; c++) free(col_names[c]);
-        free(dtypes); free(col_names); goto oom_cleanup;
+    table = calloc(1, sizeof(smaug_table_t));
+    if (!table) {
+        free_csv_fields(column_names, column_count);
+        free(dtypes);
+        goto oom_cleanup;
     }
-    t->columns = calloc(n_cols, sizeof(smaug_column_t));
-    if (!t->columns) {
-        free(t);
-        for (size_t c = 0; c < n_cols; c++) free(col_names[c]);
-        free(dtypes); free(col_names); goto oom_cleanup;
+    table->columns = calloc(column_count, sizeof(smaug_column_t));
+    if (!table->columns) {
+        free(table);
+        free_csv_fields(column_names, column_count);
+        free(dtypes);
+        goto oom_cleanup;
     }
-    t->ncols = n_cols;
-    t->nrows = data_rows;
+    table->ncols = column_count;
+    table->nrows = data_rows;
 
-    for (size_t c = 0; c < n_cols; c++) {
-        t->columns[c].name  = col_names[c]; col_names[c] = NULL;
-        t->columns[c].dtype = dtype_name(dtypes[c]);
+    for (size_t column_index = 0; column_index < column_count; column_index++) {
+        table->columns[column_index].name = column_names[column_index];
+        column_names[column_index] = NULL;
+        table->columns[column_index].dtype = dtype_name(dtypes[column_index]);
 
-        switch (dtypes[c]) {
+        switch (dtypes[column_index]) {
         case DT_I64: {
-            smaug_series_i64_t *s = smaug_i64_create(data_rows);
-            if (!s) { smaug_table_free(t); t=NULL; goto done; }
-            for (size_t r = 0; r < data_rows; r++) {
-                char **row = rows[r + header_row]; size_t rsz = row_sizes[r+header_row];
-                const char *v = (c < rsz) ? row[c] : "";
-                int64_t vi;
-                if (is_na(v,nav,nc)) smaug_i64_set_null(s,r);
-                else if (try_i64(v,&vi)) smaug_i64_set(s,r,vi); /* COV-EXCL-BR: dtype=int64 implica que todo valor não-NA já passou em try_i64 durante a inferência (mesma string, mesma is_na, função pura e determinística) — confirmado por auditoria adversarial (overflow/inf/nan/zeros à esquerda) e 400k+ checks da suíte, nunca quebrou */
-                else smaug_i64_set_null(s,r);
+            smaug_series_i64_t *series = smaug_i64_create(data_rows);
+            if (!series) {
+                smaug_table_free(table);
+                table = NULL;
+                goto done;
             }
-            t->columns[c].i64 = s; break;
+            table->columns[column_index].i64 = series;
+            for (size_t row_index = 0; row_index < data_rows; row_index++) {
+                char **row = rows[row_index + header_row];
+                size_t row_size = row_sizes[row_index + header_row];
+                const char *text = (column_index < row_size) ? row[column_index] : "";
+                if (is_na(text, na_values, na_count)) {
+                    smaug_i64_set_null(series, row_index);
+                    continue;
+                }
+                int64_t value;
+                smaug_status_t status = smaug_parse_i64_cstr_status(text, &value);
+                if (status != SMG_OK) {
+                    smaug_table_free(table);
+                    table = make_error("numeric conversion failed");
+                    goto done;
+                }
+                smaug_i64_set(series, row_index, value);
+            }
+            break;
         }
         case DT_F64: {
-            smaug_series_f64_t *s = smaug_f64_create(data_rows);
-            if (!s) { smaug_table_free(t); t=NULL; goto done; }
-            for (size_t r = 0; r < data_rows; r++) {
-                char **row = rows[r + header_row]; size_t rsz = row_sizes[r+header_row];
-                const char *v = (c < rsz) ? row[c] : "";
-                double vd; int64_t vi;
-                if (is_na(v,nav,nc)) smaug_f64_set_null(s,r);
-                else if (try_f64(v,&vd,decimal)) smaug_f64_set(s,r,vd); /* COV-EXCL-BR: dtype=float64 implica try_f64=1 pelo mesmo argumento de pureza da inferência (ver linha 303) */
-                else if (try_i64(v,&vi)) smaug_f64_set(s,r,(double)vi); /* COV-EXCL-BR: duplamente inalcançável — além da pureza da inferência, try_i64(v) bem-sucedido implica try_f64(v) também bem-sucedido (strtod aceita toda a gramática de strtoll), então o try_f64 da linha acima já teria capturado este valor */
-                else smaug_f64_set_null(s,r);
+            smaug_series_f64_t *series = smaug_f64_create(data_rows);
+            if (!series) {
+                smaug_table_free(table);
+                table = NULL;
+                goto done;
             }
-            t->columns[c].f64 = s; break;
+            /* Transfere ownership antes de converter: qualquer falha limpa a tabela inteira. */
+            table->columns[column_index].f64 = series;
+            for (size_t row_index = 0; row_index < data_rows; row_index++) {
+                char **row = rows[row_index + header_row];
+                size_t row_size = row_sizes[row_index + header_row];
+                const char *text = (column_index < row_size) ? row[column_index] : "";
+                if (is_na(text, na_values, na_count)) {
+                    smaug_f64_set_null(series, row_index);
+                    continue;
+                }
+                double value;
+                smaug_status_t status = parse_csv_f64(text, &value, decimal);
+                if (status != SMG_OK) {
+                    smaug_table_free(table);
+                    table = make_error(status == SMG_ERR_NOMEM
+                        ? "OOM" : "numeric conversion failed");
+                    goto done;
+                }
+                smaug_f64_set(series, row_index, value);
+            }
+            break;
         }
         case DT_BOOL: {
-            smaug_series_bool_t *s = smaug_bool_create(data_rows);
-            if (!s) { smaug_table_free(t); t=NULL; goto done; }
-            for (size_t r = 0; r < data_rows; r++) {
-                char **row = rows[r + header_row]; size_t rsz = row_sizes[r+header_row];
-                const char *v = (c < rsz) ? row[c] : "";
-                uint8_t vb;
-                if (is_na(v,nav,nc)) smaug_bool_set_null(s,r);
-                else if (try_bool(v,&vb)) smaug_bool_set(s,r,vb); /* COV-EXCL-BR: dtype=bool implica try_bool=1 pelo mesmo argumento de pureza da inferência (ver linha 303) */
-                else smaug_bool_set_null(s,r);
+            smaug_series_bool_t *series = smaug_bool_create(data_rows);
+            if (!series) {
+                smaug_table_free(table);
+                table = NULL;
+                goto done;
             }
-            t->columns[c].boolcol = s; break;
+            for (size_t row_index = 0; row_index < data_rows; row_index++) {
+                char **row = rows[row_index + header_row];
+                size_t row_size = row_sizes[row_index + header_row];
+                const char *text = (column_index < row_size) ? row[column_index] : "";
+                uint8_t bool_value;
+                if (is_na(text, na_values, na_count)) {
+                    smaug_bool_set_null(series, row_index);
+                } else if (try_bool(text, &bool_value)) {
+                    smaug_bool_set(series, row_index, bool_value);
+                } else {
+                    smaug_bool_set_null(series, row_index);
+                }
+            }
+            table->columns[column_index].boolcol = series;
+            break;
         }
         default: {
-            smaug_series_str_t *s = smaug_str_create(data_rows);
-            if (!s) { smaug_table_free(t); t=NULL; goto done; }
-            for (size_t r = 0; r < data_rows; r++) {
-                char **row = rows[r + header_row]; size_t rsz = row_sizes[r+header_row];
-                const char *v = (c < rsz) ? row[c] : "";
-                if (is_na(v,nav,nc)) smaug_str_set_null(s,r);
-                else smaug_str_set(s,r,v,strlen(v));
+            smaug_series_str_t *series = smaug_str_create(data_rows);
+            if (!series) {
+                smaug_table_free(table);
+                table = NULL;
+                goto done;
             }
-            t->columns[c].str = s; break;
+            for (size_t row_index = 0; row_index < data_rows; row_index++) {
+                char **row = rows[row_index + header_row];
+                size_t row_size = row_sizes[row_index + header_row];
+                const char *text = (column_index < row_size) ? row[column_index] : "";
+                smaug_status_t status;
+                if (is_na(text, na_values, na_count)) {
+                    status = smaug_str_set_null(series, row_index);
+                } else {
+                    status = smaug_str_set(series, row_index, text, strlen(text));
+                }
+                if (status != 0) {
+                    smaug_str_free(series);
+                    smaug_table_free(table);
+                    table = make_error("OOM");
+                    goto done;
+                }
+            }
+            table->columns[column_index].str = series;
+            break;
         }
         }
     }
 
 done:
-    /* libera nomes ainda não transferidos para t (NULL = já transferido) */
-    if (col_names) {
-        for (size_t c = 0; c < n_cols; c++) free(col_names[c]);
-        free(col_names);
-    }
+    /* Nomes transferidos para a tabela foram zerados no vetor temporário. */
+    free_csv_fields(column_names, column_count);
     free(dtypes);
-    for (size_t r = 0; r < n_rows; r++) {
-        for (size_t c = 0; c < row_sizes[r]; c++) free(rows[r][c]);
-        free(rows[r]);
-    }
-    free(rows); free(row_sizes);
-    return t;
+    free_csv_rows(rows, row_sizes, row_count);
+    return table;
 
-cleanup_empty:
-    free(rows); free(row_sizes);
-    return make_error("sem colunas");
 oom_cleanup:
-    for (size_t r = 0; r < n_rows; r++) {
-        for (size_t c = 0; c < row_sizes[r]; c++) free(rows[r][c]);
-        free(rows[r]);
-    }
-    free(rows); free(row_sizes);
-    return make_error("OOM");
-oom:
-    for (size_t r = 0; r < n_rows; r++) {
-        if (rows[r]) { for(size_t c=0;c<row_sizes[r];c++) free(rows[r][c]); free(rows[r]); }
-    }
-    free(rows); free(row_sizes);
+    free_csv_rows(rows, row_sizes, row_count);
     return make_error("OOM");
 }
 
@@ -498,12 +609,21 @@ char *smaug_write_csv_mem(const smaug_table_t *t,
                  * status possíveis aqui: col->i64 não-NULL e r<nrows sempre,
                  * então ERR_ARGUMENT/ERR_OOB são inalcançáveis) — simplificado. */
                 if (st != SMG_OK) { s=""; n=0; }
-                else { n=smaug_fmt_i64(tmp,sizeof(tmp),v); s=tmp; }
+                else {
+                    n = smaug_fmt_i64(tmp, sizeof(tmp), v);
+                    if (n == 0) {
+                        goto format_error;
+                    }
+                    s = tmp;
+                }
             } else if (col->f64) {
                 smaug_status_t st; double v = smaug_f64_get(col->f64, r, &st);
                 if (st != SMG_OK) { s=""; n=0; } /* idem i64: subcaso redundante removido */
                 else {
-                    n = smaug_fmt_f64(tmp, sizeof(tmp), v);  /* normaliza NaN/inf */
+                    n = smaug_fmt_f64(tmp, sizeof(tmp), v);
+                    if (n == 0) {
+                        goto format_error;
+                    }
                     /* decimal customizado: troca o '.' do fmt pelo separador
                        configurado. "%.17g" produz no máximo um '.' (nan/inf não têm). */
                     if (decimal != '.') {
@@ -528,6 +648,10 @@ char *smaug_write_csv_mem(const smaug_table_t *t,
     if (wbuf_pushc(&b, '\0')) goto oom;
     *out_len = b.len - 1;  /* out_len não inclui o \0 */
     return b.data;
+format_error:
+    set_io_error(err_out, "falha ao formatar número no CSV");
+    free(b.data);
+    return NULL;
 oom: set_io_error(err_out, "OOM ao serializar CSV"); free(b.data); return NULL;
 }
 

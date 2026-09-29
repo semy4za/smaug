@@ -5,8 +5,8 @@
    smaug_types.h — Tipos base do Smaug (a fundação)
    -------------------------------------------------------------------
    Contém APENAS tipos: máscara de nulos, metadados e as structs de série.
-   Zero funções. Todo header de operação (core, numeric, bool, e o futuro
-   string) inclui este. Inspirado no ndarraytypes.h do NumPy, que isola os
+   Zero funções. Todo header de operação (core, numeric, bool, string e
+   datetime) inclui este. Inspirado no ndarraytypes.h do NumPy, que isola os
    tipos/structs das funções para que novos tipos possam ser adicionados sem
    arrastar o lifecycle/operações de outros tipos.
    =================================================================== */
@@ -23,8 +23,10 @@ typedef enum {
     SMG_NULL_VALUE,    /* leitura: elemento é NULL (não é erro)   */
     SMG_ERR_OOB,       /* índice fora dos limites                 */
     SMG_ERR_ARGUMENT,  /* ponteiro nulo / argumento inconsistente */
-    SMG_ERR_NOMEM,     /* falha de alocação no COW detach         */
-    SMG_ERR_OVERFLOW   /* resultado não cabe no intervalo do tipo   */
+    SMG_ERR_NOMEM,     /* falha de alocação                       */
+    SMG_ERR_OVERFLOW,  /* resultado não cabe no intervalo do tipo   */
+    SMG_ERR_SYNTAX,    /* texto não pertence à gramática esperada   */
+    SMG_ERR_UNDERFLOW  /* não zero arredondaria para zero            */
 } smaug_status_t;
 
 /* Tipo opaque para hash table (uso futuro: GroupBy/joins) */

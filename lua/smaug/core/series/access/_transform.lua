@@ -28,7 +28,8 @@ return function(I)
     -- =====================================================================
     -- astype: matriz de conversão src×dst delegada ao Anel 0 (10.7 Passo B).
     -- Tabela explícita [src][dst] -> primitiva C (diagonal usa clone; pares
-    -- com bool/categorical ficam no Anel 1 até 10.8). Retorno por ponteiro.
+    -- com bool/categorical permanecem no caminho Lua enquanto o contrato
+    -- dessas conversões não for fechado. Retorno por ponteiro.
     -- =====================================================================
     local ASTYPE_C = {
         int64    = { float64  = C.smaug_i64_to_f64,
@@ -316,7 +317,8 @@ return function(I)
                   " não suportado; use :map(fn) para definir a regra", 2)
         end
 
-        -- Zona 4 — pares com bool (bool<->int64/float64/string): Anel 1 até 10.8.
+        -- Zona 4 — pares com bool (bool<->int64/float64/string): caminho Lua
+        -- explícito, com regras próprias de nulidade e representação.
         -- Loop reduzido: só os ramos que envolvem bool.
         local length = self:len()
         local result_series = Series.new(dtype, length, name or self._name)

@@ -1,7 +1,7 @@
 -- Rode da raiz: luajit tests/dataset/test_relational.lua
 -- Contratos: docs/CONTRACT.md (NA em chaves; NA != NaN), docs/API_INDEX.md.
--- Revisão: docs/TEST_SUITE_REWRITE_REVIEW.md, R01/R09 e camada Relacional.
--- docs/COVERAGE.md mede o backend C no commit 51184cb, não este módulo Lua.
+-- Revisão: docs/Roadmap.md, achados históricos R01/R09 e checkpoint relacional.
+-- docs/COVERAGE.md identifica a árvore medida do backend C, não este módulo Lua.
 -- Vazios, máscaras, tipos e ordenação abaixo exercitam a fronteira Lua/C;
 -- não demonstram cobertura de OOM nem substituem uma medição instrumentada.
 --

@@ -9,9 +9,9 @@
  *   - eq: compara COMPRIMENTO primeiro (O(1) via offsets); só faz memcmp se
  *     os comprimentos baterem (pula o memcmp na maioria dos "diferentes").
  *   - lt/gt: memcmp até o menor comprimento, desempata pelo comprimento.
- * (A otimização real para string repetida é o dictionary encoding / categorical,
- * Tier 2 — ver Roadmap. As comparações daqui seguem válidas; o categorical será
- * um tipo separado que implementa a mesma interface de forma acelerada.)
+ * Dictionary encoding não faz parte desta struct; categorical é um tipo
+ * separado do frontend Lua. Qualquer otimização compartilhada exige contrato
+ * próprio e não deve ser inferida desta implementação.
  */
 
 #include "smaug_string.h"

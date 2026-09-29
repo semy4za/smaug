@@ -1,963 +1,459 @@
-# Smaug — Roadmap
-
-[Início](README.md) · [Primeiros passos](GETTING_STARTED.md) · [Guia do usuário](USER_GUIDE.md) · [API Reference: Lua](API_INDEX.md) | [Núcleo C](API_Reference.md)
-
-<details>
-<summary>Nesta página</summary>
-
-- [Filosofia](#section-filosofia)
-- [Arquitetura em anéis](#section-arquitetura-em-aneis)
-- [Já entregue (fora da timeline)](#section-ja-entregue-fora-da-timeline)
-- [Índice do concluído](#section-indice-do-concluido)
-- [10. Completude de vetorização (Anel 0)  Fedora](#section-10-completude-de-vetorizacao-anel-0-fedora)
-- [12. Achados menores + débitos antigos  Windows+Fedora](#section-12-achados-menores-debitos-antigos-windows-fedora)
-- [13. Reescrita de exemplos + docstrings  Windows](#section-13-reescrita-de-exemplos-docstrings-windows)
-- [14. VERIFICAÇÃO PONTA A PONTA — porta de entrega  Fedora + Windows](#section-14-verificacao-ponta-a-ponta-porta-de-entrega-fedora-windows)
-  - [14.1 Motor (Anel 0) — leitura linha a linha do C](#section-14-1-motor-anel-0-leitura-linha-a-linha-do-c)
-  - [14.2 Anéis 1–3 — coerência de camada](#section-14-2-aneis-1-3-coerencia-de-camada)
-  - [14.3 Contratos e documentação — a doc descreve o que o código faz](#section-14-3-contratos-e-documentacao-a-doc-descreve-o-que-o-codigo-faz)
-  - [14.4 Verificação executável — as duas plataformas](#section-14-4-verificacao-executavel-as-duas-plataformas)
-  - [14.5 Superfície externa — o que falta para ser usável por terceiros](#section-14-5-superficie-externa-o-que-falta-para-ser-usavel-por-terceiros)
-  - [14.6 Critério de saída](#section-14-6-criterio-de-saida)
-- [15. RELEASE v1.0 (último)  Windows+Fedora](#section-15-release-v1-0-ultimo-windows-fedora)
-
-</details>
-
-**Decisão datetime — 2026-09-18:** aprovados anos completos de `-9999` a `9999`,
-inclusive, com ano zero; UTC quando o offset for omitido e aceitação de frações somente
-quando exatas em milissegundos. Entrada estrita rejeita perda; `astype` converte
-o elemento inconversível em NA. Contrato e critérios de verificação estão em
-`CONTRACT.md`, seção "Perfil datetime". Limites aplicados após normalização
-do offset para UTC. Anos negativos usam sinal menos e seis dígitos, somente
-ano primeiro e hífens; rejeitar `-000000`, formas abreviadas e segundo `:60`.
-Ano `-1` é valor válido: extração deve separar valor de status pelo padrão
-checked, preservando a saída em falha e `.dt:year()` no Lua.
-Implementação, validação desses limites e
-migração das APIs com sentinelas continuam pendentes; itens históricos abaixo
-não substituem essa decisão.
-
-> Alinhamento documental — 2026-09-18: `CONTRACT.md` define as garantias
-> vigentes; [parecer do rework](TEST_SUITE_REWRITE_REVIEW.md) registra as lacunas de verificação.
-> Entradas concluídas e medições abaixo são históricas, não certificação da
-> árvore atual. Em particular, a auditoria refutou exclusões de datetime e
-> reabriu a suficiência das verificações de OOM, parity e cobertura.
-
-Este roadmap é uma **timeline sequencial**. Cada número é um tema; os decimais são
-subtarefas. A ordem reflete dependência e risco — temas anteriores são fundação
-dos seguintes. A **v1.0 ganha o direito de existir quando a timeline zerar**
-(item 14 não achar inconsistência nova).
-
-O arquivo lista **o que falta**. O que fechou vive em duas camadas: o *Índice do
-concluído* (abaixo) resolve as referências por número que o código faz em
-comentários, e o `CHANGELOG` guarda o raciocínio, as medições e os achados de
-cada item. A descrição arquitetural permanente (Filosofia, Anéis) fica antes da
-timeline.
-
----
-
-<a id="section-filosofia"></a>
-
-## Filosofia
-
-Smaug é fluido e robusto — uma engine feita para processar dados. Features
-novas só entram sobre uma fundação sólida — um engine confiável vale mais
-do que dez operações frágeis.
-
-Robustez é funcionalidade. Testes não são suporte às funcionalidades, são
-funcionalidades. Cobertura é ferramenta de confiança, não métrica de vaidade.
-Valgrind é parte do desenvolvimento, não etapa final. A capacidade de sobreviver
-a entradas inválidas é tão importante quanto qualquer operação matemática.
-
-E o design importa. A API deve ser bonita de escrever e o fluxo de dados
-deve ser natural de ler e conciso de compor.
-
-Coerência se verifica, não se presume. Disparidade estrutural ("existe aqui mas
-não ali") é trabalho de auditor automatizável — paridade cruzada com lista de
-exceções conscientes. Erro semântico de implementação (ex.: precisão perdida numa
-conversão) escapa ao auditor estrutural e exige leitura humana e revisão cruzada.
-As duas camadas se complementam; nenhuma substitui a outra.
-
----
-
-<a id="section-arquitetura-em-aneis"></a>
-
-## Arquitetura em anéis
-
-O projeto cresce de dentro pra fora. Um anel só expande quando o interior está
-sólido — não o contrário. A partir do Anel 3, o crescimento segue **duas trilhas
-paralelas** (Projeto: Persistência→Models; Analítica: Matrix→Tensor→ML). Ver
-`ARCHITECTURE.md` para o modelo completo (10 anéis, duas trilhas), princípios,
-diagrama, regra de decisão e régua de versões.
-
-- **Anel 0 — Backend C.** Memória, tipos, operações primitivas. O engine não
-  confia no caller — toda fronteira pública valida e comunica o resultado.
-- **Anel 1 — Frontend Lua.** Series, BoolSeries, operações vetorizadas.
-- **Anel 2 — Operações Relacionais.** DataSet, join, groupby, reshape. Depende
-  só do Anel 1.
-- **Anel 3 — Conectividade / I/O.** CSV, JSON, conectores externos.
-
----
-
-<a id="section-ja-entregue-fora-da-timeline"></a>
-
-## Já entregue (fora da timeline)
-
-Resumo enxuto — detalhe histórico no apêndice e no `CHANGELOG`.
-
-- **Anéis 0–3 completos e funcionais** — motor C, camada Lua, relacional, I/O.
-- **Ring 0 hardened** — Valgrind-clean, meta de 95% branch-alvo, `test_allocfail`
-  varrendo todos os pontos, stress N=1M.
-- **Blocos A–I** — estatística, dtypes, transformações, robustez, enriquecimento
-  dos núcleos, coerência de API (Bloco H: separador/decimal/dayfirst), fechamento
-  de coerência (Bloco I).
-- **Auditoria dos 4 anéis** — campanha de revisão que originou esta timeline. Os
-  achados viraram os itens abaixo.
-
----
-
----
-
-<a id="section-indice-do-concluido"></a>
-
-## Índice do concluído
-
-Os itens abaixo **fecharam**. Ficam aqui como **stubs resolvíveis**, não como
-histórico: o código referencia estes números em comentários (`10.6` aparece 52
-vezes, `12.21` 30, `9.1` 25) para explicar por que ele é como é — apagar as
-entradas orfanaria essas referências. O **raciocínio, as medições e os achados
-de cada um estão no `CHANGELOG`** (103 entradas), que é o registro histórico do
-projeto. Aqui fica só o suficiente para resolver uma referência.
-
-**Temas fechados por inteiro**
-
-| # | tema | ambiente |
-|---|------|----------|
-| 1 | Fonte única de nulidade no Ring 0 | [Fedora] |
-| 2 | Sentinela único na camada Lua | [Windows] |
-| 3 | `bool_view` | [Windows] |
-| 4 | NA relacional unificado + Contrato 7 | [Windows] |
-| 5 | Reduções + element-wise no DataSet | [Windows/Fedora] |
-| 6 | Paridade Series↔DataSet e auditor | [Windows] |
-| 7 | Completude do motor (Ring 0) | [Fedora] |
-| 8 | Rolling → Ring 0 | [Windows+Fedora] |
-| 9 | Contratos de fronteira | [Fedora] |
-| 11 | Ergonomia REPL | [Windows] |
-
-**Subitens fechados referenciados pelo código** (blocos 5, 7, 9 e 11)
-
-- 5.0 / 5.1 / 5.3 — reduções e element-wise no DataSet; `5.5` cobriu
-  `sum(min_count)`.
-- 7.1 / 7.1b — movimentação de dados (`ffill`/`bfill`) como responsabilidade do
-  Anel 0.
-- 7.2a — `argmin`/`argmax` de string (ordem lexicográfica por bytes; `SIZE_MAX`
-  para vazia ou toda-NA).
-- 7.2b — `min`/`max` de string.
-- 7.3 — todos os dtypes ordenáveis (f64/i64/dt/str/bool) com `sort`/`argsort`.
-- 9.1 — int64 acima de 2^53 sem caminho de entrada correto: `check_value` passou
-  a aceitar `cdata int64_t` (Sub-B) e `get_raw` deu a saída exata (Sub-A). É a
-  raiz da família que os itens 9.3 e 9.4 continuaram.
-- 9.2 — `string` ganhou view + Copy-on-Write, com detach seguro sob OOM.
-- 9.3 — fronteira do escalar int-based nos call-sites de **operação**
-  (comparadores e aritmética escalar): `core/int_scalar.lua` como fonte única;
-  cdata aceito, `number >= 2^53` recusado por origem.
-- 9.4 — `nlargest`/`nsmallest` devolviam valor **ausente do dataset** (o buffer
-  int64 passava por `tonumber`, e `…995` virava `…996`); separado em
-  `c_sorted_nonnull_native` (exato) e wrapper que normaliza para double.
-- 11.3 — invariante + auditoria de exibição (eixo de paridade `13_tostring`).
-- 11.4 — exibição de int64 exato (`cell_of` → `get_raw`).
-
-**Subitens fechados do bloco 10** (completude de vetorização)
-
-- 10.2 — `between` → Anel 0 nos **quatro** dtypes ordenáveis (f64/i64/datetime/
-  string). Primitiva dedicada de passada única em vez de compor `ge`+`le`
-  internamente (que custaria três pares de alocação e três varreduras); os dois
-  `bool` `inc_lo`/`inc_hi` cobrem os quatro modos de `inclusive`. Fechou também
-  uma violação de **P3**: o fallback em Lua e o degrau `check_i64` saíram do
-  `_predicates.lua`, e a comparação element-wise deixou de existir em dois anéis.
-  Em int64 o suporte a > 2^53 virou real — os limites entram exatos pela fronteira
-  do escalar (9.3). Fatiado em f64+i64 e depois dt+str; a lição de cobertura das
-  duas fatias está no `CHANGELOG` (testar os modos num dtype não cobre os outros).
-- 10.3 — família matemática element-wise → Anel 0: as nove operações
-  (`sin`/`cos`/`tan`/`exp`/`log`/`sqrt` por macro `F64_MATH_IMPL`, mais
-  `abs`/`round`/`clip` com versão int64). **Aposentou o degrau
-  `check_int64_lossless`** — com estas três no Anel 0 ele ficou sem consumidor no
-  projeto inteiro. Três casos sem resposta passaram a errar com causa nomeada via
-  `smaug_status_t`: `abs(INT64_MIN)`, `clip(lo > hi)` e `round` fora de faixa.
-  `round(int64)` preserva int64 (identidade como cópia, sem aritmética, para não
-  degradar acima de 2^53). Entrada int64 nas seis matemáticas encadeia `astype`
-  em vez de ter versão própria (Opção 1).
-- 10.5 — chave de igualdade/cardinalidade → int64 exato (L2). Passo A: `core/keys.lua`
-  como fonte única de codificação de chave. Passo B (hash no Anel 0) segue aberto → ver 10.5-B abaixo.
-- 10.6 — família seleção/preenchimento por máscara (`fillna`/`combine_first`/`where`/`select`/`ffill`) → Anel 0.
-- 10.7 — `astype`: matriz `src×dst` no Anel 0.
-- 10.8 — `BoolSeries`: coerência de caminho com o Anel 0; `boolseries.lua` era código morto, removido.
-- 10.9 — formatação de serialização canônica (`smaug_fmt_*`, `smaug_parse_*`) como fonte única.
-
-**Subitens fechados do bloco 12** (achados menores)
-
-- 12.37 — fronteiras públicas que não validavam: `read_csv_mem`/`read_json_mem`
-  **segfaltavam** com `buf = NULL` e `len > 0`, enquanto a contraparte de escrita
-  já validava e já tinha teste. Guarda é `!buf && len > 0` (buf NULL com len 0 é
-  entrada vazia legítima). Auditoria das 305 funções exportadas.
-- 12.38 — objeto do Smaug onde se espera tabela Lua: `type(v) ~= "table"` não
-  distingue array de Series/DataSet, e como esses não têm parte array, `#v` dá 0
-  — `take`, `isin`, `select`, `categorical:take` e `drop_duplicates` devolviam
-  vazio ou errado **em silêncio**. `Err.check_plain_array` discrimina por
-  metatable e a mensagem nomeia a saída (`:to_table()`).
-
-12.1 a 12.7, 12.9, 12.10, 12.12, 12.15, 12.17, 12.18, 12.20 a 12.24, 12.27,
-12.28, 12.29, 12.31, 12.32 — correções pontuais de robustez, cobertura, paridade
-e contratos. Cada um narrado no `CHANGELOG` na data em que fechou. Dois merecem
-menção por mudarem processo, não só código:
-
-- 12.31 — a inferência de dtype passou a decidir por **família** (numérico /
-  string / bool) em vez de por rank; mistura sem promoção segura erra na
-  inferência, nomeando os tipos e as posições, em vez de construir um container
-  que rejeita a própria lista.
-- 12.32 — **um** gerador de MANIFEST (o `.ps1` delega ao `.sh`), acabando com seis
-  eixos de divergência entre plataformas; cabeçalho ganhou **procedência**
-  (`# Arvore: <commit>`), porque hash de arquivo prova consistência interna e
-  nunca atualidade — um MANIFEST antigo valida limpo contra a própria árvore
-  antiga. Escrita atômica: falha no meio deixa o arquivo anterior intacto.
-
-**Fronteiras encerradas (decisões de "não fazer")** — registradas no `CHANGELOG`:
-broadcasting axis-aware pertence ao Anel 6, não ao 1; `map` sobre FFI é
-intrínseco ao Anel 1; `get()` degradar int64 > 2^53 é limitação do Lua com saída
-documentada (`get_raw`).
-
-**Antes da timeline** — trabalho que originou esta lista, sem numeração de item:
-
-- **Fases 1–5** — inventário arquitetural, decisões de fundação (Bloco G),
-  migração de primitivas para Ring 0, split dos arquivos-deus, hardening global
-  (Valgrind, cobertura, allocfail).
-- **Bloco H** — coerência de API e convenções de entrada: separador de data `/`,
-  decimal CSV configurável (BR), validação `sep==decimal`, `dayfirst` completo.
-- **Bloco I** — fechamento de coerência pré-auditoria: docs sync, Ring 0 fixes
-  (rank i64, make_error OOM guard), camada Lua (dt_view exposto), parity eixo 10.
-- **Auditoria dos 4 anéis** — a campanha de revisão cujos achados viraram os
-  itens numerados desta timeline.
-
-> Números frágeis (contagens de check, cobertura) vivem em `COVERAGE.md`,
-> `MANIFEST.txt` e na saída do `build.sh` — não são copiados para cá, onde
-> envelheceriam em silêncio.
-
----
-
-# Timeline — caminho até a v1.0
-
-**Critério geral de fechamento** (vale para todo item, salvo exceção explícita):
-build verde (`build.sh --all` no Fedora / `build.ps1` no Windows), teste
-que guarda o comportamento novo, parity 12/12, e — para itens de Ring 0 —
-Valgrind-clean + cobertura medida no Fedora. Nenhum item fecha sem um teste que o
-proteja de regressão. Documentação afetada (`CHANGELOG`, contrato, COW.md)
-atualizada no mesmo passo.
-
-Legenda de ambiente:
-- **[Windows]** fecha no Windows (Lua/teste — sem Valgrind/gcov).
-- **[Fedora]** exige Fedora (Ring 0 — Valgrind/gcov autoritativos).
-- **[Windows+Fedora]** toca os dois (C + Lua).
-
----
-
-<a id="section-10-completude-de-vetorizacao-anel-0-fedora"></a>
-
-## 10. Completude de vetorização (Anel 0)  [Fedora]
-
-Operações que fazem o loop em Lua cruzando FFI por elemento, quando o padrão
-correto — delegar ao descritor → C — já existe. Subitens 10.5 a 10.9 fechados
-(ver índice acima); 10.5 Passo B segue aberto.
-
-- 10.1 **`prod()` → Ring 0** (E3) — **RECLASSIFICADO 2026-07-28: é defeito de
-  correção, não assimetria.** Única redução escalar fora do C; sum/mean/min/max/
-  std/var já têm primitiva. Criar `smaug_f64_prod`/`smaug_i64_prod`, espelhando a
-  assinatura do `sum` (`double smaug_f64_sum(s, bool ignore_na)`).
-  - **Bug provado (2026-07-28), nunca registrado.** O laço faz `p = p * v` com `v`
-    vindo de `get(i)` — **double**. Em int64 o produto degrada em silêncio:
-    `prod` de `{3037000500, 3037000499}` devolve `9223372033963249664` quando o
-    exato é `9223372033963249500`. Erra por 164, e o resultado **cabe** em int64 —
-    não é limite de faixa, é round-trip por double. Mesma família de 10.2/10.3.
-  - **Direção acordada, consolidada em 2026-09-18:** overflow int64 deve ser
-    explícito via C/status, FFI e erro Lua, sem wrap ou promoção silenciosa.
-    O bug acima continua distinto: seu resultado cabe, mas perde precisão.
-  - A assinatura deve oferecer canal de status (`SMG_ERR_OVERFLOW`), conforme
-    `CONTRACT.md`; copiar uma assinatura legada sem esse canal não basta.
-    Comportamento de intermediários e migração das reduções devem ser mapeados
-    por operação antes de declarar esta entrega concluída.
-- 10.4 **família `.dt` e `.str` vetorizadas** (E6). **Duas metades com custos
-  opostos** — dimensionado em 2026-07-28; tratá-las como um item só esconde isso.
-  - **Fatia A — os 11 componentes base: [Done — Fedora + Windows 2026-07-28]** Valgrind 0 erros nos 13 binários; cobertura **95,07% branch-alvo
-    e 98,87% linha**, com 139 exclusões (as 11 novas justificadas). Falta o
-    `build.ps1`: são 11 `cdef` novos, superfície FFI. Macro `DT_COMPONENT_SERIES_IMPL` gera as onze versões de série
-    sobre as escalares que já existiam e já eram testadas — nenhuma matemática de
-    calendário nova. Ganho **medido: 1,5×** (0,082 s → 0,053 s em 1M linhas).
-    Modesto de propósito: o gargalo aqui nunca foi o FFI (0,079 s por 1M
-    travessias), era a construção da série via tabela Lua + `from_table`.
-    - **Erro de medição registrado:** a primeira medição deu **0,7× (mais
-      lento)** porque eu havia comparado com metade do caminho antigo — sem o
-      `Series.from_table`, que era parte dele. Quase reportei que a vetorização
-      tinha piorado.
-    - **Achado que virou item (12.36):** a mutação `v >= 0` → `v >= -1` **passou**
-      por todos os testes, o que levou à descoberta de que as escalares nunca
-      devolvem -1, apesar de o header prometer — e que o overflow acontece em
-      silêncio (`year(INT64_MIN)` = +292278994). O guard foi mantido como defesa
-      em profundidade e as 11 instanciações marcadas `COV-EXCL-BR`.
-    - `test_datetime_c` 473→530, allocfail 2032→**2131**, cobertura **95,07%**
-      branch-alvo no Fedora (acima do 94,96% que o 10.3 deixou).
-  - **`.dt` derivadas (fatia B, a fazer):** os 14 usuários do `dt_map` são
-    composições (`is_month_start` = `day(v)==1`, `month_name` = tabela indexada).
-    Com as bases vetorizadas, **várias viram composição de operações já
-    vetorizadas** — `is_month_start` seria `self:day():eq(1)`, sem C novo.
-    Reavaliar quantas sobram antes de escrever qualquer coisa.
-  - **Contexto do dimensionamento original:** a
-    matemática de calendário **já existe em C e está testada** (473 checks) —
-    `smaug_dt_year`, `month`, `day`, `hour`, `minute`, `second`, `ms`, `quarter`,
-    `week`, `weekday`, `yearday`, `format`, `truncate`, `diff_ms`. São **escalares**
-    (`int smaug_dt_year(int64_t epoch_ms)`), e o Lua faz o laço chamando `get(i)` e
-    depois a escalar: **duas travessias de FFI por elemento**. Faltam só as versões
-    de série, que são ~11 invólucros idênticos sobre o que já existe — **é a macro
-    do 10.3 de novo**, não matemática nova. Sobram 6 laços (`dt_component`,
-    `dt_map`, `format`, `diff`).
-  - **`.str` é o grande, e nada existe em C.** 28 métodos, **todos** por
-    `str_map`/`bool_map`, que iteram em Lua com `get(i)`/`set(i)` por elemento.
-    - **Dimensionamento (boa notícia): nenhum padrão Lua é exposto.** O `replace`
-      **escapa** os metacaracteres antes do `gsub`, e o `API_INDEX` promete
-      "substituição literal". Sem motor de padrões — é território de `memcmp`/
-      `memchr`. É a diferença entre tratável e projeto próprio.
-    - **Risco 1 — não usar `smaug_str_set` em laço.** Ele resolve comprimento
-      variável com `memmove` do rabo: O(n) por chamada, **O(n²) no laço**. O
-      caminho é `create_with_capacity` + `append` (amortizado, já existe).
-    - **Risco 2 — busca de substring não existe em C**, e `memmem` é GNU, não C11
-      portável (o Windows é MSYS2-UCRT64). Cinco métodos precisam (`contains`,
-      `find`, `count`, `replace`, `split`): **um** helper compartilhado, no
-      `smaug_str_internal.h` que o 12.34 criou — não cinco cópias.
-    - **Risco 3 — `str_map`/`bool_map` viram código morto.** Mesmo padrão do
-      `boolseries.lua` (10.8) e do `check_int64_lossless` (10.3): planejar a
-      remoção junto, não deixar para depois.
-  - **Sem sobreposição (verificado):** `.str` × inferência do CSV são concerns
-    distintos — CSV **parseia** (texto→número) e já delega ao `smaug_parse_*`
-    (10.9); `.str` **transforma** (texto→texto).
-
-- 10.5 Passo B **chave de igualdade sem alocar string por linha** —
-  **[BLOQUEADO pelo 12.38 · desenho concluído, protótipo validado]**
-  A execução foi iniciada em 2026-07-28 e **revertida**: o caminho por ordenação
-  herda o bug do comparador com NaN (12.38). Em float64 com NaN, `unique`/
-  `nunique` passariam a dar resultado errado, enquanto o caminho atual por
-  `keys.encode` acerta (`"float64:nan"` agrupa os NaN). Contornar agora — fazer
-  float64 recair no caminho antigo — seria trabalho jogado fora quando o 12.38
-  fechar, porque o conserto dele (comparador total) **desbloqueia este item
-  inteiro**. O protótipo ficou validado: correto em nulos misturados com zeros
-  reais, série vazia, só-nula e int64 > 2^53, com ganho de 3× a 11× conforme
-  haja nulos. Renomeado: o
-  item chamava-se "hash de chave no Anel 0", e a análise mostrou que hash é uma
-  *implementação possível*, não o problema.
-  - **O gargalo foi MEDIDO** (primeira medição de desempenho do projeto; até
-    aqui só correção era medida). Coluna int64 de 1M linhas, ~100k grupos:
-    | etapa | tempo |
-    |---|---|
-    | só `get_raw` (travessia FFI) | 0,079 s |
-    | + `keys.encode` (monta a string) | **1,171 s** |
-    | + tabela Lua | 1,250 s |
-    O custo é **construir a string** `"int64:12345"` por linha — 93% do total.
-    Nem o FFI (0,079 s) nem a tabela Lua (0,079 s) são o problema. A premissa do
-    item está certa; o alvo é a alocação de string, não a estrutura de dados.
-  - **A alternativa foi medida, e usa C que JÁ EXISTE.** `smaug_multi_argsort`
-    (+ wrapper FFI) está implementado, testado e selado: recebe N colunas de
-    qualquer dtype e devolve índices na ordem lexicográfica, com sort estável.
-    Ordenar torna os grupos **contíguos**, e uma varredura acha as fronteiras.
-    | abordagem | 1M linhas |
-    |---|---|
-    | atual (`encode` + tabela Lua) | 1,355 s |
-    | `multi_argsort` + varredura | **0,152 s** (0,138 + 0,014) |
-    **8,9× mais rápido, com zero estrutura de dados nova em C.**
-    **Correção (2026-07-28):** a primeira medição usou `kind = 0`, que é
-    `SMAUG_COL_F64`, sobre uma série int64 — o C reinterpretou os bits e ordenou
-    lixo. O número publicado antes (7,9×) media a coisa errada. Refeito com
-    `kind = 1` (`SMAUG_COL_I64`): 8,9×. A conclusão sobrevive e fica mais forte,
-    mas o erro fica registrado — passar o `kind` errado **não falha**, produz
-    resultado silenciosamente sem sentido.
-  - **Consequência: a decisão mudou.** Não é mais "chave string com call-sites
-    intactos × valores crus com 26 call-sites mudando". É **tabela hash do zero
-    × ordenação sobre o que já existe**. A segunda não precisa de
-    `smaug_hash_table_t` (que está declarado e não implementado), não cria
-    superfície de OOM nova, não inventa gerência de tempo de vida — e o trabalho
-    fica quase todo em **Lua**, o que pode tornar o item Lua-puro.
-  - **Dois obstáculos reais, a resolver na execução:**
-    1. **Nulos — medido, e pior do que o header sugere.** O comparador
-       (`cmp_col_at`) **não consulta `null_mask` em lugar nenhum**: um elemento
-       nulo é ordenado pelo valor cru do buffer (0 em int64), então nulos se
-       **intercalam** com dados reais. Provado: `{-5, NA, 10, NA, -20}` sai como
-       `-20, -5, NA, NA, 10`. Não é "nulos primeiro" nem "nulos por último" — é
-       "nulos onde o lixo do buffer cair".
-       Saída sem tocar C: **filtrar as linhas nulas antes de ordenar** (elas
-       formam um grupo só, e o `NULL_KEY` já existe no `keys.lua`), ordenar só as
-       válidas e recompor. Alternativa que toca C: o comparador passar a
-       consultar a máscara — mais correto em geral, mas muda o comportamento de
-       `sort_values`, que hoje depende dele. **Decidir antes de implementar.**
-    2. **Ordem de saída.** `unique()` promete "ordem de primeira aparição";
-       ordenar dá ordem lexicográfica. Resolve-se guardando o menor índice
-       original de cada grupo e reordenando por ele — passada extra em O(g), com
-       g = número de grupos.
-  - **O `keys.value` sobrevive de qualquer forma.** Ele não codifica chave: ele
-    devolve o valor **exato** para reconstruir a coluna do resultado (int64 via
-    `get_raw`). Nenhuma abordagem de agrupamento o dispensa. Só o `encode` está
-    em questão — a formulação anterior ("o `keys.lua` é o ponto de plugue")
-    tratava os dois como uma coisa só.
-  - **Por que a hash não era separável da operação.** Uma primitiva
-    `hash_series(s, row) -> uint64` chamada do Lua custaria uma travessia de FFI
-    por linha (0,079 s medidos — barato), mas o resultado precisaria ser
-    armazenado: `uint64` como cdata não serve de chave de tabela Lua, e como
-    number degrada. Ou seja, mover só a hash exigiria mover também o
-    armazenamento — isto é, a operação inteira. O item nunca foi "adicionar uma
-    função de hash".
-  - **Consumidores (26 call-sites, 4 arquivos):** `unique`, `nunique`,
-    `value_counts`, `mode` (`series/stats/_stat`), `isin`, `duplicated`
-    (`series/selection/_predicates`), `join`, `groupby` (`dataset/_relational`,
-    `dataset/_stat`). O `join` compõe N colunas concatenando chaves com `\1` —
-    o `multi_argsort` já aceita N colunas nativamente, o que **elimina** a
-    concatenação em vez de reimplementá-la.
-  - **Recomendação:** executar pela via da ordenação, começando por `unique`/
-    `nunique`/`value_counts` (dtype único, sem composição), e só depois `join`/
-    `groupby` (N colunas). Manter `keys.encode` enquanto houver consumidor —
-    remover só quando o último sair, como foi feito com o degrau no 10.3.
-  - Vínculo: 12.4; 10.5 Passo A (o `keys.value` permanece; o `encode` é que
-    tende a sair).
-<a id="section-12-achados-menores-debitos-antigos-windows-fedora"></a>
-
-## 12. Achados menores + débitos antigos  [Windows+Fedora]
-
-Vinte e quatro subitens já fecharam (ver índice acima). Restam:
-
-- 12.8 **Fixtures de I/O órfãos + teatro de "dados reais"** (achado 2026-06-30).
-  `tests/fixtures/` tem 5 arquivos; os testes em `tests/io/` abrem só 1
-  (`pedidos_digitados.csv`, 917 linhas). Os outros 4 (`cotacoes.csv`,
-  `cotacoes.json`, `cotacoes_SHIB_BRL.json`, `cotacoes_USD_BRL.json`) NÃO são
-  lidos por nenhum teste — estão no repo decorativos. O parser em si é exercitado
-  de verdade (por strings CSV/JSON embutidas nos .lua + o fixture de 917 linhas),
-  então não há bug; o "falso" é o rótulo "dados reais" sugerir variedade que não
-  é testada. Mesma família do 12.7 (número/aparência engana, validação é real).
-  Ação: ou remover os 4 órfãos, ou — preferível — convertê-los em cobertura de
-  **variedade real** com asserções específicas. Plano (Gui): separar tabelas
-  abertas ≤1.000 linhas de fontes BR (IBGE/dados.gov.br: `;` separador + vírgula
-  decimal) e ONU (UTF-8 acentuado, multi-idioma), cada fixture exercitando uma
-  armadilha concreta: vírgula decimal → inferência float; data BR `dd/mm/aaaa` →
-  o `dayfirst` (item F.3); aspas com vírgula interna; separador de milhar; linha
-  malformada. **Invariante:** fixture sem asserção que o exercite é decoração —
-  cada arquivo novo entra junto com os `check()` que justificam sua presença.
-- 12.11 **`Series:nrows()` — NÃO FAZER (decisão 2026-07-14).** A leitura do
-  código mostrou que o "gap" contradiz uma convenção deliberada: o eixo 08
-  registra "Series tem len+size (size = alias de len); DataSet tem nrows+ncols" —
-  `nrows` é vocabulário tabular (uma Series não tem linhas, tem elementos),
-  `len`/`size` é vocabulário de sequência. Não é ausência, é separação de
-  domínio. Pandas faz igual: `Series` não tem `nrows` (é `DataFrame.shape[0]`).
-  Adicionar o alias violaria a convenção que o próprio parity audita. Sub-item
-  encerrado sem código.
-- 12.13 **documentação prometida pelo 9.1 incompleta** — [Windows]. A limitação
-  do `get()` (`tonumber`, perda > 2^53) e a faixa correta `get_raw` estão
-  registradas só no API_INDEX; API_Reference e CONTRACT silenciosos. Completar,
-  incluindo a herança nos consumidores do `get()` — em especial `map` (a função
-  do usuário recebe double, série armazenada intacta).
-- 12.14 **`GroupBy:quantile` duplica a interpolação canônica** — [Windows]
-  (achado 2026-07-05). `_relational.lua:551` reimplementa linha a linha a
-  fórmula de `I.quantile_sorted` (`stats/_stat.lua:93-102`, já exposta em `I`)
-  em vez de delegar. Se a regra de interpolação mudar num lugar, diverge. De
-  quebra: `col:get(i)` em loop + `table.sort` em Lua (element-wise no Anel 1).
-  Delegar a `I.quantile_sorted`.
-- 12.16 **`fillna` de datetime aceitar string ISO** — [Windows] (registrado
-  2026-07-07, futuro próximo). O `check_value` de datetime já aceita `number`
-  (epoch_ms) **ou** string ISO 8601, como `set`/`append`. Mas o `fillna` de
-  datetime aceita só `number` — na integração ao `coalesce_scalar` (Anel 0) o
-  `dt` ficou restrito a `number` para não ampliar escopo. Alinhar: aceitar string
-  ISO no `fillna` de datetime, parseando via `dt_parse` antes de delegar —
-  uniformiza `fillna` com `set`/`append`.
- - 12.19 **PARCIAL (2026-07-20) — metade SRCS concluída; C_TESTS registrado.**
-   [achado 2026-07-09, Fase 1 do 10.7]. Eram 5 listas duplicadas; o levantamento
-   mostrou que têm **duas naturezas**:
-   - **SRCS (fontes C) — RESOLVIDO.** As 3 cópias viram descoberta automática:
-     `build.sh` já era glob (12.29); agora `Makefile` usa `$(wildcard src/*.c)` e
-     `make_coverage.sh` deriva por glob + basename (`src/X.c → X`). Mata o risco
-     central do achado — esquecer a de coverage deixava o build **verde** com o
-     `.c` novo reportando 0% e fora do selo. Provado: um `.c` novo é pego pelos
-     três sem editar lista. (Restava só `build.sh:SRCS` no 12.29; agora as 3.)
-   - **C_TESTS (test binaries) — REGISTRADO, não derivável por glob puro.** As 2
-     cópias (`build.sh:C_TESTS_PLAIN`, `make_coverage.sh:C_TESTS`) têm
-     categorização **semântica**: `test_allocfail` exige `-Wl,--wrap`, `test_stress`
-     é categoria à parte. Um glob de `tests/c/*.c` pegaria os 13 mas quebraria a
-     compilação especial. Unificar exigiria um manifesto que preserve categorias
-     (mais invasivo). Menos perigoso que a de coverage: esquecer um teste aqui
-     apenas não o roda (visível no contador de checks), não mente sobre cobertura.
-     Candidato a fazer junto do item 10, quando `.c`/testes novos entrarem.
- - 12.25 **`read_csv` não infere ISO 8601 — e o critério de inferência não tem
-   critério** — [achado 2026-07-14, durante o 12.3]. Medido: o CSV **já infere**
-   3 dtypes (`try_bool` → `try_i64` → `try_f64` → `DT_STR`, csv:296-299). O que
-   ele recusa (`2024-03-15`) é o **único não-ambíguo** dos casos — ISO 8601 é
-   não-ambíguo por design; `03/04/2024` (mar ou abr?) é que não deveria ser
-   inferido, e corretamente não é. Consequência: **o Smaug escreve ISO e não lê
-   de volta** — `to_csv` de datetime produz `2024-03-15T00:00:00.000Z`, e o
-   `read_csv` devolve string. Mesmo critério que classificou o JSON como bug no
-   12.21 ("o Smaug não lê o que o Smaug escreve"), aqui em tipo, não em valor
-   (o `astype("datetime")` recupera — round-trip de valor testado, preserva).
-   `smaug_dt_parse` já existe no Anel 0. Decidir: inferir só ISO (fecha o
-   round-trip, risco baixo) ou `parse_dates` opt-in (estilo pandas / `na_values`
-   do 12.21). **Muda contrato público do reader** — precisa de design próprio.
- - 12.26 **zeros à esquerda destruídos na inferência — CEP, CNPJ, telefone** —
-   [achado 2026-07-14, durante o 12.3]. **Prioridade alta: perda silenciosa de
-   dado, em dados BR (o alvo do projeto).** Medido:
-
-   | coluna | CSV | vira |
-   |---|---|---|
-   | CEP | `01310100` | `1310100` |
-   | CNPJ | `00000000000191` | `191` |
-   | telefone | `011999998888` | `11999998888` |
-
-   O `try_i64` aceita zeros à esquerda e o dtype vira int64 — o identificador
-   deixa de ser identificador. E o round-trip do próprio Smaug quebra: escrever
-   a string `"01310100"` e ler de volta devolve `1310100` (int64). Não há aviso.
-   É mais grave que o 12.25: ali se perde o *tipo* (recuperável via astype); aqui
-   se perde o *dado*. Conecta com 12.8 (fixtures BR: IBGE/dados.gov.br têm CEP e
-   código de município). Decidir: `try_i64` recusar zeros à esquerda (`"007"` vira
-   string, `"7"` continua int) — coerente com "falha visível > acerto adivinhado",
-   já que hoje adivinha errado; ou `dtype=` explícito por coluna. Verificar antes
-   se algum teste/fixture depende do comportamento atual.
- - 12.30 **PARCIAL — Fase 1 concluída (2026-07-21). Contrato de erro de escrita
-   em I/O.** [Fase 1: Fedora] `smaug_io.h` promete no cabeçalho:
-   "toda função que escreve retorna 0/-1 (checar `smaug_io_last_error()`)". Essa
-   função **não existe** — nem protótipo, nem definição, nem cdef — em lugar
-   nenhum do projeto (confirmado por leitura completa de `smaug_io.h` e
-   `smaug_io_internal.h`).
-   - **A assimetria é real e específica, não geral.** O lado de LEITURA está bem
-     construído: `make_error()` (`smaug_io_internal.h`) aloca a `smaug_table_t`
-     com `->error = strdup(msg)`, tratado até no caso raro de falha do próprio
-     `strdup` (não deixa `error` NULL por acidente — o caller leria como
-     sucesso). Usado consistentemente em TODOS os pontos de falha de
-     `smaug_read_csv_mem`/`smaug_read_json_mem` (separador=decimal, entrada
-     vazia, sem colunas, "não foi possível abrir", OOM em vários pontos) — sem
-     lacuna, li os dois parsers inteiros.
-   - **O lado de ESCRITA descarta a causa que já tinha em mãos.** Li
-     `smaug_write_csv` (csv.c) e `smaug_write_json` (json.c) por inteiro: os dois
-     têm a MESMA estrutura — `fopen(path,"wb")` falha → `free(buf); return -1` —
-     sem checar `errno` (que já contém a causa exata: permissão negada, diretório
-     inexistente, etc.) e sem diferenciar de uma falha de `fwrite` parcial (disco
-     cheio no meio). A assinatura retorna só `int`, sem onde guardar mensagem.
-   - **Por que importa:** o Lua repassa isso como `"to_csv — falha ao escrever
-     'path'"` — genérico, igual para qualquer causa. Na leitura, o mesmo tipo de
-     falha (`fopen` de path inválido) já diz exatamente por quê. Viola em parte
-     "falha visível": a falha é visível, a causa não.
-   - **Correção — Opção B (canal de erro no C, espelhando `make_error`).**
-     Descartadas: (A) resolver no Lua duplicaria a checagem `sep==decimal` que já
-     existe no C — fere "fonte única"; (C) implementar o `last_error()` global do
-     header exigiria `static` mutável — violaria a thread-safety do Anel 0 (o
-     eixo 14 pegaria como 🟥). A Opção B adiciona `char **err_out` às funções de
-     escrita, que recebe `strdup` da causa (heap da DLL → Lua libera com
-     `smaug_free`, respeitando o heap separado no Windows). Helper
-     `set_io_error()` em `smaug_io_internal.h`, ao lado do `make_error`.
-   - **Faseado (~45 call-sites, 33 em testes C; selo Fedora por ser C):**
-     - **Fase 1 — CONCLUÍDA (2026-07-21):** as 2 variantes `_mem`
-       (`smaug_write_csv_mem`/`smaug_write_json_mem`) — o bug mais grave: o NULL
-       colapsava OOM com `sep==decimal`, e o Lua repassava "OOM" (mensagem
-       factualmente errada). Agora err_out carrega a causa; o teste `sep==decimal`
-       em `test_io_c` verifica a mensagem (espelha o que o read já fazia via
-       `t->error`); guard Lua em `test_csv` (to_csv_mem não diz mais OOM);
-       allocfail cobre o `strdup` do set_io_error sob OOM. Contadores: test_io_c
-       312→315, test_csv 141→144, allocfail 1874→1878. Chamadas internas
-       `write→write_mem` passam err_out=NULL por ora.
-     - **Fase 2 — PENDENTE:** as 2 funções de arquivo (`smaug_write_csv`/
-       `smaug_write_json`), que hoje descartam `errno` do `fopen`/`fwrite`. Darão
-       err_out próprio e propagarão a causa da serialização + a de sistema
-       (`strerror(errno)`). Atualizar os 2 call-sites Lua (`M.write`) e os testes
-       C de path inválido (`test_io_c:719`/`:908`). Mesmo padrão da Fase 1.
- - 12.33 **Duas semânticas visíveis ao usuário sem contrato** — [Fedora]
-   (doc; sem C, sem Lua). Achado ao verificar o desenho da fatia 2 do 10.2 contra
-   o CONTRACT (2026-07-27). Nenhum dos 11 contratos cobre:
-   - **Colação de string.** `str_cmp_at` (`smaug_ops_str.c:24`) define
-     lexicográfico **por byte**, com prefixo igual desempatando pela **mais
-     curta**. Isso existe só num comentário de código, e determina o que
-     `sort`, `min`/`max`, os seis comparadores e o `between` de string devolvem —
-     semântica visível ao usuário. Sem contrato, não se sabe se é promessa ou
-     detalhe de implementação: alguém poderia trocar por colação por locale
-     achando que é melhoria, e nada diz que isso quebraria expectativa. Fica mais
-     exposto com `between` (consulta por faixa).
-   - **Propagação de nulo em comparação.** Nulo entra → nulo sai, consistente nos
-     seis comparadores de cada dtype e no `between`. Implementado certo, nunca
-     prometido. O Contrato 6 fala de `filter` descartando `NA`; o 9 distingue NaN
-     (valor) de ausência (`null_mask`); a propagação em si não está em lugar
-     nenhum.
-   - **Não é bug** — os dois comportamentos existem e estão corretos e uniformes.
-     É lacuna de contrato: comportamento sem promessa é comportamento que pode
-     mudar por acidente. Vira Contrato 12 e 13, ou notas nos existentes (o de
-     nulo talvez caiba como parágrafo no Contrato 9).
-   - **Vínculo:** 10.2 fatia 2 (que tornou as duas visíveis); Contrato 6, 9;
-     item 12.34 (a colação está implementada cinco vezes).
- - 12.36 **Componentes de datetime prometem `-1` em overflow e não cumprem** —
-   [Fedora] (Anel 0). Achado ao vetorizar os componentes (10.4 fatia A,
-   2026-07-28), medindo em vez de ler.
-   - **O header promete**, em `smaug_datetime.h`: *"Retornam -1 em caso de
-     overflow ou valor inválido"*. As onze funções (`year`, `month`, `day`,
-     `hour`, `minute`, `second`, `ms`, `weekday`, `yearday`, `quarter`, `week`)
-     **nunca retornam -1** — não há um único `return -1` no corpo delas.
-   - **E o overflow acontece, em silêncio.** Medido: `smaug_dt_year(INT64_MIN)`
-     devolve **+292278994**. `INT64_MIN` em epoch_ms corresponde a cerca do ano
-     **-292.277.024**; devolver +292 milhões é o cálculo transbordando e
-     produzindo um valor errado sem sinalizar. Mesma classe do que os itens
-     10.2/10.3 corrigiram: resultado errado que parece válido.
-   - **O projeto já conhece o limite** — `smaug_datetime.c:64` tem
-     `COV-EXCL-BR: ramo z<0 no algoritmo de Hinnant — datas antes de ~292Mi a.C.`
-     O limite está documentado no algoritmo; o que falta é a fronteira pública
-     sinalizá-lo.
-   - **Consequência já materializada:** o frontend fazia `r >= 0 and r or NA` —
-     um guard para um caso que nunca ocorre — e a versão vetorizada herdou o
-     mesmo `if (v >= 0)`. Nas onze instanciações da macro o ramo falso é
-     inalcançável, marcado `COV-EXCL-BR` apontando para este item. O guard foi
-     **mantido** de propósito: quando a promessa do header for cumprida, ele já
-     está correto e no lugar.
-   - **Descoberto por mutação, não por leitura.** Trocar `v >= 0` por `v >= -1`
-     passou por todos os testes — o que levantou a pergunta "então quando é que
-     dá -1?" e revelou que nunca dá. Mutação que escapa é sinal, não ruído.
-   - **A decidir:** as componentes passam a sinalizar overflow (e aí o guard vira
-     alcançável e testável), ou o header é corrigido para dizer que não sinalizam
-     e o limite vira contrato explícito? A primeira é mais coerente com
-     "falha visível"; a segunda é mais barata. Em ambos os casos, a divergência
-     entre o que o header promete e o que o código faz precisa acabar.
-   - **Vínculo:** 10.4 fatia A (que expôs); Contrato 9 (ausência × valor);
-     Contrato 10 (guard excluído precisa de justificativa).
- - 12.39 **`groupby` em coluna float com NaN produz agrupamento errado** —
-   **[implementado 2026-07-29 · selos PENDENTES]** Era resultado errado em
-   silêncio pela API pública. Achado 2026-07-28 ao implementar o 10.5-B.
-   **Renumerado de 12.38** (colisão: dois itens receberam o mesmo número no
-   mesmo dia, em trabalho paralelo; o outro já tinha 16 referências em código,
-   este nenhuma).
-   - **Provado.** `groupby` sobre `{1.0, NaN, 1.0, NaN, 2.0}` somando `v`:
-     resultado `1=10, NaN=20, 1=30, NaN=40, 2=50` — **cinco grupos para três
-     valores distintos**, e o valor `1.0` aparece **duas vezes como grupos
-     separados**. Sem NaN na coluna, o mesmo groupby funciona certo.
-     **Um único NaN corrompe o agrupamento das OUTRAS chaves também**, não só
-     das linhas com NaN.
-   - **Causa.** O comparador do `multi_argsort` (`cmp_col_at`, f64) é
-     `(a > b) - (a < b)`. Com NaN as duas comparações são falsas, então NaN
-     compara **igual a tudo**. Isso viola a ordem fraca estrita que o `qsort`
-     exige: o comparador fica **inconsistente**, e o comportamento passa a ser
-     indefinido pelo padrão C — não é só "ordem esquisita", é UB.
-   - **Por que escapa das guardas existentes.** O Contrato 8 rejeita `NA` em
-     chave relacional, e o Anel 1 aplica isso via `validate_keys_no_na`. Mas
-     **NaN não é NA** neste projeto (Contrato 9: não-finito é VALOR, ausência é
-     `null_mask`). Então NaN passa pela validação e chega ao comparador. É a
-     interação entre dois contratos corretos produzindo um buraco.
-   - **Assimetria que confirma o diagnóstico:** o `API_INDEX` promete que
-     `sort`/`argsort` de coluna única **recusam NaN e null** — e eles recusam. O
-     `multi_argsort` não recusa nem trata. Mesma família do 12.37.
-   - **Decisão a tomar (semântica, não só técnica):** (a) tornar o comparador
-     **total** — NaN ordena num extremo e `NaN == NaN` para fins de ordenação,
-     como o `totalOrder` do IEEE-754 e como numpy/pandas fazem; NaN vira um
-     grupo. Corrige o UB e dá semântica útil. (b) **recusar** NaN em chave,
-     como o sort de coluna única faz — coerente com o já documentado, mas
-     quebra `groupby` em coluna float com NaN, que hoje "funciona".
-     Recomendo (a): (b) troca resultado errado por erro, o que é melhor, mas (a)
-     troca por resultado **certo**.
-   - **Alcance da correção — corrigido na implementação (2026-07-29):** o
-     `cmp_col_at` é usado por `groupby` e `join`, **não** por `sort_by`. Este
-     último chama o `argsort` de **coluna única**, que recusa NaN conforme o
-     `API_INDEX` promete — então já era seguro e não muda. Verificado
-     executando.
-   - **Resolvido pela opção (a), ordem total** (`smaug_ops_window.c`,
-     `cmp_col_at`, caso f64): `if (na || nb) return na - nb` antes da comparação
-     normal. NaN vai para o fim e compara igual a NaN, como o `totalOrder` do
-     IEEE-754. Resultado medido: `groupby` de `{1.0, NaN, 1.0, NaN, 2.0}` passou
-     de **5 grupos** para 3, com as somas certas (1.0 → 40, NaN → 60, 2.0 → 50).
-     `join` passou a casar NaN com NaN.
-   - Testes `12.39.1-5` em `test_relational` (+10, 173→183): o caso medido com
-     verificação das **somas** (não só da contagem), prova de que NaN não
-     contamina as outras chaves, ordem total determinística, `join` e o caminho
-     int64 intacto. **Mutação verificada:** remover a linha da ordem total
-     aborta o teste.
-   - **Achado lateral:** a mensagem do `sort_by` diz "não suporta **nulos**"
-     quando a causa pode ser **NaN** — que o Contrato 9 trata como coisa
-     distinta de ausência. Impreciso, não incorreto. Anotado, não corrigido.
-   - **Consequência para o 10.5-B — resolvida:** `unique`/`nunique` por
-     ordenação herdariam o problema em float64 com NaN. Com a ordem total, o
-     caminho por `multi_argsort` passa a ser seguro para f64 também, sem
-     tratamento próprio nem fallback.
-   - **Vínculo:** 12.37 (mesma família de fronteira que assume em vez de
-     validar); Contrato 8; Contrato 9; 10.5-B.
- - 12.35 **Custo de adicionar um dtype** — [Fedora] (Anel 0 + Anel 1).
-   **EXIGE BLOCO DE DESIGN.** Levantado em 2026-07-28. O objetivo não é dtype de
-   graça — em C sem genéricos isso não existe, e despacho por dtype **é** a
-   arquitetura (P2). O objetivo é que o custo seja **proporcional ao que é
-   genuinamente novo** (a semântica do tipo) e que **esquecer um passo falhe
-   alto**, não em silêncio.
-   - **Por que agora:** a Trilha Analítica registrada no `ARCHITECTURE` exige
-     dtypes novos — quantização INT8/INT4 está explícita no Anel 8, e float32 é o
-     padrão de ML. Não é "se", é "quando". E `float32`/`int32` já estavam nas
-     frentes diferidas.
-   - **Medido: adicionar `float32` hoje toca oito frentes.**
-     | frente | custo | natureza |
-     |---|---|---|
-     | `smaug_ops_f32.c` | ~1.042 linhas, 39 funções | parte acidental |
-     | conversões `astype` | ~10 pares novos (é N²) | **inerente** |
-     | entrada no descritor | 52 campos | **inerente** (é o design) |
-     | guardas de dtype em Lua | **25 edições coordenadas** | acidental e **perigosa** |
-     | `cdef` no `ffi_loader` | ~39 declarações | acidental |
-     | inferência CSV/JSON | enum `DT_*` próprio | acidental |
-     | eixo de paridade `01_dtypes` | lista fixa de dtypes | acidental |
-     | testes | suíte por dtype | inerente |
-   - **A distinção que orienta o trabalho: perigo × trabalho.** As 25 guardas são
-     **perigo** — esquecer uma edição faz a operação recusar um dtype válido, e
-     nenhum teste existente pega, porque o dtype é novo. Os 16 corpos de
-     aritmética repetidos em C são só **trabalho** — esquecer não dá bug, dá
-     função faltando, que quebra alto na primeira chamada. Atacar o perigo antes
-     do trabalho.
-   - **Três noções de dtype convivem hoje, todas incompletas:** `DTYPES` no
-     `_types.lua` (5 dtypes, é o descritor), `DTYPE_FAMILY` no `_factories.lua`
-     (4 dtypes — **falta datetime**, porque a inferência nunca o produz) e o enum
-     `DT_*` no `smaug_io_internal.h` (4, para inferência de CSV). Consolidar é
-     parte do item.
-   - **ARMADILHA — o eixo `01_dtypes` DEPENDE das guardas.** Ele varre o corpo de
-     cada método procurando `self._dtype ~= "X"` (`gmatch` literal) para deduzir
-     quais dtypes cada método suporta. Trocar as guardas por consulta ao descritor
-     **cegaria a auditoria**. A migração tem de mover o eixo para ler a
-     capacidade declarada — o que é melhor (declarativo em vez de regex sobre
-     fonte), mas **não é opcional e não é separável**. Isto invalida a proposta
-     ingênua de "só trocar as 25 guardas".
-   - **Desvio a corrigir, introduzido em 2026-07-27 (10.3):** `abs`/`round`/`clip`
-     fazem despacho **manual** (`if self._dtype == "float64" then C.smaug_f64_abs
-     else C.smaug_i64_abs`) em vez de `self._d.abs` — exatamente o que o descritor
-     existe para evitar. O `between` (10.2) seguiu o padrão; o 10.3 não. Alinhar
-     reduz a barreira: com `self._d.abs`, um dtype novo é uma linha no descritor
-     em vez de editar um `if/else`. Motivo do desvio: as assinaturas divergem
-     (`f64_abs` sem `status`, `i64_abs` com) — uniformizá-las é pré-requisito.
-   - **Frentes candidatas (a decidir no bloco de design):**
-     1. **Capacidade declarada no descritor** (elimina as 25 guardas). O descritor
-        é o único lugar que um dtype novo **não consegue evitar tocar** — sem
-        entrada lá, nada funciona. Uma tabela paralela pode ficar desatualizada em
-        silêncio, que foi o que aconteceu com o `DTYPE_FAMILY`. E se alguém
-        esquecer a flag, o campo é `nil` e a operação **recusa**: falha visível.
-        Ressalva: dos ~52 campos do descritor, só o `name` não é função — isto
-        **estende** o padrão, não o instancia. Cinco guardas são "numérico ou
-        datetime" e três são "ordenável", então é capacidade, não família única.
-     2. **Macro para os 16 corpos de aritmética** (`add`/`sub`/`mul`/`div`, escalar
-        e série×série, f64 e i64), no padrão do `F64_MATH_IMPL` já selado. Medido:
-        o esqueleto "aloca + itera + `SMAUG_VALID`" aparece **34 vezes** em 39
-        funções do `ops_f64.c`; com as 7 já macro-geradas do 10.3, ~60% do arquivo
-        vira gerado e o `.c` de um dtype novo encolhe perto de 40%.
-        **Fazer como incremento próprio, antes do dtype novo** — é
-        comportamento-preservante (critério de aceite: suíte com números
-        idênticos), e misturar refatoração com feature impede saber de onde veio
-        uma falha.
-     3. **Alinhar o despacho ao descritor** (o desvio do 10.3, e varrer se há
-        outros).
-     4. **Migrar o eixo `01_dtypes`** para ler capacidade declarada.
-   - **Fora de escopo (inerente, não é defeito):** a matriz `astype` é N² por
-     natureza; o descritor de 52 campos é o design de despacho; a suíte por dtype
-     é o preço de verificar cada um. numpy e pandas resolvem o mesmo problema com
-     macros e geração de código — não eliminando o custo.
-   - **Vínculo:** 12.31 (criou o `DTYPE_FAMILY` local); 10.3 (introduziu o
-     desvio de despacho e a macro que serve de precedente); `ARCHITECTURE`,
-     Princípios da Trilha Analítica (que torna os dtypes novos inevitáveis).
- - 12.34 **Colação de string implementada cinco vezes** — **[Done — Fedora
-   2026-07-27]** (refatoração interna do C: nenhuma função pública nova, nenhum
-   `cdef` — **não muda ABI**). Valgrind 0 erros; cobertura confirmou a previsão
-   exata: **226 ramos descobertos antes e depois**, com 24 ramos cobertos a menos
-   no total (a lógica duplicada). MANIFEST 126→128 arquivos.
-   A edição do `build.ps1` (lista de testes Lua), que não pôde ser testada no
-   ambiente de desenvolvimento, foi **confirmada no Windows em 2026-07-27**: os
-   dois testes de `core/` passaram a aparecer na saída de lá, o que também
-   comprovou na prática o achado das listas divergentes.
-   - **Resolvido:** núcleo único `smaug_cmp_bytes(pa, la, pb, lb)` em
-     `include/smaug_str_internal.h` (`static inline`, no padrão do
-     `smaug_io_internal.h` — não exporta símbolo). As quatro implementações
-     passaram a delegar: `str_cmp_at` e `str_cmp_idx` viraram invólucros de duas
-     linhas; `sort_cmp_idx` virou `str_cmp_idx` + desempate por índice (que é
-     preocupação de *sort*, não de colação); o `memcmp` inline do
-     `ops_window.c` passou a chamar o núcleo. `str_cmp_idx` foi movida para
-     antes de `sort_cmp_idx` — ordem lógica, colação antes de ordenação.
-   - **Não era só duplicação: uma das quatro divergia.** A do `ops_window.c`
-     chamava `memcmp(pa, pb, lmin)` **sem a guarda `lmin > 0`** — a única das
-     quatro sem ela. `memcmp` exige ponteiro válido mesmo com `n == 0`, e em
-     série vazia `buffer + offset` pode ser `NULL + 0`: UB pelo padrão C, ainda
-     que inofensivo na prática. Unificar eliminou o caso.
-   - **Sobrou um `memcmp` e ele é legítimo:** o atalho de *igualdade* em
-     `str_compare` (eq/ne), que compara comprimento primeiro (rejeição O(1)) e
-     só então compara bytes. Não é colação — não ordena nem desempata — e é
-     semanticamente equivalente ao núcleo (`cmp_bytes(...) == 0` ⟺ mesmo
-     comprimento e bytes iguais).
-   - **A invariante Lua↔C virou teste:** `tests/core/test_collation.lua` (59
-     checks) assevera que o `<`/`>`/`==` do LuaJIT concordam com o C em pares
-     onde `memcmp` e colação de locale **divergem de fato** — maiúscula ×
-     minúscula, `"Z"` × `"a"`, acento multibyte, NUL embutido, prefixo, vazia —,
-     que `CategoricalSeries` (compara em Lua) dá o mesmo que `Series<string>`
-     (compara no C), e que `sort` ordena por byte. Se o interpretador mudar, ou
-     alguém rodar sob outro runtime com `strcoll`, isto falha alto em vez de
-     divergir em silêncio. **Mutação verificada:** inverter o desempate de
-     prefixo no núcleo aborta o teste.
-   - **Cobertura:** descobertos **227 antes e 227 depois** — a refatoração
-     removeu 24 ramos que estavam totalmente cobertos (a lógica duplicada) e não
-     introduziu nenhum descoberto. O percentual mexeu só porque o denominador
-     encolheu (4397→4373): efeito de tirar redundância, não regressão.
-   - **Dois achados colaterais, ambos corrigidos aqui:**
-     - **O `Makefile` não declarava dependência de header.** `$(TARGET): $(SRCS)`
-       — editar um `.h` **não** recompilava, então a `.so` ficava velha e a suíte
-       passava sobre código que não é o da árvore. Falso verde silencioso.
-       Descoberto na pele: um teste de mutação num header "passou" indevidamente.
-       Agora `$(TARGET): $(SRCS) $(HDRS)`, com `$(HDRS) = $(wildcard include/*.h)`
-       espelhando o glob do 12.19. O `build.sh` era imune (recompila todos os
-       fontes num comando só); o `make` é o que se usa no dia a dia.
-     - **As três listas de teste Lua tinham divergido.** `core/test_keys` — que
-       guarda a correção L2 do int64 > 2^53 — estava só no `build.sh`: **não**
-       rodava no Windows nem na cobertura. Mesma família do `test_astype`
-       (12 binários no Fedora, 11 no Windows). As três listas foram alinhadas.
-       A causa de fundo é manutenção manual de lista, que é o que o 12.19
-       (metade C_TESTS, aberta) existe para resolver.
-   - **Vínculo:** 12.33 (o contrato de colação passa a ser sustentado por um
-     núcleo único + teste de invariante, em vez de cinco cópias que por acaso
-     concordam); 10.2 fatia 2 (`str_between` já consome o núcleo); 12.19
-     (listas mantidas à mão).
-<a id="section-13-reescrita-de-exemplos-docstrings-windows"></a>
-
-## 13. Reescrita de exemplos + docstrings  [Windows]
-
-Doc reflete a API depois que ela para de mudar (itens 1–12).
-
-- 13.1 exemplos README/API_INDEX → forma oficial `smaug.Series({...})`
-- 13.2 docstrings nos métodos públicos de Series e DataSet
-
-<a id="section-14-verificacao-ponta-a-ponta-porta-de-entrega-fedora-windows"></a>
-
-## 14. VERIFICAÇÃO PONTA A PONTA — porta de entrega  [Fedora + Windows]
-
-O item que decide se o projeto **pode ser entregue**. Não é uma revisão de código:
-é a prova de que motor, contratos, documentação e superfície externa contam a
-**mesma história**. Nada aqui é opcional, e achar 🟥 devolve o item à timeline.
-
-Cinco frentes. As três primeiras verificam o que existe; as duas últimas
-verificam o que falta para alguém **de fora** conseguir usar.
-
-<a id="section-14-1-motor-anel-0-leitura-linha-a-linha-do-c"></a>
-
-### 14.1 Motor (Anel 0) — leitura linha a linha do C
-
-Não é rodar a suíte: é **ler**. A suíte prova o que foi testado; a leitura acha o
-que ninguém pensou em testar. Um arquivo por vez, com estas lentes:
-
-- **Fronteira pública valida?** Toda função exportada checa ponteiro nulo,
-  índice fora de faixa e tamanho zero — o engine não confia no caller.
-- **Todo caminho de erro libera o que alocou?** Especialmente os parciais: alocou
-  dois buffers e o segundo falhou.
-- **Overflow e casos degenerados estão decididos?** `INT64_MIN` em `abs`/negação,
-  faixa contraditória em `clip`, `10^n` estourando, divisão por zero, série vazia,
-  `malloc(0)`.
-- **Duplicação de regra.** Mesma semântica escrita em mais de um lugar é onde a
-  divergência nasce. Precedente: a colação de string existe em quatro pontos do C
-  (`str_cmp_at`, `sort_cmp_idx`, `str_cmp_idx`, `ops_window`) — ver 12.34.
-- **Reentrância.** Nenhum estado global mutável (Contrato 11, eixo 14).
-- **Convenções divergentes entre dtypes** para a mesma operação lógica: alocação
-  de máscara (dt sempre × f64/i64 condicional), `malloc(0)` vs `malloc(size?:1)`.
-
-<a id="section-14-2-aneis-1-3-coerencia-de-camada"></a>
-
-### 14.2 Anéis 1–3 — coerência de camada
-
-- Nenhum loop element-wise sobre FFI sobrou no Anel 1 (é o item 10 fechado de fato).
-- Nenhuma regra do Anel 0 reimplementada acima dele (P3).
-- Fonte única por concern: `keys.lua`, `int_scalar.lua`, `errors.lua` — e nenhum
-  guard cru sobrevivendo ao lado deles.
-- Paridade Series ↔ DataSet ↔ CategoricalSeries: o que existe num existe nos
-  outros, ou a exceção está registrada em `exceptions.txt`.
-
-<a id="section-14-3-contratos-e-documentacao-a-doc-descreve-o-que-o-codigo-faz"></a>
-
-### 14.3 Contratos e documentação — a doc descreve o que o código faz
-
-O eixo `12_docs_sync` prova **presença** do método na referência, não **correção**
-da descrição. Staleness semântica não tem rede automática — só leitura. Já
-aconteceu: a nota de int64 > 2^53 no README ficou factualmente errada por semanas
-com o eixo verde.
-
-- Reler `CONTRACT.md` **contra o código**, contrato por contrato, executando os
-  exemplos.
-- Todo comportamento visível ao usuário tem contrato, ou está explicitamente
-  fora dele. Ver 12.33 (colação, propagação de nulo).
-- `ARCHITECTURE.md` descreve os anéis como eles são hoje — inclusive o que
-  `[Done]` significa em cada um.
-- `README`, `API_INDEX`, `API_Reference`, `COW`, `Build_and_Testing`: sem promessa
-  vencida.
-- `CHANGELOG` com entrada para cada sessão; `Roadmap` sem item fantasma.
-
-<a id="section-14-4-verificacao-executavel-as-duas-plataformas"></a>
-
-### 14.4 Verificação executável — as duas plataformas
-
-- **Fedora:** `build.sh --all` verde, Valgrind 0 erros em todos os binários,
-  cobertura medida (linha e branch-alvo), `allocfail` varrendo todos os pontos,
-  stress.
-- **Windows MSYS2-UCRT64:** `build.ps1` verde, com a **mesma** contagem de
-  checks do Fedora. Divergência de contagem é sintoma, não detalhe.
-- **Paridade 15/15**, com `exceptions.txt` limpo e reconciliado — cada exceção
-  ainda justificada, nenhuma herdada por inércia.
-- Cada teste C rodando nas duas plataformas: hoje o Windows roda 11 binários e o
-  Fedora 12 (falta `test_astype` na lista do `build.ps1`).
-- MANIFEST idêntico nas duas plataformas para a mesma árvore (12.32), com
-  procedência apontando o commit certo.
-
-<a id="section-14-5-superficie-externa-o-que-falta-para-ser-usavel-por-terceiros"></a>
-
-### 14.5 Superfície externa — o que falta para ser usável por terceiros
-
-Verificado em 2026-07-27 e **ausente**. Correção interna não substitui isto: sem
-estes pontos o projeto é excelente e inutilizável por quem não é o autor.
-
-- **`LICENSE`** — não existe. Sem licença, ninguém pode legalmente usar, copiar ou
-  derivar. É o maior bloqueio do projeto e o mais barato de resolver.
-- **Fronteira público × interno** — hoje é um comentário no `init.lua`, não um
-  contrato. Nada impede alguém de acoplar em `smaug.core.series._types`. Declarar,
-  e idealmente verificar por eixo de paridade.
-- **Política de versão** — `_VERSION = "1.0.0-dev"` sem semver declarado nem
-  janela de depreciação. Depois de existirem usuários, isto fica caro.
-- **Instalação** — sem rockspec, sem artefato de release; o caminho é "clone e
-  compile", que exige gcc (e MSYS2 no Windows). Ver 15.1/15.2.
-- **Taxonomia de erro** — erros são string. Um pipeline que precise ramificar por
-  causa (arquivo ausente × dtype incompatível × OOM) só pode fazer match em texto,
-  que quebra quando a mensagem melhora. `smaug_status_t` existe no C e não sobe.
-  Mudança de contrato: barata agora, cara depois.
-- **Medição de performance** — correção é medida à exaustão (MC/DC, allocfail,
-  property-based, mutação); performance **não é medida**. O bloco 10 inteiro se
-  justifica por coerência arquitetural, não por número. Uma fundação de pipeline
-  precisa poder afirmar performance.
-
-<a id="section-14-6-criterio-de-saida"></a>
-
-### 14.6 Critério de saída
-
-A timeline zera — e a v1.0 ganha o direito de existir — somente se 14.1 a 14.4
-não acharem inconsistência nova **e** 14.5 estiver resolvido ou explicitamente
-adiado com justificativa registrada.
-
-
-<a id="section-15-release-v1-0-ultimo-windows-fedora"></a>
-
-## 15. RELEASE v1.0 (último)  [Windows+Fedora]
-
-- 15.1 FFI loader instalável (descobre `.so`/`.dll`/`.dylib` em layout instalado)
-- 15.2 distribuição / LuaRocks
-- 15.3 LDoc + GitHub Pages
-- 15.4 tag v1.0.0
-- 15.5 `LICENSE` — pré-requisito de qualquer distribuição (ver 14.5)
-
----
-
-# Pós-v1.0 — trilhas paralelas (fora desta timeline)
-
-- **Versão em inglês** — documentação, mensagens de erro e i18n. Trilha própria;
-  mensagens de erro são API, mas a internacionalização completa é projeto à parte.
-- **Trilha Analítica** — Matrix (Anel 6) → Tensor + grafo + autograd (Anel 7) →
-  ML (Anel 8, dividido em preparação/ML clássico, treino e inferência). O
-  conteúdo de cada anel, os princípios que regem a trilha (escopo do "zero
-  dependências", ser dono da estrutura e não da aritmética, treino × inferência,
-  corpus antes de modelo) e o critério de verificação estão no `ARCHITECTURE`,
-  não aqui: **são visão arquitetural, não itens de timeline**. Este Roadmap lista
-  compromissos com selo; aquilo é destino sem data.
-- **Trilha Projeto** — I/O estendido (SQL, Excel, Parquet) → Persistência → Models.
-- **Frentes diferidas** — `replace({de=para})`, índice/MultiIndex, plotting,
-  tipos extras (float32, int32/16/8). Só se caso real justificar.
-  (`sum(min_count)` subiu para a timeline, item 5.5.)
-
----
-
-[Referência do Núcleo C](API_Reference.md) · [Rework da suíte](TEST_SUITE_REWORK.md) · [Início da documentação](README.md)
+# Smaug — roadmap
+
+[Documentação](README.md) · [Contrato](CONTRACT.md) · [Arquitetura](ARCHITECTURE.md)
+
+Revisão: 2026-09-28. Base inspecionada: `320b4bc`; parser R1 aplicado e
+consumidores CSV/JSON ainda em verificação. Objetivo imediato: preservar valores e tornar confiáveis
+os contratos e sua verificação nos anéis 0–3. Esta fila substitui a anterior;
+não aprova automaticamente mudanças de contrato ainda abertas.
+
+[Checkpoint](#checkpoint) · [Verificação](#verificacao) ·
+[Review de comentários](#comentarios)
+
+**Régua de revisão:** para cada afirmação, perguntar “isso é verdade na árvore
+atual?” e registrar a evidência. Leitura de código é observação; teste executado
+valida apenas seu domínio/ambiente; contrato aprovado pode ter implementação
+pendente. Sem evidência suficiente, manter a lacuna aberta. Nenhum percentual,
+comentário ou suíte verde isolada significa certificação geral.
+
+## Estado de partida
+
+- Existem `Series`, `DataSet`, categorical e I/O CSV/JSON próprios.
+- `prod` já tem implementação C e consumidores Lua. Aritmética i64 checked,
+  conversão estrita string/int64/float64→datetime e correções de join/groupby
+  também existem. Não são tarefas de implementação inicial.
+- Foram reproduzidos problemas de sintaxe/associação JSON, preservação de NUL
+  e transporte exato de int64. [Evidências e decisões](IO_REVIEW.md).
+- A suíte relacional foi reescrita inicialmente e corrigida; a auditoria de
+  migração e o poder de detecção ainda precisam ser concluídos.
+- Os quatro helpers aritméticos checked têm evidência dirigida favorável.
+  Isso não certifica consumidores, memória ou restante do core.
+- O parser R1 tem contrato de saída obrigatória, consumo integral, gramática
+  explícita e diagnósticos testados. A integração dos leitores ainda não é
+  contabilizada como concluída.
+- A licença MIT já existe. Distribuição e política de compatibilidade seguem
+  abertas; não recriar a tarefa de adicionar licença.
+
+## Ordem de trabalho
+
+1. Fechar o mecanismo numérico e seu uso pelos consumidores (R1), com a
+   evidência pertinente de R6 em cada correção.
+2. Fechar transporte de valores e layouts de I/O (R2) antes de implementar
+   toda a adaptação CSV/JSON (R3).
+3. Concluir a auditoria de inferência e entrada Lua (R4), então retomar
+   `dayfirst`, detecção de datas e componentes datetime (R5).
+4. Concluir a reconstrução e verificação por famílias (R6); tratar R7 nas
+   famílias afetadas e fechar a entrega pública (R8).
+
+Discussão de R2–R4 pode ocorrer antes de R1 terminar quando esclarecer seus
+consumidores. Esta ordem preserva a decisão de auditar inferência antes de
+ampliar datetime. Não exige reescrever todo o motor para corrigir um mecanismo.
+
+<a id="r1"></a>
+## R1 — Conversão numérica e defesas do core
+
+**Estado:** parser e `astype` implementados conforme a gramática aprovada;
+integração CSV/JSON e verificação ampliada permanecem em andamento.
+
+Direção solicitada em 28/09: preservar os anéis e estabilizar as convenções
+de biblioteca C. O [padrão C/Lua consolidado](CODING_STYLE.md) usa o C11 já selecionado
+pelos builds e explicita tipos, erros, memória e portabilidade. Conferir também
+locale e dependência de `-fwrapv`; não migrar assinaturas por padronização estética.
+
+Aplicar C01–C08 aos parsers e L02/L04–L07 aos consumidores alterados. A
+gramática, saída obrigatória, consumo integral, comprimento sem truncamento e
+política de subnormal/underflow foram registrados e implementados no core.
+
+Evidência de 28/09: probe em GCC/glibc reproduziu dependência de locale
+(`1.5` versus `1,5`), rejeição do subnormal decimal testado e divergência de
+comprimento entre slice e `_cstr`. [Resultados e recomendação](IO_REVIEW.md#r1-padrao-c).
+Decisão aprovada em 28/09: formato/inferência no leitor, conversão no core;
+causas por código no core e contexto/mensagem na camada externa. `astype`
+tolerante distingue elemento inconversível de falha operacional, sem converter
+OOM em NA. [Contrato](CONTRACT.md#conversao-numerica-responsabilidades).
+Próximo passo: verificar consumidores CSV/JSON, formatadores e o mapeamento de
+diagnósticos antes de ampliar a ABI.
+
+[Matriz de comparação](IO_REVIEW.md#r1-proposta): gramática atual versus
+destino, mudanças de compatibilidade e categorias de falha. A migração de astype e inferência CSV distingue falha operacional de texto
+inconversível desde a revisão de 29/09; JSON e transporte seguem abertos.
+Suporte explícito a hexadecimal aprovado em 28/09. A
+[gramática detalhada](IO_REVIEW.md#r1-gramatica) registra as regras aprovadas
+e casos de aceitação/rejeição; hexadecimal inteiro é aceito em i64 e f64. A
+suíte C cobre limites, subnormais e underflow; a inferência CSV ainda precisa
+de verificação dirigida.
+
+Conferir as quatro funções `smaug_parse_i64/f64` e `_cstr`, seus headers,
+`astype` e wrappers CSV. Validar o mapeamento dos códigos nos consumidores.
+NUL dentro de um slice não pode permitir aceitação silenciosa de seu prefixo
+numérico. Falha deve preservar saída válida.
+
+Slices e `_cstr` usam a mesma gramática e não truncam tokens longos.
+Não migrar CSV cegamente sem verificar seus limites próprios. `astype` numérico conserva
+seu contrato de elemento inconversível→NA; escolha de dtype do arquivo é R3.
+
+**Conclusão:** decisões documentadas; regressões de NUL inicial/intermediário/
+final, buffers não terminados, limites representáveis e ponteiros; consumidores
+C/Lua verificados; mutações detectadas; evidência de memória/UB com lacunas
+de ambiente explicitadas. [Review](IO_REVIEW.md#core).
+
+<a id="r2"></a>
+## R2 — Preservação C/Lua e compatibilidade ABI
+
+**Estado:** preservação de NUL e identificação da ABI aprovadas; implementação
+pendente. Detalhes do transporte de marcadores ainda propostos.
+
+- Preservar int64 nas duas direções: tabela C→DataSet e DataSet→writer,
+  sem passagem intermediária por `number` Lua.
+- Transportar comprimento de valores e nomes; distinguir `a` de `a\0b`.
+- Coordenar `smaug_column_t.name_len`, opções de `na_values`, produtores C,
+  cdef, buffers Lua e ownership. Metadata permanece fora desse recorte.
+- Implementar consulta estável `smaug_abi_version()` antes de acessar estruturas;
+  biblioteca carregada incompatível deve falhar sem fallback silencioso.
+- Verificar cleanup quando a adaptação Lua lança erro e nos caminhos parciais C.
+
+**Conclusão:** comparação de bytes/valores/máscaras nos dois sentidos, nomes
+com NUL e colisões, biblioteca ausente/incompatível/correta, sizeof/offsetof
+entre C compilado e FFI, falhas de alocação e testes Linux/Windows identificados.
+[Desenho e limites](IO_REVIEW.md#transporte).
+
+<a id="r3"></a>
+## R3 — Leitura e escrita CSV/JSON
+
+**Estado:** defeitos reproduzidos; políticas parcialmente fechadas.
+
+Implementar as decisões aprovadas: associação JSON por nome, união de campos,
+ordem por primeira aparição, desambiguação sem perda e ausência/null→NA;
+strings `""`, `"null"` e `"NA"` continuam texto. Validar documento completo,
+com erro por posição/motivo e sem resultado parcial.
+
+Antes das respectivas mudanças, fechar largura irregular e dialeto CSV;
+inteiros fora da faixa, mistura int64/float64, zeros iniciais e schema explícito;
+BOM, UTF-8 e surrogates. Corrigir corte de tokens e saturação numérica sem
+escolher silenciosamente uma política de representação.
+
+Completar diagnóstico da escrita em arquivo, propagação de erros de leitura/
+escrita/fechamento, limpeza parcial e fixtures com expectativas independentes.
+Não ampliar automaticamente o perfil JSON para objetos aninhados.
+
+**Conclusão:** corpus válido/inválido com resultados externos esperados,
+preservação de valores, diagnósticos e cleanup; regressões por defeito;
+opções e limitações refletidas na API. [Review](IO_REVIEW.md).
+
+<a id="r4"></a>
+## R4 — Inferência e entrada nas APIs Lua
+
+**Estado:** consumidores mapeados; decisões de uniformização pendentes.
+
+Confrontar `Series`/`from_table`, `from_dict`, `full`, `map` normal/categórico,
+`explode`, `ifelse`, `where` e `mask`. Separar inferência de dtype, validação de
+dtype já fixado e conversão explícita. Não substituir um pelo outro apenas
+para eliminar duplicação. Conferir cdata int64, ordem dos valores, tudo NA,
+misturas de famílias e preservação das colunas reconstruídas.
+
+**Conclusão:** matriz de comportamento por entrada, decisões para divergências,
+regressões de precisão/nulidade/ordem e consumidores do mecanismo comum listados.
+[Mapa atual](IO_REVIEW.md#inferencia-lua).
+
+<a id="r5"></a>
+## R5 — Completar datetime
+
+**Estado:** parser e `astype` estritos implementados; demais entradas e
+componentes ainda em migração. Depende da auditoria R1–R4.
+
+Integrar `dayfirst` nas entradas restantes; definir detecção automática e
+gatilhos de diagnóstico sem mudar o padrão mês/dia aprovado. Migrar os 11
+componentes escalares e os 11 de série para as assinaturas já aprovadas,
+preservando anos negativos e NA. Corrigir semana ISO, revisar formatter,
+buffers, helpers, construção, set/append, fillna e operações derivadas.
+
+Aliases de outras famílias e opções futuras permanecem propostas próprias.
+**Conclusão:** limites UTC e offsets, ano -1 distinto de falha, precisão exata,
+posição de erro, saída preservada e todos os consumidores C/FFI/Lua atualizados.
+[Contrato](CONTRACT.md#section-perfil-datetime-decisoes-aprovadas-em-2026-09-18) ·
+[API C planejada](API_Reference.md#section-datetime-migracao-c) ·
+[Integração Lua](API_INDEX.md#section-datetime-migracao-lua).
+
+<a id="r6"></a>
+## R6 — Verificação por famílias e executores confiáveis
+
+**Estado:** reconstrução incremental iniciada; auditoria geral aberta.
+
+Padrão C/Lua consolidado em 28/09: regras, contrato mínimo, critérios de revisão
+e registro de exceções ficam em CODING_STYLE. Falta configurar baseline e gates
+de análise estática C, lint LuaJIT e formatação; o verificador atual cobre apenas
+convenções dos testes. Avaliar ferramentas contra C11/LuaJIT/FFI, testar se
+detectam violações reais e documentar suas limitações antes de exigir o gate.
+Começar a adoção funcional por R1; conformidade integral da base não foi medida.
+
+Concluir migração relacional e repetir o método nas demais famílias:
+contrato independente, estado/resultado completos, destino dos casos antigos
+e mutações que demonstrem detecção. Enumerar pontos reais de OOM e eliminar
+asserções sem poder de rejeição.
+
+Corrigir executores para exigir código de saída, arquivos/dependências e
+quantidade de casos; identificar a biblioteca FFI testada. Unificar inventários
+preservando as categorias plain, wrap e stress. Revisar os 15 eixos de paridade,
+incluindo layout compilado e reentrância. Refazer cobertura bruta íntegra,
+incluindo headers executáveis, dados brutos e exclusões por ramo comprovadas.
+
+**Conclusão:** evidências reproduzíveis por árvore e plataforma, falhas do
+próprio executor detectadas, exclusões auditadas e nenhuma equivalência entre
+branches e MC/DC. Não manter contagens antigas como meta de qualidade.
+[Checkpoint](#checkpoint) · [R01–R09](#verificacao).
+
+<a id="r7"></a>
+## R7 — Contratos e débitos remanescentes dos anéis 0–2
+
+**Estado:** tratar por família, após conferir se cada pendência ainda existe.
+
+- Lifetime/invalidação de views, realocação do pai, COW e rollback por dtype.
+- Overflow intermediário e canais de status nos consumidores dos helpers.
+- Divergências relacionais: `count`, padrão de `pivot_table`, join composto;
+  codificação das chaves de duplicatas em `dataset/_stat.lua`.
+- Colação e nulidade em comparações como contrato explícito; compartilhamento
+  de interpolação de quantis; distinção NaN/NA nas mensagens.
+- Vetorização `.str`/operações derivadas `.dt` e otimização de igualdade apenas
+  com semântica fechada e benchmark reproduzível. O bloqueio histórico por NaN
+  do antigo 10.5-B não deve ser presumido atual.
+- Despacho por capacidades/dtypes novos exige desenho próprio, incluindo os
+  auditores que hoje deduzem suporte de texto do código.
+
+**Conclusão:** cada item verificado ou adiado com motivo, sem transferir
+políticas externas ao core nem reformar APIs por uniformidade superficial.
+
+<a id="r8"></a>
+## R8 — Entrega pública
+
+**Estado:** posterior às correções e à verificação; sem data de release.
+
+Fechar superfície pública/interna, política de versões/depreciação, instalação
+e distribuição, taxonomia de erros, exemplos/docstrings e benchmarks.
+Linux e Windows precisam executar o mesmo conjunto previsto para a mesma
+árvore; diferenças e skips têm de aparecer no relatório. Licença já presente.
+
+**Conclusão:** limitações documentadas; correções prioritárias concluídas;
+contratos, código e APIs coerentes; evidências de memória, testes, ABI e
+cobertura disponíveis. Só então preparar release/tag; não publicar por esta
+reorganização documental.
+
+
+<a id="checkpoint"></a>
+## Checkpoint de retomada — 2026-09-29
+
+Gramática R1 aprovada em 28/09. A revisão de 29/09 corrigiu o parser,
+`astype` e o consumidor CSV, mantendo a ABI e a arquitetura de anéis.
+**Estado de entrega:** mudanças locais sem commit; R1 permanece aberta.
+
+**Concluído nesta etapa:**
+
+- Inteiros continuam a validar o sufixo após exceder a faixa, sem continuar
+  a acumulação. `SYNTAX` prevalece sobre overflow de um prefixo; fronteiras
+  decimais/hexadecimais e preservação da saída têm regressões.
+- f64 distingue overflow saturado em `DBL_MAX` com `ERANGE` de subnormal
+  representável, inclusive na fronteira que arredonda para `DBL_MIN`.
+  Removido o ramo duplicado de underflow; quatro modos de arredondamento
+  exercitados nativamente, sem alterar o modo do caller.
+- `astype` tolera apenas SYNTAX/OVERFLOW/UNDERFLOW; outras falhas abortam.
+  OOM na cópia de token longo e na criação de locale têm injeção dirigida.
+- CSV consome status na conversão numérica: falha operacional não altera
+  inferência nem vira NA. Decimal customizado aceita tokens longos por inteiro.
+  Cleanup do crescimento de linhas preserva o ponteiro retornado pelo primeiro
+  realloc se o segundo falhar; falha no setter de string aborta a tabela.
+- Nomes, blocos, ownership e limites dos trechos revisados seguem CODING_STYLE.
+  Não houve mudança de layout/assinatura nem nova dependência de runtime.
+
+**Verificação e vínculo com os reviews:** `make test` e `make test-lua`
+aprovados no Linux, GCC 16.2.1/glibc 2.43. Astype também passou com
+`-O2 -Wall -Wextra -Wpedantic -Werror`, sem `-fwrapv`. O guard de estilo passou
+nos 33 arquivos de teste; `git diff --check` passou. Probes em `C` e
+`pt_BR.utf8` confirmaram ponto decimal e subnormais.
+
+`python3 scripts/audit_numeric_regressions.py` exige baseline válida e testa
+seis mutantes compiláveis em cópias temporárias: seis detectados, nenhum
+sobrevivente na rodada final. O mutante que ignorava o setter de string
+sobreviveu inicialmente; o caso novo força crescimento do buffer e o rejeita.
+O script registra hashes dos fontes. `test_allocfail` passou sob Valgrind
+3.27.1 com verificação de leaks e erro não zero habilitado. Os casos de CSV
+misto/100 linhas substituem limites fixos e a asserção `|| 1`: enumeram as
+alocações da baseline, confirmam injeção e verificam recuperação/conteúdo.
+Isso aplica R03/R05 do review; não certifica todos os casos antigos de OOM.
+
+**Limitações:** Valgrind divergiu da execução nativa no arredondamento de
+`1e-400` para subnormal sob FE_UPWARD; a suíte astype inteira não foi aprovada
+sob essa ferramenta. ASan/UBSan não executado: link falhou por ausência de
+`/usr/lib64/libasan.so.8.0.0`. Não há compilador Windows neste ambiente;
+portabilidade desse ramo continua sem verificação nova. Coverage, parity e
+manifest não foram regenerados; não usar relatórios históricos como selo.
+
+**Seguimento — formatação concluída no Linux:** os formatadores agora usam
+ponto decimal fixo e retornam zero sem alterar o buffer em falha (inclusive
+capacidade insuficiente). Astype/CSV/JSON conferem o retorno, sem strings vazias
+ou tabelas parciais. O contrato de 17 dígitos permanece; roundtrip verificado
+sob FE_TONEAREST, sem alterar o arredondamento do caller. Locale global e
+objeto de locale da thread são preservados. Foram exercitados C e pt_BR.utf8,
+falha de criação/ativação de locale, capacidade exata e recuperação após OOM.
+
+Validação do seguimento: `make test` (12 binários; astype 525 checks e
+allocfail 2.665), `make test-lua` (20 suítes), astype com
+`-O2 -Wall -Wextra -Wpedantic -Werror`, guard dos 33 arquivos e diff aprovados.
+`python3 scripts/audit_numeric_regressions.py` agora detecta nove mutantes
+compiláveis (três de formatação); baseline allocfail aprovada sob Valgrind.
+A seleção/restauração POSIX é nova para formatação; o ramo `_snprintf_l` não
+foi verificado no Windows. Mantidas as limitações de sanitizers e de Valgrind
+nos testes de arredondamento acima. Detalhes em IO_REVIEW, sem novo diário.
+
+**Próximo passo:** continuar R2/R3 para bytes/comprimentos no CSV e
+lexer/conversão JSON, que ainda usa libc diretamente e depende de locale. A política de faixa/inferência dos leitores permanece explícita: CSV
+sem schema ainda pode inferir texto para elemento numericamente inconversível.
+Não declarar leitura estrita implementada por a propagação de OOM ter passado.
+Completar Windows/sanitizers quando disponíveis e manter revisão incremental
+da suíte conforme R01–R09, sem nova campanha de renomeação global.
+
+| Frente | Já conferido | Falta para avançar |
+|---|---|---|
+| Core numérico | Helpers checked: 30.712 chamadas e cinco mutações detectadas; parser/formatter/astype/CSV com regressões de status, OOM e nove mutações detectadas | Leitura JSON, transporte CSV, Windows e sanitizers |
+| I/O | 30 + 23 casos observacionais; baseline recompilada; NUL, int64 e associação JSON reproduzidos | Fechar transporte/opções e implementar R2/R3 |
+| Inferência Lua | Entradas mapeadas no review de I/O | Decidir divergências, sem uniformizar por conveniência |
+| Datetime | Parser e astype estritos C/Lua implementados em 25/09; build Windows histórica passou | Integração restante, 11 componentes escalares + 11 de série, formatter e semana ISO |
+| Relacional | Reescrita inicial; três defeitos corrigidos; 68 casos passaram no seguimento de 25/09 | Contratos count/pivot/join, migração dos casos antigos e mutações |
+| Verificação | Inventário/review dos executores; cobertura e parity disponíveis como artefatos históricos | Corrigir confiabilidade e comprovar detecção por família |
+| Documentação | Roadmap substituído; checkpoints unificados; redundâncias removidas | Manter este checkpoint após cada frente, sem novos diários paralelos |
+
+A implementação R1 tem regressões C para gramática, limites, subnormal,
+underflow, overflow e preservação de saída. Isso não é teste da futura migração
+ABI. Não houve nova cobertura Windows ou sanitizers para esta frente.
+As evidências específicas ficam nos reviews [I/O](IO_REVIEW.md) e
+[aritmético](CORE_ARITHMETIC_REVIEW.md), sem manter outra fila de execução.
+
+<a id="verificacao"></a>
+## Review da verificação — origem e destino dos achados
+
+R01–R09 abaixo são IDs da auditoria histórica de 18/09, distintos das frentes
+R1–R8. A árvore auditada era `9787701` com mudanças locais; números e linhas
+daquela auditoria não certificam a árvore atual. A reconstrução é incremental:
+cada caso antigo recebe destino (manter, fortalecer, substituir, fundir ou
+retirar com justificativa); só retirar depois de validar o substituto.
+
+| Achado histórico | Evidência que orienta a revisão | Frente atual |
+|---|---|---|
+| R01 — testes aceitam resultado errado | Mutações view→clone, join vazio, last→first e aceitação de índice inválido escaparam às suítes indicadas | R6: completude, multiplicidade, estado e rejeição efetiva |
+| R02 — datetime | Semana de 2023-01-01 retornou 53 em vez de 52; extração em série anulou ano -2 | R5: esperado único independente, ano separado de status |
+| R03 — OOM | Contagem de checks não enumera alocações e rollback de cada caminho | R6: registrar ponto atingido e estado após cada falha |
+| R04 — cobertura | Relatório histórico, coleta parcial e headers executáveis fora da visão podem ocultar lacunas | R6: dados brutos íntegros, árvore e ferramenta identificadas |
+| R05 — exclusões | Guards classificados como inalcançáveis foram atingidos por entradas públicas | R6: manter triagem individual do inventário de exclusões |
+| R06 — parity | Campo extra no cdef f64 e global mutável escaparam; fonte ausente virou texto vazio | R2/R6: layout compilado, inventário completo e falha explícita |
+| R07 — executores | PASS textual pode ocultar exit não zero; skips e eixos parity não barram aprovação | R6: testar executor, não só os testes |
+| R08 — fixtures/manifest | Uso das quatro fixtures de cotações não demonstrado; manifest omite csv/json/txt | R6: origem, licença, hashes e expectativas externas; Python já entrou no manifest |
+| R09 — duplicação/contratos | Propriedade redefinida, bootstrap repetido e contratos documentais contraditórios | R6/R7: revisar expectativas antes de copiar implementação |
+
+Cada família deve registrar entrada, dtype/shape, ordem, máscara, saída/status,
+ownership, efeitos, limites e oracle. Compartilhar infraestrutura de teste é
+útil; compartilhar a lógica de produção como oracle anula a independência.
+Testar os comparadores com resultados deliberadamente errados. As mutações
+relacionais devem partir de baseline verde e identificar a regressão causada.
+
+Nos executores, exigir rejeição de PASS seguido de erro, arquivo/dependência
+ausente, zero casos, timeout e relatório parcial. Confirmar caminho/hash da
+biblioteca carregada. Preservar inventários plain/wrap/stress e os 15 eixos de
+parity; revisar seu significado, não apenas sua contagem. Concorrência usa
+objetos independentes; não certifica mutação simultânea de um mesmo objeto.
+
+<a id="comentarios"></a>
+## Review de comentários e coerência documental
+
+Leitura dirigida nesta revisão; não é uma auditoria linha a linha de todo o
+repositório. Antes de corrigir cada comentário, conferir função, consumidores
+e teste que sustentam a redação. Comentário não resolve contrato aberto.
+
+| Local conferido | Divergência ou limite | Encaminhamento |
+|---|---|---|
+| `src/smaug_ops_i64.c`, abertura do Grupo A | Diz overflow por wrap; cumsum/cumprod checked rejeitam antes de calcular | R7: revisar bloco por operação e corrigir descrição |
+| `include/smaug_core.h`, helpers checked | false descrito só como overflow; divisão também rejeita zero e out NULL é permitido | R1/R7: documentar casos e preservação da saída por API |
+| `include/smaug_numeric.h`, smaug_i64_div | `/0 → NULL` confunde ponteiro com célula NA; implementação produz máscara NA | R7: esclarecer forma de falha sem trocar semântica |
+| `include/smaug_numeric.h`, reduções f64 | Dizia var/std populacionais; código divide por n−1 e exige n≥2 | Corrigido para amostral; consumidores e contrato completo seguem em R7 |
+| `src/smaug_ops_str.c`, introdução | Categorical era descrito como futura otimização do backend; já existe como superfície Lua separada | Comentário alinhado; colação por bytes e separação de tipos seguem em R7 |
+| `src/smaug_ops_bool.c`, API struct-based | Comentário tratava a aposentadoria de BoolSeries como destino certo; bool continua dtype de primeira classe | Comentário alinhado para superfície legada; R7/R8 ainda decidem os consumidores raw |
+| `scripts/build.sh` / `scripts/build.ps1` | Comentários de execução completa não mostram todas as condições de skip/aprovação | R6: alinhar comentários à correção dos runners |
+| Referência C, catálogo rápido duplicado | Assinaturas simplificadas divergiam das tabelas principais | Consolidado nesta revisão; manter uma descrição por operação |
+| Referência C, views/memória e soma i64 | Dizia que escrever na view alterava o pai, invertia lifetime e sugeria contar não-nulos para resolver ambiguidade de overflow | Corrigido contra COW, destrutores e sum_checked; não implica auditoria integral da API |
+| Guia datetime e fila antiga | Parser/astype já implementados ainda apareciam como futuros | Corrigido nesta revisão; componentes/formatter continuam abertos |
+| Referência C, writers em memória | Omitia `err_out` em CSV/JSON e a responsabilidade de liberar a causa | Corrigido contra `smaug_io.h`; conferir consumidores FFI em R2 |
+| Referência C, CSV | Listava `nan`/`NaN` como NA padrão, mas o parser preserva esses tokens como valores IEEE | Corrigido contra `src/smaug_csv.c`; manter teste que distingue NaN de null em R3 |
+| Referência C, datetime parse | Omitia `dayfirst` na assinatura legada e misturava API atual com assinatura aprovada futura | Separado nesta revisão; migração permanece R5 |
+| Referência Lua, reduções | Omitia `min_count` em `sum`/`prod` e dizia NaN onde o wrapper central entrega `nil` | Corrigido contra `series/_core.lua`; confirmar a matriz completa em R4 |
+| Referência Lua, bool | Apontava uma classe `BoolSeries` que não existe mais no caminho público | Corrigido para `Series<bool>`; raw arrays C continuam legados até R7/R8 |
+| `include/smaug_io.h`, comentário de erro global | Citava `smaug_io_last_error()`, símbolo que não existe; a implementação usa `table->error` e `err_out` | Corrigido no header; manter o transporte local de causa em R2 |
+| Referência C, operações de janela | O header `smaug_ops_window.h` tinha multi-argsort/rolling sem seção correspondente | Seção adicionada; conferir consumers Lua e status de overflow em R6/R7 |
+| Referência C, problemas conhecidos | Apontava `tests/test_alloc.c`, `extern` e `memset` que não correspondem mais à árvore | Caminho corrigido e itens não reproduzidos removidos |
+| `lua/smaug/core/series/stats/_stat.lua`, produto i64 | Comentário dizia que overflow reutilizava `SMG_ERR_OOB`, mas o enum atual possui `SMG_ERR_OVERFLOW`; o teste do wrapper ainda está divergente | Comentário alinhado ao código observado; corrigir despacho em R7 |
+
+### Review executável da referência de API — 2026-09-27
+
+Um probe Lua isolado recompilou a biblioteca da árvore atual e verificou 24
+comportamentos pequenos, cobrindo NaN/NULL, precisão i64, datetime, CSV/JSON,
+views, categorias, seleção e agregações. Vinte e dois casos confirmaram a
+descrição ou o contrato observado. Dois não são problemas de redação:
+
+- `Series<int64>:prod()` em overflow devolve uma mensagem genérica porque o
+  wrapper não reconhece o status efetivo `SMG_ERR_OVERFLOW`; revisar o canal de
+  status em R7 antes de prometer diagnóstico específico.
+- `Series<bool>:where(cond, outra_series)` falha quando o valor selecionado
+  de `other` é false: a expressão Lua `and/or` usa a própria tabela como
+  fallback. Selecionar true funciona. Conferir também NA, `mask` e `ifelse`
+  em R4/R7.
+
+Outras observações que ficam explícitas na documentação: `INT64_MIN` válido é
+indistinguível da sentinela em algumas reduções Lua; `corr`/`cov` preservam NaN,
+enquanto as reduções centrais o convertem em `nil`; a semana ISO de
+`2023-01-01` ainda retorna 53; e `dt:format()` ignora a falha de formatação no
+wrapper. Esses pontos são evidência dirigida, não certificação do restante da
+API.
+
+Comentários de exclusões precisam de prova por ramo, conforme o
+[inventário](TEST_SUITE_EXCLUSIONS_REVIEW.md). Referências numéricas antigas
+no código continuam rastreáveis na versão Git indicada abaixo. Não renumerar
+comentários mecanicamente nem interpretar marcações históricas como garantias.
+O cabeçalho do teste relacional foi atualizado para este roadmap e deixou de
+fixar a revisão antiga de coverage. Nenhuma asserção ou lógica foi alterada.
+
+### Conferência da revisão — 2026-09-28
+
+A revisão documental anterior também exigiu correção: `multi_argsort` não
+valida máscaras/tamanhos das colunas; rolling permite janelas iniciais parciais
+com `min_periods >= 1`; `ne(NaN)` é true; remoção de afixos não é idempotente.
+Leitura do C e execução Lua dirigida confirmaram rolling(3)/min_periods(1)
+com somas 1, 3, 6 e distinguiram `where` selecionando true (sucesso) de false
+(erro). A saída registrada do build anterior contém 12 binários e 5.002
+verificações, corrigindo a contagem do changelog. Não houve nova suíte completa.
+O diff documental inclui uma mudança de texto no erro de `filter`; portanto,
+o relato anterior de alterações exclusivamente em comentários era impreciso.
+
+## Como atualizar este roadmap
+
+Ao concluir uma etapa, atualizar sua frente e este checkpoint com: decisão,
+código/consumidores conferidos, evidência (árvore, comando, plataforma), lacunas
+e próximo passo. Contrato aprovado fica em CONTRACT; assinatura em API;
+resultado detalhado em review específico quando necessário; changelog recebe
+apenas o marco. Evitar repetir o relato da sessão nessas quatro fontes.
+
+<a id="historico"></a>
+## Referências antigas e trabalho futuro
+
+Os IDs antigos `1`–`15`, inclusive `10.x`, `12.x` e `14.x`, continuam
+consultáveis no [roadmap anterior](https://github.com/semy4za/smaug/blob/320b4bcbd5b50df20872668dd36afbe54ca941e2/docs/Roadmap.md).
+Eles identificam contexto histórico; novos trabalhos usam R1–R8.
+
+| Frente antiga | Destino atual |
+|---|---|
+| 10.1 prod; 12.34 colação; LICENSE | Implementações/arquivo existentes; verificar em R6/R7/R8 |
+| 10.4; 12.16; 12.25; 12.36 | R5; `.str` e performance em R7 |
+| 10.5-B; 12.14; 12.33; 12.35; 12.39 | R7 |
+| 12.8; 12.26; 12.30 | R2/R3 e evidência em R6 |
+| 12.19; 14.1–14.4 | R6/R7 |
+| 12.13; 13; 14.5; 15 | R8 e documentação do comportamento correspondente |
+
+Persistência `.smg`, Models, Matrix, Tensor, ML, interfaces e formatos
+adicionais ficam na [visão arquitetural](ARCHITECTURE.md#futuro), sem compromisso
+de implementação nesta fila. Internacionalização, tipos extras, índices e
+visualização dependem de caso de uso e desenho próprios.

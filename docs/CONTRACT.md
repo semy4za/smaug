@@ -10,7 +10,7 @@
   - [Contrato 2 — astype converte por elemento, tolerante a falha](#section-contrato-2-astype-converte-por-elemento-tolerante-a-falha)
   - [Contrato 3 — fillna preserva o original e segue a validação de entrada](#section-contrato-3-fillna-preserva-o-original-e-segue-a-validacao-de-entrada)
   - [Contrato 4 — DataSet nunca existe desalinhado](#section-contrato-4-dataset-nunca-existe-desalinhado)
-  - [Contrato 5 — BoolSeries é coluna de primeira classe](#section-contrato-5-boolseries-e-coluna-de-primeira-classe)
+  - [Contrato 5 — Series<bool> é coluna de primeira classe](#section-contrato-5-series-bool-e-coluna-de-primeira-classe)
   - [Contrato 6 — filter descarta NA na máscara](#section-contrato-6-filter-descarta-na-na-mascara)
   - [Contrato 7 — índices são 1-based](#section-contrato-7-indices-sao-1-based)
   - [Contrato 8 — NA em chave relacional é erro](#section-contrato-8-na-em-chave-relacional-e-erro)
@@ -33,7 +33,7 @@ Este documento especifica os contratos de comportamento do Ring 1 (frontend Lua)
 e do Ring 0 (backend C). Um contrato aqui significa: comportamento garantido,
 exigido, e que não muda sem decisão explícita e versionada. O contrato não
 certifica seu cumprimento: evidências e gaps estão em
-[parecer do rework](TEST_SUITE_REWRITE_REVIEW.md). Revisão documental: 2026-09-18.
+[parecer do rework](Roadmap.md#verificacao). Revisão documental: 2026-09-18.
 
 ---
 
@@ -144,6 +144,41 @@ em milissegundos e estar no domínio de -9999 a 9999; não há truncamento.
 Texto inválido gera erro com posição, sem resultado parcial ou NA fabricado;
 NA já presente na entrada continua sendo ausência. Ver a seção de detecção abaixo.
 
+<a id="conversao-numerica-responsabilidades"></a>
+**Responsabilidades da conversão numérica — decisão de 2026-09-28:**
+
+O leitor conhece o formato: gramática CSV/JSON, opções de separador e
+inferência pertencem ao anel de conectividade. O core conhece a conversão
+numérica e comunica a causa de falha por código, sem construir mensagens
+orientadas ao usuário. A camada externa acrescenta operação, coluna e demais
+informações de contexto disponíveis e decide a apresentação do erro.
+
+Diagnóstico não determina automaticamente a política do consumidor. Na
+conversão tolerante de texto para número, `astype` mantém elemento
+inconversível→NA; falhas operacionais, como falta de memória, devem ser
+propagadas e não podem ser disfarçadas de elemento inconversível. As exceções
+estritas de datetime e bool permanecem com seus contratos próprios.
+
+Esses princípios estão aprovados. Também aprovado em 2026-09-28: aceitar
+hexadecimal como parte explícita da gramática, não apenas por delegação à libc.
+Gramática aprovada: hexadecimal inteiro em int64 e float64; fração/expoente
+hexadecimal apenas em float64. Decimal e hexadecimal têm sinal opcional;
+ponto independente de locale, consumo integral, sem espaços nem payload NaN.
+As produções e casos aceitos/rejeitados estão na
+[especificação de R1](IO_REVIEW.md#r1-gramatica).
+Os códigos `SMG_ERR_SYNTAX` e `SMG_ERR_UNDERFLOW` foram adicionados ao status
+comum; os quatro helpers `_status` já os retornam e preservam a saída em falha.
+Subnormais representáveis têm sucesso; underflow para zero é diagnóstico.
+Formatação numérica segue o mesmo ponto decimal fixo desde a revisão de 29/09:
+`smaug_fmt_i64/f64` publicam texto completo com NUL e retornam seu comprimento,
+sem incluir NUL. Zero indica falha; destino e comprimento de saída dos writers
+não são publicados parcialmente. Buffer curto não é consulta de tamanho nem
+sucesso truncado. Astype/writers propagam falha operacional, sem fabricar
+string vazia ou NA. O modo de arredondamento do caller é preservado; o
+roundtrip de f64 com 17 dígitos foi verificado sob FE_TONEAREST. Outros modos
+continuam seguindo a libc, sem promessa adicional de roundtrip exato.
+Limites de recurso e migração restante dos consumidores CSV/JSON seguem em R1/R3.
+
 **Exceção — `astype("bool")` a partir de numérico é estrito:** aceita só `0`/`1`;
 qualquer outro valor lança erro que orienta para `:map(fn)`. A regra de truthiness
 não é imposta silenciosamente — quem quer defini-la usa `map`.
@@ -212,9 +247,9 @@ imediato — não existe estado intermediário desalinhado.
 
 ---
 
-<a id="section-contrato-5-boolseries-e-coluna-de-primeira-classe"></a>
+<a id="section-contrato-5-series-bool-e-coluna-de-primeira-classe"></a>
 
-### Contrato 5 — `BoolSeries` é coluna de primeira classe
+### Contrato 5 — `Series<bool>` é coluna de primeira classe
 
 ```lua
 local smaug = require("smaug")
@@ -358,6 +393,16 @@ Estado por formato:
 | **JSON** | → `null` **+ warn** | RFC 8259 não tem `Infinity`/`NaN` na gramática de `number` |
 | **Parquet** *(futuro)* | preserva | IEEE 754 nativo + null separado |
 | **`.smg`** *(futuro)* | preserva | binário nosso |
+
+**JSON — decisões aprovadas em 2026-09-25/26, implementação pendente:**
+associar campos por nome, unir o conjunto de campos e ordenar colunas pela
+primeira aparição. Campo ausente e null explícito viram NA, inclusive em linhas
+anteriores; strings "", "null" e "NA" permanecem texto. Desambiguar nomes
+repetidos com .1, .2 etc. até obter nome livre, sem reordenar ou perder valores.
+Repetição entre objetos identifica a mesma coluna; repetição dentro do objeto
+exige colunas distintas e associação estável entre registros. Validar sintaxe
+e consumo completo do documento, com posição/motivo e sem resultado parcial.
+O perfil continua array de objetos com células escalares. Execução em [R3](Roadmap.md#r3).
 
 Vocabulário do CSV, deliberado:
 
@@ -551,8 +596,10 @@ typedef enum {
     SMG_NULL_VALUE,    /* leitura: elemento é NULL (não é erro)   */
     SMG_ERR_OOB,       /* índice fora dos limites                 */
     SMG_ERR_ARGUMENT,  /* ponteiro nulo / argumento inconsistente */
-    SMG_ERR_NOMEM,     /* falha de alocação (COW detach)          */
-    SMG_ERR_OVERFLOW   /* resultado não cabe no intervalo do tipo */
+    SMG_ERR_NOMEM,     /* falha de alocação                       */
+    SMG_ERR_OVERFLOW,  /* resultado não cabe no intervalo do tipo */
+    SMG_ERR_SYNTAX,    /* texto fora da gramática                 */
+    SMG_ERR_UNDERFLOW  /* não zero arredondaria para zero         */
 } smaug_status_t;
 ```
 
@@ -864,4 +911,4 @@ Ver `docs/COW.md` para a especificação completa.
 
 ---
 
-[Referência do Núcleo C](API_Reference.md) · [Rework da suíte](TEST_SUITE_REWORK.md) · [Início da documentação](README.md)
+[Referência do Núcleo C](API_Reference.md) · [Rework da suíte](Roadmap.md#checkpoint) · [Início da documentação](README.md)

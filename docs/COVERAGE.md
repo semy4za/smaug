@@ -3,17 +3,17 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `ad6a380`  |  Data: 2026-09-26 13:39:33 -0300
+- Commit medido: `320b4bc`  |  Data: 2026-09-26 14:39:57 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `4612/5041 = 91.49%` -- 135 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- **Branch-bruto** (todos os ramos): `4757/5229 = 90.97%` -- 135 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 <a id="coverage-total"></a>
 
 | Arquivo | Linhas | Branch-alvo (taken) |
 | :--- | :--- | :--- |
-| `smaug_astype.c` | `153/153 = 100.00%` `[██████████]` | `140/140 = 100.00%` `[██████████]` |
-| `smaug_convert.c` | `37/37 = 100.00%` `[██████████]` | `37/37 = 100.00%` `[██████████]` |
+| `smaug_astype.c` | `157/161 = 97.52%` `[█████████░]` | `142/144 = 98.61%` `[█████████░]` |
+| `smaug_convert.c` | `144/156 = 92.31%` `[█████████░]` | `180/221 = 81.45%` `[████████░░]` |
 | `smaug_core.c` | `426/426 = 100.00%` `[██████████]` | `343/350 = 98.00%` `[█████████░]` |
 | `smaug_csv.c` | `299/307 = 97.39%` `[█████████░]` | `336/374 = 89.84%` `[█████████░]` |
 | `smaug_datetime.c` | `585/594 = 98.48%` `[█████████░]` | `753/820 = 91.83%` `[█████████░]` |
@@ -24,11 +24,40 @@
 | `smaug_ops_str.c` | `278/285 = 97.54%` `[█████████░]` | `318/342 = 92.98%` `[█████████░]` |
 | `smaug_ops_window.c` | `335/342 = 97.95%` `[█████████░]` | `355/397 = 89.42%` `[████████░░]` |
 | `smaug_str.c` | `297/297 = 100.00%` `[██████████]` | `254/254 = 100.00%` `[██████████]` |
-| **TOTAL** | `4209/4267 = 98.64%` `[█████████░]` | `4612/4906 = 94.01%` `[█████████░]` |
+| **TOTAL** | `4320/4394 = 98.32%` `[█████████░]` | `4757/5094 = 93.38%` `[█████████░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
 Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
+
+**`smaug_astype.c`** — 2 linha(s) com ramo descoberto:
+- `smaug_astype.c:273` — } else if (parse_status == SMG_ERR_NOMEM) {
+- `smaug_astype.c:297` — } else if (parse_status == SMG_ERR_NOMEM) {
+
+**`smaug_convert.c`** — 23 linha(s) com ramo descoberto:
+- `smaug_convert.c:34` — if (c >= (unsigned char)'a' && c <= (unsigned char)'f') return (int)(c - (unsigned char)'a') + 10;
+- `smaug_convert.c:67` — (text[position + 1] == 'x' || text[position + 1] == 'X'));
+- `smaug_convert.c:73` — if (hex_digit((unsigned char)text[position]) != 0) nonzero = 1;
+- `smaug_convert.c:76` — if (position < length && text[position] == '.') {
+- `smaug_convert.c:78` — while (position < length && hex_digit((unsigned char)text[position]) >= 0) {
+- `smaug_convert.c:79` — if (hex_digit((unsigned char)text[position]) != 0) nonzero = 1;
+- `smaug_convert.c:83` — if (mantissa_digits == 0) return SMG_ERR_SYNTAX;
+- `smaug_convert.c:84` — if (position < length && (text[position] == 'p' || text[position] == 'P')) {
+- `smaug_convert.c:86` — if (position < length && (text[position] == '+' || text[position] == '-')) position++;
+- `smaug_convert.c:88` — while (position < length && is_dec_digit((unsigned char)text[position])) {
+- `smaug_convert.c:91` — if (exponent_digits == 0) return SMG_ERR_SYNTAX;
+- `smaug_convert.c:106` — if (position < length && (text[position] == 'e' || text[position] == 'E')) {
+- `smaug_convert.c:108` — if (position < length && (text[position] == '+' || text[position] == '-')) position++;
+- `smaug_convert.c:110` — while (position < length && is_dec_digit((unsigned char)text[position])) {
+- `smaug_convert.c:127` — if (!text || !output) return SMG_ERR_ARGUMENT;
+- `smaug_convert.c:133` — (text[position + 1] == 'x' || text[position + 1] == 'X')) {
+- `smaug_convert.c:168` — if (!locale) return SMG_ERR_NOMEM;
+- `smaug_convert.c:185` — if (status != SMG_OK) return status;
+- `smaug_convert.c:186` — if (!parse_end || (size_t)(parse_end - text) != length) return SMG_ERR_SYNTAX;
+- `smaug_convert.c:189` — if (parse_errno == ERANGE && !special && parsed_value == 0.0 && lexical_nonzero)
+- `smaug_convert.c:210` — if (length < 256) {
+- `smaug_convert.c:215` — if (length == SIZE_MAX) return SMG_ERR_NOMEM;
+- `smaug_convert.c:217` — if (!buffer) return SMG_ERR_NOMEM;
 
 **`smaug_core.c`** — 7 linha(s) com ramo descoberto:
 - `smaug_core.c:37` — if (a == 0 || b == 0) {
@@ -307,10 +336,10 @@ Fora da meta por justificativa tecnica (assert reservado a invariantes internas;
 - `smaug_astype.c:231` — OOM sem injecao
 - `smaug_astype.c:243` — OOM no append
 - `smaug_astype.c:263` — OOM sem injecao
-- `smaug_astype.c:283` — OOM sem injecao
-- `smaug_convert.c:75` — bufsize < 5 nunca ocorre (callers usam >= 32)
-- `smaug_convert.c:75` — bufsize < 5 nunca ocorre (callers usam >= 32)
-- `smaug_convert.c:75` — bufsize < 5 nunca ocorre (callers usam >= 32)
+- `smaug_astype.c:287` — OOM sem injecao
+- `smaug_convert.c:261` — bufsize < 5 nunca ocorre (callers usam >= 32)
+- `smaug_convert.c:261` — bufsize < 5 nunca ocorre (callers usam >= 32)
+- `smaug_convert.c:261` — bufsize < 5 nunca ocorre (callers usam >= 32)
 - `smaug_core.c:63` — overflow ao dobrar capacity; so com capacity ~ SIZE_MAX
 - `smaug_core.c:80` — realloc de shrink falhando; defensivo, mantem buffer maior (seguro)
 - `smaug_core.c:91` — overflow ao dobrar capacity; so com capacity ~ SIZE_MAX

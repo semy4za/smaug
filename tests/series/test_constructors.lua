@@ -29,6 +29,23 @@ local function check_error(callback, message)
     check(not succeeded, message .. " (deveria lançar erro)")
 end
 
+-- Conversao numerica exige todos os bytes; falha por elemento continua NA.
+do
+    local source_values = {"123\0abc", "1.5\0abc", "123\0", "\0", "123", smaug.NA}
+    local source_series = smaug.Series(source_values, "string")
+    for dtype_index, dtype in ipairs({"int64", "float64"}) do
+        local result_series = source_series:astype(dtype)
+        check(result_series:len() == 6, "astype numerico preserva tamanho")
+        for row_index = 1, 4 do
+            check(result_series:is_null(row_index), "NUL no texto numerico vira NA")
+            check(source_series:get(row_index) == source_values[row_index]
+                and not source_series:is_null(row_index), "astype preserva bytes e mascara da fonte")
+        end
+        check(result_series:get(5) == 123 and result_series:is_null(6), "numero e NA original preservados")
+        check(source_series:get(5) == "123" and source_series:is_null(6), "fonte permanece intacta")
+    end
+end
+
 -- =====================================================================
 -- 1. Factories e Acesso Básico
 -- =====================================================================

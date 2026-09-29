@@ -139,8 +139,8 @@ bool smaug_bool_all(const uint8_t *a, const smaug_mask_t *am, size_t n) {
    Estas recebem/retornam smaug_series_bool_t, seguindo o padrão dos demais
    dtypes. A lógica Kleene reusa as funções raw acima (não reimplementa a
    tabela-verdade): extrai (data, null_mask) da struct, chama a raw, e embrulha
-   o resultado numa nova struct. As raw permanecem como API até a BoolSeries
-   ser aposentada (ver Roadmap, dívida de contrato do bool).
+   o resultado numa nova struct. As raw permanecem como API legada enquanto a
+   superfície pública do bool é consolidada (ver Roadmap, dívida de contrato).
    =================================================================== */
 
 #include "../include/smaug_core.h"     /* smaug_bool_create/free */

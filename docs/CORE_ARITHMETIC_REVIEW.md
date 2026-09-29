@@ -85,3 +85,13 @@ não são certificadas por essa verificação escalar.
 O próximo endurecimento deve manter esse padrão: especificação independente,
 valor exato/status/estado verificados e evidência de que o teste percebe a
 quebra da propriedade, sem transferir políticas de anéis externos ao núcleo.
+
+## Reexecução — 2026-09-27
+
+Reexecutado `python3 scripts/audit_checked_arithmetic.py` no Linux, GCC 16.2.1,
+com o mesmo hash do core: 30.712 chamadas aprovadas e cinco mutações detectadas.
+Conferidos o script, os quatro helpers e as responsabilidades da arquitetura.
+Mantidos os limites da conclusão anterior; nenhuma alteração nesses helpers.
+O suporte intencional a saída NULL desses helpers não se estende aos parsers
+numéricos: rejeitá-la com retorno 0 é uma proposta local ainda em avaliação.
+O checkpoint e a decisão pendente estão em [R1](Roadmap.md#r1).

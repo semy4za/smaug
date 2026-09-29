@@ -1,5 +1,11 @@
+#ifndef _WIN32
+#define _GNU_SOURCE
+#endif
 #include "../include/smaug.h"
 #include <assert.h>
+#include <float.h>
+#include <fenv.h>
+#include <locale.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -185,22 +191,22 @@ static smaug_series_str_t *make_string(const char *const *values, size_t element
 
 /* ---------- Grupo B-in: string -> num/dt (parsing rigido) ---------- */
 static void test_inbound_conversions(void) {
-    /* str -> i64: rigido (strtoll base 10). */
+    /* str -> i64: gramática decimal/hexadecimal explícita. */
     const char *text_values[] = {"42","  42","42 ","0x1A","3.7","9007199254740993","abc",NULL};
     smaug_series_str_t *source_series = make_string(text_values, 8);
     smaug_series_i64_t *row_index = smaug_str_to_i64(source_series);
     OK(row_index != NULL, "str->i64 retorna serie");
     OK(smaug_i64_get(row_index, 0, NULL) == 42, "str->i64 '42' -> 42");
-    OK(smaug_i64_get(row_index, 1, NULL) == 42, "str->i64 '  42' leading ws ok");
+    OK(smaug_i64_is_null(row_index, 1), "str->i64 leading ws -> null");
     OK(smaug_i64_is_null(row_index, 2), "str->i64 '42 ' trailing ws -> null");
-    OK(smaug_i64_is_null(row_index, 3), "str->i64 '0x1A' hex -> null");
+    OK(smaug_i64_get(row_index, 3, NULL) == 26, "str->i64 '0x1A' hex -> 26");
     OK(smaug_i64_is_null(row_index, 4), "str->i64 '3.7' float -> null");
     OK(smaug_i64_get(row_index, 5, NULL) == TWO53_PLUS_1,
        "str->i64 2^53+1 EXATO (conserta o tonumber->double)");
     OK(smaug_i64_is_null(row_index, 6), "str->i64 'abc' -> null");
     OK(smaug_i64_is_null(row_index, 7), "str->i64 origem nula -> null");
 
-    /* str -> f64: strtod (aceita hex/inf; rejeita overflow/trailing). */
+    /* str -> f64: gramática explícita (hex/inf; rejeita overflow/trailing). */
     const char *text_values_2[] = {"3.14","0x1A","1e3","inf","1e400","3.14 ","abc",NULL};
     smaug_series_str_t *source_series_2 = make_string(text_values_2, 8);
     smaug_series_f64_t *source_series_3 = smaug_str_to_f64(source_series_2);
@@ -239,15 +245,16 @@ static void test_inbound_conversions(void) {
 
 /* ---------- fonte unica de parsing (smaug_convert) — teste direto ----------
    Cobre os ramos que o astype nunca alcanca: ptr NULL (defensivo), len==0
-   (string vazia), len>=64 (nao-numero), e overflow (errno). */
+   (string vazia), token longo sem truncamento e overflow. */
 static void test_convert_direto(void) {
     int64_t integer_value; double double_value;
     /* i64 — sucesso e cada ramo de rejeicao */
     OK(smaug_parse_i64("42", 2, &integer_value) == 1 && integer_value == 42, "parse_i64 '42' ok");
     OK(smaug_parse_i64(NULL, 2, &integer_value) == 0, "parse_i64 ptr NULL -> 0");
     OK(smaug_parse_i64("", 0, &integer_value) == 0,   "parse_i64 len 0 -> 0");
-    { char source_values[80]; memset(source_values, '9', 79); source_values[79] = '\0';
-      OK(smaug_parse_i64(source_values, 79, &integer_value) == 0, "parse_i64 len>=64 -> 0"); }
+    { char source_values[80]; memset(source_values, '0', 79); source_values[78] = '1'; source_values[79] = '\0';
+      OK(smaug_parse_i64(source_values, 79, &integer_value) == 1 && integer_value == 1,
+         "parse_i64 token longo sem truncar"); }
     OK(smaug_parse_i64("99999999999999999999", 20, &integer_value) == 0,
        "parse_i64 overflow (errno) -> 0");
     OK(smaug_parse_i64("42 ", 3, &integer_value) == 0, "parse_i64 trailing -> 0");
@@ -256,8 +263,9 @@ static void test_convert_direto(void) {
     OK(smaug_parse_f64("3.14", 4, &double_value) == 1 && double_value == 3.14, "parse_f64 '3.14' ok");
     OK(smaug_parse_f64(NULL, 4, &double_value) == 0, "parse_f64 ptr NULL -> 0");
     OK(smaug_parse_f64("", 0, &double_value) == 0,   "parse_f64 len 0 -> 0");
-    { char source_values[80]; memset(source_values, '9', 79); source_values[79] = '\0';
-      OK(smaug_parse_f64(source_values, 79, &double_value) == 0, "parse_f64 len>=64 -> 0"); }
+    { char source_values[80]; memset(source_values, '0', 79); source_values[78] = '1'; source_values[79] = '\0';
+      OK(smaug_parse_f64(source_values, 79, &double_value) == 1 && double_value == 1.0,
+         "parse_f64 token longo sem truncar"); }
     OK(smaug_parse_f64("1e400", 5, &double_value) == 0, "parse_f64 overflow (errno) -> 0");
     OK(smaug_parse_f64("3.14 ", 5, &double_value) == 0, "parse_f64 trailing -> 0");
 
@@ -270,6 +278,197 @@ static void test_convert_direto(void) {
     OK(smaug_parse_f64_cstr(NULL, &double_value) == 0, "parse_f64_cstr NULL -> 0");
     OK(smaug_parse_f64_cstr("", &double_value) == 0,   "parse_f64_cstr vazio -> 0");
     OK(smaug_parse_f64_cstr("1x", &double_value) == 0, "parse_f64_cstr trailing -> 0");
+}
+
+/* Diagnósticos do core: o valor anterior nunca é sobrescrito em falha. */
+static void test_convert_diagnosticos(void) {
+    int64_t integer_output = 77;
+    double real_output = 77.0;
+    OK(smaug_parse_i64_status("0x1A", 4, &integer_output) == SMG_OK && integer_output == 26,
+       "status i64 hexadecimal inteiro");
+    integer_output = 77;
+    OK(smaug_parse_i64_status("9223372036854775808", 19, &integer_output) == SMG_ERR_OVERFLOW
+       && integer_output == 77, "status i64 overflow preserva saída");
+    integer_output = 77;
+    OK(smaug_parse_i64_status("1.0", 3, &integer_output) == SMG_ERR_SYNTAX
+       && integer_output == 77, "status i64 fração é sintaxe");
+    OK(smaug_parse_i64_status(NULL, 1, &integer_output) == SMG_ERR_ARGUMENT,
+       "status i64 texto NULL é argumento");
+
+    real_output = 77.0;
+    OK(smaug_parse_f64_status("0x1p-1074", 9, &real_output) == SMG_OK
+       && real_output > 0.0 && real_output < DBL_MIN, "status f64 subnormal representável");
+    real_output = 77.0;
+    OK(smaug_parse_f64_status("1e-400", 6, &real_output) == SMG_ERR_UNDERFLOW
+       && real_output == 77.0, "status f64 underflow preserva saída");
+    real_output = 77.0;
+    OK(smaug_parse_f64_status("0x1p-1075", 9, &real_output) == SMG_ERR_UNDERFLOW
+       && real_output == 77.0, "status f64 underflow hexadecimal");
+    real_output = 77.0;
+    OK(smaug_parse_f64_status("0e-400", 6, &real_output) == SMG_OK
+       && real_output == 0.0, "status f64 zero textual não é underflow");
+    real_output = 77.0;
+    OK(smaug_parse_f64_status("1e400", 5, &real_output) == SMG_ERR_OVERFLOW
+       && real_output == 77.0, "status f64 overflow preserva saída");
+    real_output = 77.0;
+    OK(smaug_parse_f64_status("nan(payload)", 12, &real_output) == SMG_ERR_SYNTAX
+       && real_output == 77.0, "status f64 payload NaN é sintaxe");
+}
+
+/* Casos exatos não dependem da precisão intermediária de double. */
+static void test_integer_syntax_and_hex_boundaries(void) {
+    const struct {
+        const char *text;
+        smaug_status_t status;
+        int64_t expected;
+    } cases[] = {
+        {"0x7fffffffffffffff", SMG_OK, INT64_MAX},
+        {"-0x8000000000000000", SMG_OK, INT64_MIN},
+        {"+0X0007FFFFFFFFFFFFFFF", SMG_OK, INT64_MAX},
+        {"0x8000000000000000", SMG_ERR_OVERFLOW, 77},
+        {"-0x8000000000000001", SMG_ERR_OVERFLOW, 77},
+        {"0xffffffffffffffffffffffff", SMG_ERR_OVERFLOW, 77},
+        {"9223372036854775808x", SMG_ERR_SYNTAX, 77},
+        {"-9223372036854775809 ", SMG_ERR_SYNTAX, 77},
+        {"0xffffffffffffffffffffffffg", SMG_ERR_SYNTAX, 77},
+        {"0x8000000000000000p0", SMG_ERR_SYNTAX, 77},
+        {"0x", SMG_ERR_SYNTAX, 77},
+        {"-0x", SMG_ERR_SYNTAX, 77},
+        {"+", SMG_ERR_SYNTAX, 77}
+    };
+    for (size_t case_index = 0; case_index < sizeof(cases) / sizeof(cases[0]); case_index++) {
+        int64_t output = 77;
+        OK(smaug_parse_i64_cstr_status(cases[case_index].text, &output)
+           == cases[case_index].status && output == cases[case_index].expected,
+           "i64 cstr: sintaxe integral e fronteiras hex exatas");
+        output = 77;
+        OK(smaug_parse_i64_status(cases[case_index].text,
+           strlen(cases[case_index].text), &output) == cases[case_index].status
+           && output == cases[case_index].expected,
+           "i64 slice: sintaxe integral e fronteiras hex exatas");
+    }
+}
+
+static void test_float_grammar(void) {
+    const struct { const char *text; double expected; } valid[] = {
+        {".5", 0.5}, {"1.", 1.0}, {"1.e2", 100.0}, {"0x10", 16.0},
+        {"-0X1A", -26.0}, {"0x.8", 0.5}, {"0x1.p2", 4.0}, {"0x1e2", 482.0}
+    };
+    const char *invalid[] = {
+        ".", "0x", "0x.p1", "1e", "1e+", "0x1p+", "0xp1", "0x1p1.5",
+        "nan(x)", "infinite", "inf0", "1e400x", "0x1p99999x", "1_000", "0b1", "1,5"
+    };
+    for (size_t case_index = 0; case_index < sizeof(valid) / sizeof(valid[0]); case_index++) {
+        double output = 77.0;
+        OK(smaug_parse_f64_cstr_status(valid[case_index].text, &output) == SMG_OK
+           && output == valid[case_index].expected, "gramática f64 válida: cstr e valor exato");
+        output = 77.0;
+        OK(smaug_parse_f64_status(valid[case_index].text,
+           strlen(valid[case_index].text), &output) == SMG_OK
+           && output == valid[case_index].expected, "gramática f64 válida: slice e valor exato");
+    }
+    for (size_t case_index = 0; case_index < sizeof(invalid) / sizeof(invalid[0]); case_index++) {
+        double output = 77.0;
+        OK(smaug_parse_f64_cstr_status(invalid[case_index], &output) == SMG_ERR_SYNTAX
+           && output == 77.0, "gramática f64 inválida: cstr preserva saída");
+        OK(smaug_parse_f64_status(invalid[case_index], strlen(invalid[case_index]), &output)
+           == SMG_ERR_SYNTAX && output == 77.0, "gramática f64 inválida: slice preserva saída");
+    }
+}
+
+static void test_float_rounding_modes(void) {
+    int original_rounding = fegetround();
+    OK(original_rounding != -1, "modo de arredondamento disponível");
+    const int modes[] = {FE_TONEAREST, FE_TOWARDZERO, FE_UPWARD, FE_DOWNWARD};
+    const char *overflow_tokens[] = {"1e400", "-1e400", "0x1p1024", "-0x1p1024"};
+    for (size_t mode_index = 0; mode_index < sizeof(modes) / sizeof(modes[0]); mode_index++) {
+        OK(fesetround(modes[mode_index]) == 0, "seleciona modo de arredondamento");
+        for (size_t token_index = 0;
+             token_index < sizeof(overflow_tokens) / sizeof(overflow_tokens[0]); token_index++) {
+            double output = 77.0;
+            OK(smaug_parse_f64_cstr_status(overflow_tokens[token_index], &output)
+               == SMG_ERR_OVERFLOW && output == 77.0,
+               "overflow dirigido não pode passar como DBL_MAX");
+        }
+        double output = 77.0;
+        OK(smaug_parse_f64_cstr_status("0x1.fffffffffffffp1023", &output) == SMG_OK
+           && output == DBL_MAX, "DBL_MAX exato é válido em todos os modos");
+        OK(smaug_parse_f64_cstr_status("0x1p-1074", &output) == SMG_OK
+           && output == DBL_TRUE_MIN, "menor subnormal exato preservado");
+        OK(smaug_parse_f64_cstr_status("0x1.fffffffffffffp-1023", &output) == SMG_OK
+           && output > 0.0 && output <= DBL_MIN,
+           "fronteira subnormal pode arredondar para DBL_MIN com ERANGE");
+        output = 77.0;
+        smaug_status_t status = smaug_parse_f64_cstr_status("1e-400", &output);
+        if (modes[mode_index] == FE_UPWARD) {
+            OK(status == SMG_OK && output == DBL_TRUE_MIN,
+               "arredondamento para subnormal preserva magnitude");
+        } else {
+            OK(status == SMG_ERR_UNDERFLOW && output == 77.0,
+               "arredondamento para zero tem diagnóstico e preserva saída");
+        }
+        OK(smaug_parse_f64_cstr_status("-0e-9999", &output) == SMG_OK
+           && output == 0.0 && signbit(output), "zero textual negativo preservado");
+        OK(fegetround() == modes[mode_index], "parser preserva modo do caller");
+    }
+    OK(fesetround(original_rounding) == 0, "restaura modo de arredondamento");
+}
+
+/* O comprimento inclui conteudo, nunca um terminador implicito. */
+static void test_numeric_slice_contract(void) {
+    const struct { const char *text; size_t length; } invalid_slices[] = {
+        {"\0" "123", 4}, {"123\0abc", 7}, {"123\0", 4},
+        {NULL, 3}, {"", 0}, {"42 ", 3}, {"+", 1}, {" ", 1},
+        {"1e", 2}, {"1e400", 5}
+    };
+    for (size_t case_index = 0; case_index < sizeof(invalid_slices) / sizeof(invalid_slices[0]); case_index++) {
+        int64_t integer_output = 77;
+        double real_output = 77;
+        OK(!smaug_parse_i64(invalid_slices[case_index].text, invalid_slices[case_index].length, &integer_output)
+           && integer_output == 77, "slice i64 invalido preserva saida");
+        OK(!smaug_parse_f64(invalid_slices[case_index].text, invalid_slices[case_index].length, &real_output)
+           && real_output == 77, "slice f64 invalido preserva saida");
+    }
+    char unterminated[] = {'1', '2', '3'};
+    int64_t integer_output = 77;
+    double real_output = 77;
+    OK(smaug_parse_i64(unterminated, sizeof(unterminated), &integer_output) && integer_output == 123,
+       "slice i64 sem terminador");
+    OK(smaug_parse_f64(unterminated, sizeof(unterminated), &real_output) && real_output == 123,
+       "slice f64 sem terminador");
+    OK(smaug_parse_i64("123\0abc", 3, &integer_output) && integer_output == 123,
+       "NUL externo nao pertence ao slice i64");
+    OK(smaug_parse_f64("123\0abc", 3, &real_output) && real_output == 123,
+       "NUL externo nao pertence ao slice f64");
+    for (size_t length = 63; length <= 65; length++) {
+        char leading_zeroes[66];
+        memset(leading_zeroes, '0', length);
+        leading_zeroes[length - 1] = '1';
+        leading_zeroes[length] = '\0';
+        integer_output = 77; real_output = 77;
+        OK(smaug_parse_i64(leading_zeroes, length, &integer_output) && integer_output == 1,
+           "slice i64 aceita token longo sem truncar");
+        OK(smaug_parse_f64(leading_zeroes, length, &real_output) && real_output == 1,
+           "slice f64 aceita token longo sem truncar");
+        OK(smaug_parse_i64_cstr(leading_zeroes, &integer_output) && integer_output == 1,
+           "cstr i64 preserva tokens longos");
+        OK(smaug_parse_f64_cstr(leading_zeroes, &real_output) && real_output == 1,
+           "cstr f64 preserva tokens longos");
+    }
+    const struct { const char *text; int valid; int64_t expected; } boundaries[] = {
+        {"9223372036854775807", 1, INT64_MAX}, {"-9223372036854775808", 1, INT64_MIN},
+        {"9223372036854775808", 0, 77}, {"-9223372036854775809", 0, 77}
+    };
+    for (size_t case_index = 0; case_index < sizeof(boundaries) / sizeof(boundaries[0]); case_index++) {
+        integer_output = 77;
+        OK(smaug_parse_i64(boundaries[case_index].text, strlen(boundaries[case_index].text), &integer_output)
+           == boundaries[case_index].valid && integer_output == boundaries[case_index].expected,
+           "fronteira i64 exata com saida preservada em falha");
+    }
+    OK(!smaug_parse_i64("1", 1, NULL), "slice i64 rejeita saida NULL");
+    OK(!smaug_parse_f64("1", 1, NULL), "slice f64 rejeita saida NULL");
+    OK(!smaug_parse_i64_cstr("1", NULL), "cstr i64 rejeita saida NULL");
+    OK(!smaug_parse_f64_cstr("1", NULL), "cstr f64 rejeita saida NULL");
 }
 
 /* ---------- fonte única de formatação (smaug_fmt) — teste direto ----------
@@ -464,11 +663,104 @@ static void test_numeric_datetime(void) {
     }
 }
 
+static void check_format_roundtrip(void) {
+    const double values[] = {0.0, -0.0, 1.5, 0.1, DBL_MAX, -DBL_MAX, DBL_MIN,
+                             DBL_TRUE_MIN, -DBL_TRUE_MIN, 0x1.fffffffffffffp-1};
+    char buffer[32];
+    OK(smaug_fmt_f64(buffer, sizeof(buffer), 1.5) == 3 && strcmp(buffer, "1.5") == 0,
+       "formatter usa ponto independentemente do locale");
+    for (size_t value_index = 0; value_index < sizeof(values) / sizeof(values[0]); value_index++) {
+        size_t length = smaug_fmt_f64(buffer, sizeof(buffer), values[value_index]);
+        OK(length > 0 && length == strlen(buffer), "formatter publica comprimento real");
+        double parsed = 77.0;
+        OK(smaug_parse_f64_status(buffer, length, &parsed) == SMG_OK
+           && parsed == values[value_index]
+           && !!signbit(parsed) == !!signbit(values[value_index]),
+           "formatter roundtrip exato incluindo subnormal e zero negativo");
+    }
+    OK(smaug_fmt_i64(buffer, sizeof(buffer), INT64_MIN) == 20
+       && strcmp(buffer, "-9223372036854775808") == 0, "formatter INT64_MIN exato");
+    OK(smaug_fmt_i64(buffer, sizeof(buffer), INT64_MAX) == 19
+       && strcmp(buffer, "9223372036854775807") == 0, "formatter INT64_MAX exato");
+}
+
+static void test_format_capacity_and_locale(void) {
+    const double values[] = {1.5, -0.0, DBL_MAX, NAN, INFINITY, -INFINITY};
+    char expected[32];
+    char output[32];
+    char sentinel[32];
+    memset(sentinel, '#', sizeof(sentinel));
+    for (size_t value_index = 0; value_index < sizeof(values) / sizeof(values[0]); value_index++) {
+        size_t length = smaug_fmt_f64(expected, sizeof(expected), values[value_index]);
+        OK(length > 0, "formatter baseline");
+        for (size_t capacity = 0; capacity <= length; capacity++) {
+            memcpy(output, sentinel, sizeof(output));
+            OK(smaug_fmt_f64(output, capacity, values[value_index]) == 0
+               && memcmp(output, sentinel, sizeof(output)) == 0,
+               "formatter buffer curto preserva todos os bytes");
+        }
+        memcpy(output, sentinel, sizeof(output));
+        OK(smaug_fmt_f64(output, length + 1, values[value_index]) == length
+           && memcmp(output, expected, length + 1) == 0 && output[length + 1] == '#',
+           "formatter capacidade exata inclui NUL sem ultrapassar");
+    }
+    for (size_t capacity = 0; capacity <= 20; capacity++) {
+        memcpy(output, sentinel, sizeof(output));
+        OK(smaug_fmt_i64(output, capacity, INT64_MIN) == 0
+           && memcmp(output, sentinel, sizeof(output)) == 0,
+           "formatter i64 curto não anuncia sucesso truncado");
+    }
+    OK(smaug_fmt_i64(NULL, 32, 1) == 0 && smaug_fmt_f64(NULL, 32, 1.5) == 0,
+       "formatter rejeita destino NULL");
+    int original_rounding = fegetround();
+    OK(original_rounding != -1 && fesetround(FE_TONEAREST) == 0, "roundtrip em nearest");
+    const char *current_locale = setlocale(LC_NUMERIC, NULL);
+    char saved_locale[256];
+    OK(current_locale != NULL && strlen(current_locale) < sizeof(saved_locale),
+       "salva locale numérico original");
+    strcpy(saved_locale, current_locale);
+    OK(setlocale(LC_NUMERIC, "C") != NULL, "seleciona locale C");
+    check_format_roundtrip();
+    const char *comma_locale = setlocale(LC_NUMERIC, "pt_BR.utf8");
+#ifdef _WIN32
+    if (!comma_locale) {
+        comma_locale = setlocale(LC_NUMERIC, "Portuguese_Brazil.1252");
+    }
+#endif
+    if (comma_locale) {
+        check_format_roundtrip();
+        OK(strcmp(localeconv()->decimal_point, ",") == 0,
+           "formatter restaura locale global do caller");
+#ifndef _WIN32
+        locale_t thread_locale = newlocale(LC_NUMERIC_MASK, "pt_BR.utf8", (locale_t)0);
+        OK(thread_locale != (locale_t)0, "cria locale de thread");
+        OK(setlocale(LC_NUMERIC, "C") != NULL, "global C distinto da thread");
+        locale_t previous_locale = uselocale(thread_locale);
+        OK(previous_locale != (locale_t)0, "instala locale de thread");
+        check_format_roundtrip();
+        OK(uselocale((locale_t)0) == thread_locale,
+           "formatter restaura objeto locale da thread");
+        OK(uselocale(previous_locale) != (locale_t)0, "restaura thread do teste");
+        freelocale(thread_locale);
+#endif
+    } else {
+        fprintf(stderr, "SKIP: locale decimal com vírgula indisponível\n");
+    }
+    OK(setlocale(LC_NUMERIC, saved_locale) != NULL, "restaura locale original");
+    OK(fesetround(original_rounding) == 0, "restaura arredondamento original");
+}
+
 int main(void) {
     test_numeric_datetime();
     test_strict_datetime();
+    test_numeric_slice_contract();
     test_convert_direto();
+    test_convert_diagnosticos();
+    test_integer_syntax_and_hex_boundaries();
+    test_float_rounding_modes();
+    test_float_grammar();
     test_fmt_direto();
+    test_format_capacity_and_locale();
     test_basic_conversions();
     test_exatidao_2e53();
     test_float64_int64_edge();

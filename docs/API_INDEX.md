@@ -36,11 +36,15 @@ O [guia do usuário](USER_GUIDE.md) explica os conceitos por assunto.
 ### `Series`
 
 **Factories:** `Series.new(dtype, size, name)`, `Series.from_table(arr, dtype, name)`,
-`Series.full(n, val)`. `Series.NA` (sentinela de nulo em tabelas).
+`Series.full(n, val, dtype, name)`. `Series.NA` (sentinela de nulo em tabelas).
 
 > **NaN ≠ null:** `nil`/`Series.NA` → null (ausente, bitmask). `NaN` → valor
 > presente indefinido, NÃO null. `ignore_na` pula null, não NaN.
-> `sort`/`argsort` recusam NaN e null. Comparação com NaN → false (máscara válida).
+> `sort`/`argsort` recusam NaN e null. Comparações ordenadas e `eq` com NaN
+> produzem false; `ne` produz true (máscara válida).
+> Nas reduções centrais (`sum`, `mean`, `min`, `max`, `var`, `std`), um NaN
+> produzido pelo backend chega como `nil` no wrapper Lua; `corr`/`cov` ainda
+> preservam NaN como resultado indefinido.
 
 | Método | O que faz |
 |--------|-----------|
@@ -51,12 +55,12 @@ O [guia do usuário](USER_GUIDE.md) explica os conceitos por assunto.
 | `:append(v)` | adiciona ao fim (chainable) |
 | `:len()` / `:size()` | tamanho |
 | `:dtype()` | string do dtype (par singular de `DataSet:dtypes`) |
-| `:sum([ignore_na])` | soma; ignore_na=true por padrão |
+| `:sum([ignore_na], [min_count])` | soma; ignore_na=true por padrão; `min_count` exige um mínimo de valores |
 | `:mean([ignore_na])` | média |
 | `:min([ignore_na])` | mínimo (ordenáveis: f64/i64 → número, datetime → epoch, string → lexicográfico, bool → false<true) |
 | `:max([ignore_na])` | máximo (mesmos dtypes; valor do maior elemento) |
-| `:var([ignore_na])` | variância amostral (÷ N-1; <2 → NaN) |
-| `:std([ignore_na])` | desvio padrão amostral (÷ N-1; <2 → NaN) |
+| `:var([ignore_na])` | variância amostral (÷ N-1); na fronteira Lua, <2 valores válidos → `nil` |
+| `:std([ignore_na])` | desvio padrão amostral (÷ N-1); na fronteira Lua, <2 valores válidos → `nil` |
 | `:count_nonnull()` | nº de não-nulos |
 | `:clone()` | cópia independente |
 | `:sort(asc)` / `:argsort(asc)` | ordenar / permutação |
@@ -107,10 +111,10 @@ O [guia do usuário](USER_GUIDE.md) explica os conceitos por assunto.
 
 | Método | O que faz |
 |--------|-----------|
-| `:median([ignore_na])` | mediana; suporta f64, i64 e datetime (retorna epoch_ms) |
-| `:quantile(q, [ignore_na])` | percentil q ∈ [0, 1] (interpolação linear); suporta f64, i64 e datetime |
+| `:median([ignore_na])` | mediana; suporta f64, i64 e datetime (retorna epoch_ms); sem dados válidos → `nil` |
+| `:quantile(q, [ignore_na])` | percentil q ∈ [0, 1] (interpolação linear); suporta f64, i64 e datetime; sem dados válidos → `nil` |
 | `:mode()` | valor mais frequente; primeira aparição em empates |
-| `:prod([ignore_na])` | produto |
+| `:prod([ignore_na], [min_count])` | produto; `min_count` exige um mínimo de valores |
 | `:rank([method])` | rank (`average`/`min`/`max`/`first`); default `average`. Ordenáveis: f64, i64, datetime (cronológico), string (lexicográfico), bool |
 | `:pct_rank()` | rank percentual (0..1); mesmos dtypes de `rank` |
 | `:skew()` / `:kurtosis()` | assimetria / curtose (Fisher; bias-corrected) |
@@ -233,7 +237,7 @@ mistura com não-numérico (bool/string/datetime) é erro. `/` é **divisão ver
 | `.str:count(sub)` | nº de ocorrências literais não-sobrepostas (sub vazio → erro) → `Series<int64>` |
 | `.str:isalnum()` / `:isalpha()` / `:isdigit()` / `:isspace()` | predicados ASCII; vazia → false → `Series<bool>` |
 | `.str:islower()` / `:isupper()` | há letra e nenhuma da caixa oposta → `Series<bool>` |
-| `.str:removeprefix(p)` / `:removesuffix(s)` | remove afixo literal uma vez (idempotente) |
+| `.str:removeprefix(p)` / `:removesuffix(s)` | remove uma ocorrência do afixo literal por chamada; chamadas repetidas podem remover outras ocorrências |
 | `.str:capitalize()` | 1ª letra maiúscula, resto minúsculo |
 | `.str:title()` | inicial de cada palavra maiúscula (palavra = letras ASCII) |
 | `.str:swapcase()` | inverte a caixa de cada letra ASCII |
@@ -259,13 +263,13 @@ Disponível quando `s._dtype == "datetime"`. Erro claro em qualquer outro dtype.
 | `.dt:weekday()` | 0=seg … 6=dom |
 | `.dt:yearday()` | 1–366 |
 | `.dt:quarter()` | 1–4 |
-| `.dt:week()` | 1–53 (ISO 8601) |
+| `.dt:week()` | 1–53 (ISO 8601); a semana de `2023-01-01` ainda retorna 53 e está em R5 |
 
 **Formatação e transformação:**
 
 | Método | O que faz |
 |--------|-----------|
-| `.dt:format()` | → `Series<string>` ISO 8601 `"YYYY-MM-DDTHH:MM:SS.mmmZ"` |
+| `.dt:format()` | → `Series<string>` ISO 8601 `"YYYY-MM-DDTHH:MM:SS.mmmZ"`; falhas e anos negativos ainda estão em R5 |
 | `.dt:truncate(unit)` | trunca para início do período: `'s'`/`'m'`/`'h'`/`'D'`/`'W'`/`'M'`/`'Q'`/`'Y'` |
 | `.dt:diff([periods])` | diferença em ms entre elemento i e i-periods (default 1) |
 | `.dt:add_ms(delta)` / `:add_days(n)` / `:add_hours(n)` / `:add_minutes(n)` / `:add_seconds(n)` | aritmética temporal → novo `Series<datetime>` |
@@ -410,7 +414,7 @@ Suítes afetadas incluem `tests/series/test_dt.lua`, `test_constructors.lua`,
 
 ### `CategoricalSeries`
 
-Dtype Tier 2 implementado em Lua puro (sem C backend). Armazenamento via
+Implementado no frontend Lua, sem backend C próprio. Armazenamento via
 dictionary encoding: `_codes` (int 1-based), `_levels` (lista ordenada),
 `_level_map` (hash inverso). Detectado por `Series.is_categorical(x)`.
 
@@ -515,7 +519,7 @@ mantém seu dtype de resultado). Erro se nenhuma coluna numérica.
 
 | Método | Resultado |
 |---|---|
-| `:sum([min_count])` / `:prod([min_count])` | redução; `min_count` opt-in (default 0 → soma de vazio = 0) |
+| `:sum([min_count])` / `:prod([min_count])` | redução; `min_count` opt-in (default 0 → soma de vazio = 0); na Series, `ignore_na` vem antes de `min_count` |
 | `:mean()` / `:median()` / `:std()` / `:var()` | `std`/`var` **amostrais** (ddof=1; <2 → NA) → float64 |
 | `:min()` / `:max()` | preservam dtype |
 | `:quantile(q)` / `:skew()` / `:kurtosis()` / `:mad()` / `:sem()` | → float64 |
@@ -543,7 +547,7 @@ mantém seu dtype de resultado). Erro se nenhuma coluna numérica.
 | `:groupby(key):mean(col)` | média por grupo |
 | `:groupby(key):min(col)` | mínimo por grupo |
 | `:groupby(key):max(col)` | máximo por grupo |
-| `:groupby(key):count()` | contagem de não-nulos por grupo |
+| `:groupby(key):count()` | implementação conta linhas; contrato de não-nulos ainda em revisão — [R7](Roadmap.md#r7) |
 | `:groupby(key):std(col)` | desvio padrão por grupo |
 | `:groupby(key):var(col)` | variância por grupo |
 | `:groupby(key):median(col)` | mediana por grupo |
@@ -554,10 +558,10 @@ mantém seu dtype de resultado). Erro se nenhuma coluna numérica.
 | `:groupby(key):nunique(col)` | distintos por grupo |
 | `:groupby(key):agg({col = fn \| {fn1, ...}})` | múltiplas agregações de uma vez |
 | `:groupby(key):transform(fn_name, col)` | broadcast do resultado de volta ao tamanho original |
-| `:join(other, on, [how], [suffixes])` | inner/left/right/outer; chave simples ou composta |
+| `:join(other, on, [how], [suffixes])` | inner/left/right/outer; lista de duas strings é interpretada como chave esquerda/direita; contrato composto em [R7](Roadmap.md#r7) |
 | `smaug.concat({ds1, ds2, ...})` | empilha lista de DataSets verticalmente |
 | `:pivot(index, columns, values)` | long → wide |
-| `:pivot_table(index, columns, values, [aggfunc])` | pivot com agregação (default `mean`) |
+| `:pivot_table(index, columns, values, [aggfunc])` | implementação usa default `sum`; documentação anterior prometia `mean`; decisão em [R7](Roadmap.md#r7) |
 | `:melt(id_vars, [value_vars], [var_name], [value_name])` | wide → long |
 | `:stack(col_names)` / `:unstack(index, col, values)` | reshape eixo→linha / linha→eixo |
 | `:explode(col)` | uma linha por elemento da coluna-lista |
@@ -596,25 +600,10 @@ smaug.join(a, b, on, [how], [suffixes])
 ---
 
 <a id="section-proximas-versoes"></a>
+## Evolução
 
-## Próximas versões
-
-Itens documentados em `Roadmap.md`:
-
-- **v1.0 (em finalização):** inventário arquitetural, Bloco G (decisões de fundação),
-  migração de primitivas para o núcleo, reorganização estrutural, hardening global
-  de cobertura, distribuição (LuaRocks), docstrings.
-- **v1.5:** NDJSON (depende de schema), driver de banco (`connect`/`query`/`execute`),
-  SQLite, Excel, Parquet/Arrow (I/O), persistência do contêiner nativo `.smg` (Anel 4),
-  `.str` Tier D (regex, Unicode-aware), `interpolate`, `cross_join`, `query`/`eval`,
-  stable sort.
-- **v2.0:** Models (Anel 5 — schema, validação, CRUD local).
-- **Trilha Analítica (2.x+):** `Matrix` (Anel 6), `Tensor` + broadcasting axis-aware
-  (Anel 7), ML e pipelines (Anel 8).
-
-*ORM relacional, query builder e tradução SQL são **Fronteiras encerradas** (ver
-`Roadmap.md`), não itens de roadmap.*
-
----
-
-[Continuar no guia do usuário](USER_GUIDE.md) · [Consultar a API](API_INDEX.md) · [Início da documentação](README.md)
+Próximas entregas e checkpoints: [roadmap](Roadmap.md).
+Conceitos de longo prazo: [arquitetura](ARCHITECTURE.md#futuro).
+As divergências de count, padrão de pivot_table e interpretação de chaves
+de join permanecem abertas em [R7](Roadmap.md#r7); não inferir suporte composto
+ou contagem de não-nulos apenas das descrições históricas desta referência.

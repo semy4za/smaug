@@ -61,7 +61,8 @@ A superfície documentada inclui CSV e JSON, em arquivo e em memória, com
 funções como `smaug.read_csv` e `smaug.read_json`. Os métodos de DataSet
 incluem `to_csv` e `to_json`.
 Veja [funções de entrada e saída](API_INDEX.md#section-entry-point-init-lua) e
-[parsers e ownership no C](API_Reference.md).
+[parsers e ownership no C](API_Reference.md). Limitações de preservação de
+valores e de sintaxe estão no [review de I/O](IO_REVIEW.md).
 
 <a id="section-indexacao-e-selecao"></a>
 
@@ -177,9 +178,9 @@ coluna inteira de strings como datetime ainda faz parte do rework.
 Consulte a [API datetime existente](API_INDEX.md#section--dt-proxy-de-operacoes-de-calendario-sobre-series-datetime), o
 [perfil e detecção aprovados](CONTRACT.md#section-perfil-datetime-decisoes-aprovadas-em-2026-09-18) e o
 [evolução da API Lua](API_INDEX.md#section-datetime-migracao-lua).
-A nova faixa de anos, formato negativo e diagnóstico `DATE_ON_THE_FENCE`
-são contratos a implementar; não devem ser apresentados como funcionalidades
-já validadas.
+O parser e astype estritos já aceitam a faixa aprovada e o formato negativo.
+Componentes, formatter, detecção automática e diagnóstico `DATE_ON_THE_FENCE`
+ainda têm pendências: [R5](Roadmap.md#r5).
 
 <a id="section-diferencas-de-tempo"></a>
 

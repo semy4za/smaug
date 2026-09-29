@@ -33,7 +33,9 @@ ffi.cdef([[
         SMG_ERR_OOB,
         SMG_ERR_ARGUMENT,
         SMG_ERR_NOMEM,
-        SMG_ERR_OVERFLOW
+        SMG_ERR_OVERFLOW,
+        SMG_ERR_SYNTAX,
+        SMG_ERR_UNDERFLOW
     } smaug_status_t;
 
     /* ===================================================================
@@ -269,7 +271,7 @@ ffi.cdef([[
     /* ===================================================================
        Series Bool — dtype de primeira classe (Fase 2: Anel 1)
        Struct-based, espelha f64/i64. As funções raw abaixo (smaug_bool_and
-       etc.) permanecem para a BoolSeries legada até a Fase 4.
+       etc.) permanecem como superfície raw legada até a decisão de R7/R8.
        =================================================================== */
 
     /* --- Lifecycle --- */
@@ -324,7 +326,7 @@ ffi.cdef([[
     double* smaug_bool_rank (const smaug_series_bool_t *s, int method);
 
     /* ===================================================================
-       Operações Boolean (BoolSeries) — lógica de três valores (Kleene)
+       Operações Boolean raw — lógica de três valores (Kleene)
        =================================================================== */
     uint8_t* smaug_bool_and(const uint8_t *a, const smaug_mask_t *am,
                             const uint8_t *b, const smaug_mask_t *bm,

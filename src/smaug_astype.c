@@ -183,40 +183,70 @@ smaug_series_f64_t *smaug_dt_to_f64(const smaug_series_dt_t *self) {
 
 /* int64 -> string: %lld exato (conserta o > 2^53 do oraculo). */
 smaug_series_str_t *smaug_i64_to_str(const smaug_series_i64_t *self) {
-    if (!self) return NULL;  /* contrato: engine nao confia no caller (testado com NULL em test_astype) */
+    if (!self) {
+        return NULL;
+    }
+    if (self->size > SIZE_MAX / 20) {
+        return NULL;
+    }
     smaug_series_str_t *result_series =
         smaug_str_create_with_capacity(0, self->size ? self->size * 20 : 1);
-    if (!result_series) return NULL;     /* COV-EXCL-BR: OOM sem injecao */
+    if (!result_series) {
+        return NULL;
+    }
     char format_buffer[32];
     for (size_t row_index = 0; row_index < self->size; row_index++) {
         int append_status;
         if (SMAUG_VALID(self->null_mask, row_index)) {
-            size_t formatted_length = smaug_fmt_i64(format_buffer, sizeof(format_buffer), self->data[row_index]);
+            size_t formatted_length = smaug_fmt_i64(
+                format_buffer, sizeof(format_buffer), self->data[row_index]);
+            if (formatted_length == 0) {
+                smaug_str_free(result_series);
+                return NULL;
+            }
             append_status = smaug_str_append(result_series, format_buffer, formatted_length);
         } else {
             append_status = smaug_str_append_null(result_series);
         }
-        if (append_status != 0) { smaug_str_free(result_series); return NULL; }  /* COV-EXCL-BR: OOM no append */
+        if (append_status != 0) {
+            smaug_str_free(result_series);
+            return NULL;
+        }
     }
     return result_series;
 }
 
 /* float64 -> string: %.17g (round-trip exato, formato canonico do projeto). */
 smaug_series_str_t *smaug_f64_to_str(const smaug_series_f64_t *self) {
-    if (!self) return NULL;  /* contrato: engine nao confia no caller (testado com NULL em test_astype) */
+    if (!self) {
+        return NULL;
+    }
+    if (self->size > SIZE_MAX / 24) {
+        return NULL;
+    }
     smaug_series_str_t *result_series =
         smaug_str_create_with_capacity(0, self->size ? self->size * 24 : 1);
-    if (!result_series) return NULL;     /* COV-EXCL-BR: OOM sem injecao */
+    if (!result_series) {
+        return NULL;
+    }
     char format_buffer[32];
     for (size_t row_index = 0; row_index < self->size; row_index++) {
         int append_status;
         if (SMAUG_VALID(self->null_mask, row_index)) {
-            size_t formatted_length = smaug_fmt_f64(format_buffer, sizeof(format_buffer), self->data[row_index]);
+            size_t formatted_length = smaug_fmt_f64(
+                format_buffer, sizeof(format_buffer), self->data[row_index]);
+            if (formatted_length == 0) {
+                smaug_str_free(result_series);
+                return NULL;
+            }
             append_status = smaug_str_append(result_series, format_buffer, formatted_length);
         } else {
             append_status = smaug_str_append_null(result_series);
         }
-        if (append_status != 0) { smaug_str_free(result_series); return NULL; }  /* COV-EXCL-BR: OOM no append */
+        if (append_status != 0) {
+            smaug_str_free(result_series);
+            return NULL;
+        }
     }
     return result_series;
 }
@@ -248,7 +278,7 @@ smaug_series_str_t *smaug_dt_to_str(const smaug_series_dt_t *self) {
 /* ===================================================================
    GRUPO B-in — string -> {int64, float64, datetime}
    Parsing rigido via fonte unica (smaug_convert): rejeita trailing,
-   vazio, overflow; i64 rejeita hex/float, f64 aceita hex/inf/nan.
+   vazio, overflow; i64 e f64 aceitam a gramática explícita do core.
    Numerico inconversivel -> null (Contrato 2); datetime falha com status.
    Diverge de proposito do oraculo
    `tonumber` (permissivo) — falha visivel > acerto adivinhado, e
@@ -256,19 +286,29 @@ smaug_series_str_t *smaug_dt_to_str(const smaug_series_dt_t *self) {
    (create + escrita direta), como o Grupo A.
    =================================================================== */
 
-/* string -> int64: strtoll base 10 (via smaug_parse_i64). */
+/* string -> int64: gramática decimal/hex exata (via smaug_parse_i64_status). */
 smaug_series_i64_t *smaug_str_to_i64(const smaug_series_str_t *self) {
-    if (!self) return NULL;  /* contrato: engine nao confia no caller (testado com NULL em test_astype) */
+    if (!self) {
+        return NULL;
+    }
     smaug_series_i64_t *result_series = smaug_i64_create(self->size);
-    if (!result_series) return NULL;     /* COV-EXCL-BR: OOM sem injecao */
+    if (!result_series) {
+        return NULL;
+    }
     for (size_t row_index = 0; row_index < self->size; row_index++) {
         if (SMAUG_VALID(self->null_mask, row_index)) {
             const char *text = self->buffer + self->offsets[row_index];
-            size_t len    = self->offsets[row_index + 1] - self->offsets[row_index];
+            size_t length = self->offsets[row_index + 1] - self->offsets[row_index];
             int64_t value;
-            if (smaug_parse_i64(text, len, &value)) {
+            smaug_status_t parse_status = smaug_parse_i64_status(text, length, &value);
+            if (parse_status == SMG_OK) {
                 result_series->data[row_index]      = value;
                 result_series->null_mask[row_index] = SMAUG_MASK_VALID;
+            } else if (parse_status != SMG_ERR_SYNTAX &&
+                       parse_status != SMG_ERR_OVERFLOW &&
+                       parse_status != SMG_ERR_UNDERFLOW) {
+                smaug_i64_free(result_series);
+                return NULL;
             }
             /* inconversivel -> permanece null */
         }
@@ -276,19 +316,29 @@ smaug_series_i64_t *smaug_str_to_i64(const smaug_series_str_t *self) {
     return result_series;
 }
 
-/* string -> float64: strtod (via smaug_parse_f64). */
+/* string -> float64: gramática decimal/hex e especiais (via status do core). */
 smaug_series_f64_t *smaug_str_to_f64(const smaug_series_str_t *self) {
-    if (!self) return NULL;  /* contrato: engine nao confia no caller (testado com NULL em test_astype) */
+    if (!self) {
+        return NULL;
+    }
     smaug_series_f64_t *result_series = smaug_f64_create(self->size);
-    if (!result_series) return NULL;     /* COV-EXCL-BR: OOM sem injecao */
+    if (!result_series) {
+        return NULL;
+    }
     for (size_t row_index = 0; row_index < self->size; row_index++) {
         if (SMAUG_VALID(self->null_mask, row_index)) {
             const char *text = self->buffer + self->offsets[row_index];
-            size_t len    = self->offsets[row_index + 1] - self->offsets[row_index];
+            size_t length = self->offsets[row_index + 1] - self->offsets[row_index];
             double value;
-            if (smaug_parse_f64(text, len, &value)) {
+            smaug_status_t parse_status = smaug_parse_f64_status(text, length, &value);
+            if (parse_status == SMG_OK) {
                 result_series->data[row_index]      = value;
                 result_series->null_mask[row_index] = SMAUG_MASK_VALID;
+            } else if (parse_status != SMG_ERR_SYNTAX &&
+                       parse_status != SMG_ERR_OVERFLOW &&
+                       parse_status != SMG_ERR_UNDERFLOW) {
+                smaug_f64_free(result_series);
+                return NULL;
             }
         }
     }

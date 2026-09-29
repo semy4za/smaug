@@ -2,7 +2,7 @@
 #define SMAUG_DATETIME_H
 
 /* ===================================================================
-   smaug_datetime.h — Dtype datetime (Anel 0, Tier 2)
+   smaug_datetime.h — Dtype datetime (Anel 0; backend C consumido pelo Lua)
    -------------------------------------------------------------------
    Armazenamento: epoch em milissegundos UTC (int64). Valores negativos
    representam datas antes de 1970-01-01. Resolução: 1 ms.

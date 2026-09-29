@@ -13,6 +13,7 @@
 #include "../include/smaug_core.h"
 #include "../include/smaug_string.h"
 #include <stdio.h>
+#include <locale.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -212,20 +213,28 @@ static void test_csv_decimal_comma_rejects_dot(void) {
     CHECK(read_csv_memory_result_2->columns[1].str != NULL,     "decimal ,: '12,3,4' e '5,6x' viram string");
     smaug_table_free(read_csv_memory_result_2);
 
-    /* :104 — campo numérico absurdamente longo (>=64 chars) → não-float, vira string */
-    char longnum[80];
-    longnum[0] = '\0';
-    /* monta "1111...,11" com >64 chars, separador decimal ',' */
+    /* Comprimento não redefine a gramática: zeros iniciais mantêm valor exato. */
     char field[80];
-    for (int row_index = 0; row_index < 70; row_index++) field[row_index] = '1';
-    field[70] = ','; field[71] = '5'; field[72] = '\0';
+    memset(field, '0', 70);
+    memcpy(field + 70, "1,5", 4);
     char source_values[160];
     snprintf(source_values, sizeof(source_values), "v\n%s\n", field);
-    smaug_table_t *read_csv_memory_result_3 = smaug_read_csv_mem(source_values, strlen(source_values), &default_options_result);
-    CHECK(read_csv_memory_result_3 && !read_csv_memory_result_3->error,               "decimal ,: campo >64 chars sem erro de parse");
-    CHECK(read_csv_memory_result_3->columns[0].str != NULL,     "decimal ,: número longo demais vira string (:104)");
-    smaug_table_free(read_csv_memory_result_3);
-    (void)longnum;
+    smaug_table_t *long_decimal_table = smaug_read_csv_mem(
+        source_values, strlen(source_values), &default_options_result);
+    CHECK(long_decimal_table && !long_decimal_table->error,
+          "decimal customizado: campo longo sem erro");
+    if (long_decimal_table && !long_decimal_table->error) {
+        CHECK(long_decimal_table->nrows == 1 && long_decimal_table->ncols == 1,
+              "decimal customizado: shape preservado");
+        CHECK(long_decimal_table->columns[0].f64 != NULL,
+              "decimal customizado: campo longo infere float64");
+        if (long_decimal_table->columns[0].f64) {
+            CHECK(!smaug_f64_is_null(long_decimal_table->columns[0].f64, 0)
+                  && long_decimal_table->columns[0].f64->data[0] == 1.5,
+                  "decimal customizado: valor exato e máscara válida");
+        }
+    }
+    smaug_table_free(long_decimal_table);
 }
 
 /* H.5.b — roundtrip: escrever com decimal ',' e reler */
@@ -1452,7 +1461,53 @@ static void test_json_write_large_string(void) {
    main
    =================================================================== */
 
+static void test_numeric_writers_locale(void) {
+    const char *current_locale = setlocale(LC_NUMERIC, NULL);
+    char saved_locale[256];
+    CHECK(current_locale != NULL && strlen(current_locale) < sizeof(saved_locale),
+          "writer salva locale original");
+    strcpy(saved_locale, current_locale);
+    CHECK(setlocale(LC_NUMERIC, "C") != NULL, "writer prepara origem em C");
+    const char *csv = "value\n1.5\n";
+    smaug_table_t *table = smaug_read_csv_mem(csv, strlen(csv), NULL);
+    CHECK(table != NULL && table->error == NULL, "writer origem válida");
+    const char *comma_locale = setlocale(LC_NUMERIC, "pt_BR.utf8");
+#ifdef _WIN32
+    if (!comma_locale) {
+        comma_locale = setlocale(LC_NUMERIC, "Portuguese_Brazil.1252");
+    }
+#endif
+    if (comma_locale && table && !table->error) {
+        size_t length = 0;
+        char *error = NULL;
+        char *output = smaug_write_csv_mem(table, NULL, &length, &error);
+        CHECK(output != NULL && error == NULL && length == strlen(csv)
+              && memcmp(output, csv, length) == 0, "CSV padrão mantém ponto sob locale com vírgula");
+        free(output);
+        free(error);
+        smaug_csv_write_opts_t options = smaug_csv_write_default_opts();
+        options.sep = ';';
+        options.decimal = ',';
+        output = smaug_write_csv_mem(table, &options, &length, &error);
+        CHECK(output != NULL && error == NULL && strcmp(output, "value\n1,5\n") == 0,
+              "CSV customizado adapta ponto apenas no leitor/writer");
+        free(output);
+        free(error);
+        output = smaug_write_json_mem(table, NULL, &length, &error);
+        CHECK(output != NULL && error == NULL && strcmp(output, "[{\"value\":1.5}]\n") == 0,
+              "JSON não emite vírgula decimal sob locale pt_BR");
+        free(output);
+        free(error);
+        CHECK(strcmp(localeconv()->decimal_point, ",") == 0, "writers preservam locale do caller");
+    } else if (!comma_locale) {
+        fprintf(stderr, "SKIP: writer sem locale decimal com vírgula\n");
+    }
+    smaug_table_free(table);
+    CHECK(setlocale(LC_NUMERIC, saved_locale) != NULL, "writer restaura locale original");
+}
+
 int main(void) {
+    test_numeric_writers_locale();
     /* CSV — erros */
     test_csv_empty();
     test_csv_only_blank_lines();

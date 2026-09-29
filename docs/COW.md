@@ -25,56 +25,19 @@ privado automaticamente. O pai nunca é tocado.
 
 <a id="section-criar-uma-view-de-tipo-fixo-e-o-1"></a>
 
-## Criar uma view de tipo fixo é O(1)
+## Criação
 
-```lua
-local smaug = require("smaug")
-
-local payload = {{"vendas", {10.0, 20.0, 30.0, 40.0, 50.0}}}
-local ds = smaug.DataSet(payload)
-
-local v = ds["vendas"]:view(2, 3)   -- janela sobre [20, 30, 40]
-
-print(v:get(1))
-print(v:len())
-```
-
-```
-20.0
-3
-```
-
-Neste exemplo numérico, nenhum dado é copiado; apenas a struct é alocada.
-String compartilha bytes e máscara, mas copia offsets: criação O(len).
-
----
+Views de float64/int64/datetime/bool compartilham buffers: O(1).
+String compartilha bytes e máscara, mas copia offsets: O(len).
 
 <a id="section-leitura-reflete-o-pai"></a>
 
-## Leitura reflete o pai
+## Leitura e lifetime
 
-```lua
-local smaug = require("smaug")
-
-local payload = {{"vendas", {10.0, 20.0, 30.0}}}
-local ds = smaug.DataSet(payload)
-local v  = ds["vendas"]:view(1, 2)
-
-ds["vendas"]:set(1, 99.0)   -- muta o pai
-
-print(v:get(1))              -- view ainda aponta pro pai
-```
-
-```
-99.0
-```
-
-O exemplo demonstra alteração de valor em buffer numérico existente. Não
-estabelece segurança para realocação, liberação do pai ou mudança de comprimento
-de strings. Lifetime e invalidação nesses casos permanecem decisões abertas
-na revisão da suíte; não se deve inferir garantia universal deste exemplo.
-
----
+Alterar um valor no buffer numérico existente do pai é visível na view ainda
+não destacada. Isso não garante segurança após realocação/liberação do pai ou
+mudança de comprimento de strings. O Lua ancora o pai contra GC; invalidação
+por mutação ainda exige contrato específico, acompanhado em [R7](Roadmap.md#r7).
 
 <a id="section-primeira-escrita-dispara-o-detach"></a>
 
@@ -107,31 +70,8 @@ Escritas subsequentes vão direto ao buffer privado — sem nova cópia.
 
 ## Views de views
 
-```lua
-local smaug = require("smaug")
-
-local payload = {{"vendas", {10.0, 20.0, 30.0, 40.0, 50.0}}}
-local ds = smaug.DataSet(payload)
-
-local v1 = ds["vendas"]:view(2, 4)   -- janela sobre ds["vendas"]
-local v2 = v1:view(1, 2)             -- janela sobre v1
-
-v2:set(1, 99.0)   -- detach de v2 apenas
-
-print(v2:get(1))
-print(v1:get(1))              -- v1 intacta
-print(ds["vendas"]:get(2))   -- pai intacto
-```
-
-```
-99.0
-20.0
-20.0
-```
-
-O detach afeta apenas a view imediata. `v1` continua sendo view de `ds["vendas"]`.
-
----
+Destacar uma view derivada materializa apenas sua janela; a view intermediária
+continua compartilhando o pai. Valem as mesmas restrições de lifetime.
 
 <a id="section-falha-segura-no-detach-oom"></a>
 
@@ -143,7 +83,8 @@ O detach aloca memória. O contrato de falha na API C é:
   nenhuma escrita ocorre.
 - `append` / `append_null` → retornam `-1`; mesmas garantias.
 
-Em qualquer caso: pai intacto, view intacta, sistema consistente.
+Essas garantias cobrem falha no detach. Falhas posteriores da mutação completa
+precisam de verificação própria por dtype, conforme [R7](Roadmap.md#r7).
 
 ---
 
@@ -185,7 +126,7 @@ tamanho fixo, então a janela é zero-copy e o detach copia uma fatia contígua 
 mesma mecânica de `float64`/`int64`.
 `bool` também tem view + COW completos: é um buffer de `uint8_t` de valores mais
 a máscara de nulos paralela, ambos de tamanho fixo — mesma mecânica zero-copy +
-detach contíguo de `float64`. (BoolSeries é mutável: tem `set`/`set_null`.)
+ detach contíguo de `float64`. (`Series<bool>` é mutável: tem `set`/`set_null`.)
 `string` tem view + COW (item 9.2). Diferente dos numéricos (buffer fixo, view =
 soma de ponteiro O(1)), a string é offset-based, então usa um **modelo de posse
 mista** (campo `offsets_owned` na struct): a view compartilha `buffer` e

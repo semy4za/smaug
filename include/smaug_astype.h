@@ -49,8 +49,9 @@ smaug_series_str_t *smaug_f64_to_str(const smaug_series_f64_t *self);
 smaug_series_str_t *smaug_dt_to_str (const smaug_series_dt_t  *self);
 
 /* Grupo B-in (string -> {int64, float64, datetime}): parsing rigido via
-   smaug_convert (rejeita trailing/vazio/overflow; i64 sem hex, f64 com
-   hex/inf/nan). Inconversivel -> null somente nas conversoes numericas. */
+   smaug_convert (i64 decimal/hex; f64 decimal/hex/inf/nan). Sintaxe/faixa/
+   underflow -> célula nula somente nas conversões numéricas. Falha operacional
+   ou argumento inválido aborta com NULL, sem publicar série parcial. */
 smaug_series_i64_t *smaug_str_to_i64(const smaug_series_str_t *self);
 smaug_series_f64_t *smaug_str_to_f64(const smaug_series_str_t *self);
 smaug_series_dt_t  *smaug_str_to_dt (const smaug_series_str_t *self, int dayfirst);

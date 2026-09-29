@@ -47,7 +47,7 @@ return function(I)
     function methods.filter(self, mask)
         local vals, _, mlen = bool_mask_parts(mask)
         if vals == nil then
-            error("smaug: filter espera uma Series<bool> ou BoolSeries (use :gt/:lt/:eq)", 2)
+            error("smaug: filter espera uma Series<bool> (use :gt/:lt/:eq)", 2)
         end
         if mlen ~= self:len() then
             error("smaug: filter com máscara de tamanho diferente ("..
@@ -140,7 +140,8 @@ return function(I)
             error("smaug: where() — tamanhos diferentes ("..cond:len().." vs "..self:len()..")", 2)
         end
         local n = self:len()
-        -- bool como dtype de VALOR fica no Anel 1 até 10.8 (sem risco int64).
+        -- Bool permanece materializado no frontend neste caminho; a seleção
+        -- com outra Series<bool> ainda precisa alinhar seu contrato (R4/R7).
         if self._dtype == "bool" then
             local vals = {}
             local is_series_other = type(other) == "table" and other._dtype ~= nil
@@ -200,7 +201,8 @@ return function(I)
         elseif type(a) == "number" and a % 1 == 0 and
                (b == nil or (type(b) == "number" and b % 1 == 0)) then dtype = "int64"
         end
-        -- bool como dtype de VALOR fica no Anel 1 até 10.8.
+        -- bool como dtype de valor permanece materializado no frontend neste
+        -- caminho; alinhar o contrato com a seleção de outras dtypes em R4/R7.
         if dtype == "bool" then
             local vals = {}
             for i = 1, n do

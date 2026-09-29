@@ -11,7 +11,7 @@
 
 </details>
 
-Data: 2026-09-18. Complemento do [parecer técnico](TEST_SUITE_REWRITE_REVIEW.md).
+Data: 2026-09-18. Complemento do [parecer técnico](Roadmap.md#verificacao).
 
 **153 marcações nos fontes atuais; nenhuma alteração nos marcadores foi feita nesta avaliação.** HEAD `9787701` com modificações locais preexistentes. IDs abaixo identificam a marcação nesta baseline, não um branch de gcov. Uma marcação pode abranger vários ramos, inclusive de macros. Os 139 ramos excluídos do relatório histórico são outra contagem, em outra revisão.
 
@@ -66,6 +66,17 @@ comparados com um oráculo de inteiros de precisão arbitrária: 30.712 chamadas
 sem divergência e cinco mutações compiláveis detectadas pelo novo oráculo.
 Escopo, reprodução e limites em [Verificação aritmética do core](CORE_ARITHMETIC_REVIEW.md).
 Isso não recalcula coverage nem certifica o restante do núcleo.
+
+### Seguimento de R1 — 2026-09-29
+
+A asserção CSV `|| 1` foi substituída por enumeração das alocações observadas,
+confirmação de injeção e resultado/recuperação completos. O caso de 100 linhas
+também deixou o teto fixo de 64, que não alcançava o crescimento dos vetores.
+Os marcadores de pureza das conversões numéricas CSV foram removidos: criação
+de locale pode falhar entre inferência e preenchimento. Falha real nesse ponto
+é agora exercitada. Correções, mutações e limites estão no
+[review de I/O](IO_REVIEW.md) e no [checkpoint](Roadmap.md#checkpoint).
+O inventário abaixo permanece histórico, sem nova contagem global de exclusões.
 
 ## Classes de triagem
 
@@ -263,4 +274,4 @@ Entradas diagnósticas: ano -2, mês 3, dia 1; JSON com bytes de `[{"value":"unf
 
 ---
 
-[Referência do Núcleo C](API_Reference.md) · [Rework da suíte](TEST_SUITE_REWORK.md) · [Início da documentação](README.md)
+[Referência do Núcleo C](API_Reference.md) · [Rework da suíte](Roadmap.md#checkpoint) · [Início da documentação](README.md)

@@ -2,7 +2,7 @@
 #define SMAUG_BOOL_H
 
 /* ===================================================================
-   smaug_bool.h — Operações booleanas (BoolSeries)
+   smaug_bool.h — Operações booleanas (arrays raw e Series<bool>)
    -------------------------------------------------------------------
    Um "bool array" é o par (valores uint8_t*, máscara smaug_mask_t*) de mesmo
    comprimento, como o devolvido por smaug_{f64,i64}_gt/lt/eq.

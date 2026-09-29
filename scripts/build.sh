@@ -142,7 +142,7 @@ LUA_TESTS=(core/test_keys core/test_collation \
 CFLAGS=(-std=c11 -fPIC -fwrapv -Wall -Wextra -O2 -I./include)
 TEST_CFLAGS=(-std=c11 -g -O0 -Wall -Wextra -I./include)
 EDGE_CFLAGS=("${TEST_CFLAGS[@]}" -fwrapv)
-WRAP_FLAGS=(-Wl,--wrap=malloc -Wl,--wrap=realloc -Wl,--wrap=calloc -Wl,--wrap=strdup)
+WRAP_FLAGS=(-Wl,--wrap=malloc -Wl,--wrap=realloc -Wl,--wrap=calloc -Wl,--wrap=strdup -Wl,--wrap=newlocale -Wl,--wrap=uselocale)
 
 ALL_PASS=1
 run_result() {

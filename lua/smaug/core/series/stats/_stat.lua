@@ -204,9 +204,9 @@ return function(I)
         if is_nan(result) then return nil end
         return result
       elseif self._dtype == "int64" then
-        -- Contrato real (smaug_numeric.h): o produto é o RETORNO (int64_t);
-        -- status é out-param por smaug_status_t*. Overflow sinaliza via
-        -- SMG_ERR_OOB (reaproveitado — não existe SMG_ERR_OVERFLOW no enum).
+        -- Contrato do header: o produto é o RETORNO (int64_t) e o status é
+        -- out-param. O C retorna SMG_ERR_OVERFLOW em overflow; este wrapper
+        -- ainda testa SMG_ERR_OOB e por isso cai no erro genérico (R7).
         local status = ffi.new("smaug_status_t[1]")   
         local result = C.smaug_i64_prod(self._c, ignore_na, status)
         if status[0] ~= C.SMG_OK then

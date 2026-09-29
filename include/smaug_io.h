@@ -5,8 +5,8 @@
    smaug_io.h — Anel 3: leitores e escritores de arquivo
    -------------------------------------------------------------------
    Toda função que lê produz uma smaug_table_t* (checar ->error antes
-   de usar). Toda função que escreve retorna 0 em sucesso, -1 em erro
-   (checar smaug_io_last_error()).
+   de usar). Writers em arquivo retornam 0 em sucesso, -1 em erro;
+   writers em memória retornam NULL e podem preencher err_out.
 
    Zero dependências externas — parsers escritos do zero.
    =================================================================== */
@@ -27,7 +27,7 @@ void smaug_table_free(smaug_table_t *t);
    - Aspas duplas (RFC 4180): "campo com, virgula", ""aspas duplas""
    - Linha de cabeçalho opcional (default true)
    - Valores nulos: células vazias ou strings em na_values
-   - Inferência de tipo: int64 → float64 → bool → string
+   - Inferência de tipo: bool → int64 → float64 → string
    - Encoding: UTF-8 / bytes crus (sem conversão)
    =================================================================== */
 
@@ -41,7 +41,7 @@ typedef struct {
 } smaug_csv_opts_t;
 
 /* Opções padrão: sep=',', header=1, quote='"', decimal='.',
-   na={"","NA","null","N/A"} */
+   na={"","NA","null","N/A","NULL"}; nan/NaN permanecem valores float */
 smaug_csv_opts_t smaug_csv_default_opts(void);
 
 /* Lê um arquivo CSV e retorna uma smaug_table_t*.

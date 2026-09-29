@@ -74,7 +74,7 @@ smaug_series_f64_t* smaug_f64_select(const smaug_series_bool_t *cond,
                                      const smaug_series_f64_t *a,
                                      const smaug_series_f64_t *b);
 
-/* Reduções (var/std são populacionais) */
+/* Reduções (var/std são amostrais: divisor n-1; exigem pelo menos 2 válidos) */
 double smaug_f64_sum (const smaug_series_f64_t *s, bool ignore_na);
 double smaug_f64_mean(const smaug_series_f64_t *s, bool ignore_na);
 double smaug_f64_min (const smaug_series_f64_t *s, bool ignore_na);
@@ -219,7 +219,8 @@ double*  smaug_i64_rank          (const smaug_series_i64_t *s, int method);     
 /* ===================== BOOL — seleção, agregação, lógica Kleene =====================
    Operações struct-based sobre smaug_series_bool_t (dtype `bool` de primeira
    classe). Distintas das funções raw de smaug_bool.h, que operam sobre arrays
-   (uint8_t*, máscara) e são o legado da BoolSeries — a ser aposentado. Estas
+   (uint8_t*, máscara) e são uma superfície raw legada; seu destino público
+   ainda precisa ser decidido. Estas
    seguem o padrão dos demais dtypes: recebem/retornam a struct. */
 size_t               smaug_bool_count_nonnull(const smaug_series_bool_t *s);
 smaug_series_bool_t* smaug_bool_take  (const smaug_series_bool_t *s, const size_t *idx, size_t len);

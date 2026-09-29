@@ -474,7 +474,13 @@ smaug_table_t *smaug_read_json_mem(const char *buf, size_t len) {
                        else if (v->type==2) n=smaug_fmt_f64(tmp,sizeof(tmp),v->d);
                        else if (v->type==3) { strcpy(tmp,v->b?"true":"false"); n=strlen(tmp); }
                        else { tmp[0]='\0'; n=0; }
-                       smaug_str_set(s, r, tmp, n); }
+                       if (n == 0 || smaug_str_set(s, r, tmp, n) != SMG_OK) {
+                           smaug_str_free(s);
+                           smaug_table_free(tbl);
+                           tbl = NULL;
+                           goto oom_recs;
+                       }
+                }
             }
             tbl->columns[c].str = s; break;
         }
@@ -589,7 +595,14 @@ char *smaug_write_json_mem(const smaug_table_t *t,
                 smaug_status_t st;
                 int64_t v = smaug_i64_get(col->i64, r, &st);
                 if (st != SMG_OK) { if (wbj_pushz(&b,"null")) goto oom; } /* st==SMG_NULL_VALUE é subcaso de st!=SMG_OK — simplificado (ver csv.c) */ /* COV-EXCL-BR: ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541) */
-                else { smaug_fmt_i64(tmp,sizeof(tmp),v); if (wbj_pushz(&b,tmp)) goto oom; } /* COV-EXCL-BR: ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541) */
+                else {
+                    if (smaug_fmt_i64(tmp, sizeof(tmp), v) == 0) {
+                        goto format_error;
+                    }
+                    if (wbj_pushz(&b, tmp)) {
+                        goto oom;
+                    }
+                }
             } else if (col->f64) {
                 smaug_status_t st;
                 double v = smaug_f64_get(col->f64, r, &st);
@@ -601,7 +614,14 @@ char *smaug_write_json_mem(const smaug_table_t *t,
                    via smaug_f64_count_nonfinite; aqui a escrita e' silenciosa
                    por contrato (o C nao tem canal de aviso). */
                 else if (!isfinite(v)) { if (wbj_pushz(&b,"null")) goto oom; }  /* COV-EXCL-BR: OOM de wbuf + nao-finito→null: ramo oom inalcançável sem injeção */
-                else { smaug_fmt_f64(tmp,sizeof(tmp),v); if (wbj_pushz(&b,tmp)) goto oom; } /* COV-EXCL-BR: ramo oom (realloc de wbuf) só dispara no instante de uma realocação — confirmado empiricamente que numa tabela de N linhas só 1 ponto falha; mesma natureza dos goto oom já excluídos em write_json_string (535-541) */
+                else {
+                    if (smaug_fmt_f64(tmp, sizeof(tmp), v) == 0) {
+                        goto format_error;
+                    }
+                    if (wbj_pushz(&b, tmp)) {
+                        goto oom;
+                    }
+                }
             } else if (col->boolcol) {
                 smaug_status_t st;
                 uint8_t v = smaug_bool_get(col->boolcol, r, &st);
@@ -630,6 +650,10 @@ char *smaug_write_json_mem(const smaug_table_t *t,
     *out_len = b.len - 1;
     return b.data;
 
+format_error:
+    set_io_error(err_out, "falha ao formatar número no JSON");
+    free(b.data);
+    return NULL;
 oom:
     set_io_error(err_out, "OOM ao serializar JSON");
     free(b.data); return NULL;
