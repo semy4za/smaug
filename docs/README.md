@@ -1,46 +1,43 @@
-# Smaug — documentação
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./doc_new/img/title_1-3.svg">
+    <img alt="Smaug Logo" src="./doc_new/img/title_1-1.svg">
+  </picture>
+</p>
 
-Biblioteca de dados tabulares em LuaJIT, com motor C e integração FFI.
-`Series` representa uma coluna tipada; `DataSet` reúne colunas alinhadas.
-O projeto está em pré-1.0. Tipos disponíveis: float64, int64, bool, string,
-datetime e categorical.
 
-## Usar a biblioteca
+-----------------
+# Smaug: Uma biblioteca de dados tabulares para Lua
 
-- [Primeiros passos](GETTING_STARTED.md): ambiente e primeiro programa.
-- [Guia por assunto](USER_GUIDE.md): caminhos de leitura e limitações.
-- [API Lua](API_INDEX.md) e [API C](API_Reference.md): métodos e assinaturas.
-- [Compilação e testes](Build_and_Testing.md): comandos e alcance das ferramentas.
+Biblioteca para manipulação e análise de dados tabulares em Lua, com motor em C
+e integração via LuaJIT FFI. Oferece estruturas Series e DataSet, com suporte
+a tipos numéricos, booleanos, strings, datetime e categorias.
 
-## Desenvolver
+| | |
+| --- | --- |
+| Tecnologia | ![Lua](https://img.shields.io/badge/Lua-2C2D72?logo=lua&logoColor=white) ![C](https://img.shields.io/badge/Motor-C-00599C) ![LuaJIT FFI](https://img.shields.io/badge/Integração-LuaJIT%20FFI-blue) |
+| Documentação | [![Documentação](https://img.shields.io/badge/docs-Smaug-blue)](https://github.com/semy4za/smaug/tree/HEAD/docs) |
+| Status | ![Pré-1.0](https://img.shields.io/badge/status-pré--1.0-orange) |
+| Licença | [![Licença MIT](https://img.shields.io/badge/licença-MIT-green)](https://github.com/semy4za/smaug/blob/HEAD/LICENSE) |
 
-| Informação | Fonte responsável |
-|---|---|
-| Próximo trabalho, dependências e critérios de conclusão | [Roadmap](Roadmap.md) |
-| Responsabilidades dos anéis | [Arquitetura](ARCHITECTURE.md) |
-| Decisões de comportamento aprovadas | [Contrato](CONTRACT.md) |
-| Views, ownership e detach | [COW](COW.md) |
-| Nomes, chamadas e estilo de testes | [Convenções](CODING_STYLE.md) |
-| Defeitos, decisões e evidência CSV/JSON | [Review de I/O](IO_REVIEW.md) |
-| Checkpoint e reconstrução dos testes | [Roadmap](Roadmap.md#checkpoint) e [achados R01–R09](Roadmap.md#verificacao) |
-| Verificação limitada dos quatro helpers i64 | [Review aritmético](CORE_ARITHMETIC_REVIEW.md) |
-| Triagem das exclusões de cobertura | [Inventário](TEST_SUITE_EXCLUSIONS_REVIEW.md) |
-| Mudanças e decisões superadas | [Changelog](CHANGELOG.md) |
+## O que é?
 
-O contrato registra o comportamento exigido; uma divergência do código deve
-ser apontada como pendência. Propostas não viram contrato pela edição da doc.
-O roadmap é a única fila de execução: guias e reviews remetem a seus itens.
+**Smaug** é uma biblioteca para manipulação e análise de dados tabulares em
+**Lua**, com motor em **C** e integração via **LuaJIT FFI**. Oferece as estruturas
+**Series** e **DataSet** para organizar e transformar dados numéricos, booleanos,
+textuais, datas e categorias de forma simples e expressiva.
 
-## Evidência gerada
+Seu objetivo é combinar a flexibilidade de Lua com o desempenho de C,
+oferecendo uma base prática para trabalhar com dados do mundo real.
+O projeto está em desenvolvimento, em fase **pré-1.0**, e sua API continua
+evoluindo
 
-[Cobertura](COVERAGE.md), [paridade](PARITY_REPORT.md) e
-[manifesto](MANIFEST.txt) identificam execuções ou árvores específicas.
-Não editar seus resultados manualmente nem apresentar percentuais históricos
-como garantia da árvore atual. Branches do gcov não demonstram MC/DC;
-paridade textual não demonstra comportamento, layout compilado ou reentrância.
+## Conteúdos
 
-Ao atualizar a documentação, altere a fonte responsável, use links nas demais
-páginas e confira as âncoras. Preserve resultados históricos com sua data e
-escopo; mantenha decisões abertas explicitamente identificadas.
+- [License](#license)
+- [Coverage: 94.95%](COVERAGE.md#coverage-total)
 
-[Licença MIT](../LICENSE).
+## License
+[Licença MIT](https://github.com/semy4za/smaug/blob/HEAD/LICENSE)
+
+[Go to Top](#conteúdos)
