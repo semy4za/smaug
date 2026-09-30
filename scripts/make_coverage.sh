@@ -35,8 +35,8 @@ for _f in src/*.c; do _b="${_f##*/}"; SRCS="$SRCS ${_b%.c}"; done
 SRCS="${SRCS# }"
 # Tudo que exercita o backend. Se test_stress deixar a medicao lenta demais,
 # pode remove-lo daqui -- ele cobre majoritariamente ramos que ops ja pega.
-C_TESTS="test_alloc test_ops test_ops_edge test_bool test_bool_lifecycle test_string test_cow test_io_c test_datetime_c test_ops_window test_astype test_stress"
-LUA_TESTS="core/test_keys core/test_collation series/test_constructors series/test_access series/test_reduce series/test_stat series/test_window series/test_predicates series/test_selection series/test_str series/test_dt series/test_categorical dataset/test_core dataset/test_relational dataset/test_stat dataset/test_io_support io/test_csv io/test_json props/test_props props/test_integration"
+C_TESTS="test_alloc test_ops test_ops_edge test_bool test_bool_lifecycle test_string test_cow test_io_c test_schema test_datetime_c test_ops_window test_astype test_stress"
+LUA_TESTS="core/test_keys core/test_collation series/test_constructors series/test_access series/test_reduce series/test_stat series/test_window series/test_predicates series/test_selection series/test_str series/test_dt series/test_categorical dataset/test_core dataset/test_relational dataset/test_stat dataset/test_io_support io/test_csv io/test_json io/test_schema props/test_props props/test_integration"
 COVDIR=cov
 OUT=docs/COVERAGE.md
 
@@ -79,7 +79,7 @@ done
 # 5. test_allocfail: precisa de --wrap (age no link do executavel), entao linka
 #    contra os MESMOS .o instrumentados + --coverage. Seus .gcda agregam.
 gcc -std=c11 -O0 --coverage -I./include \
-    -Wl,--wrap=malloc -Wl,--wrap=realloc -Wl,--wrap=calloc -Wl,--wrap=strdup -Wl,--wrap=newlocale -Wl,--wrap=uselocale \
+    -Wl,--wrap=malloc -Wl,--wrap=realloc -Wl,--wrap=calloc -Wl,--wrap=strdup -Wl,--wrap=newlocale -Wl,--wrap=uselocale -Wl,--wrap=fclose \
     tests/c/test_allocfail.c $objs -lm -o "$COVDIR/test_allocfail"
 "./$COVDIR/test_allocfail" >/dev/null 2>&1
 

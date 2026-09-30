@@ -19,6 +19,9 @@
    ------------------------------------------------------------------- */
 void smaug_free(void *ptr);
 
+/* ABI de structs/assinaturas; conferir antes de acessar layouts via FFI. */
+uint32_t smaug_abi_version(void);
+
 /* Aritmética int64 com resultado verificável. Estes helpers são a fonte
    única para operações do engine que precisam preservar a semântica de
    inteiros assinados do C: nunca calculam antes de provar que o resultado cabe.

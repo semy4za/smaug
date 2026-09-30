@@ -578,6 +578,38 @@ mantém seu dtype de resultado). Erro se nenhuma coluna numérica.
 
 <a id="section-entry-point-init-lua"></a>
 
+<a id="schema-api"></a>
+### `Schema` — descrição reutilizável para importação
+
+```lua
+local smaug = require("smaug")
+local schema = smaug.Schema({
+    { name = "codigo", dtype = "string", nullable = false },
+    { name = "quantidade", dtype = "int64", nullable = true },
+})
+local dataset = smaug.read_csv_mem("codigo,quantidade\n00123,\n", { schema = schema })
+local json_dataset = smaug.read_json_mem(
+    '[{"quantidade":null,"codigo":"00123"}]', { schema = schema }
+)
+```
+
+`codigo` mantém `"00123"`; `quantidade` é int64 com NA. O mesmo objeto pode
+ser reutilizado em `read_csv`, `read_csv_mem`, `read_json` e `read_json_mem`.
+As opções CSV existentes (sep/header/quote/decimal/na_values) continuam
+independentes do schema. JSON aceita `{schema=...}`; sem schema preserva a
+inferência vigente.
+
+Campos formam uma sequência sem buracos, não vazia; cada campo exige name
+string, dtype bool/int64/float64/string e nullable booleano. Propriedades
+extras, nomes duplicados e descritores inválidos são rejeitados. O objeto é
+imutável e independente de alterações da tabela usada no construtor.
+A ordem do schema determina a saída; veja as regras de associação, conversão
+e nulidade no [contrato](CONTRACT.md#schema-reutilizavel).
+
+Esta validação pertence à leitura: não instala constraints em futuras mutações
+do DataSet. Schema parcial, defaults, modo tolerante, datetime e categorical
+não estão disponíveis nesta API inicial. `.smg` continua futuro.
+
 ### Funções do módulo `smaug`
 
 ```lua

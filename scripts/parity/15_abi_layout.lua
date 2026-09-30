@@ -23,6 +23,8 @@ local C = dofile("scripts/parity/common.lua")
 -- corpo — só ponteiro cego) ficam de fora: seu layout nunca é lido pelo Lua.
 -- Cada entrada: nome da struct + headers onde pode estar declarada.
 local STRUCTS = {
+    { name = "smaug_schema_t",           headers = {"smaug_schema.h"} },
+    { name = "smaug_schema_field_t",     headers = {"smaug_schema.h"} },
     { name = "smaug_metadata_t",         headers = {"smaug_types.h"} },
     { name = "smaug_series_bool_t",      headers = {"smaug_types.h", "smaug_bool.h"} },
     { name = "smaug_series_str_t",       headers = {"smaug_types.h", "smaug_string.h"} },
@@ -119,7 +121,7 @@ local function scan_packing()
     local files = {
         "include/smaug_types.h", "include/smaug_string.h", "include/smaug_bool.h",
         "include/smaug_datetime.h", "include/smaug_io.h", "include/smaug_ops_window.h",
-        "include/smaug_core.h", "include/smaug_numeric.h",
+        "include/smaug_core.h", "include/smaug_numeric.h", "include/smaug_schema.h",
         "lua/smaug/ffi_loader.lua",
     }
     for _, f in ipairs(files) do

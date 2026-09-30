@@ -170,4 +170,110 @@ do
     check(converted_series:get(1) == source_dataset:col("t"):get(1), "12.3 round-trip de valor via astype")
 end
 
+-- Associação por nome, união tardia e colisão entre nome literal e gerado.
+do
+    local document = '[{}, {"a":1,"a":2}, {"a.1":30,"a":3,"a":4,"text":"NA"}]'
+    local dataset = smaug.read_json_mem(document)
+    check(dataset:nrows() == 3 and dataset:ncols() == 4, "json união após objeto vazio")
+    check(dataset:col("a"):is_null(1), "json campo futuro preenche NA")
+    check(dataset:col("a"):get(3) == 3, "json associação por nome reordenado")
+    check(dataset:col("a.1"):get(2) == 2, "json segunda ocorrência preservada")
+    check(dataset:col("a.1"):get(3) == 4, "json ocorrência estável entre objetos")
+    check(dataset:col("a.1.1"):get(3) == 30, "json sufixo literal distinto do gerado")
+    check(dataset:col("text"):get(3) == "NA", "json marcador permanece texto")
+    local roundtrip = smaug.read_json_mem(dataset:to_json_mem())
+    check(roundtrip:col("a.1.1"):get(3) == 30, "json nomes únicos no roundtrip")
+    check(roundtrip:col("a.1"):is_null(1), "json NA preservado no roundtrip")
+end
+
+do
+    local document = [=[[{"a":"NA\u0000x","a\u0000b":"123\u0000x","":"true\u0000x"}]]=]
+    local dataset = smaug.read_json_mem(document)
+    check(dataset:ncols() == 3, "json NUL nome distinto do prefixo")
+    check(dataset:col("a"):get(1) == "NA\0x", "json NUL após marcador")
+    check(dataset:col("a\0b"):get(1) == "123\0x", "json NUL em nome e valor")
+    check(dataset:col(""):get(1) == "true\0x", "json nome vazio legítimo")
+    local again = smaug.read_json_mem(dataset:to_json_mem())
+    check(again:col("a\0b"):get(1) == "123\0x", "json NUL roundtrip C Lua C")
+    local csv = dataset:to_csv_mem()
+    local from_csv = smaug.read_csv_mem(csv)
+    check(from_csv:col("a\0b"):get(1) == "123\0x", "csv NUL roundtrip C Lua C")
+end
+
+do
+    local csv = "v,x\nNA\0x,1\nNA,2\nNA\0y,3\n\"\",4\n"
+    local dataset = smaug.read_csv_mem(csv, {na_values = {"NA\0x"}})
+    check(dataset:col("v"):is_null(1), "csv marcador NUL completo vira NA")
+    check(dataset:col("v"):get(2) == "NA", "csv prefixo do marcador permanece texto")
+    check(dataset:col("v"):get(3) == "NA\0y", "csv marcador com sufixo diferente")
+    check(dataset:col("v"):get(4) == "", "csv vazio fora da lista permanece texto")
+    local no_markers = smaug.read_csv_mem(csv, {na_values = {}})
+    check(no_markers:col("v"):get(1) == "NA\0x", "csv lista vazia desativa padrões")
+end
+
+-- Expectativas textuais e cdata independentes: nunca criar limites via number.
+do
+    local expected = {9007199254740993LL, -9007199254740993LL,
+                      9223372036854775807LL, -9223372036854775807LL - 1LL, 0LL}
+    local literals = {"9007199254740993", "-9007199254740993", "9223372036854775807",
+                      "-9223372036854775808", "0"}
+    local records = {}
+    for row, literal in ipairs(literals) do records[row] = '{"id":' .. literal .. '}' end
+    records[6] = '{"id":null}'
+    local json = "[" .. table.concat(records, ",") .. "]\n"
+    -- NA explícito evita que uma linha CSV inteiramente vazia seja ignorada.
+    local csv = "id\n" .. table.concat(literals, "\n") .. "\nNA\n"
+    local function check_exact(dataset, label)
+        check(dataset:nrows() == 6 and dataset:col("id")._dtype == "int64", label .. " shape/dtype")
+        for row, value in ipairs(expected) do
+            local actual = dataset:col("id"):get_raw(row)
+            check(type(actual) == "cdata" and actual == value, label .. " int64 exato")
+        end
+        check(dataset:col("id"):is_null(6) and dataset:col("id"):get_raw(6) == nil,
+              label .. " NA preservado")
+    end
+    local from_json = smaug.read_json_mem(json)
+    local from_csv = smaug.read_csv_mem(csv)
+    check_exact(from_json, "JSON leitura")
+    check_exact(from_csv, "CSV leitura")
+    local values = {expected[1], expected[2], expected[3], expected[4], expected[5], smaug.NA}
+    local source = smaug.DataSet({{"id", values, "int64"}})
+    check(source:to_json_mem() == json, "JSON escrita int64 exata sem reader")
+    -- Coluna auxiliar mantém a linha NA no roundtrip CSV padrão.
+    source:add_column("keep", smaug.Series({1, 1, 1, 1, 1, 1}, "int64"))
+    local csv_rows = {"id,keep"}
+    for row, literal in ipairs(literals) do csv_rows[row + 1] = literal .. ",1" end
+    csv_rows[7] = ",1"
+    local written_csv = source:to_csv_mem()
+    check(written_csv == table.concat(csv_rows, "\n") .. "\n", "CSV escrita int64 exata sem reader")
+    check_exact(smaug.read_csv_mem(written_csv), "CSV roundtrip")
+    check_exact(smaug.read_json_mem(from_json:to_json_mem()), "JSON roundtrip")
+end
+
+do
+    local bom = string.char(0xef, 0xbb, 0xbf) .. "[{\"v\":1}]"
+    local dataset = smaug.read_json_mem(bom)
+    check(dataset:nrows() == 1 and dataset:col("v"):get(1) == 1,
+          "JSON BOM: leitura aceita marcador inicial")
+
+    local invalid = string.char(0xed, 0xa0, 0x80)
+    local succeeded, message = pcall(smaug.read_json_mem, '[{"n":"' .. invalid .. '"}]')
+    check(not succeeded and tostring(message):find("UTF-8", 1, true),
+          "JSON Lua rejeita UTF8 inválido na leitura")
+    local source = smaug.DataSet({{"n", {invalid}, "string"}})
+    succeeded, message = pcall(function() return source:to_json_mem() end)
+    check(not succeeded and tostring(message):find("UTF-8", 1, true),
+          "JSON Lua rejeita UTF8 inválido na escrita")
+    local csv = source:to_csv_mem()
+    check(smaug.read_csv_mem(csv):col("n"):get(1) == invalid,
+          "CSV continua preservando bytes sem exigir UTF8")
+    local named = smaug.DataSet({{invalid, {"text"}, "string"}})
+    succeeded, message = pcall(function() return named:to_json_mem() end)
+    check(not succeeded and tostring(message):find("nome byte 0", 1, true),
+          "JSON Lua diagnostica UTF8 inválido no nome")
+    local valid = string.char(0xf4, 0x8f, 0xbf, 0xbf)
+    local roundtrip = smaug.read_json_mem(smaug.DataSet({{valid, {valid}, "string"}}):to_json_mem())
+    check(roundtrip:col(valid):get(1) == valid, "JSON Lua preserva U+10FFFF")
+end
+
 print(string.format("OK — %d checks passaram (I/O JSON + unicode)", passed_checks))

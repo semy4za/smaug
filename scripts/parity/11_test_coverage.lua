@@ -13,7 +13,7 @@ local test_files = {
     "series/test_categorical",
     "dataset/test_core", "dataset/test_relational", "dataset/test_stat",
     "dataset/test_io_support",
-    "io/test_csv", "io/test_json",
+    "io/test_csv", "io/test_json", "io/test_schema",
     "props/test_props", "props/test_integration",
 }
 

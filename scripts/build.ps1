@@ -122,7 +122,7 @@ Write-Host "== Compilando build\smaug.dll ==" -ForegroundColor Cyan
 if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar a DLL." }
 Write-Host "OK -> build\smaug.dll" -ForegroundColor Green
 
-$cTests      = @("test_alloc", "test_ops", "test_ops_edge", "test_bool", "test_bool_lifecycle", "test_string", "test_cow", "test_io_c", "test_datetime_c", "test_ops_window", "test_astype")
+$cTests      = @("test_alloc", "test_ops", "test_ops_edge", "test_bool", "test_bool_lifecycle", "test_string", "test_cow", "test_io_c", "test_schema", "test_datetime_c", "test_ops_window", "test_astype")
 $cTestsWrap  = @("test_allocfail")
 $cTestsStress = @("test_stress")
 $allPass = $true
@@ -137,25 +137,27 @@ foreach ($t in $cTests) {
     if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar $t." }
 
     $out = (& ".\$exe") | Out-String
+    $testExitCode = $LASTEXITCODE
     $out = $out.Trim()
     Write-Host ("{0,-14} -> {1}" -f $t, $out)
-    if ($out -notlike "PASS*") { $allPass = $false }
+    if ($testExitCode -ne 0 -or $out -notlike "PASS*") { $allPass = $false }
 }
 
 foreach ($t in $cTestsWrap) {
     $exe = "build\$t.exe"
     $cargs = @(
         "-std=c11", "-g", "-O0", "-Wall", "-Wextra", "-I.\include",
-        "-Wl,--wrap=malloc", "-Wl,--wrap=realloc", "-Wl,--wrap=calloc", "-Wl,--wrap=strdup",
+        "-Wl,--wrap=malloc", "-Wl,--wrap=realloc", "-Wl,--wrap=calloc", "-Wl,--wrap=strdup", "-Wl,--wrap=fclose",
         "tests\c\$t.c"
     ) + $sources + @("-lm", "-o", $exe)
     & $gcc @cargs
     if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar $t." }
 
     $out = (& ".\$exe") | Out-String
+    $testExitCode = $LASTEXITCODE
     $out = $out.Trim()
     Write-Host ("{0,-14} -> {1}" -f $t, $out)
-    if ($out -notlike "PASS*") { $allPass = $false }
+    if ($testExitCode -ne 0 -or $out -notlike "PASS*") { $allPass = $false }
 }
 
 Write-Host ""
@@ -166,10 +168,11 @@ foreach ($t in $cTestsStress) {
     if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar $t." }
 
     $out = (& ".\$exe") | Out-String
+    $testExitCode = $LASTEXITCODE
     $out = $out.Trim()
     $lastLine = ($out -split "`n")[-1].Trim()
     Write-Host ("{0,-14} -> {1}" -f $t, $lastLine)
-    if ($lastLine -notlike "PASS*") { $allPass = $false }
+    if ($testExitCode -ne 0 -or $lastLine -notlike "PASS*") { $allPass = $false }
 }
 
 if ($luajit -and -not $SkipLua) {
@@ -180,7 +183,7 @@ if ($luajit -and -not $SkipLua) {
                   "series/test_stat", "series/test_window", "series/test_predicates",
                   "series/test_selection", "series/test_str", "series/test_dt", "series/test_categorical",
                   "dataset/test_core", "dataset/test_relational", "dataset/test_stat", "dataset/test_io_support",
-                  "io/test_csv", "io/test_json",
+                  "io/test_csv", "io/test_json", "io/test_schema",
                   "props/test_props", "props/test_integration")
     foreach ($lt in $luaTests) {
         # Captura stdout e stderr separados para distinguir output normal de erros

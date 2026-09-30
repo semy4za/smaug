@@ -19,7 +19,8 @@ Estas regras se aplicam ao código, aos testes e aos exemplos novos ou revisados
 A migração dos arquivos existentes é incremental; este documento não declara
 que toda a base já foi convertida.
 
-Os 33 arquivos de testes C e Lua em `tests/` foram padronizados em 2026-09-18.
+Os arquivos de testes C e Lua em `tests/` foram padronizados; a árvore atual
+tem 35 arquivos verificados pelo guard.
 As fixtures de dados foram preservadas. O núcleo e o frontend não fizeram parte
 daquela etapa histórica; agora estão no alcance das regras incrementais abaixo.
 

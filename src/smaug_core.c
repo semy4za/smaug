@@ -8,6 +8,10 @@
 
 /* Libera buffers crus devolvidos pelo backend, usando o mesmo heap/runtime que
    os alocou. Ver smaug_core.h. */
+uint32_t smaug_abi_version(void) {
+    return 1;
+}
+
 void smaug_free(void *ptr) {
     free(ptr);
 }

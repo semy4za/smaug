@@ -33,7 +33,7 @@ EDGE_CFLAGS = $(TEST_CFLAGS) -fwrapv
 #   C_TEST_WRAP   : teste(s) que exigem -Wl,--wrap (falha de alocação).
 #   LUA_TESTS     : suítes do frontend Lua.
 C_TESTS_PLAIN = test_alloc test_ops test_ops_edge test_bool test_bool_lifecycle test_string test_cow \
-                test_io_c test_datetime_c test_ops_window test_astype
+                test_io_c test_schema test_datetime_c test_ops_window test_astype
 C_TEST_WRAP   = test_allocfail
 C_TEST_STRESS = test_stress
 LUA_TESTS_CORE    = core/test_keys core/test_collation
@@ -42,10 +42,10 @@ LUA_TESTS_SERIES  = series/test_constructors series/test_access series/test_redu
                     series/test_selection series/test_str series/test_dt series/test_categorical
 LUA_TESTS_DATASET = dataset/test_core dataset/test_relational dataset/test_stat \
                     dataset/test_io_support
-LUA_TESTS_IO      = io/test_csv io/test_json
+LUA_TESTS_IO      = io/test_csv io/test_json io/test_schema
 LUA_TESTS_PROPS   = props/test_props props/test_integration
 LUA_TESTS         = $(LUA_TESTS_CORE) $(LUA_TESTS_SERIES) $(LUA_TESTS_DATASET) $(LUA_TESTS_IO) $(LUA_TESTS_PROPS)
-WRAP_FLAGS    = -Wl,--wrap=malloc -Wl,--wrap=realloc -Wl,--wrap=calloc -Wl,--wrap=strdup -Wl,--wrap=newlocale -Wl,--wrap=uselocale
+WRAP_FLAGS    = -Wl,--wrap=malloc -Wl,--wrap=realloc -Wl,--wrap=calloc -Wl,--wrap=strdup -Wl,--wrap=newlocale -Wl,--wrap=uselocale -Wl,--wrap=fclose
 
 $(TARGET): $(SRCS) $(HDRS) | build
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(SRCS)

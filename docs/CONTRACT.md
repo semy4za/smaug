@@ -108,6 +108,14 @@ faixa do destino. `uint64_t` só é aceito até `INT64_MAX`.
 Em ambos, a forma exata (`cdata int64_t`) preserva os bits de entrada. Fonte única do
 reconhecimento: `core/int_scalar.lua` (ver Roadmap 9.3).
 
+Na ponte de I/O CSV/JSON, inteiros são transportados como `int64_t` cdata nas
+duas direções: o reader mantém o retorno do getter C e o writer usa `get_raw`.
+Isso preserva todo int64 e sua máscara, inclusive acima de 2^53. `get()` mantém
+seu contrato público de retornar number; use `get_raw()` para observar o valor
+exato. Se a adaptação da tabela C para DataSet lançar exceção, a tabela C é
+liberada antes de repassar o erro, sem publicar DataSet parcial.
+
+
 ---
 
 <a id="section-contrato-2-astype-converte-por-elemento-tolerante-a-falha"></a>
@@ -394,7 +402,7 @@ Estado por formato:
 | **Parquet** *(futuro)* | preserva | IEEE 754 nativo + null separado |
 | **`.smg`** *(futuro)* | preserva | binário nosso |
 
-**JSON — decisões aprovadas em 2026-09-25/26, implementação pendente:**
+**JSON — decisões aprovadas em 2026-09-25/26, implementação parcial:**
 associar campos por nome, unir o conjunto de campos e ordenar colunas pela
 primeira aparição. Campo ausente e null explícito viram NA, inclusive em linhas
 anteriores; strings "", "null" e "NA" permanecem texto. Desambiguar nomes
@@ -404,10 +412,40 @@ exige colunas distintas e associação estável entre registros. Validar sintaxe
 e consumo completo do documento, com posição/motivo e sem resultado parcial.
 O perfil continua array de objetos com células escalares. Execução em [R3](Roadmap.md#r3).
 
+Associação implementada em 29/09 para nomes com comprimento explícito: a identidade usa o nome
+original e o ordinal da ocorrência dentro do objeto. O nome publicado é único,
+mas nunca substitui essa identidade. Exemplo: `[ {"a":1,"a":2},
+{"a.1":30,"a":3,"a":4} ]` produz colunas `a`, `a.1`, `a.1.1`; a segunda
+ocorrência de `a` recebe 2/4 e a chave literal `a.1` recebe NA/30. O primeiro
+nome publicado é mantido quando uma colisão literal aparece em linha posterior.
+União, inferência e preenchimento usam a mesma associação. O transporte preserva NUL;
+o JSON valida UTF-8 completo em nomes e valores desde 29/09. Sequências fora da
+forma RFC 3629, truncadas, sobrelongas, surrogate codificadas ou acima de
+U+10FFFF produzem diagnóstico com o byte da falha; o writer faz a mesma
+validação antes de emitir qualquer saída.
+
+
+**Números JSON — decisão aprovada em 2026-09-29:** o lexer valida a gramática
+JSON integral, sem zeros iniciais, hexadecimal, NaN ou Infinity. Token sem
+fração/expoente usa int64 e falha fora dessa faixa, mesmo quando caberia em
+float64. Token com fração/expoente usa float64 com arredondamento binário usual;
+zero textual e subnormal representável são válidos. Overflow e não zero que
+arredonda para zero geram diagnóstico distinto, com byte base 0, sem tabela
+parcial. O ponto decimal independe do locale global; tokens não são truncados.
+
+Coluna mista int64/float64 só promove para float64 quando todos os inteiros
+forem exatamente representáveis. A validação considera o dtype final: se a
+mistura resultar em string, não exige promoção intermediária para float64.
+Perda de exatidão gera diagnóstico PRECISION no token inteiro. Isso não exige
+representação decimal exata de `0.1` nem restringe todos os inteiros a 2^53.
+Não há fallback automático para texto, saturação ou NA. Bigint/decimal e opções
+explícitas de representação continuam sem API aprovada. Falhas operacionais
+permanecem erros; sem memória até para o diagnóstico, a API pode retornar NULL.
+
 Vocabulário do CSV, deliberado:
 
-**NUL em valores e nomes — decisão aprovada em 2026-09-26, implementação
-de I/O pendente:** byte NUL é conteúdo válido, distinto de string vazia e NA.
+**NUL em valores e nomes — decisão aprovada em 2026-09-26, transporte
+implementado em 2026-09-29:** byte NUL é conteúdo válido, distinto de string vazia e NA.
 CSV e JSON devem preservá-lo em valores e nomes de colunas, na leitura e escrita,
 sem truncamento. JSON usa o escape `\u0000`; NUL literal não escapado permanece
 inválido na sintaxe JSON. CSV preserva o byte como extensão do dialeto do Smaug
@@ -415,12 +453,105 @@ em relação à RFC 4180. Nomes `a` e `a\0b` são distintos em associação e
 desambiguação. A regra de campo vazio/NA abaixo permanece. Ver `IO_REVIEW.md`
 para evidências, migração da fronteira C/Lua e limitações atuais.
 
+ABI 1 adiciona `smaug_column_t.name_len` após `name` e
+`smaug_csv_opts_t.na_lengths` após `na_values`. Produtores fornecem comprimentos
+reais, sem fallback para strlen. Writers rejeitam `name == NULL`, inclusive
+quando não há linhas; nome vazio é ponteiro válido com comprimento zero.
+Marcadores CSV personalizados usam arrays emprestados de ponteiros e tamanhos
+com `na_count` entradas; `na_lengths` é obrigatório quando a lista é não vazia,
+e cada ponteiro de marcador deve ser válido, inclusive para marcador vazio.
+`na_values == NULL` mantém padrões; lista explícita de contagem zero desativa
+os padrões. A comparação é por bytes e comprimento, incluindo NUL.
+
+O frontend consulta `smaug_abi_version()` imediatamente após carregar uma
+biblioteca, antes de acessar structs. Versão diferente de 1 ou símbolo ausente
+encerra a carga com diagnóstico; só falha ao carregar o arquivo permite tentar
+outro candidato. A migração exige recompilar consumidores C e atualizar o
+frontend Lua em conjunto; frontends antigos não são protegidos por essa consulta.
+
+
 - **saída:** ausência → campo vazio; `NaN` → `nan`; `±inf` → `inf`/`-inf`.
 - **entrada (`BUILTIN_NA`):** `""`, `NA`, `null`, `N/A`, `NULL`. **`nan`/`NaN`
   não estão aqui** — são valores, via `strtod` (que aceita todas as grafias,
   case-insensitive: `nan`/`NaN`/`NAN`/`inf`/`Infinity`/`INF`).
 - **opt-in:** quem lê CSV de terceiros onde `nan` significa ausência passa
   `na_values = {"nan"}`.
+
+<a id="io-erros-estrutura-ausencia-codificacao"></a>
+**Leitura estrita — orientação aprovada em 2026-09-29:**
+distinguir erro estrutural, ausência de valor e erro de codificação. Uma falha
+de estrutura ou de codificação não deve ser convertida silenciosamente em NA,
+texto substituído ou dados descartados.
+
+| Categoria | Exemplo | Regra na leitura estrita |
+|---|---|---|
+| Estrutura | Aspas malformadas ou largura incompatível com o schema | Diagnóstico, sem tabela parcial |
+| Ausência em campo existente | Segundo campo vazio em `1,` | Aplicar a política NA vigente; default somente se previsto na API |
+| Codificação | Bytes que não formam UTF-8 em string JSON | Diagnóstico; sem substituição ou descarte silencioso |
+
+Para duas colunas, `1,` contém um segundo campo vazio e vira NA; `1` contém
+apenas um campo e gera erro estrutural. A leitura CSV exige largura exata,
+rejeita aspas malformadas e CR isolado, aceita LF/CRLF e remove um único BOM
+inicial. O writer nunca emite BOM.
+No JSON estrito, o reader e o writer validam UTF-8 antes de publicar dados ou
+bytes de saída. O core e o CSV continuam preservando bytes crus/NUL; a regra de
+texto pertence ao formato/operação. Falhas de validação preservam o contrato de
+saída em falha (`NULL`, diagnóstico e comprimento de saída inalterado).
+
+TensorFlow é referência comparativa para essa separação: schema/default por
+campo em `tf.io.decode_csv` e tratamento explícito de erros Unicode. Seus
+defaults não são adotados automaticamente: `unicode_decode` usa replace por
+padrão, enquanto o JSON estrito do Smaug deve rejeitar codificação inválida.
+Fontes, versões consultadas e limites em
+[TensorFlow no review de I/O](IO_REVIEW.md#tensorflow-referencia).
+Isso não introduz dependência de TensorFlow nem exige paridade integral.
+Modos tolerantes continuam como opção de dialeto separada; referências de
+linguagem C/CERT/JPL não os determinam. O JSON aceita um único BOM inicial na
+leitura e nunca o emite; U+FEFF dentro de uma string permanece conteúdo.
+
+<a id="schema-reutilizavel"></a>
+**Schema reutilizável — direção conceitual aprovada em 2026-09-29:**
+o schema descreve os dados do Smaug e deve poder ser reutilizado por DataSet,
+persistência `.smg` e Models. A primeira implementação será aplicada à leitura
+CSV/JSON; esta decisão não implementa nem antecipa a entrega de `.smg` ou Models.
+
+Separar a descrição dos campos (ordem, nomes, tipos e permissão de NA) das
+opções de importação (associação das colunas, marcadores de ausência, defaults,
+dialeto e tratamento de conversões inválidas). A persistência futura armazena
+e recupera o schema com os dados, com versionamento e migrações próprios.
+Default, permissão de NA e tolerância a valor inválido são conceitos distintos.
+
+O primeiro recorte da API foi aprovado no seguimento e implementado em C/Lua:
+`smaug.Schema` descreve um schema completo, não vazio, com nomes únicos por
+bytes, tipos bool/int64/float64/string e `nullable` booleano explícito. O objeto
+Lua copia os descritores e não oferece mutação. Não retém tabelas de entrada
+mutáveis. Nomes vazios e NUL são aceitos; JSON exige nomes UTF-8 válidos.
+
+Com schema, CSV com header e JSON associam campos pelo nome original; CSV sem
+header associa por posição. A saída segue a ordem/tipos do schema. Header CSV
+precisa conter todos os campos uma vez, sem extras. JSON rejeita extras e
+chaves repetidas; campos ausentes/null exigem nullable. Coluna só NA mantém
+seu tipo. Header CSV sem dados e JSON `[]` produzem colunas tipadas vazias.
+CSV vazio mantém o erro vigente; linhas curtas continuam erro estrutural.
+
+O leitor CSV aplica marcadores NA e gramáticas vigentes ao campo original;
+string preserva bytes e zeros iniciais. JSON preserva famílias: string recebe
+string, bool recebe booleano, int64 recebe token inteiro representável,
+float64 recebe fração/expoente ou inteiro exatamente representável. Não há
+coerção de `"123"` ou `1.0` para int64, nem de número para string. Falhas de
+conversão abortam mesmo quando nullable; não promovem o tipo e não viram NA.
+Diagnósticos identificam registro/campo base 1, tipo esperado e motivo; byte
+base 0 quando disponível. Contexto 0 indica header/descritor, não registro de
+dados; byte indisponível é identificado como tal. Erros sintáticos anteriores
+à associação mantêm os diagnósticos de parsing existentes.
+
+Sem schema, leitores preservam a inferência atual. Descritores C são
+emprestados até a chamada terminar; resultado tem nomes/buffers próprios.
+Arquivo com falha de leitura/fechamento não publica tabela parcial nos novos
+leitores. A validação vale para a importação, sem impor constraints futuras
+às mutações do DataSet. Defaults, overrides parciais, modo tolerante e outros
+tipos não estão implementados. Assinaturas e exemplos ficam na
+[API C](API_Reference.md#schema-api) e [API Lua](API_INDEX.md#schema-api).
 
 **Datetime nos formatos de texto (12.3):** `smaug_column_t` (fronteira C de I/O, Anel 3) carrega
 f64/i64/bool/str — não tem `dt`. O Anel 3 converte datetime para **ISO 8601** na

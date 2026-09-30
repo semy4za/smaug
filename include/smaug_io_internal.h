@@ -11,6 +11,29 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Buffer interno com comprimento real, inclusive para nomes vazios/NUL. */
+typedef struct {
+    char *data;
+    size_t length;
+} smaug_io_text_t;
+
+static inline char *io_copy_bytes(const char *data, size_t length) {
+    if (length == SIZE_MAX) {
+        return NULL;
+    }
+    char *copy = malloc(length + 1);
+    if (copy) {
+        memcpy(copy, data, length);
+        copy[length] = '\0';
+    }
+    return copy;
+}
+
+static inline int io_bytes_equal(const char *left, size_t left_length,
+                                 const char *right, size_t right_length) {
+    return left_length == right_length && memcmp(left, right, left_length) == 0;
+}
+
 /* Códigos de dtype para inferência (uso interno) */
 #define DT_UNKNOWN 0
 #define DT_I64     1
@@ -68,5 +91,18 @@ static inline smaug_table_t *make_error(const char *msg) {
     }
     return t;
 }
+
+#include "smaug_schema.h"
+
+/* Internal schema adapters. SIZE_MAX denotes no field/record/byte context. */
+smaug_table_t *smaug_io_schema_error(const char *format, const smaug_schema_t *schema,
+    size_t record, size_t field, size_t byte, const char *reason);
+smaug_table_t *smaug_io_schema_table(const smaug_schema_t *schema, size_t rows);
+size_t smaug_io_schema_find(const smaug_schema_t *schema, const char *name, size_t length);
+smaug_status_t smaug_io_schema_set_null(smaug_column_t *column, size_t row);
+const char *smaug_io_status_reason(smaug_status_t status);
+/* Allocates *buffer only on success; caller frees it. No partial read success. */
+smaug_status_t smaug_io_read_bytes(const char *path, char **buffer, size_t *length,
+    const char **reason);
 
 #endif /* SMAUG_IO_INTERNAL_H */

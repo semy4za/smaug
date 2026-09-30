@@ -10,7 +10,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-09-28 18:06:26 UTC
+Gerado em: 2026-09-30 02:46:49 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -617,6 +617,18 @@ Matriz origem→destino (`smaug_astype.h`); não cabe na tabela por-dtype acima 
 | f64 | dt | `smaug_f64_to_dt_checked` | 🟩 |
 | str | dt | `smaug_str_to_dt_checked` | 🟩 |
 
+
+### Schema — descritor e leitores
+
+Presença textual no frontend; execução e layout compilado têm auditoria própria.
+
+| função C | referenciada em Lua? |
+| :--- | :-: |
+| `smaug_schema_validate` | 🟩 |
+| `smaug_read_csv_mem_schema` | 🟩 |
+| `smaug_read_csv_schema` | 🟩 |
+| `smaug_read_json_mem_schema` | 🟩 |
+| `smaug_read_json_schema` | 🟩 |
 ## Eixo 4 — Paridade Anel 2 (operações relacionais) por dtype
 
 Heurística conservadora: verifica menção explícita do dtype no corpo da função. 🟩 = dtype mencionado explicitamente (provável suporte). 🟨 = dtype não mencionado (pode ser sem suporte, pode ser polimorfismo via dispatcher genérico — requer revisão manual).
@@ -849,21 +861,22 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `dataset/test_relational` | 13 | 42 | 92 | 6 | 75 | — | — |
 | `dataset/test_stat` | 117 | 14 | 18 | 1 | 17 | 4 | — |
 | `dataset/test_io_support` | 53 | 4 | 15 | 1 | 7 | — | — |
-| `io/test_csv` | 138 | 3 | 7 | 2 | 11 | 4 | 1 |
-| `io/test_json` | 48 | 4 | 4 | 1 | 2 | 2 | — |
+| `io/test_csv` | 143 | 3 | 7 | 2 | 11 | 4 | 1 |
+| `io/test_json` | 79 | 4 | 7 | 1 | 5 | 2 | — |
+| `io/test_schema` | 19 | 1 | 3 | 5 | 9 | — | — |
 | `props/test_props` | 40 | 10 | 32 | — | 7 | — | — |
 | `props/test_integration` | 88 | 23 | 3 | 2 | 5 | 1 | 1 |
 
-**Total de checks:** 2328
+**Total de checks:** 2383
 
 ### Menções totais por dtype (toda a suite)
 
 | dtype | menções |
 | :--- | :-: |
-| float64 | 295 |
-| int64 | 382 |
-| bool | 62 |
-| string | 297 |
+| float64 | 296 |
+| int64 | 388 |
+| bool | 67 |
+| string | 309 |
 | datetime | 103 |
 | categorical | 40 |
 
@@ -913,12 +926,14 @@ Cada método público do código deveria aparecer em `API_INDEX.md`. Faltantes p
 | `smaug_core.c` | 🟩 | — |
 | `smaug_csv.c` | 🟩 | — |
 | `smaug_datetime.c` | 🟩 | — |
+| `smaug_io_schema.c` | 🟩 | — |
 | `smaug_json.c` | 🟩 | — |
 | `smaug_ops_bool.c` | 🟩 | — |
 | `smaug_ops_f64.c` | 🟩 | — |
 | `smaug_ops_i64.c` | 🟩 | — |
 | `smaug_ops_str.c` | 🟩 | — |
 | `smaug_ops_window.c` | 🟩 | — |
+| `smaug_schema.c` | 🟩 | — |
 | `smaug_str.c` | 🟩 | — |
 
 ## Eixo 15 — Layout de struct (ABI) — header ↔ cdef
@@ -927,13 +942,15 @@ O `cdef` do `ffi_loader.lua` replica à mão o layout de cada struct dos headers
 
 | struct | layout | nota |
 | :--- | :-: | :-: |
+| `smaug_schema_t` | 🟩 | 2 campos, layout coerente |
+| `smaug_schema_field_t` | 🟩 | 4 campos, layout coerente |
 | `smaug_metadata_t` | 🟩 | 4 campos, layout coerente |
 | `smaug_series_bool_t` | 🟩 | 5 campos, layout coerente |
 | `smaug_series_str_t` | 🟩 | 9 campos, layout coerente |
 | `smaug_series_dt_t` | 🟩 | 5 campos, layout coerente |
-| `smaug_column_t` | 🟩 | 6 campos, layout coerente |
+| `smaug_column_t` | 🟩 | 7 campos, layout coerente |
 | `smaug_table_t` | 🟩 | 4 campos, layout coerente |
-| `smaug_csv_opts_t` | 🟩 | 6 campos, layout coerente |
+| `smaug_csv_opts_t` | 🟩 | 7 campos, layout coerente |
 | `smaug_csv_write_opts_t` | 🟩 | 4 campos, layout coerente |
 | `smaug_json_write_opts_t` | 🟩 | 1 campos, layout coerente |
 | `smaug_sort_col_ffi_t` | 🟩 | 2 campos, layout coerente |
@@ -945,7 +962,7 @@ O `cdef` do `ffi_loader.lua` replica à mão o layout de cada struct dos headers
 
 **Contagem global de status no relatório:**
 
-- 🟩 paridade: 1139
+- 🟩 paridade: 1148
 - ⬜ exceção registrada: 215
 - 🟨 suspeita (revisar): 257
 - 🟥 inconsistência clara: 15

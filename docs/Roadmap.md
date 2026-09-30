@@ -76,7 +76,8 @@ diagnósticos antes de ampliar a ABI.
 
 [Matriz de comparação](IO_REVIEW.md#r1-proposta): gramática atual versus
 destino, mudanças de compatibilidade e categorias de falha. A migração de astype e inferência CSV distingue falha operacional de texto
-inconversível desde a revisão de 29/09; JSON e transporte seguem abertos.
+inconversível desde a revisão de 29/09. A leitura numérica JSON foi migrada no
+seguimento abaixo; transporte e demais pontos de R3 seguem abertos.
 Suporte explícito a hexadecimal aprovado em 28/09. A
 [gramática detalhada](IO_REVIEW.md#r1-gramatica) registra as regras aprovadas
 e casos de aceitação/rejeição; hexadecimal inteiro é aceito em i64 e f64. A
@@ -100,15 +101,16 @@ de ambiente explicitadas. [Review](IO_REVIEW.md#core).
 <a id="r2"></a>
 ## R2 — Preservação C/Lua e compatibilidade ABI
 
-**Estado:** preservação de NUL e identificação da ABI aprovadas; implementação
-pendente. Detalhes do transporte de marcadores ainda propostos.
+**Estado:** transporte de NUL, comprimentos dos marcadores CSV e identificação
+da ABI implementados em 29/09. Ponte int64 e cleanup da adaptação de leitura
+também implementados; verificação Windows e inferência geral ainda abertas.
 
 - Preservar int64 nas duas direções: tabela C→DataSet e DataSet→writer,
   sem passagem intermediária por `number` Lua.
 - Transportar comprimento de valores e nomes; distinguir `a` de `a\0b`.
 - Coordenar `smaug_column_t.name_len`, opções de `na_values`, produtores C,
   cdef, buffers Lua e ownership. Metadata permanece fora desse recorte.
-- Implementar consulta estável `smaug_abi_version()` antes de acessar estruturas;
+- Consulta `smaug_abi_version()` implementada antes de acessar estruturas;
   biblioteca carregada incompatível deve falhar sem fallback silencioso.
 - Verificar cleanup quando a adaptação Lua lança erro e nos caminhos parciais C.
 
@@ -120,17 +122,20 @@ entre C compilado e FFI, falhas de alocação e testes Linux/Windows identificad
 <a id="r3"></a>
 ## R3 — Leitura e escrita CSV/JSON
 
-**Estado:** defeitos reproduzidos; políticas parcialmente fechadas.
+**Estado:** políticas estritas de JSON/CSV fechadas; integração de arquivo e
+compatibilidade de modos tolerantes permanecem.
 
-Implementar as decisões aprovadas: associação JSON por nome, união de campos,
+Implementadas inclusive para nomes com NUL: associação JSON por nome, união de campos,
 ordem por primeira aparição, desambiguação sem perda e ausência/null→NA;
-strings `""`, `"null"` e `"NA"` continuam texto. Validar documento completo,
-com erro por posição/motivo e sem resultado parcial.
+strings `""`, `"null"` e `"NA"` continuam texto. Estrutura do documento exige
+consumo completo e erro por posição/motivo sem resultado parcial. O JSON também
+valida UTF-8 estrito em nomes e valores, com diagnóstico por byte e sem saída
+parcial. Restam as demais políticas de strings e dialeto.
 
-Antes das respectivas mudanças, fechar largura irregular e dialeto CSV;
-inteiros fora da faixa, mistura int64/float64, zeros iniciais e schema explícito;
-BOM, UTF-8 e surrogates. Corrigir corte de tokens e saturação numérica sem
-escolher silenciosamente uma política de representação.
+Gramática numérica, faixa e promoção int64/float64 JSON foram aprovadas e
+implementadas em 29/09; corte de tokens e saturação foram corrigidos. O CSV
+agora exige largura exata, aceita BOM inicial/LF/CRLF e rejeita CR isolado e
+aspas malformadas. Resta fechar schema explícito e eventual modo tolerante.
 
 Completar diagnóstico da escrita em arquivo, propagação de erros de leitura/
 escrita/fechamento, limpeza parcial e fixtures com expectativas independentes.
@@ -245,6 +250,12 @@ Gramática R1 aprovada em 28/09. A revisão de 29/09 corrigiu o parser,
 `astype` e o consumidor CSV, mantendo a ABI e a arquitetura de anéis.
 **Estado de entrega:** mudanças locais sem commit; R1 permanece aberta.
 
+O checkpoint atual também inclui a frente R3: JSON e CSV seguem o contrato
+estrito baseado em RFC 8259/RFC 4180 e TensorFlow comparativo. JSON/CSV aceitam
+um BOM inicial apenas na leitura; writers nunca o emitem. CSV exige largura
+uniforme, aceita LF/CRLF, rejeita CR isolado e aspas malformadas. UTF-8 inválido
+continua sendo rejeitado no JSON, com byte e motivo, sem resultado parcial.
+
 **Concluído nesta etapa:**
 
 - Inteiros continuam a validar o sufixo após exceder a faixa, sem continuar
@@ -303,17 +314,178 @@ A seleção/restauração POSIX é nova para formatação; o ramo `_snprintf_l` 
 foi verificado no Windows. Mantidas as limitações de sanitizers e de Valgrind
 nos testes de arredondamento acima. Detalhes em IO_REVIEW, sem novo diário.
 
-**Próximo passo:** continuar R2/R3 para bytes/comprimentos no CSV e
-lexer/conversão JSON, que ainda usa libc diretamente e depende de locale. A política de faixa/inferência dos leitores permanece explícita: CSV
-sem schema ainda pode inferir texto para elemento numericamente inconversível.
-Não declarar leitura estrita implementada por a propagação de OOM ter passado.
-Completar Windows/sanitizers quando disponíveis e manter revisão incremental
-da suíte conforme R01–R09, sem nova campanha de renomeação global.
+**Seguimento — estrutura e números JSON (2026-09-29):** leitura exige fechamento
+do array, vírgulas entre registros e consumo integral após whitespace; erros
+trazem byte base 0 e motivo, sem tabela parcial. A política numérica foi aprovada
+pelo mantenedor após os exemplos e referências de
+[representação numérica](IO_REVIEW.md#r3-representacao-proposta). Inteiros usam
+int64; fração/expoente usa o core f64, com subnormais preservados, sem truncamento
+ou dependência do locale global. Overflow/underflow para zero são diagnosticados.
+A promoção de coluna mista exige exatidão dos inteiros, considerando o dtype final.
+O probe `scripts/audit_json_numeric_policy.c` permite comparar antes/depois;
+não é teste de aceitação por si só.
+
+Validação: `make test` (12 executáveis C; I/O 430, allocfail 2.667 checks) e
+`make test-lua` (20 suítes) passaram. I/O passou com `-O2 -Wall -Wextra
+-Wpedantic -Werror` e Valgrind: 1.962 alocações/liberações, zero blocos pendentes
+e zero erros. Allocfail também passou sob Valgrind, sem erros ou blocos pendentes.
+O probe recompilado em `pt_BR.utf8` confirmou ponto fixo, subnormal preservado e
+token longo com valor 1. Guard de estilo (33 arquivos) e `git diff --check` passaram.
+A campanha numérica detectou 13 mutantes compiláveis, quatro novos de JSON
+(precisão, truncamento, zero inicial e overflow); baselines de I/O e allocfail
+passaram sob Valgrind. Não é campanha completa de mutações estruturais/Unicode.
+
+**Seguimento — associação JSON por nome (2026-09-29):** união dos campos pela
+primeira aparição, NA retroativo e identidade por nome original/ordinal da
+ocorrência. Sufixos publicados não participam da associação; colisões com nomes
+literais preservam todos os valores. Inferência, promoção numérica e construção
+usam o mesmo mapa. O setter de string passa a propagar falha de alocação.
+
+`make test` passou (I/O 467 checks; allocfail 2.745). `make test-lua` passou;
+o teste JSON ampliado passou depois com 56 checks, incluindo roundtrip Lua.
+A varredura OOM específica usa a contagem real de alocações, exige a injeção e
+verifica ausência de resultado parcial e recuperação. Nomes com NUL ainda não
+estão cobertos: dependem da migração de comprimentos da fronteira C/Lua.
+I/O passou com `-O2 -Wall -Wextra -Wpedantic -Werror` e sob Valgrind: 2.095
+alocações/liberações, zero erros/blocos pendentes. Baseline allocfail também
+passou sob Valgrind. A campanha ampliada detectou 16 mutantes compiláveis,
+três novos de associação JSON; guard de estilo e diff passaram. Sem nova
+execução Windows/sanitizers ou regeneração de cobertura global.
+
+**Seguimento — transporte de bytes e ABI 1 (2026-09-29):** NUL preservado em
+valores e nomes C↔Lua↔CSV/JSON; JSON exige escape, CSV carrega bytes crus.
+`smaug_column_t.name_len` e `smaug_csv_opts_t.na_lengths` transportam tamanhos
+reais. Writers rejeitam ponteiro de nome NULL; vazio exige ponteiro válido e
+comprimento zero. Marcadores não vazios exigem comprimentos e ponteiros válidos;
+lista explícita vazia desativa padrões. Token com NUL não é convertido por prefixo.
+Recompilar biblioteca e consumidores juntos: o novo frontend exige ABI 1 antes
+de acessar structs. O mecanismo não protege frontends antigos.
+
+`make test` passou (I/O 549 checks; allocfail 2.750), assim como as 20 suítes
+Lua; JSON ampliado tem 67 checks. Build I/O com `-O2 -Wall -Wextra -Wpedantic
+-Werror` passou; Valgrind registrou 2.383 alocações/liberações, zero erros/blocos
+pendentes. Baseline allocfail passou sob Valgrind na campanha de 20 mutantes
+compiláveis, todos detectados. `scripts/audit_io_abi.py` verificou sizeof/offsetof,
+símbolo ausente/versão divergente sem fallback, fallback de arquivo não carregável
+e falha do setter de string na ponte Lua com cleanup/recuperação. Guard e diff
+passaram. Sem nova execução Windows/sanitizers ou cobertura global.
+
+**Seguimento — ponte int64 e cleanup Lua (2026-09-29):** reader mantém cdata,
+writer usa `get_raw`; getter público `get()` mantém seu contrato. A adaptação
+para DataSet libera a tabela C em sucesso/erro; construção da série inteira no
+writer registra ownership antes do laço e confere status dos setters.
+
+As 20 suítes Lua passaram (CSV 145 checks, JSON 102). Expectativas independentes
+cobrem leitura, escrita e roundtrip de ±(2^53+1), INT64_MAX, INT64_MIN, zero e NA.
+O probe ABI manteve suas verificações e adicionou falha no setter int64/exceção
+na segunda coluna, com liberação contada e recuperação. Três mutantes Lua foram
+detectados: reader via number, writer via get e tabela C abandonada. O teste
+antigo de injeção em get agora alcança get_raw e exige uma injeção real. Guard
+e diff passaram. Sem mudança C nesta etapa; as evidências C/Valgrind anteriores
+não equivalem a nova execução de memória para todo o frontend.
+
+**Preparação — leitura estrita (2026-09-29):** probe
+`scripts/audit_io_strict_policy.c` compilado com warnings como erro reproduziu
+UTF-8 inválido aceito pelo reader/writer JSON, campos CSV excedentes descartados,
+aspas não fechadas aceitas e texto após aspas convertido em linha extra. A
+recomendação e as referências estão no review de I/O. Solicitadas as escolhas
+JSON UTF-8/BOM e largura CSV; aguardando resposta antes das mudanças dependentes.
+A aceitação atual de linha curta tem teste explícito. TensorFlow foi incluído
+como referência comparativa no review, a pedido do mantenedor: schema/default
+por campo, distinção entre largura inválida e campo vazio, e política explícita
+de erros Unicode. Consulta documental/de fonte, sem execução local do TensorFlow. Nenhuma alteração de parser
+nesta preparação; o probe é observacional, não um teste de conformidade.
+
+**Decisão documental — referências de I/O (2026-09-29):** mantenedor aprovou
+TensorFlow como referência comparativa e a separação entre erro estrutural,
+ausência em campo existente e erro de codificação. Registrado em
+[CONTRACT](CONTRACT.md#io-erros-estrutura-ausencia-codificacao): leitura estrita
+rejeita estrutura inválida; JSON reader/writer rejeitam UTF-8 inválido sem
+substituir bytes. Core/CSV preservam bytes crus. Não adotar defaults TensorFlow
+nem introduzir dependência. UTF-8 JSON foi implementado no seguimento abaixo;
+BOM e largura CSV foram resolvidos pela política estrita seguinte.
+
+**Implementação UTF-8 JSON (2026-09-29):** reader e writer rejeitam sequências
+inválidas, truncadas, sobrelongas, surrogate codificadas e codepoints fora de
+U+10FFFF em nomes/valores. O diagnóstico informa o byte; falha não publica
+tabela nem buffer parcial. Foram adicionados testes C/Lua de fronteira e onze
+mutantes dirigidos de UTF-8/dialeto, todos detectados. Core/CSV continuam
+preservando bytes crus.
+
+**Implementação do dialeto CSV (2026-09-29):** a leitura remove um único BOM
+inicial, aceita LF e CRLF, rejeita CR isolado e diagnostica aspas não fechadas,
+texto após aspas fechadas e aspas em campo não citado. Cada registro deve ter a
+mesma largura do header; campo vazio explícito continua ausência/NA. A escrita
+não emite BOM.
+
+Validação deste checkpoint: `make test` passou com 700 verificações de I/O C e
+2.788 verificações de alocação; `make test-lua` passou com 149 verificações CSV
+e 103 JSON. O build otimizado com `-Werror` e Valgrind passaram duas vezes no
+I/O. ABI, guard de estilo e `git diff --check` passaram. A campanha C agora
+detecta 31 mutantes compiláveis, sem sobreviventes. Windows, sanitizers,
+schema explícito e modo tolerante opcional permanecem fora desta retomada.
+
+**Retomada — fechamento de arquivo (2026-09-29):** corrigidos os writers CSV/JSON
+que retornavam sucesso quando `fclose` falhava ao descarregar o buffer. Regressão
+em `/dev/full` falhou nos dois writers antes da correção e passou depois: 703
+checks de I/O, build GCC com `-O2 -Wall -Wextra -Wpedantic -Werror` e Valgrind
+(2.940 alocações/liberações, zero erros/blocos pendentes). Sem mudança de ABI;
+sem garantia de escrita atômica. `make test-lua` passou nas 20 suítes (CSV 149,
+JSON 103 checks); guard de estilo e diff aprovados.
+ASan/UBSan tentados novamente: link ASan falhou pela mesma biblioteca ausente;
+UBSan também tem runtime ausente. Compilador MinGW não encontrado no PATH.
+Schema explícito tem direção conceitual aprovada: reutilizável pelo Smaug,
+com primeira implementação em CSV/JSON. Opções de importação ficam separadas
+da descrição dos dados; `.smg` e Models permanecem futuros. Contrato em
+[Schema reutilizável](CONTRACT.md#schema-reutilizavel); detalhes da API,
+conversões e modo tolerante continuam em proposta no IO_REVIEW, sem implementação.
+Diagnóstico detalhado de arquivo e validação dos readers permanecem pendentes.
+
+**Implementação — schema reutilizável (2026-09-29):** `smaug_schema.h`/C e
+`smaug.Schema`/FFI agora implementam o primeiro recorte aprovado. O schema é
+completo, não vazio, com nomes únicos por bytes, `bool`/`int64`/`float64`/`string`
+e `nullable` explícito. CSV com header e JSON associam por nome; CSV sem header
+associa por posição. A saída segue a ordem do schema, inclusive em `[]`, header
+sem dados e colunas só NA. Extras, duplicatas, ausência não nullable, famílias
+JSON incompatíveis, conversão numérica inválida, perda de precisão, UTF-8
+inválido e falhas estruturais geram erro sem tabela parcial. String mantém zeros
+iniciais e bytes/NUL; descritores e resultados têm ownership separado.
+
+As APIs existentes sem schema preservam a inferência anterior. Leitores de
+memória e arquivo foram adicionados sem alterar layouts ABI existentes; erro de
+leitura/fechamento também é propagado. Defaults, overrides parciais, modo
+tolerante, datetime/categorical e persistência `.smg` continuam fora do recorte.
+
+**Verificação da implementação:** `bash scripts/build.sh --skip-manifest` passou
+no Linux com GCC 16.2.1/glibc 2.43: 13 binários C, incluindo `test_schema`
+(131 checks), `test_io_c` (703), e `test_allocfail` (3.927 verificações). As 21
+suítes Lua passaram; schema teve 82 checks, CSV 149 e JSON 103. O guard de estilo
+(35 arquivos), ABI C/FFI e `git diff --check` passaram. `test_schema` e
+`test_allocfail` passaram sob Valgrind, sem erros ou blocos pendentes. A auditoria
+numérica/I-O detectou 39 mutantes compiláveis, sem sobreviventes; inclui nove
+mutantes específicos de schema. A coleta de coverage foi regenerada: 5.218/5.366
+linhas (97,24%) e 5.216/5.660 branches-alvo (92,16%); `smaug_io_schema.c` ficou
+91,73%/83,15% e `smaug_schema.c` 100%/97,06%. A paridade atualizada passou nos
+15 eixos, incluindo schema no C↔Lua, cobertura de testes e ABI.
+
+**Limitações desta rodada:** Windows/MinGW não foi executado; ASan/UBSan
+continuam sem runtime utilizável neste ambiente. O executor Windows foi ajustado
+para exigir exit code zero além do texto `PASS`, mas ainda precisa de execução
+na plataforma. O relatório de coverage agora inclui as novas fontes e suítes;
+parity/manifest continuam artefatos gerados, não substitutos da execução Windows.
+Valgrind individual de `test_schema` e `test_allocfail` passou sem erros ou
+vazamentos. A rodada Valgrind completa para no `test_astype` por divergência
+numérica conhecida no arredondamento de subnormal sob Valgrind; o erro não é de
+memória e o binário libera todos os blocos.
+
+**Próximo passo:** revisar a API implementada contra consumidores externos e
+preparar a migração Windows/sanitizers. Schema parcial, defaults e modo tolerante
+exigem decisão própria antes de qualquer extensão.
 
 | Frente | Já conferido | Falta para avançar |
 |---|---|---|
-| Core numérico | Helpers checked: 30.712 chamadas e cinco mutações detectadas; parser/formatter/astype/CSV com regressões de status, OOM e nove mutações detectadas | Leitura JSON, transporte CSV, Windows e sanitizers |
-| I/O | 30 + 23 casos observacionais; baseline recompilada; NUL, int64 e associação JSON reproduzidos | Fechar transporte/opções e implementar R2/R3 |
+| Core numérico | Helpers checked: 30.712 chamadas e cinco mutações detectadas; parser/formatter/astype/CSV/JSON com regressões de status, OOM e 20 mutações detectadas | Windows e sanitizers |
+| I/O | 834 verificações C (`test_io_c` 703 + schema 131), 149 CSV + 103 JSON + 82 schema em Lua; NUL, int64, associação JSON, UTF-8, dialeto estrito e schema reproduzidos; 39 mutantes detectados | Windows/sanitizers e modo tolerante opcional |
 | Inferência Lua | Entradas mapeadas no review de I/O | Decidir divergências, sem uniformizar por conveniência |
 | Datetime | Parser e astype estritos C/Lua implementados em 25/09; build Windows histórica passou | Integração restante, 11 componentes escalares + 11 de série, formatter e semana ISO |
 | Relacional | Reescrita inicial; três defeitos corrigidos; 68 casos passaram no seguimento de 25/09 | Contratos count/pivot/join, migração dos casos antigos e mutações |

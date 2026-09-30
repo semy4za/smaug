@@ -60,6 +60,19 @@ locale_t __wrap_newlocale(int category, const char *name, locale_t base) {
 }
 #endif
 
+/* Close the real stream even when reporting a simulated delayed I/O failure. */
+extern int __real_fclose(FILE *stream);
+static int fail_file_close = 0;
+int __wrap_fclose(FILE *stream) {
+    int result = __real_fclose(stream);
+    if (fail_file_close) {
+        fail_file_close = 0;
+        errno = EIO;
+        return EOF;
+    }
+    return result;
+}
+
 /* ---- interceptação de malloc/realloc ---------------------------------- */
 extern void *__real_malloc(size_t);
 extern void *__real_realloc(void *, size_t);
@@ -1896,10 +1909,14 @@ static void allocation_failure_csv_write(void) {
     smaug_str_set(source_series, 0, "a,b", 3); smaug_str_set_null(source_series, 1);
 
     smaug_column_t column_names[4] = {0};
-    column_names[0].name = "i"; column_names[0].dtype = "int64";   column_names[0].i64     = integer_series;
-    column_names[1].name = "f"; column_names[1].dtype = "float64"; column_names[1].f64     = floating_point_series;
-    column_names[2].name = "b"; column_names[2].dtype = "bool";    column_names[2].boolcol = boolean_series;
-    column_names[3].name = "s"; column_names[3].dtype = "string";  column_names[3].str     = source_series;
+    column_names[0].name = "i";
+    column_names[0].name_len = sizeof("i") - 1; column_names[0].dtype = "int64";   column_names[0].i64     = integer_series;
+    column_names[1].name = "f";
+    column_names[1].name_len = sizeof("f") - 1; column_names[1].dtype = "float64"; column_names[1].f64     = floating_point_series;
+    column_names[2].name = "b";
+    column_names[2].name_len = sizeof("b") - 1; column_names[2].dtype = "bool";    column_names[2].boolcol = boolean_series;
+    column_names[3].name = "s";
+    column_names[3].name_len = sizeof("s") - 1; column_names[3].dtype = "string";  column_names[3].str     = source_series;
 
     smaug_table_t values = {0};
     values.columns = column_names; values.ncols = 4; values.nrows = 2;
@@ -1953,6 +1970,71 @@ static void allocation_failure_json_read_memory(void) {
     OK(read_json_memory_result && !read_json_memory_result->error && read_json_memory_result->nrows == 2 && read_json_memory_result->ncols == 4,
        "json_read_mem: sucesso");
     smaug_table_free(read_json_memory_result);
+}
+
+static void allocation_failure_json_utf8_growth(void) {
+    char document[128];
+    memcpy(document, "[{\"n\":\"", 7);
+    memset(document + 7, 'a', 63);
+    memcpy(document + 70, "\xf0\x90\x80\x80\"}]", 7);
+    reset(-1);
+    smaug_table_t *table = smaug_read_json_mem(document, 77);
+    long observed_allocations = allocation_count;
+    OK(table && !table->error && table->columns[0].str, "UTF8 growth allocation baseline");
+    smaug_table_free(table);
+    for (long allocation = 0; allocation < observed_allocations; allocation++) {
+        reset(allocation);
+        table = smaug_read_json_mem(document, 77);
+        OK(injected_failures == 1, "UTF8 growth allocation failure injected");
+        OK(!table || (table->error && !table->columns && !table->nrows),
+           "UTF8 growth OOM has no partial output");
+        smaug_table_free(table);
+    }
+    reset(-1);
+    table = smaug_read_json_mem(document, 77);
+    OK(table && !table->error && table->columns[0].str, "UTF8 growth recovery");
+    if (table && !table->error && table->columns[0].str) {
+        size_t length;
+        const char *value = smaug_str_get(table->columns[0].str, 0, &length);
+        OK(value && length == 67 && memcmp(value, document + 7, 67) == 0,
+           "UTF8 growth recovery exact bytes");
+    }
+    smaug_table_free(table);
+    smaug_column_t column = {.name = "\x80", .name_len = 1};
+    smaug_table_t source = {.columns = &column, .ncols = 1};
+    char *error = NULL;
+    size_t length = 77;
+    reset(0);
+    char *output = smaug_write_json_mem(&source, NULL, &length, &error);
+    OK(injected_failures == 1 && !output && !error && length == 77,
+       "UTF8 writer diagnostic OOM preserves failure");
+    free(output);
+    free(error);
+    reset(-1);
+}
+
+static void allocation_failure_json_named_columns(void) {
+    const char *document = "[{}, {\"a\":1,\"a\":2,\"text\":\"hello\\u0000tail\"},"
+                           "{\"text\":\"world\\u0000tail\",\"a.1\":30,\"a\":3,\"a\":4}]";
+    reset(-1);
+    smaug_table_t *table = smaug_read_json_mem(document, strlen(document));
+    long observed_allocations = allocation_count;
+    OK(table && !table->error && table->ncols == 4 && table->nrows == 3,
+       "JSON named allocation baseline");
+    smaug_table_free(table);
+    for (long allocation = 0; allocation < observed_allocations; allocation++) {
+        reset(allocation);
+        table = smaug_read_json_mem(document, strlen(document));
+        OK(injected_failures == 1, "JSON named allocation failure actually injected");
+        OK(!table || (table->error && !table->columns && !table->nrows && !table->ncols),
+           "JSON named OOM publishes no partial result");
+        smaug_table_free(table);
+    }
+    reset(-1);
+    table = smaug_read_json_mem(document, strlen(document));
+    OK(table && !table->error && table->ncols == 4 && table->nrows == 3,
+       "JSON named allocation recovery");
+    smaug_table_free(table);
 }
 
 /* JSON — leitura com muitos records (exercita realloc do vetor de recs[]) */
@@ -2010,10 +2092,14 @@ static void allocation_failure_json_write(void) {
     smaug_str_set(source_series, 0, "SP", 2);      smaug_str_set_null(source_series, 1);
 
     smaug_column_t column_names[4] = {0};
-    column_names[0].name = "i"; column_names[0].dtype = "int64";   column_names[0].i64     = integer_series;
-    column_names[1].name = "f"; column_names[1].dtype = "float64"; column_names[1].f64     = floating_point_series;
-    column_names[2].name = "b"; column_names[2].dtype = "bool";    column_names[2].boolcol = boolean_series;
-    column_names[3].name = "s"; column_names[3].dtype = "string";  column_names[3].str     = source_series;
+    column_names[0].name = "i";
+    column_names[0].name_len = sizeof("i") - 1; column_names[0].dtype = "int64";   column_names[0].i64     = integer_series;
+    column_names[1].name = "f";
+    column_names[1].name_len = sizeof("f") - 1; column_names[1].dtype = "float64"; column_names[1].f64     = floating_point_series;
+    column_names[2].name = "b";
+    column_names[2].name_len = sizeof("b") - 1; column_names[2].dtype = "bool";    column_names[2].boolcol = boolean_series;
+    column_names[3].name = "s";
+    column_names[3].name_len = sizeof("s") - 1; column_names[3].dtype = "string";  column_names[3].str     = source_series;
 
     smaug_table_t values = {0};
     values.columns = column_names; values.ncols = 4; values.nrows = 2;
@@ -2042,8 +2128,10 @@ static void allocation_failure_json_write_pretty(void) {
     smaug_i64_set(integer_series, 0, 1); smaug_i64_set_null(integer_series, 1); smaug_i64_set(integer_series, 2, 3);
     smaug_str_set(source_series, 0, "a", 1); smaug_str_set(source_series, 1, "b", 1); smaug_str_set_null(source_series, 2);
     smaug_column_t column_names[2] = {0};
-    column_names[0].name = "i"; column_names[0].dtype = "int64";  column_names[0].i64 = integer_series;
-    column_names[1].name = "s"; column_names[1].dtype = "string"; column_names[1].str = source_series;
+    column_names[0].name = "i";
+    column_names[0].name_len = sizeof("i") - 1; column_names[0].dtype = "int64";  column_names[0].i64 = integer_series;
+    column_names[1].name = "s";
+    column_names[1].name_len = sizeof("s") - 1; column_names[1].dtype = "string"; column_names[1].str = source_series;
     smaug_table_t values = {0};
     values.columns = column_names; values.ncols = 2; values.nrows = 3;
 
@@ -2825,9 +2913,22 @@ static void allocation_failure_numeric_formatting(void) {
     }
     locale_failure_index = 0;
     locale_call_count = 0;
+    const char *numeric_json = "[{\"n\":1.5}]";
+    smaug_table_t *numeric_table = smaug_read_json_mem(numeric_json, strlen(numeric_json));
+    OK(numeric_table && numeric_table->error && strstr(numeric_table->error, "NOMEM")
+       && numeric_table->nrows == 0 && !numeric_table->columns && locale_call_count == 1,
+       "JSON numeric locale OOM propagates without partial table");
+    smaug_table_free(numeric_table);
+    locale_failure_index = -1;
+    numeric_table = smaug_read_json_mem(numeric_json, strlen(numeric_json));
+    OK(numeric_table && !numeric_table->error && numeric_table->nrows == 1,
+       "JSON numeric recovery after locale OOM");
+    smaug_table_free(numeric_table);
+    locale_failure_index = 1;
+    locale_call_count = 0;
     const char *mixed_json = "[{\"value\":1.5},{\"value\":\"text\"}]";
     smaug_table_t *mixed_table = smaug_read_json_mem(mixed_json, strlen(mixed_json));
-    OK(mixed_table != NULL && mixed_table->error != NULL && locale_call_count == 1,
+    OK(mixed_table != NULL && mixed_table->error != NULL && locale_call_count == 2,
        "JSON misto: falha ao formatar número não vira string vazia");
     smaug_table_free(mixed_table);
     locale_failure_index = -1;
@@ -2839,6 +2940,111 @@ static void allocation_failure_numeric_formatting(void) {
     smaug_str_free(converted);
     smaug_table_free(table);
 #endif
+}
+
+static smaug_table_t *read_schema_allocation_case(int mode, const char *csv, const char *json,
+    const char *path, const smaug_schema_t *schema) {
+    switch (mode) {
+        case 0: return smaug_read_csv_mem_schema(csv, strlen(csv), NULL, schema);
+        case 1: return smaug_read_json_mem_schema(json, strlen(json), schema);
+        case 2: return smaug_read_csv_schema(path, NULL, schema);
+        default: return smaug_read_json_schema(path, schema);
+    }
+}
+
+static void check_schema_allocation_result(smaug_table_t *table) {
+    OK(table && !table->error && table->nrows == 1 && table->ncols == 4,
+       "schema allocation recovery shape");
+    size_t length;
+    const char *text = smaug_str_get(table->columns[0].str, 0, &length);
+    OK(text && length == 6000 && text[0] == 'x' && text[5999] == 'x',
+       "schema allocation recovery long string");
+    smaug_status_t status;
+    OK(smaug_i64_get(table->columns[1].i64, 0, &status) == INT64_MAX && status == SMG_OK,
+       "schema allocation recovery exact int64");
+    OK(smaug_bool_get(table->columns[2].boolcol, 0, &status) == 0 && status == SMG_OK,
+       "schema allocation recovery false");
+    OK(smaug_f64_get(table->columns[3].f64, 0, &status) == 0.5 && status == SMG_OK,
+       "schema allocation recovery float");
+}
+
+static void allocation_failure_schema(void) {
+    const smaug_schema_field_t fields[] = {
+        {"text", 4, SMAUG_DTYPE_STRING, 0}, {"count", 5, SMAUG_DTYPE_INT64, 1},
+        {"flag", 4, SMAUG_DTYPE_BOOL, 1}, {"real", 4, SMAUG_DTYPE_FLOAT64, 1}
+    };
+    const smaug_schema_t schema = {fields, 4};
+    char long_text[6001];
+    memset(long_text, 'x', sizeof(long_text) - 1);
+    long_text[sizeof(long_text) - 1] = '\0';
+    char csv[6300];
+    char json[6300];
+    int written = snprintf(csv, sizeof(csv),
+        "flag,count,real,text\nfalse,9223372036854775807,0.5,%s\n", long_text);
+    OK(written > 0 && (size_t)written < sizeof(csv), "schema CSV fixture size");
+    written = snprintf(json, sizeof(json),
+        "[{\"flag\":false,\"count\":9223372036854775807,\"real\":0.5,\"text\":\"%s\"}]", long_text);
+    OK(written > 0 && (size_t)written < sizeof(json), "schema JSON fixture size");
+    const char *temporary = getenv("TMPDIR");
+    if (!temporary || !temporary[0]) {
+        temporary = getenv("TEMP");
+    }
+    if (!temporary || !temporary[0]) {
+        temporary = "/tmp";
+    }
+    char path[1024];
+    written = snprintf(path, sizeof(path), "%s/smaug_schema_allocfail.data", temporary);
+    OK(written > 0 && (size_t)written < sizeof(path), "schema temporary path size");
+    for (int mode = 0; mode < 4; mode++) {
+        reset(-1);
+        if (mode >= 2) {
+            FILE *file = fopen(path, "wb");
+            OK(file != NULL, "schema file fixture open");
+            const char *document = mode == 2 ? csv : json;
+            OK(fwrite(document, 1, strlen(document), file) == strlen(document),
+               "schema file fixture write");
+            OK(fclose(file) == 0, "schema file fixture close");
+        }
+        reset(-1);
+        smaug_table_t *table = read_schema_allocation_case(mode, csv, json, path, &schema);
+        long observed = allocation_count;
+        check_schema_allocation_result(table);
+        smaug_table_free(table);
+        for (long allocation = 0; allocation < observed; allocation++) {
+            reset(allocation);
+            table = read_schema_allocation_case(mode, csv, json, path, &schema);
+            OK(injected_failures == 1, "schema allocation failure actually injected");
+            OK(!table || (table->error && !table->columns && !table->nrows && !table->ncols),
+               "schema OOM never publishes partial success");
+            smaug_table_free(table);
+            reset(-1);
+            table = read_schema_allocation_case(mode, csv, json, path, &schema);
+            check_schema_allocation_result(table);
+            smaug_table_free(table);
+        }
+        reset(-1);
+        if (mode >= 2) {
+            fail_file_close = 1;
+            table = read_schema_allocation_case(mode, csv, json, path, &schema);
+            OK(fail_file_close == 0, "schema file close failure actually injected");
+            OK(table && table->error && strstr(table->error, "close failed") &&
+               !table->columns && !table->nrows && !table->ncols,
+               "schema file close failure never publishes partial success");
+            smaug_table_free(table);
+            table = read_schema_allocation_case(mode, csv, json, path, &schema);
+            check_schema_allocation_result(table);
+            smaug_table_free(table);
+            OK(remove(path) == 0, "schema fixture cleanup");
+        }
+    }
+    /* A diagnostic allocation failure must not turn an invalid schema into success. */
+    for (long allocation = 0; allocation < 2; allocation++) {
+        reset(allocation);
+        smaug_table_t *table = smaug_read_json_mem_schema("[]", 2, NULL);
+        OK(injected_failures == 1 && !table, "schema diagnostic OOM remains failure");
+        smaug_table_free(table);
+    }
+    reset(-1);
 }
 
 int main(void) {
@@ -2960,12 +3166,15 @@ int main(void) {
     allocation_failure_bool_cow_append_null();
 
     /* Anel 3 — parsers CSV e JSON */
+    allocation_failure_schema();
     allocation_failure_csv_read_memory();
     allocation_failure_csv_read_quoted();
     allocation_failure_csv_read_many_rows();
     allocation_failure_csv_read_no_header();
     allocation_failure_csv_write();
     allocation_failure_json_read_memory();
+    allocation_failure_json_named_columns();
+    allocation_failure_json_utf8_growth();
     allocation_failure_json_read_many_records();
     allocation_failure_json_read_long_string();
     allocation_failure_json_write();

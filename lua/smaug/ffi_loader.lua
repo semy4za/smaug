@@ -13,6 +13,8 @@
 local ffi = require("ffi")
 
 ffi.cdef([[
+    uint32_t smaug_abi_version(void);
+
     /* ===== Tipos base ===== */
 
     typedef struct smaug_hash_table smaug_hash_table_t;  /* opaque (GroupBy futuro) */
@@ -418,6 +420,7 @@ ffi.cdef([[
 
     typedef struct {
         const char          *name;
+        size_t               name_len;
         const char          *dtype;
         smaug_series_f64_t  *f64;
         smaug_series_i64_t  *i64;
@@ -432,6 +435,22 @@ ffi.cdef([[
         char           *error;
     } smaug_table_t;
 
+    typedef enum {
+        SMAUG_DTYPE_BOOL = 1, SMAUG_DTYPE_INT64 = 2,
+        SMAUG_DTYPE_FLOAT64 = 3, SMAUG_DTYPE_STRING = 4
+    } smaug_dtype_t;
+    typedef struct {
+        const char *name;
+        size_t name_len;
+        smaug_dtype_t dtype;
+        int nullable;
+    } smaug_schema_field_t;
+    typedef struct {
+        const smaug_schema_field_t *fields;
+        size_t count;
+    } smaug_schema_t;
+    smaug_status_t smaug_schema_validate(const smaug_schema_t *schema, size_t *error_field);
+
     /* stdlib básico necessário para o frontend I/O */
     void* malloc(size_t size);
     void  free(void *ptr);
@@ -442,6 +461,7 @@ ffi.cdef([[
         char        sep;
         int         header;
         const char **na_values;
+        const size_t *na_lengths;
         size_t      na_count;
         char        quote;
         char        decimal;
@@ -460,6 +480,14 @@ ffi.cdef([[
     smaug_table_t*          smaug_read_csv_mem(const char *buf, size_t len, const smaug_csv_opts_t *opts);
     int                     smaug_write_csv(const char *path, const smaug_table_t *t, const smaug_csv_write_opts_t *opts);
     char*                   smaug_write_csv_mem(const smaug_table_t *t, const smaug_csv_write_opts_t *opts, size_t *out_len, char **err_out);
+
+    smaug_table_t *smaug_read_csv_mem_schema(const char *buffer, size_t length,
+        const smaug_csv_opts_t *opts, const smaug_schema_t *schema);
+    smaug_table_t *smaug_read_csv_schema(const char *path,
+        const smaug_csv_opts_t *opts, const smaug_schema_t *schema);
+    smaug_table_t *smaug_read_json_mem_schema(const char *buffer, size_t length,
+        const smaug_schema_t *schema);
+    smaug_table_t *smaug_read_json_schema(const char *path, const smaug_schema_t *schema);
 
     typedef struct { int pretty; } smaug_json_write_opts_t;
 
@@ -656,7 +684,15 @@ local function load_library()
     local errors = {}
     for _, path in ipairs(candidates) do
         local ok, lib = pcall(ffi.load, path)
-        if ok then return lib end
+        if ok then
+            local version_ok, version = pcall(function() return lib.smaug_abi_version() end)
+            if not version_ok or version ~= 1 then
+                error("Smaug: ABI incompatível em " .. path ..
+                      "; esperado 1, recebido " .. (version_ok and tostring(version) or "sem símbolo") ..
+                      ". Recompile a biblioteca e atualize o frontend juntos.", 2)
+            end
+            return lib
+        end
         errors[#errors + 1] = "  " .. path .. " -> " .. tostring(lib)
     end
 

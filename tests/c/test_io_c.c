@@ -18,6 +18,7 @@
 #include <string.h>
 #include <assert.h>
 #include <math.h>
+#include <float.h>
 
 static int passed_checks = 0;
 static int failed_checks = 0;
@@ -136,15 +137,13 @@ static void test_csv_crlf(void) {
 }
 
 static void test_csv_cr_only(void) {
-    /* CR sem LF — menos comum mas válido */
+    /* RFC 4180: CR isolado não é terminador válido; só CRLF ou LF. */
     const char *text_value = "a,b\r1,2\r3,4\r";
     smaug_table_t *read_csv_memory_result = smaug_read_csv_mem(text_value, strlen(text_value), NULL);
-    CHECK(read_csv_memory_result && !read_csv_memory_result->error,        "CR only: sem erro");
-    CHECK(read_csv_memory_result->nrows == 2,         "CR only: 2 linhas");
-    CHECK(get_int64(read_csv_memory_result, 0, 0) == 1,"CR only: a[0]=1");
-    CHECK(get_int64(read_csv_memory_result, 1, 0) == 2,"CR only: b[0]=2");
-    CHECK(get_int64(read_csv_memory_result, 0, 1) == 3,"CR only: a[1]=3");
-    CHECK(get_int64(read_csv_memory_result, 1, 1) == 4,"CR only: b[1]=4");
+    CHECK(read_csv_memory_result && read_csv_memory_result->error,
+          "CR only: erro estrutural");
+    CHECK(read_csv_memory_result && strstr(read_csv_memory_result->error, "CR isolado"),
+          "CR only: diagnóstico orienta CRLF/LF");
     smaug_table_free(read_csv_memory_result);
 }
 
@@ -303,11 +302,27 @@ static void test_csv_quotes_escaped(void) {
 }
 
 static void test_csv_quotes_unclosed(void) {
-    /* aspas não fechadas — parser deve tolerar (trata como fim de buffer) */
+    /* aspas não fechadas são erro estrutural, sem linha parcial. */
     const char *text_value = "v\n\"abc\n";
     smaug_table_t *read_csv_memory_result = smaug_read_csv_mem(text_value, strlen(text_value), NULL);
-    CHECK(read_csv_memory_result != NULL, "aspas não fechadas: retorna algo (sem crash)");
+    CHECK(read_csv_memory_result && read_csv_memory_result->error,
+          "aspas não fechadas: diagnóstico");
+    CHECK(read_csv_memory_result && strstr(read_csv_memory_result->error, "aspas não fechadas"),
+          "aspas não fechadas: motivo explícito");
     smaug_table_free(read_csv_memory_result);
+}
+
+static void test_csv_quotes_structural_errors(void) {
+    const char *trailing = "v\n\"x\"junk\n";
+    smaug_table_t *table = smaug_read_csv_mem(trailing, strlen(trailing), NULL);
+    CHECK(table && table->error && strstr(table->error, "texto após aspas"),
+          "aspas: texto após fechamento é erro");
+    smaug_table_free(table);
+    const char *unquoted = "v\nx\"y\n";
+    table = smaug_read_csv_mem(unquoted, strlen(unquoted), NULL);
+    CHECK(table && table->error && strstr(table->error, "campo não citado"),
+          "aspas: quote em campo não citado é erro");
+    smaug_table_free(table);
 }
 
 static void test_csv_newline_in_quoted_field(void) {
@@ -368,6 +383,8 @@ static void test_csv_nonfinite_values(void) {
        CSV de terceiros onde "nan" significa missing). */
     const char *null_vals[] = {"nan"};
     smaug_csv_opts_t default_options_result = smaug_csv_default_opts();
+    const size_t null_lengths[] = {3};
+    default_options_result.na_lengths = null_lengths;
     default_options_result.na_values = null_vals;
     default_options_result.na_count  = 1;
     const char *text_value_2 = "v,x\nnan,1\n2.5,2\n";
@@ -457,7 +474,7 @@ static void test_csv_lf_only_field_end(void) {
     smaug_table_free(read_csv_memory_result);
 }
 
-/* csv.c:178/179 — linha vazia com \r\n e \r no último byte (pos+1>=len) */
+/* csv.c:178/179 — CRLF final é válido; CR isolado no fim é erro. */
 static void test_csv_crlf_at_eof(void) {
     /* \r\n final */
     const char *text_value = "v\n1\r\n";
@@ -469,9 +486,8 @@ static void test_csv_crlf_at_eof(void) {
     /* \r sem \n no último byte */
     const char *text_value_2 = "v\n1\r";
     smaug_table_t *read_csv_memory_result_2 = smaug_read_csv_mem(text_value_2, strlen(text_value_2), NULL);
-    CHECK(read_csv_memory_result_2 && !read_csv_memory_result_2->error,       "CR EOF: sem erro");
-    CHECK(read_csv_memory_result_2->nrows == 1,         "CR EOF: 1 linha");
-    CHECK(get_int64(read_csv_memory_result_2, 0, 0) == 1, "CR EOF: v[0]=1 (\\r final tratado)");
+    CHECK(read_csv_memory_result_2 && read_csv_memory_result_2->error,
+          "CR EOF: erro estrutural");
     smaug_table_free(read_csv_memory_result_2);
 }
 
@@ -505,14 +521,44 @@ static void test_csv_many_columns(void) {
 }
 
 static void test_csv_short_row(void) {
-    /* linha com menos campos que o header → campos faltando viram NA */
+    /* RFC 4180/TensorFlow: largura estrutural deve coincidir com o header. */
     const char *text_value = "a,b,c\n1,2\n3,4,5\n";
     smaug_table_t *read_csv_memory_result = smaug_read_csv_mem(text_value, strlen(text_value), NULL);
-    CHECK(read_csv_memory_result && !read_csv_memory_result->error,       "linha curta: sem erro");
-    CHECK(read_csv_memory_result->nrows == 2,        "linha curta: 2 linhas");
-    CHECK(column_is_null(read_csv_memory_result, 2, 0), "linha curta: c[0] = NA");
-    CHECK(!column_is_null(read_csv_memory_result,2, 1), "linha curta: c[1] = 5 (não NA)");
+    CHECK(read_csv_memory_result && read_csv_memory_result->error,
+          "linha curta: erro de largura");
+    CHECK(read_csv_memory_result && strstr(read_csv_memory_result->error, "largura"),
+          "linha curta: diagnóstico de largura");
     smaug_table_free(read_csv_memory_result);
+
+    const char *long_value = "a,b\n1,2,3\n";
+    read_csv_memory_result = smaug_read_csv_mem(long_value, strlen(long_value), NULL);
+    CHECK(read_csv_memory_result && read_csv_memory_result->error,
+          "linha longa: erro de largura");
+    smaug_table_free(read_csv_memory_result);
+
+    const char *explicit_empty = "a,b\n1,\n";
+    read_csv_memory_result = smaug_read_csv_mem(explicit_empty, strlen(explicit_empty), NULL);
+    CHECK(read_csv_memory_result && !read_csv_memory_result->error,
+          "campo vazio explícito: não é erro estrutural");
+    CHECK(column_is_null(read_csv_memory_result, 1, 0),
+          "campo vazio explícito: b[0] = NA");
+    smaug_table_free(read_csv_memory_result);
+}
+
+static void test_csv_bom(void) {
+    const char text_value[] = "\xef\xbb\xbfv\n1\n";
+    smaug_table_t *table = smaug_read_csv_mem(text_value, sizeof(text_value) - 1, NULL);
+    CHECK(table && !table->error && table->ncols == 1,
+          "CSV BOM: leitura aceita um BOM inicial");
+    CHECK(table && table->ncols && table->columns[0].name_len == 1 &&
+          table->columns[0].name[0] == 'v',
+          "CSV BOM: BOM não vira parte do nome");
+    size_t output_length = 0;
+    char *output = smaug_write_csv_mem(table, NULL, &output_length, NULL);
+    CHECK(output && output_length > 0 && output[0] == 'v',
+          "CSV BOM: writer não emite BOM");
+    free(output);
+    smaug_table_free(table);
 }
 
 static void test_csv_options_zero_sep_quote(void) {
@@ -552,6 +598,7 @@ static void test_csv_write_nan(void) {
     smaug_table_t values = {0};
     smaug_column_t column = {0};
     column.name  = "v";
+    column.name_len = sizeof("v") - 1;
     column.dtype = "float64";
     column.f64   = floating_point_series;
     values.columns = &column;
@@ -574,7 +621,8 @@ static void test_csv_write_options_zero_sep_quote(void) {
     smaug_i64_set(integer_series, 0, 1);
     smaug_table_t values = {0};
     smaug_column_t column = {0};
-    column.name = "a"; column.dtype = "int64"; column.i64 = integer_series;
+    column.name = "a";
+    column.name_len = sizeof("a") - 1; column.dtype = "int64"; column.i64 = integer_series;
     values.columns = &column; values.ncols = 1; values.nrows = 1;
 
     smaug_csv_write_opts_t write_default_options_result = smaug_csv_write_default_opts();
@@ -603,7 +651,8 @@ static void test_csv_write_large_field(void) {
 
     smaug_table_t values = {0};
     smaug_column_t column = {0};
-    column.name = "v"; column.dtype = "string"; column.str = source_series;
+    column.name = "v";
+    column.name_len = sizeof("v") - 1; column.dtype = "string"; column.str = source_series;
     values.columns = &column; values.ncols = 1; values.nrows = 1;
 
     smaug_csv_write_opts_t write_default_options_result = smaug_csv_write_default_opts();
@@ -633,6 +682,7 @@ static void test_csv_write_field_with_sep(void) {
     smaug_table_t values = {0};
     smaug_column_t column = {0};
     column.name  = "v";
+    column.name_len = sizeof("v") - 1;
     column.dtype = "string";
     column.str   = source_series;
     values.columns = &column;
@@ -656,6 +706,7 @@ static void test_csv_write_field_with_quote(void) {
     smaug_table_t values = {0};
     smaug_column_t column = {0};
     column.name  = "v";
+    column.name_len = sizeof("v") - 1;
     column.dtype = "string";
     column.str   = source_series;
     values.columns = &column;
@@ -678,6 +729,7 @@ static void test_csv_write_no_header(void) {
     smaug_table_t values = {0};
     smaug_column_t column = {0};
     column.name  = "v";
+    column.name_len = sizeof("v") - 1;
     column.dtype = "int64";
     column.i64   = integer_series;
     values.columns = &column;
@@ -703,6 +755,7 @@ static void test_csv_write_file(void) {
     smaug_table_t values = {0};
     smaug_column_t column = {0};
     column.name  = "v";
+    column.name_len = sizeof("v") - 1;
     column.dtype = "int64";
     column.i64   = integer_series;
     values.columns = &column;
@@ -730,7 +783,8 @@ static void test_csv_write_invalid_path(void) {
 
     smaug_table_t values = {0};
     smaug_column_t column = {0};
-    column.name  = "v"; column.dtype = "int64"; column.i64 = integer_series;
+    column.name  = "v";
+    column.name_len = sizeof("v") - 1; column.dtype = "int64"; column.i64 = integer_series;
     values.columns = &column; values.ncols = 1; values.nrows = 1;
 
     smaug_csv_write_opts_t write_default_options_result = smaug_csv_write_default_opts();
@@ -853,7 +907,8 @@ static void test_json_write_nan(void) {
 
     smaug_table_t values = {0};
     smaug_column_t column = {0};
-    column.name = "v"; column.dtype = "float64"; column.f64 = floating_point_series;
+    column.name = "v";
+    column.name_len = sizeof("v") - 1; column.dtype = "float64"; column.f64 = floating_point_series;
     values.columns = &column; values.ncols = 1; values.nrows = 2;
 
     smaug_json_write_opts_t values_2 = {0};
@@ -873,7 +928,8 @@ static void test_json_write_escape(void) {
 
     smaug_table_t values = {0};
     smaug_column_t column = {0};
-    column.name = "v"; column.dtype = "string"; column.str = source_series;
+    column.name = "v";
+    column.name_len = sizeof("v") - 1; column.dtype = "string"; column.str = source_series;
     values.columns = &column; values.ncols = 1; values.nrows = 1;
 
     smaug_json_write_opts_t values_2 = {0};
@@ -993,8 +1049,10 @@ static void test_json_roundtrip_all_dtypes(void) {
 static void test_csv_null_custom(void) {
     /* na_values customizados passados pelo caller */
     const char *text_values[] = {"N/D", "ausente"};
+    const size_t text_lengths[] = {3, 7};
     smaug_csv_opts_t default_options_result = smaug_csv_default_opts();
     default_options_result.na_values = text_values;
+    default_options_result.na_lengths = text_lengths;
     default_options_result.na_count  = 2;
     const char *text_value = "v\nN/D\nausente\n1\n";
     smaug_table_t *read_csv_memory_result = smaug_read_csv_mem(text_value, strlen(text_value), &default_options_result);
@@ -1011,8 +1069,10 @@ static void test_csv_null_custom_empty_field(void) {
      * (cobre o ramo !*s, nunca alcançado pelo default que trata "" como NA
      * antes mesmo de chamar try_i64/try_f64). */
     const char *text_values[] = {"N/D"};
+    const size_t text_lengths[] = {3};
     smaug_csv_opts_t default_options_result = smaug_csv_default_opts();
     default_options_result.na_values = text_values;
+    default_options_result.na_lengths = text_lengths;
     default_options_result.na_count  = 1;
     const char *text_value = "v,w\nN/D,5\n,7\n1,8\n";
     smaug_table_t *read_csv_memory_result = smaug_read_csv_mem(text_value, strlen(text_value), &default_options_result);
@@ -1085,7 +1145,8 @@ static void test_csv_write_null_args(void) {
     smaug_i64_set(integer_series, 0, 1);
     smaug_table_t values = {0};
     smaug_column_t column = {0};
-    column.name = "v"; column.dtype = "int64"; column.i64 = integer_series;
+    column.name = "v";
+    column.name_len = sizeof("v") - 1; column.dtype = "int64"; column.i64 = integer_series;
     values.columns = &column; values.ncols = 1; values.nrows = 1;
 
     char *write_csv_memory_result_2 = smaug_write_csv_mem(&values, NULL, &length, NULL);
@@ -1243,7 +1304,8 @@ static void test_json_bf_escape(void) {
     smaug_str_set(source_series, 0, text_value, strlen(text_value));
     smaug_table_t values = {0};
     smaug_column_t column = {0};
-    column.name = "v"; column.dtype = "string"; column.str = source_series;
+    column.name = "v";
+    column.name_len = sizeof("v") - 1; column.dtype = "string"; column.str = source_series;
     values.columns = &column; values.ncols = 1; values.nrows = 1;
     smaug_json_write_opts_t values_2 = {0};
     size_t length;
@@ -1372,7 +1434,8 @@ static void test_json_write_options_null(void) {
     smaug_i64_set(integer_series, 0, 1);
     smaug_table_t values = {0};
     smaug_column_t column = {0};
-    column.name = "v"; column.dtype = "int64"; column.i64 = integer_series;
+    column.name = "v";
+    column.name_len = sizeof("v") - 1; column.dtype = "int64"; column.i64 = integer_series;
     values.columns = &column; values.ncols = 1; values.nrows = 1;
 
     smaug_json_write_opts_t values_2 = {0};
@@ -1390,8 +1453,10 @@ static void test_json_write_pretty_rich(void) {
     smaug_i64_set(integer_series, 0, 1);  smaug_i64_set_null(integer_series, 1);
     smaug_str_set(source_series, 0, "a", 1); smaug_str_set_null(source_series, 1);
     smaug_column_t column_names[2] = {0};
-    column_names[0].name = "i"; column_names[0].dtype = "int64";  column_names[0].i64 = integer_series;
-    column_names[1].name = "s"; column_names[1].dtype = "string"; column_names[1].str = source_series;
+    column_names[0].name = "i";
+    column_names[0].name_len = sizeof("i") - 1; column_names[0].dtype = "int64";  column_names[0].i64 = integer_series;
+    column_names[1].name = "s";
+    column_names[1].name_len = sizeof("s") - 1; column_names[1].dtype = "string"; column_names[1].str = source_series;
     smaug_table_t values = {0};
     values.columns = column_names; values.ncols = 2; values.nrows = 2;
 
@@ -1432,7 +1497,8 @@ static void test_json_write_large_string(void) {
     smaug_str_set(source_series, 0, text_value, big_length);
     smaug_table_t values = {0};
     smaug_column_t column = {0};
-    column.name = "v"; column.dtype = "string"; column.str = source_series;
+    column.name = "v";
+    column.name_len = sizeof("v") - 1; column.dtype = "string"; column.str = source_series;
     values.columns = &column; values.ncols = 1; values.nrows = 1;
 
     smaug_json_write_opts_t values_2 = {0};
@@ -1498,6 +1564,16 @@ static void test_numeric_writers_locale(void) {
               "JSON não emite vírgula decimal sob locale pt_BR");
         free(output);
         free(error);
+        const char *json_input = "[{\"n\":1.5}]";
+        smaug_table_t *parsed = smaug_read_json_mem(json_input, strlen(json_input));
+        CHECK(parsed && !parsed->error && parsed->columns[0].f64,
+              "JSON reader uses fixed decimal point");
+        if (parsed && !parsed->error && parsed->columns[0].f64) {
+            smaug_status_t status;
+            CHECK(smaug_f64_get(parsed->columns[0].f64, 0, &status) == 1.5
+                  && status == SMG_OK, "JSON locale preserves value");
+        }
+        smaug_table_free(parsed);
         CHECK(strcmp(localeconv()->decimal_point, ",") == 0, "writers preservam locale do caller");
     } else if (!comma_locale) {
         fprintf(stderr, "SKIP: writer sem locale decimal com vírgula\n");
@@ -1506,7 +1582,499 @@ static void test_numeric_writers_locale(void) {
     CHECK(setlocale(LC_NUMERIC, saved_locale) != NULL, "writer restaura locale original");
 }
 
+static void test_json_complete_document(void) {
+    const struct { const char *text; size_t position; const char *reason; } invalid[] = {
+        {"[", 1, "objeto"},
+        {"[{", 2, "chave"},
+        {"[{}", 3, "após objeto"},
+        {"[{}{}]", 3, "após objeto"},
+        {"[{},]", 4, "objeto"},
+        {"[{},", 4, "objeto"},
+        {"[{}]x", 4, "após fechamento"},
+        {"[] []", 3, "após fechamento"},
+        {"[{\"a\" 1}]", 6, "':'"},
+        {"[{\"a\":1,}]", 8, "chave"},
+        {"[{\"a\":1 \"b\":2}]", 8, "após valor"},
+        {"[1]", 1, "objeto"},
+        {"[[]]", 1, "objeto"},
+        {"[{\"a\":[]} ]", 6, "escalar"},
+        {"\"top-level string\"", 0, "topo"}
+    };
+    for (size_t case_index = 0; case_index < sizeof(invalid) / sizeof(invalid[0]); case_index++) {
+        smaug_table_t *table = smaug_read_json_mem(invalid[case_index].text,
+                                                  strlen(invalid[case_index].text));
+        CHECK(table != NULL && table->error != NULL, "JSON estrutural inválido tem diagnóstico");
+        if (table && table->error) {
+            char expected_position[64];
+            snprintf(expected_position, sizeof(expected_position), "JSON byte %zu:",
+                     invalid[case_index].position);
+            CHECK(strstr(table->error, expected_position) != NULL
+                  && strstr(table->error, invalid[case_index].reason) != NULL,
+                  "JSON diagnóstico identifica byte base 0 e motivo");
+            CHECK(table->nrows == 0 && table->ncols == 0 && table->columns == NULL,
+                  "JSON inválido não entrega tabela parcial");
+        }
+        smaug_table_free(table);
+    }
+    const char *valid[] = {"[]", " \r\n[ ]\t", "[{}]", "[{}, {}]"};
+    const size_t expected_rows[] = {0, 0, 1, 2};
+    for (size_t case_index = 0; case_index < sizeof(valid) / sizeof(valid[0]); case_index++) {
+        smaug_table_t *table = smaug_read_json_mem(valid[case_index], strlen(valid[case_index]));
+        CHECK(table != NULL && table->error == NULL
+              && table->nrows == expected_rows[case_index] && table->ncols == 0,
+              "JSON vazio e objetos vazios mantêm cardinalidade");
+        smaug_table_free(table);
+    }
+    const char trailing_nul[] = {'[', ']', '\0'};
+    smaug_table_t *table = smaug_read_json_mem(trailing_nul, sizeof(trailing_nul));
+    CHECK(table != NULL && table->error != NULL, "JSON NUL após documento não é whitespace");
+    smaug_table_free(table);
+}
+
+static void test_json_numeric_policy(void) {
+    const struct { const char *text; const char *reason; } failures[] = {
+        {"[{\"n\":9223372036854775808}]", "OVERFLOW"},
+        {"[{\"n\":-9223372036854775809}]", "OVERFLOW"},
+        {"[{\"n\":1e400}]", "OVERFLOW"},
+        {"[{\"n\":1e-400}]", "UNDERFLOW"},
+        {"[{\"n\":01}]", "SYNTAX"},
+        {"[{\"n\":-01}]", "SYNTAX"},
+        {"[{\"n\":1.}]", "SYNTAX"},
+        {"[{\"n\":1e}]", "SYNTAX"},
+        {"[{\"n\":1e+}]", "SYNTAX"},
+        {"[{\"n\":0x10}]", "SYNTAX"},
+        {"[{\"n\":1e400x}]", "SYNTAX"},
+        {"[{\"n\":9007199254740993},{\"n\":1.5}]", "PRECISION"},
+        {"[{\"n\":9223372036854775807},{\"n\":1.5}]", "PRECISION"},
+    };
+    for (size_t index = 0; index < sizeof(failures) / sizeof(failures[0]); index++) {
+        smaug_table_t *table = smaug_read_json_mem(failures[index].text,
+                                                 strlen(failures[index].text));
+        CHECK(table && table->error && strstr(table->error, failures[index].reason)
+              && strstr(table->error, "JSON byte 6:"), "JSON numeric reason and byte");
+        CHECK(table && table->nrows == 0 && table->ncols == 0 && !table->columns,
+              "JSON numeric failure publishes no partial table");
+        smaug_table_free(table);
+    }
+    const char *reverse = "[{\"n\":1.5},{\"n\":9007199254740993}]";
+    smaug_table_t *reversed = smaug_read_json_mem(reverse, strlen(reverse));
+    CHECK(reversed && reversed->error && strstr(reversed->error, "JSON byte 16:")
+          && strstr(reversed->error, "PRECISION"), "JSON precision independent of row order");
+    smaug_table_free(reversed);
+    const char *integers = "[{\"n\":9223372036854775807},{\"n\":-9223372036854775808},"
+                           "{\"n\":9007199254740993},{\"n\":-0}]";
+    smaug_table_t *table = smaug_read_json_mem(integers, strlen(integers));
+    CHECK(table && !table->error && table->nrows == 4 && table->columns[0].i64,
+          "JSON integer representation");
+    if (table && !table->error && table->columns[0].i64) {
+        smaug_status_t status;
+        const int64_t expected[] = {INT64_MAX, INT64_MIN, INT64_C(9007199254740993), 0};
+        for (size_t row = 0; row < 4; row++) {
+            CHECK(smaug_i64_get(table->columns[0].i64, row, &status) == expected[row]
+                  && status == SMG_OK, "JSON exact integer value and validity");
+        }
+    }
+    smaug_table_free(table);
+    const char *floats = "[{\"n\":5e-324},{\"n\":1e-310},{\"n\":0e-9999},"
+                         "{\"n\":-0.0},{\"n\":9007199254740994},"
+                         "{\"n\":-9223372036854775808}]";
+    table = smaug_read_json_mem(floats, strlen(floats));
+    CHECK(table && !table->error && table->nrows == 6 && table->columns[0].f64,
+          "JSON subnormals and exact promotion accepted");
+    if (table && !table->error && table->columns[0].f64) {
+        const double expected[] = {DBL_TRUE_MIN, 1e-310, 0.0, -0.0,
+                                   9007199254740994.0, -9223372036854775808.0};
+        smaug_status_t status;
+        for (size_t row = 0; row < 6; row++) {
+            double actual = smaug_f64_get(table->columns[0].f64, row, &status);
+            CHECK(actual == expected[row] && status == SMG_OK,
+                  "JSON float value and validity");
+            CHECK(!!signbit(actual) == !!signbit(expected[row]), "JSON float sign");
+        }
+    }
+    smaug_table_free(table);
+    char long_json[128];
+    memcpy(long_json, "[{\"n\":1", 7);
+    memset(long_json + 7, '0', 63);
+    strcpy(long_json + 70, "e-63}]");
+    table = smaug_read_json_mem(long_json, strlen(long_json));
+    CHECK(table && !table->error && table->columns[0].f64,
+          "JSON long number accepted without truncation");
+    if (table && !table->error && table->columns[0].f64) {
+        smaug_status_t status;
+        CHECK(smaug_f64_get(table->columns[0].f64, 0, &status) == 1.0 && status == SMG_OK,
+              "JSON long number consumes exponent");
+    }
+    smaug_table_free(table);
+    const char *string_mix = "[{\"n\":9007199254740993},{\"n\":1.5},{\"n\":\"text\"}]";
+    table = smaug_read_json_mem(string_mix, strlen(string_mix));
+    CHECK(table && !table->error && table->columns[0].str,
+          "JSON final string dtype does not require float promotion");
+    if (table && !table->error && table->columns[0].str) {
+        size_t length;
+        const char *value = smaug_str_get(table->columns[0].str, 0, &length);
+        CHECK(value && length == 16 && memcmp(value, "9007199254740993", 16) == 0,
+              "JSON string promotion preserves integer");
+    }
+    smaug_table_free(table);
+}
+
+static void test_json_named_columns(void) {
+    const char *document = "[{}, {\"a\":1,\"a.1\":10,\"a\":2},"
+                           "{\"a.1\":30,\"b\":40,\"a\":3,\"a\":4},"
+                           "{\"b\":null,\"a\":5}]";
+    smaug_table_t *table = smaug_read_json_mem(document, strlen(document));
+    CHECK(table && !table->error && table->nrows == 4 && table->ncols == 4,
+          "JSON named union includes fields after empty first row");
+    if (table && !table->error && table->nrows == 4 && table->ncols == 4) {
+        const char *names[] = {"a", "a.1", "a.2", "b"};
+        const int64_t expected[4][4] = {{0, 0, 0, 0}, {1, 10, 2, 0},
+                                      {3, 30, 4, 40}, {5, 0, 0, 0}};
+        const int valid[4][4] = {{0, 0, 0, 0}, {1, 1, 1, 0},
+                                 {1, 1, 1, 1}, {1, 0, 0, 0}};
+        for (size_t column = 0; column < 4; column++) {
+            CHECK(strcmp(table->columns[column].name, names[column]) == 0,
+                  "JSON stable unique names in first appearance order");
+            CHECK(table->columns[column].i64 != NULL, "JSON dtype inferred by name");
+            if (!table->columns[column].i64) {
+                continue;
+            }
+            for (size_t row = 0; row < 4; row++) {
+                smaug_status_t status;
+                int64_t value = smaug_i64_get(table->columns[column].i64, row, &status);
+                CHECK(valid[row][column] ? status == SMG_OK && value == expected[row][column]
+                                        : status == SMG_NULL_VALUE,
+                      "JSON values and NA follow original name and occurrence");
+            }
+        }
+    }
+    smaug_table_free(table);
+    document = "[{\"a\":1,\"a\":2},{\"a.1\":30,\"a\":3,\"a\":4}]";
+    table = smaug_read_json_mem(document, strlen(document));
+    CHECK(table && !table->error && table->ncols == 3,
+          "JSON literal suffix does not merge with generated name");
+    if (table && !table->error && table->ncols == 3) {
+        CHECK(strcmp(table->columns[2].name, "a.1.1") == 0,
+              "JSON later literal suffix receives free display name");
+        smaug_status_t status;
+        CHECK(table->columns[1].i64 &&
+              smaug_i64_get(table->columns[1].i64, 1, &status) == 4 && status == SMG_OK,
+              "JSON duplicate identity survives literal suffix collision");
+        CHECK(table->columns[2].i64 &&
+              smaug_i64_get(table->columns[2].i64, 1, &status) == 30 && status == SMG_OK,
+              "JSON literal suffix keeps its value");
+    }
+    smaug_table_free(table);
+    document = "[{\"id\":9007199254740993,\"value\":1.5},"
+                "{\"value\":2.5,\"id\":7,\"text\":\"NA\"},"
+                "{\"text\":\"\"},{\"text\":\"null\"}]";
+    table = smaug_read_json_mem(document, strlen(document));
+    CHECK(table && !table->error && table->ncols == 3 && table->nrows == 4,
+          "JSON reordered fields avoid unrelated numeric promotion");
+    if (table && !table->error && table->ncols == 3 && table->nrows == 4) {
+        smaug_status_t status;
+        CHECK(table->columns[0].i64 &&
+              smaug_i64_get(table->columns[0].i64, 0, &status) == INT64_C(9007199254740993)
+              && status == SMG_OK, "JSON named integer remains exact");
+        CHECK(table->columns[1].f64 &&
+              smaug_f64_get(table->columns[1].f64, 1, &status) == 2.5 && status == SMG_OK,
+              "JSON named float preserved");
+        const char *expected[] = {"NA", "", "null"};
+        CHECK(table->columns[2].str != NULL, "JSON later string column");
+        if (table->columns[2].str) {
+            CHECK(column_is_null(table, 2, 0), "JSON later field fills earlier row with NA");
+            for (size_t row = 1; row < 4; row++) {
+                size_t length;
+                const char *value = smaug_str_get(table->columns[2].str, row, &length);
+                CHECK(value && length == strlen(expected[row - 1]) &&
+                      memcmp(value, expected[row - 1], length) == 0,
+                      "JSON empty and marker strings remain text");
+            }
+        }
+    }
+    smaug_table_free(table);
+}
+
+static void check_nul_table(smaug_table_t *table) {
+    CHECK(table && !table->error && table->ncols == 3 && table->nrows == 2,
+          "NUL table shape");
+    if (!table || table->error || table->ncols != 3 || table->nrows != 2) {
+        return;
+    }
+    const char *names[] = {"a", "a\0b", ""};
+    const size_t lengths[] = {1, 3, 0};
+    const char *values[] = {"NA\0x", "123\0x", "true\0x"};
+    const size_t value_lengths[] = {4, 5, 6};
+    for (size_t column = 0; column < 3; column++) {
+        CHECK(table->columns[column].name_len == lengths[column] &&
+              memcmp(table->columns[column].name, names[column], lengths[column]) == 0,
+              "NUL name bytes and length");
+        CHECK(table->columns[column].str != NULL, "NUL is not NA bool or numeric prefix");
+        if (table->columns[column].str) {
+            size_t length;
+            const char *value = smaug_str_get(table->columns[column].str, 0, &length);
+            CHECK(value && length == value_lengths[column] &&
+                  memcmp(value, values[column], length) == 0, "NUL value bytes and length");
+            value = smaug_str_get(table->columns[column].str, 1, &length);
+            CHECK(value && length == value_lengths[column] &&
+                  memcmp(value, values[column], length) == 0, "NUL reordered association");
+        }
+    }
+}
+
+static void test_io_nul_transport(void) {
+    CHECK(smaug_abi_version() == 1, "I/O ABI version");
+    const char json[] = "[{\"a\":\"NA\\u0000x\",\"a\\u0000b\":\"123\\u0000x\","
+                        "\"\":\"true\\u0000x\"},{\"\":\"true\\u0000x\","
+                        "\"a\\u0000b\":\"123\\u0000x\",\"a\":\"NA\\u0000x\"}]";
+    const char csv[] = "a,a\0b,\nNA\0x,123\0x,true\0x\nNA\0x,123\0x,true\0x\n";
+    smaug_table_t *table = smaug_read_json_mem(json, sizeof(json) - 1);
+    check_nul_table(table);
+    if (table && !table->error) {
+        size_t length = 0;
+        char *error = NULL;
+        char *output = smaug_write_json_mem(table, NULL, &length, &error);
+        CHECK(output && !error && strstr(output, "a\\u0000b"), "JSON writer escapes NUL name");
+        if (output) {
+            smaug_table_t *again = smaug_read_json_mem(output, length);
+            check_nul_table(again);
+            smaug_table_free(again);
+        }
+        free(output);
+        free(error);
+        output = smaug_write_csv_mem(table, NULL, &length, &error);
+        CHECK(output && !error && length == sizeof(csv) - 1 &&
+              memcmp(output, csv, length) == 0, "CSV writer preserves complete bytes");
+        free(output);
+        free(error);
+        char path[512];
+        temporary_file_path(path, sizeof(path), "smaug_nul_transport.csv");
+        CHECK(smaug_write_csv(path, table, NULL) == 0, "CSV NUL file write");
+        smaug_table_t *from_file = smaug_read_csv(path, NULL);
+        check_nul_table(from_file);
+        smaug_table_free(from_file);
+        remove(path);
+        temporary_file_path(path, sizeof(path), "smaug_nul_transport.json");
+        CHECK(smaug_write_json(path, table, NULL) == 0, "JSON NUL file write");
+        from_file = smaug_read_json(path);
+        check_nul_table(from_file);
+        smaug_table_free(from_file);
+        remove(path);
+    }
+    smaug_table_free(table);
+    table = smaug_read_csv_mem(csv, sizeof(csv) - 1, NULL);
+    check_nul_table(table);
+    smaug_table_free(table);
+    const char literal_nul[] = "[{\"a\":\"x\0y\"}]";
+    table = smaug_read_json_mem(literal_nul, sizeof(literal_nul) - 1);
+    CHECK(table && table->error && !table->columns, "JSON rejects literal NUL in string");
+    smaug_table_free(table);
+    const char *duplicates = "[{\"a\\u0000b\":1,\"a\\u0000b\":2,\"a\":3}]";
+    table = smaug_read_json_mem(duplicates, strlen(duplicates));
+    CHECK(table && !table->error && table->ncols == 3, "NUL duplicate keys distinct from prefix");
+    if (table && !table->error && table->ncols == 3) {
+        CHECK(table->columns[1].name_len == 5 &&
+              memcmp(table->columns[1].name, "a\0b.1", 5) == 0,
+              "NUL duplicate suffix follows all bytes");
+    }
+    smaug_table_free(table);
+}
+
+static void test_csv_nul_markers_and_writer_names(void) {
+    const char *markers[] = {"NA\0x"};
+    const size_t marker_lengths[] = {4};
+    smaug_csv_opts_t options = smaug_csv_default_opts();
+    options.na_values = markers;
+    options.na_lengths = marker_lengths;
+    options.na_count = 1;
+    const char document[] = "v,x\nNA\0x,1\nNA,2\nNA\0y,3\n\"\",4\n";
+    smaug_table_t *table = smaug_read_csv_mem(document, sizeof(document) - 1, &options);
+    CHECK(table && !table->error && table->nrows == 4 && table->columns[0].str,
+          "CSV binary marker baseline");
+    if (table && !table->error && table->nrows == 4 && table->columns[0].str) {
+        CHECK(column_is_null(table, 0, 0) && !column_is_null(table, 0, 1) &&
+              !column_is_null(table, 0, 2) && !column_is_null(table, 0, 3),
+              "CSV marker compares all bytes and length");
+        size_t length;
+        const char *value = smaug_str_get(table->columns[0].str, 2, &length);
+        CHECK(value && length == 4 && memcmp(value, "NA\0y", 4) == 0,
+              "CSV nonmatching binary marker remains text");
+    }
+    smaug_table_free(table);
+    options.na_lengths = NULL;
+    table = smaug_read_csv_mem(document, sizeof(document) - 1, &options);
+    CHECK(table && table->error && strstr(table->error, "na_lengths") && !table->columns,
+          "CSV rejects missing marker lengths");
+    smaug_table_free(table);
+    options.na_count = 0;
+    table = smaug_read_csv_mem(document, sizeof(document) - 1, &options);
+    CHECK(table && !table->error && !column_is_null(table, 0, 0),
+          "CSV explicit empty marker list disables defaults");
+    smaug_table_free(table);
+    options.na_count = 1;
+    options.na_lengths = marker_lengths;
+    markers[0] = NULL;
+    table = smaug_read_csv_mem(document, sizeof(document) - 1, &options);
+    CHECK(table && table->error && !table->columns, "CSV rejects null marker pointer");
+    smaug_table_free(table);
+    smaug_column_t column = {0};
+    smaug_table_t source = {.columns = &column, .ncols = 1, .nrows = 0};
+    size_t length = 77;
+    char *error = NULL;
+    char *output = smaug_write_json_mem(&source, NULL, &length, &error);
+    CHECK(!output && error && length == 77, "JSON rejects null name without publishing length");
+    free(error);
+    output = smaug_write_csv_mem(&source, NULL, &length, &error);
+    CHECK(!output && error && length == 77, "CSV rejects null name without publishing length");
+    free(error);
+    column.name = "";
+    column.name_len = 0;
+    output = smaug_write_csv_mem(&source, NULL, &length, &error);
+    CHECK(output && !error && length == 1 && output[0] == '\n', "CSV accepts explicit empty name");
+    free(output);
+    free(error);
+}
+
+static void test_json_utf8_validation(void) {
+    const char bom_document[] = "\xef\xbb\xbf[{\"v\":1}]";
+    smaug_table_t *bom_table = smaug_read_json_mem(bom_document, sizeof(bom_document) - 1);
+    CHECK(bom_table && !bom_table->error && bom_table->nrows == 1,
+          "JSON BOM: leitura aceita um BOM inicial");
+    size_t bom_output_length = 0;
+    char *bom_output = smaug_write_json_mem(bom_table, NULL, &bom_output_length, NULL);
+    CHECK(bom_output && bom_output_length > 0 && bom_output[0] == '[',
+          "JSON BOM: writer não emite BOM");
+    free(bom_output);
+    smaug_table_free(bom_table);
+
+    const char *invalid[] = {
+        "\x80", "\xbf", "\xc0\x80", "\xc1\xbf", "\xc2", "\xc2\x7f",
+        "\xe0\x9f\xbf", "\xe1\x80", "\xe1\x80\x7f", "\xed\xa0\x80",
+        "\xed\xbf\xbf", "\xf0\x8f\xbf\xbf", "\xf1\x80\x80",
+        "\xf4\x90\x80\x80", "\xf5\x80\x80\x80", "\xff"
+    };
+    for (size_t index = 0; index < sizeof(invalid) / sizeof(invalid[0]); index++) {
+        char document[128];
+        int written = snprintf(document, sizeof(document), "[{\"n\":\"A%s\"}]", invalid[index]);
+        CHECK(written > 0 && (size_t)written < sizeof(document), "UTF8 fixture fits");
+        smaug_table_t *table = smaug_read_json_mem(document, (size_t)written);
+        CHECK(table && table->error && strstr(table->error, "JSON byte 8:") &&
+              strstr(table->error, "UTF-8") && !table->columns && table->nrows == 0,
+              "JSON reader rejects invalid UTF8 value at byte");
+        smaug_table_free(table);
+        written = snprintf(document, sizeof(document), "[{\"A%s\":1}]", invalid[index]);
+        table = smaug_read_json_mem(document, (size_t)written);
+        CHECK(table && table->error && strstr(table->error, "JSON byte 4:") &&
+              strstr(table->error, "UTF-8") && !table->columns,
+              "JSON reader rejects invalid UTF8 name at byte");
+        smaug_table_free(table);
+        char bytes[16] = "A";
+        size_t byte_count = strlen(invalid[index]) + 1;
+        memcpy(bytes + 1, invalid[index], byte_count - 1);
+        smaug_series_str_t *series = smaug_str_create(1);
+        CHECK(series != NULL, "UTF8 writer series allocated");
+        if (!series) {
+            continue;
+        }
+        CHECK(smaug_str_set(series, 0, bytes, byte_count) == SMG_OK, "UTF8 raw bytes stored");
+        smaug_column_t column = {.name = "n", .name_len = 1, .dtype = "string", .str = series};
+        smaug_table_t source = {.columns = &column, .ncols = 1, .nrows = 1};
+        size_t length = 917;
+        char *error = NULL;
+        char *output = smaug_write_json_mem(&source, NULL, &length, &error);
+        CHECK(!output && length == 917 && error && strstr(error, "UTF-8") &&
+              strstr(error, "linha 0 coluna 0 valor byte 1"),
+              "JSON writer rejects invalid UTF8 value without output");
+        free(output);
+        free(error);
+        column.name = bytes;
+        column.name_len = byte_count;
+        source.nrows = 0;
+        output = smaug_write_json_mem(&source, NULL, &length, &error);
+        CHECK(!output && length == 917 && error && strstr(error, "UTF-8") &&
+              strstr(error, "coluna 0 nome byte 1"),
+              "JSON writer validates UTF8 names even without rows");
+        free(output);
+        free(error);
+        smaug_str_free(series);
+    }
+    const char *valid[] = {
+        "\x7f", "\xc2\x80", "\xdf\xbf", "\xe0\xa0\x80", "\xed\x9f\xbf",
+        "\xee\x80\x80", "\xef\xbf\xbf", "\xf0\x90\x80\x80",
+        "\xf4\x8f\xbf\xbf", "\xef\xbb\xbf", "e\xcc\x81"
+    };
+    for (size_t index = 0; index < sizeof(valid) / sizeof(valid[0]); index++) {
+        char document[256];
+        int written = snprintf(document, sizeof(document), "[{\"%s\":\"%s\"}]",
+                               valid[index], valid[index]);
+        smaug_table_t *table = smaug_read_json_mem(document, (size_t)written);
+        CHECK(table && !table->error && table->ncols == 1 && table->columns[0].str,
+              "JSON UTF8 boundary accepted");
+        if (table && !table->error && table->ncols == 1 && table->columns[0].str) {
+            size_t length;
+            const char *value = smaug_str_get(table->columns[0].str, 0, &length);
+            CHECK(value && length == strlen(valid[index]) &&
+                  memcmp(value, valid[index], length) == 0 &&
+                  table->columns[0].name_len == length &&
+                  memcmp(table->columns[0].name, valid[index], length) == 0,
+                  "JSON UTF8 boundaries preserve original bytes");
+            char *error = NULL;
+            char *output = smaug_write_json_mem(table, NULL, &length, &error);
+            CHECK(output && !error && length == (size_t)written + 1 &&
+                  memcmp(output, document, (size_t)written) == 0 && output[written] == '\n',
+                  "JSON valid UTF8 output preserves bytes");
+            free(output);
+            free(error);
+        }
+        smaug_table_free(table);
+    }
+    const char truncated[] = {'[', '{', '"', 'n', '"', ':', '"', (char)0xf0, (char)0x90};
+    smaug_table_t *table = smaug_read_json_mem(truncated, sizeof(truncated));
+    CHECK(table && table->error && strstr(table->error, "UTF-8") &&
+          strstr(table->error, "JSON byte 7:"), "JSON UTF8 truncated slice reports byte");
+    smaug_table_free(table);
+    char growing[128];
+    memcpy(growing, "[{\"n\":\"", 7);
+    memset(growing + 7, 'a', 63);
+    memcpy(growing + 70, "\xf0\x90\x80\x80\"}]", 7);
+    table = smaug_read_json_mem(growing, 77);
+    CHECK(table && !table->error && table->columns[0].str, "JSON UTF8 grows string at boundary");
+    if (table && !table->error && table->columns[0].str) {
+        size_t length;
+        const char *value = smaug_str_get(table->columns[0].str, 0, &length);
+        CHECK(value && length == 67 && memcmp(value, growing + 7, 67) == 0,
+              "JSON UTF8 growth preserves sequence");
+    }
+    smaug_table_free(table);
+}
+
+static void test_file_write_flush_failure(void) {
+#ifdef __linux__
+    const char *source = "[{\"value\":42}]";
+    smaug_table_t *table = smaug_read_json_mem(source, strlen(source));
+    CHECK(table && !table->error, "flush failure: valid source table");
+    if (!table || table->error) {
+        smaug_table_free(table);
+        return;
+    }
+    /* Small writes fit in stdio's buffer; /dev/full fails when fclose flushes it. */
+    CHECK(smaug_write_csv("/dev/full", table, NULL) == -1,
+          "CSV reports failure flushing the file");
+    CHECK(smaug_write_json("/dev/full", table, NULL) == -1,
+          "JSON reports failure flushing the file");
+    smaug_table_free(table);
+#else
+    printf("SKIP: file flush failure requires Linux /dev/full\n");
+#endif
+}
+
 int main(void) {
+    test_json_utf8_validation();
+    test_csv_nul_markers_and_writer_names();
+    test_io_nul_transport();
+    test_json_named_columns();
+    test_json_numeric_policy();
+    test_json_complete_document();
     test_numeric_writers_locale();
     /* CSV — erros */
     test_csv_empty();
@@ -1528,6 +2096,7 @@ int main(void) {
     test_csv_quotes_rfc4180();
     test_csv_quotes_escaped();
     test_csv_quotes_unclosed();
+    test_csv_quotes_structural_errors();
     test_csv_newline_in_quoted_field();
     test_csv_null_values();
     test_csv_nonfinite_values();
@@ -1543,9 +2112,12 @@ int main(void) {
     test_csv_long_unquoted_field();
     test_csv_many_columns();
     test_csv_short_row();
+    test_csv_bom();
     test_csv_options_zero_sep_quote();
     test_csv_numeric_overflow();
     test_csv_float_overflow();
+
+    test_file_write_flush_failure();
 
     /* CSV — writer */
     test_csv_write_nan();

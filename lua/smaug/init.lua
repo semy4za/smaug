@@ -23,6 +23,7 @@ local io_json    = require("smaug.io.json")
 local smaug = {
     _VERSION   = "1.0.0-dev",
     Series     = Series,
+    Schema     = require("smaug.core.schema"),
     DataSet    = DataSet,   -- classe com __call: smaug.DataSet({...}) e .from_columns(...)
 }
 

@@ -170,7 +170,8 @@ typedef struct {
    =================================================================== */
 
 typedef struct {
-    const char          *name;     /* nome da coluna (cópia alocada pelo leitor) */
+    const char          *name;     /* bytes do nome, cópia alocada pelo leitor */
+    size_t               name_len; /* comprimento real; pode conter NUL */
     const char          *dtype;    /* "float64" | "int64" | "bool" | "string"    */
     smaug_series_f64_t  *f64;      /* não-NULL se dtype == "float64"             */
     smaug_series_i64_t  *i64;      /* não-NULL se dtype == "int64"               */

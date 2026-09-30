@@ -127,7 +127,7 @@ if [[ ${#SRCS[@]} -eq 0 || ! -e "${SRCS[0]}" ]]; then
 fi
 
 C_TESTS_PLAIN=(test_alloc test_ops test_ops_edge test_bool \
-               test_bool_lifecycle test_string test_cow test_io_c test_datetime_c \
+               test_bool_lifecycle test_string test_cow test_io_c test_schema test_datetime_c \
                test_ops_window test_astype)
 C_TESTS_WRAP=(test_allocfail)
 C_TESTS_STRESS=(test_stress)
@@ -136,13 +136,13 @@ LUA_TESTS=(core/test_keys core/test_collation \
            series/test_stat series/test_window series/test_predicates \
            series/test_selection series/test_str series/test_dt series/test_categorical \
            dataset/test_core dataset/test_relational dataset/test_stat dataset/test_io_support \
-           io/test_csv io/test_json \
+           io/test_csv io/test_json io/test_schema \
            props/test_props props/test_integration)
 
 CFLAGS=(-std=c11 -fPIC -fwrapv -Wall -Wextra -O2 -I./include)
 TEST_CFLAGS=(-std=c11 -g -O0 -Wall -Wextra -I./include)
 EDGE_CFLAGS=("${TEST_CFLAGS[@]}" -fwrapv)
-WRAP_FLAGS=(-Wl,--wrap=malloc -Wl,--wrap=realloc -Wl,--wrap=calloc -Wl,--wrap=strdup -Wl,--wrap=newlocale -Wl,--wrap=uselocale)
+WRAP_FLAGS=(-Wl,--wrap=malloc -Wl,--wrap=realloc -Wl,--wrap=calloc -Wl,--wrap=strdup -Wl,--wrap=newlocale -Wl,--wrap=uselocale -Wl,--wrap=fclose)
 
 ALL_PASS=1
 run_result() {

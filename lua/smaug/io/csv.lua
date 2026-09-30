@@ -12,6 +12,7 @@ local ffi     = require("ffi")
 local C       = require("smaug.ffi_loader")
 local Series  = require("smaug.core.series")
 local DataSet = require("smaug.core.dataset")
+local Schema = require("smaug.core.schema")
 
 local NA = Series.NA
 local warn = require("smaug.core.warn")
@@ -77,60 +78,62 @@ local function table_to_dataset(t, op)
     if t == nil then
         error("smaug: " .. op .. " — retornou NULL (OOM)", 3)
     end
-    if t.error ~= nil then
-        local msg = ffi.string(t.error)
-        C.smaug_table_free(t)
-        error("smaug: " .. op .. " — " .. msg, 3)
-    end
-
-    local ds = DataSet.new("DataFrame")
-    local n  = tonumber(t.nrows)
-
-    for ci = 0, tonumber(t.ncols) - 1 do
-        local col   = t.columns[ci]
-        local name  = ffi.string(col.name)
-        local dtype = ffi.string(col.dtype)
-        local vals  = {}
-
-        if dtype == "int64" then
-            for r = 0, n - 1 do
-                local st = ffi.new("smaug_status_t[1]")
-                local v  = C.smaug_i64_get(col.i64, r, st)
-                vals[r+1] = (st[0] == 0) and tonumber(v) or NA
-            end
-        elseif dtype == "float64" then
-            for r = 0, n - 1 do
-                local st = ffi.new("smaug_status_t[1]")
-                local v  = C.smaug_f64_get(col.f64, r, st)
-                vals[r+1] = (st[0] == 0) and tonumber(v) or NA
-            end
-        elseif dtype == "bool" then
-            for r = 0, n - 1 do
-                local st = ffi.new("smaug_status_t[1]")
-                local v  = C.smaug_bool_get(col.boolcol, r, st)
-                if st[0] == 0 then
-                    vals[r+1] = (v == 1)  -- true ou false, nunca nil
-                else
-                    vals[r+1] = NA
-                end
-            end
-        else  -- string
-            for r = 0, n - 1 do
-                local slen = ffi.new("size_t[1]")
-                local sv   = C.smaug_str_get(col.str, r, slen)
-                if sv == nil then
-                    vals[r+1] = NA
-                else
-                    vals[r+1] = ffi.string(sv, slen[0])
-                end
-            end
+    local succeeded, result = pcall(function()
+        if t.error ~= nil then
+            local msg = ffi.string(t.error)
+            error("smaug: " .. op .. " — " .. msg, 3)
         end
 
-        ds:add_column(name, Series.from_table(vals, dtype, name))
-    end
+        local ds = DataSet.new("DataFrame")
+        local n  = tonumber(t.nrows)
 
+        for ci = 0, tonumber(t.ncols) - 1 do
+            local col   = t.columns[ci]
+            local name  = ffi.string(col.name, col.name_len)
+            local dtype = ffi.string(col.dtype)
+            local vals  = {}
+
+            if dtype == "int64" then
+                for r = 0, n - 1 do
+                    local st = ffi.new("smaug_status_t[1]")
+                    local v  = C.smaug_i64_get(col.i64, r, st)
+                    vals[r+1] = (st[0] == 0) and v or NA
+                end
+            elseif dtype == "float64" then
+                for r = 0, n - 1 do
+                    local st = ffi.new("smaug_status_t[1]")
+                    local v  = C.smaug_f64_get(col.f64, r, st)
+                    vals[r+1] = (st[0] == 0) and tonumber(v) or NA
+                end
+            elseif dtype == "bool" then
+                for r = 0, n - 1 do
+                    local st = ffi.new("smaug_status_t[1]")
+                    local v  = C.smaug_bool_get(col.boolcol, r, st)
+                    if st[0] == 0 then
+                        vals[r+1] = (v == 1)  -- true ou false, nunca nil
+                    else
+                        vals[r+1] = NA
+                    end
+                end
+            else  -- string
+                for r = 0, n - 1 do
+                    local slen = ffi.new("size_t[1]")
+                    local sv   = C.smaug_str_get(col.str, r, slen)
+                    if sv == nil then
+                        vals[r+1] = NA
+                    else
+                        vals[r+1] = ffi.string(sv, slen[0])
+                    end
+                end
+            end
+
+            ds:add_column(name, Series.from_table(vals, dtype, name))
+        end
+        return ds
+    end)
     C.smaug_table_free(t)
-    return ds
+    if not succeeded then error(result, 0) end
+    return result
 end
 
 -- ===================================================================
@@ -187,22 +190,27 @@ local function dataset_to_table(ds)
         -- nome: precisamos manter a string viva durante a escrita
         -- alocamos com strdup para ser gerenciado pelo C
         local name_c = ffi.C.malloc(#cname + 1)  -- heap do luajit → free com ffi.C.free (ver free_table_lua)
-        ffi.copy(name_c, cname)
+        if name_c == nil then error("smaug: OOM", 3) end
+        ffi.copy(name_c, cname, #cname)
+        ffi.cast("char*", name_c)[#cname] = 0
         t.columns[idx].name  = ffi.cast("const char*", name_c)
+        t.columns[idx].name_len = #cname
         t.columns[idx].dtype = dtype == "float64" and "float64"
                             or dtype == "int64"   and "int64"
                             or dtype == "bool"    and "bool"
                             or "string"
 
         if dtype == "int64" then
-            local s = C.smaug_i64_create(nrows)
-            if s == nil then error("smaug: OOM", 3) end
-            for r = 1, nrows do
-                local v = col:get(r)
-                if v == nil then C.smaug_i64_set_null(s, r-1)
-                else C.smaug_i64_set(s, r-1, v) end
+            local series = C.smaug_i64_create(nrows)
+            if series == nil then error("smaug: OOM", 3) end
+            t.columns[idx].i64 = series
+            for row = 1, nrows do
+                local value = col:get_raw(row)
+                local status
+                if value == nil then status = C.smaug_i64_set_null(series, row - 1)
+                else status = C.smaug_i64_set(series, row - 1, value) end
+                if status ~= 0 then error("smaug: falha ao copiar int64 para I/O", 3) end
             end
-            t.columns[idx].i64 = s
 
         elseif dtype == "float64" then
             local s = C.smaug_f64_create(nrows)
@@ -227,12 +235,14 @@ local function dataset_to_table(ds)
         else  -- string
             local s = C.smaug_str_create(nrows)
             if s == nil then error("smaug: OOM", 3) end
+            t.columns[idx].str = s
             for r = 1, nrows do
                 local v = col:get(r)
-                if v == nil then C.smaug_str_set_null(s, r-1)
-                else C.smaug_str_set(s, r-1, v, #v) end
+                local status
+                if v == nil then status = C.smaug_str_set_null(s, r-1)
+                else status = C.smaug_str_set(s, r-1, v, #v) end
+                if status ~= 0 then error("smaug: falha ao copiar string para I/O", 3) end
             end
-            t.columns[idx].str = s
         end
     end
     end)  -- fim do pcall de construção
@@ -290,6 +300,7 @@ local function apply_opts(opts)
         end
         local n = #opts.na_values
         local arr = ffi.new("const char*[?]", n > 0 and n or 1)
+        local lengths = ffi.new("size_t[?]", n > 0 and n or 1)
         local keep = {}
         for i = 1, n do
             local v = opts.na_values[i]
@@ -299,10 +310,12 @@ local function apply_opts(opts)
             end
             keep[i]  = v
             arr[i-1] = keep[i]
+            lengths[i-1] = #v
         end
         copts.na_values = arr
+        copts.na_lengths = lengths
         copts.na_count  = n
-        anchor = { arr, keep }
+        anchor = { arr, lengths, keep }
     end
     return copts, anchor
 end
@@ -310,28 +323,53 @@ end
 local M = {}
 
 -- opts: { sep=",", header=true, na_values={...} }
-function M.read(path, opts)
+function M.read(path, options)
     if type(path) ~= "string" then
         error("smaug: read_csv espera string como path", 2)
     end
-    local copts, anchor = apply_opts(opts)
-    local t = C.smaug_read_csv(path, copts)
-    local ds = table_to_dataset(t, "read_csv")
-    warn_if_suspect_sep(ds, copts)
-    local _ = anchor   -- mantém na_values vivo até aqui
-    return ds
+    if options ~= nil and type(options) ~= "table" then
+        error("smaug: read_csv — opts espera tabela", 2)
+    end
+    local c_options, anchor = apply_opts(options)
+    local table_result
+    local schema_anchor
+    if options and options.schema ~= nil then
+        if path:find("\0", 1, true) then
+            error("smaug: read_csv — path contém NUL", 2)
+        end
+        local descriptor, owner, operation = Schema._borrow(options.schema, "smaug_read_csv_schema")
+        schema_anchor = owner
+        table_result = operation(path, c_options, descriptor)
+    else
+        table_result = C.smaug_read_csv(path, c_options)
+    end
+    local dataset = table_to_dataset(table_result, "read_csv")
+    warn_if_suspect_sep(dataset, c_options)
+    local unused_na_owner, unused_schema_owner = anchor, schema_anchor -- keeps borrowed owners alive
+    return dataset
 end
 
-function M.read_mem(buf, opts)
-    if type(buf) ~= "string" then
+function M.read_mem(buffer, options)
+    if type(buffer) ~= "string" then
         error("smaug: read_csv_mem espera string", 2)
     end
-    local copts, anchor = apply_opts(opts)
-    local t = C.smaug_read_csv_mem(buf, #buf, copts)
-    local ds = table_to_dataset(t, "read_csv_mem")
-    warn_if_suspect_sep(ds, copts)
-    local _ = anchor   -- mantém na_values vivo até aqui
-    return ds
+    if options ~= nil and type(options) ~= "table" then
+        error("smaug: read_csv — opts espera tabela", 2)
+    end
+    local c_options, anchor = apply_opts(options)
+    local table_result
+    local schema_anchor
+    if options and options.schema ~= nil then
+        local descriptor, owner, operation = Schema._borrow(options.schema, "smaug_read_csv_mem_schema")
+        schema_anchor = owner
+        table_result = operation(buffer, #buffer, c_options, descriptor)
+    else
+        table_result = C.smaug_read_csv_mem(buffer, #buffer, c_options)
+    end
+    local dataset = table_to_dataset(table_result, "read_csv_mem")
+    warn_if_suspect_sep(dataset, c_options)
+    local unused_na_owner, unused_schema_owner = anchor, schema_anchor -- keeps borrowed owners alive
+    return dataset
 end
 
 -- ds:to_csv(path, [opts])

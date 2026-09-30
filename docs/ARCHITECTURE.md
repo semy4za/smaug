@@ -29,6 +29,16 @@ dialeto e o significado de um token no arquivo é política do leitor.
 | 2 — relacional | Join, groupby, concat, pivot/melt e operações de janela | Trabalha sobre abstrações de dados, independente de formato |
 | 3 — conectividade | Leitura/escrita CSV e JSON, gramática e adaptação de formatos | Transporta dados; não define persistência do projeto |
 
+O schema reutilizável é uma descrição neutra compartilhada, não um novo anel.
+Seu descritor e sua validação básica (`smaug_schema.c`) permanecem compatíveis
+com o Anel 0: não conhecem DataSet, CSV, JSON, `.smg` ou Models. A aplicação do
+descritor durante a leitura (`smaug_io_schema.c`) pertence ao Anel 3 e usa os
+tokenizadores/conversores de cada formato. O Anel 1 expõe o construtor Lua e
+recebe o DataSet; a persistência do Anel 4 e Models do Anel 5 poderão consumir
+o mesmo descritor quando forem implementados. Assim as dependências continuam
+fluindo para dentro, sem fazer o núcleo conhecer políticas de formato ou
+persistência.
+
 <a id="section-anel-0-nucleo-computacional-done"></a>
 ### Núcleo e fronteira pública
 
@@ -76,11 +86,22 @@ Os itens abaixo são conceitos, sem release ou prazo comprometido.
 <a id="section-anel-4-persistencia-concept"></a>
 ### 4 — Persistência
 
+Direção aprovada em 2026-09-29: schema reutilizável entre os consumidores do
+Smaug, com implementação inicial em CSV/JSON. A descrição dos dados é separada
+das opções de importação; seu uso no anel 3 não cria dependência de persistência
+ou Models. Compartilhamento concreto de tipos/módulos será definido no desenho
+da API. Escopo e pendências no [contrato](CONTRACT.md#schema-reutilizavel).
+
 `.smg` é contêiner nativo versionado de trabalho editável: DataSets, schema,
 buffers, máscaras e metadata; posteriormente fontes, etapas, parâmetros e
 snapshots. Começar por um DataSet e crescer para projeto. Reader deve rejeitar
 truncamento, corrupção e versão incompatível; migrações são explícitas.
 Exportar CSV/JSON é conectividade; reabrir o trabalho é persistência.
+
+Orientação de implementação: manter C como padrão também no `.smg`. C++ é
+uma alternativa possível, não uma escolha aprovada nem requisito. Sua adoção
+só deve ser considerada diante de necessidade concreta e benefício justificado,
+com avaliação do impacto em build, runtime, portabilidade e fronteira C/Lua.
 
 <a id="section-anel-5-models-concept"></a>
 ### 5 — Models

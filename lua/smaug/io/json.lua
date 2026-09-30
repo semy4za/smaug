@@ -11,27 +11,62 @@ local ffi  = require("ffi")
 local C    = require("smaug.ffi_loader")
 local csv  = require("smaug.io.csv")   -- reutiliza table_to_dataset e dataset_to_table
 local warn = require("smaug.core.warn")
+local Schema = require("smaug.core.schema")
 
 -- Reutiliza table_to_dataset do módulo CSV
 -- (ambos produzem / consomem smaug_table_t com a mesma estrutura)
 local M = {}
 
-function M.read(path)
+local function read_schema(opts, symbol)
+    if opts == nil then
+        return nil
+    end
+    if type(opts) ~= "table" then
+        error("smaug: read_json — opts espera tabela", 3)
+    end
+    for key in pairs(opts) do
+        if key ~= "schema" then
+            error("smaug: read_json — opção desconhecida: " .. tostring(key), 3)
+        end
+    end
+    if opts.schema ~= nil then
+        return Schema._borrow(opts.schema, symbol)
+    end
+end
+
+function M.read(path, opts)
     if type(path) ~= "string" then
         error("smaug: read_json espera string como path", 2)
     end
-    local t = C.smaug_read_json(path)
-    -- delega ao csv que sabe converter smaug_table_t → DataSet
-    -- (table_to_dataset é interno ao csv.lua; reexpomos via wrapper)
-    return csv._table_to_dataset(t, "read_json")
+    local descriptor, anchor, operation = read_schema(opts, "smaug_read_json_schema")
+    local table_result
+    if descriptor then
+        if path:find("\0", 1, true) then
+            error("smaug: read_json — path contém NUL", 2)
+        end
+        table_result = operation(path, descriptor)
+    else
+        table_result = C.smaug_read_json(path)
+    end
+    local result = csv._table_to_dataset(table_result, "read_json")
+    local unused_owner = anchor
+    return result
 end
 
-function M.read_mem(buf)
-    if type(buf) ~= "string" then
+function M.read_mem(buffer, opts)
+    if type(buffer) ~= "string" then
         error("smaug: read_json_mem espera string", 2)
     end
-    local t = C.smaug_read_json_mem(buf, #buf)
-    return csv._table_to_dataset(t, "read_json_mem")
+    local descriptor, anchor, operation = read_schema(opts, "smaug_read_json_mem_schema")
+    local table_result
+    if descriptor then
+        table_result = operation(buffer, #buffer, descriptor)
+    else
+        table_result = C.smaug_read_json_mem(buffer, #buffer)
+    end
+    local result = csv._table_to_dataset(table_result, "read_json_mem")
+    local unused_owner = anchor
+    return result
 end
 
 -- 12.21: JSON (RFC 8259) nao comporta NaN/±inf — o writer C os converte para

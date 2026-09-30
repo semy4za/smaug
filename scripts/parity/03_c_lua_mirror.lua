@@ -91,6 +91,28 @@ do
     sections[#sections+1] = section .. C.render_table(header, rows) .. "\n"
 end
 
+-- Schema is format-independent; the readers expose it through opts.schema.
+do
+    local schema_header = assert(C.read_file("include/smaug_schema.h"), "missing schema header")
+    local schema_frontend = assert(C.read_file("lua/smaug/core/schema.lua"), "missing schema frontend")
+        .. assert(C.read_file("lua/smaug/io/csv.lua"), "missing CSV frontend")
+        .. assert(C.read_file("lua/smaug/io/json.lua"), "missing JSON frontend")
+    local schema_rows = {}
+    local visited = {}
+    for symbol in (schema_header .. hdr_io):gmatch("(smaug_[%w_]+)%s*%(") do
+        if symbol:find("schema", 1, true) and not visited[symbol] then
+            visited[symbol] = true
+            schema_rows[#schema_rows + 1] = {
+                "`" .. symbol .. "`",
+                schema_frontend:find(symbol, 1, true) and "🟩" or "🟨",
+            }
+        end
+    end
+    sections[#sections + 1] = "\n### Schema — descritor e leitores\n\n"
+        .. "Presença textual no frontend; execução e layout compilado têm auditoria própria.\n\n"
+        .. C.render_table({ "função C", "referenciada em Lua?" }, schema_rows)
+end
+
 local out = {
     C.section(3, "Espelhamento C ↔ Lua",
         "Cada função pública do backend C deveria ter caminho no frontend Lua "

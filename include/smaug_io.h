@@ -5,13 +5,18 @@
    smaug_io.h — Anel 3: leitores e escritores de arquivo
    -------------------------------------------------------------------
    Toda função que lê produz uma smaug_table_t* (checar ->error antes
-   de usar). Writers em arquivo retornam 0 em sucesso, -1 em erro;
+   de usar). Writers em arquivo retornam 0 em sucesso, -1 em erro (inclusive fechamento);
    writers em memória retornam NULL e podem preencher err_out.
+
+   Writers exigem name não nulo e name_len real em cada coluna, inclusive
+   para nomes vazios. Nomes e valores podem conter NUL dentro do comprimento.
+   ABI 1: recompile biblioteca e consumidores juntos.
 
    Zero dependências externas — parsers escritos do zero.
    =================================================================== */
 
 #include "smaug_types.h"
+#include "smaug_schema.h"
 
 /* --- Ciclo de vida da smaug_table_t -------------------------------- */
 
@@ -29,12 +34,15 @@ void smaug_table_free(smaug_table_t *t);
    - Valores nulos: células vazias ou strings em na_values
    - Inferência de tipo: bool → int64 → float64 → string
    - Encoding: UTF-8 / bytes crus (sem conversão)
+   - Entrada: um BOM inicial é consumido; LF/CRLF aceitos; largura uniforme
+     e aspas RFC 4180 são exigidas; CR isolado é erro
    =================================================================== */
 
 typedef struct {
     char        sep;          /* separador de campo (default ',')              */
     int         header;       /* 1 = primeira linha é cabeçalho (default 1)   */
     const char **na_values;   /* array de strings que representam NA (NULL = default) */
+    const size_t *na_lengths; /* comprimentos; obrigatório se na_values e na_count > 0 */
     size_t      na_count;     /* tamanho de na_values                         */
     char        quote;        /* caractere de aspas (default '"')             */
     char        decimal;      /* separador decimal de floats (default '.')    */
@@ -62,7 +70,8 @@ typedef struct {
 
 smaug_csv_write_opts_t smaug_csv_write_default_opts(void);
 
-/* Escreve uma smaug_table_t num arquivo CSV.
+/* Writers exigem nomes não nulos com name_len real (zero é nome vazio).
+   Escreve uma smaug_table_t num arquivo CSV.
    Retorna 0 em sucesso, -1 em erro. */
 int smaug_write_csv(const char *path, const smaug_table_t *t,
                     const smaug_csv_write_opts_t *opts);
@@ -83,7 +92,9 @@ char* smaug_write_csv_mem(const smaug_table_t *t,
 
    Inferência de tipo: número inteiro → int64, número float → float64,
    true/false → bool, string → string, null → NA.
-   Todas as colunas inferidas a partir do primeiro objeto não-nulo.
+   União de campos por nome/ocorrência, na ordem da primeira aparição.
+   Nomes e strings preservam NUL escapado; nome usa name_len. Um BOM inicial
+   é aceito na leitura e nunca emitido; nomes/valores exigem UTF-8 válido.
    =================================================================== */
 
 /* Lê um arquivo JSON (array de records). */
@@ -105,5 +116,20 @@ int smaug_write_json(const char *path, const smaug_table_t *t,
 char* smaug_write_json_mem(const smaug_table_t *t,
                             const smaug_json_write_opts_t *opts,
                             size_t *out_len, char **err_out);
+
+/* Complete strict schema readers. schema is required and borrowed for the call.
+ * CSV header/JSON keys match unique names by bytes; output follows schema order.
+ * Headerless CSV matches position. Unknown/duplicate fields and failed value
+ * conversions are errors; JSON missing/null and CSV NA require nullable=1.
+ * Existing readers retain inference. NULL means allocation failure; other
+ * failures return an error table. Always release with smaug_table_free.
+ * File paths must be non-NULL NUL-terminated strings. */
+smaug_table_t *smaug_read_csv_mem_schema(const char *buffer, size_t length,
+    const smaug_csv_opts_t *opts, const smaug_schema_t *schema);
+smaug_table_t *smaug_read_csv_schema(const char *path,
+    const smaug_csv_opts_t *opts, const smaug_schema_t *schema);
+smaug_table_t *smaug_read_json_mem_schema(const char *buffer, size_t length,
+    const smaug_schema_t *schema);
+smaug_table_t *smaug_read_json_schema(const char *path, const smaug_schema_t *schema);
 
 #endif /* SMAUG_IO_H */

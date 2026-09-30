@@ -6,6 +6,66 @@ Marcos resumidos. Decisões vigentes ficam no [contrato](CONTRACT.md);
 checkpoints e pendências ficam no roadmap. Resultados de uma execução não
 certificam versões posteriores.
 
+## 2026-09-29 — Schema reutilizável em CSV/JSON
+
+Implementados `smaug.Schema` e leitores C com schema completo: associação por
+nome/posição, tipos e nulidade explícitos, ordem estável, nomes/valores com NUL
+e conversões estritas. Entrada em memória e arquivo; falhas não publicam tabela
+parcial. APIs sem schema e layouts existentes preservados. Testes C/Lua,
+varredura OOM, ABI e inventários de build/coverage/paridade ampliados.
+
+## 2026-09-29 — Direção do schema reutilizável
+
+Aprovado o desenho conceitual de schema reutilizável pelo Smaug, começando por
+CSV/JSON e separando descrição dos dados das opções de importação. `.smg` e
+Models continuam futuros; API e políticas detalhadas ainda em definição.
+
+## 2026-09-29 — Falha no fechamento de arquivos CSV/JSON
+
+Writers em arquivo agora retornam erro quando o fechamento falha ao gravar
+bytes pendentes, mesmo se `fwrite` tiver aceitado todo o buffer. Regressão
+Linux em `/dev/full`; assinaturas e ABI preservadas.
+
+## 2026-09-29 — Referências e categorias de erro em I/O
+
+Aprovado o uso comparativo de TensorFlow e a separação entre erro estrutural,
+ausência e erro de codificação na leitura estrita. Contrato e review registram
+fontes, limites da comparação e decisões de dialeto ainda abertas. A validação
+UTF-8 JSON foi implementada no seguimento abaixo.
+
+## 2026-09-29 — UTF-8 estrito no JSON
+
+Reader e writer rejeitam UTF-8 inválido em nomes e valores, com diagnóstico no
+byte da falha e sem substituição, descarte ou saída parcial. O validador cobre
+as fronteiras RFC 3629, escapes Unicode, truncamento e crescimento de buffers.
+Testes C/Lua e cinco mutantes dirigidos cobrem as novas regras; CSV/core seguem
+byte-oriented.
+
+## 2026-09-29 — Dialeto CSV estrito e BOM de entrada
+
+JSON e CSV aceitam um único BOM inicial na leitura, sem emitir BOM na escrita.
+CSV aceita LF/CRLF, rejeita CR isolado, aspas malformadas e registros com
+largura diferente do header. Campo vazio explícito continua NA. Seis mutantes
+de dialeto e cinco de UTF-8 foram detectados, junto da campanha anterior.
+
+## 2026-09-29 — JSON estrito numérico, associação e transporte de bytes
+
+JSON usa conversão do core com gramática própria, preserva subnormais e exige
+exatidão na promoção inteira. União de campos por nome/ocorrência substitui a
+associação posicional. CSV/JSON preservam NUL em valores e nomes, inclusive pela
+ponte Lua; marcadores CSV passam a ter comprimentos explícitos.
+
+**Mudança de ABI:** `smaug_column_t.name_len`, `smaug_csv_opts_t.na_lengths` e
+consulta `smaug_abi_version()` (versão 1). Recompilar biblioteca e consumidores
+juntos. O novo frontend rejeita bibliotecas carregadas incompatíveis; frontends
+antigos não fazem essa proteção. Evidências e pendências no checkpoint R2/R3.
+
+Seguimento: ponte CSV/JSON preserva int64 como cdata nas duas direções, com
+limites e NA verificados independentemente. Exceções na construção do DataSet
+liberam a tabela C; setters inteiros na escrita são conferidos. Três mutantes
+do frontend detectados, além da campanha C já registrada.
+
+
 ## 2026-09-29 — Revisão de R1 e falhas operacionais no CSV
 
 Parser inteiro valida sufixos após overflow; f64 reconhece overflow finito

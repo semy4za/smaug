@@ -288,6 +288,21 @@ check(read_csv_result_3:ncols() == 15,               "roundtrip: 15 colunas")
 check(read_csv_result_3:col("N_PEDIDO_SAP"):get(1) == 51208236, "roundtrip: N_PEDIDO_SAP[1]")
 check(read_csv_result_3:col("(R$)"):get(1) == "34,12",           "roundtrip: (R$)[1] preservado")
 
+do
+    local bom = string.char(0xef, 0xbb, 0xbf) .. "v\n1\n"
+    local dataset = smaug.read_csv_mem(bom)
+    check(dataset:col("v"):get(1) == 1, "CSV BOM: remove marcador inicial")
+    local succeeded, message = pcall(smaug.read_csv_mem, "a,b\n1\n")
+    check(not succeeded and tostring(message):find("largura", 1, true),
+          "CSV largura curta: erro estrutural")
+    succeeded, message = pcall(smaug.read_csv_mem, "v\n\"x\"tail\n")
+    check(not succeeded and tostring(message):find("aspas", 1, true),
+          "CSV texto após aspas: erro estrutural")
+    succeeded, message = pcall(smaug.read_csv_mem, "v\n1\r")
+    check(not succeeded and tostring(message):find("CR isolado", 1, true),
+          "CSV CR isolado: erro estrutural")
+end
+
 -- ================================================================
 -- Roundtrip JSON
 -- ================================================================
@@ -448,20 +463,24 @@ end
 -- Uma falha no meio do laço de colunas (ex.: create devolve nil → error)
 -- deixaria o parcial vazando, pois `t` nunca chega ao caller. O pcall
 -- interno captura, free_table_lua libera o parcial e o erro é repropagado.
--- Simulamos a falha injetando um erro no get da 2ª coluna (a 1ª já alocada).
+-- Simulamos a falha no getter da 2ª coluna (a 1ª já alocada).
 do
     local csv_text = require("smaug.io.csv")
     local source_dataset_2  = smaug.DataSet({ {"a", {1, 2}}, {"b", {3, 4}}, {"c", {5, 6}} })
 
+    local injected_failures = 0
     local orig_raw = source_dataset_2._raw_column
     source_dataset_2._raw_column = function(self, name)
         local column = orig_raw(self, name)
         if name == "b" then
-            -- proxy cujo :get lança → falha no meio do laço (após a coluna 'a')
+            -- proxy cujo getter lança após a coluna a, inclusive no caminho int64 cru.
             return setmetatable({ _dtype = column._dtype, _name = column._name }, {
                 __index = function(unused_value, key)
-                    if key == "get" then
-                        return function() error("smaug: OOM simulado (teste 12.27)", 3) end
+                    if key == "get" or key == "get_raw" then
+                        return function()
+                            injected_failures = injected_failures + 1
+                            error("smaug: OOM simulado (teste 12.27)", 3)
+                        end
                     end
                     return column[key]
                 end,
@@ -473,12 +492,13 @@ do
     local succeeded, error_message = pcall(function() return csv_text._dataset_to_table(source_dataset_2) end)
     source_dataset_2._raw_column = orig_raw
 
+    check(injected_failures == 1, "12.27 falha do getter realmente injetada")
     check(not succeeded, "12.27 falha no meio da construção é capturada (não vaza silenciosamente)")
     check(tostring(error_message):match("OOM simulado") ~= nil,
           "12.27 erro original é repropagado")
 
-    -- Sem crash acima já prova que free_table_lua rodou sobre o parcial. Confirma
-    -- que o heap segue íntegro: uma nova construção+liberação funciona.
+    -- Verifica recuperação. Ausência de crash não prova cleanup; o probe
+    -- audit_io_abi.py confere chamadas de liberação sob falha injetada.
     local source_dataset_3 = smaug.DataSet({ {"x", {1, 2, 3}} })
     local succeeded_2 = pcall(function()
         local _dataset_to_table_result = csv_text._dataset_to_table(source_dataset_3)

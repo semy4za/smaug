@@ -29,8 +29,7 @@ cobre o que você usa, ou o umbrella `smaug.h` para tudo:
 | `smaug_convert.h` | Parsing/formatação numérica e textual de baixo nível. | headers C padrão |
 | `smaug.h` | **Umbrella** — inclui os de operação. | todos acima |
 
-> O antigo `smaug_math.h` foi **removido** (o nome "math" não refletia o
-> conteúdo). Use `smaug.h` ou o header específico. A biblioteca compilada
+> Use `smaug.h` ou o header específico. A biblioteca compilada
 > permanece `libsmaug.so`/`smaug.dll` (nome do binário).
 
 ---
@@ -607,13 +606,67 @@ dos structs de série.
 Parsers CSV e JSON escritos do zero, zero dependências externas.
 Fronteira `smaug_table_t` entre leitores e o frontend Lua.
 
+<a id="schema-api"></a>
+### Schema reutilizável (`smaug_schema.h`)
+
+Descritor independente de formato: sequência não vazia de campos únicos por
+bytes. `name` não nulo, comprimento explícito, dtype e nullable (exatamente
+0 ou 1). Tipos públicos: `SMAUG_DTYPE_BOOL`, `SMAUG_DTYPE_INT64`,
+`SMAUG_DTYPE_FLOAT64`, `SMAUG_DTYPE_STRING`. Schema/nomes são emprestados e
+imutáveis durante a chamada; tabelas resultantes possuem suas próprias cópias.
+
+```c
+typedef struct {
+    const char *name;
+    size_t name_len;
+    smaug_dtype_t dtype;
+    int nullable;
+} smaug_schema_field_t;
+typedef struct {
+    const smaug_schema_field_t *fields;
+    size_t count;
+} smaug_schema_t;
+
+smaug_status_t smaug_schema_validate(const smaug_schema_t *schema, size_t *error_field);
+smaug_table_t *smaug_read_csv_mem_schema(const char *buffer, size_t length,
+    const smaug_csv_opts_t *opts, const smaug_schema_t *schema);
+smaug_table_t *smaug_read_csv_schema(const char *path,
+    const smaug_csv_opts_t *opts, const smaug_schema_t *schema);
+smaug_table_t *smaug_read_json_mem_schema(const char *buffer, size_t length,
+    const smaug_schema_t *schema);
+smaug_table_t *smaug_read_json_schema(const char *path, const smaug_schema_t *schema);
+```
+
+`smaug_schema_validate` não aloca: retorna OK, ARGUMENT ou OVERFLOW; o índice
+opcional `error_field` é base 0, ou SIZE_MAX para sucesso/erro global. Os leitores
+exigem schema válido, retornam tabela de erro ou NULL em OOM, sem resultado
+parcial. Liberar qualquer tabela com `smaug_table_free`. `buffer=NULL` só é
+admissível com comprimento zero (a gramática ainda exige entrada válida).
+Caminhos de arquivo são C-strings não nulas.
+
+CSV com header/JSON associam por nome; CSV sem header por posição. Saída na
+ordem do schema; tipos/nulidade são validados antes da publicação. Regras de
+conversão e ausência no [contrato](CONTRACT.md#schema-reutilizavel).
+
+São símbolos adicionais sem mudança dos layouts existentes: ABI permanece 1.
+Frontend novo verifica capacidade de schema e orienta recompilação quando a
+biblioteca carregada não tem os símbolos; ABI não é versão de funcionalidade.
+Os descritores em memória não especificam o formato futuro `.smg`.
+
 <a id="section--smaug-table-t-struct-intermediaria"></a>
 
 ### `smaug_table_t` — struct intermediária
 
+**ABI 1:** `uint32_t smaug_abi_version(void)` (smaug_core.h) identifica o layout.
+Recompile biblioteca e consumidores juntos. O frontend Lua consulta a versão
+antes de acessar structs; biblioteca carregada sem símbolo ou com versão
+diferente é rejeitada sem fallback. Frontends antigos não têm essa proteção.
+
+
 ```c
 typedef struct {
-    const char          *name;     /* nome da coluna */
+    const char          *name;     /* bytes do nome; ponteiro não nulo */
+    size_t               name_len; /* comprimento real, inclusive NUL interno */
     const char          *dtype;    /* "float64" | "int64" | "bool" | "string" */
     smaug_series_f64_t  *f64;
     smaug_series_i64_t  *i64;
@@ -636,6 +689,10 @@ Verificar `t->error != NULL` antes de usar. Liberar sempre com `smaug_table_free
 ### CSV
 
 ```c
+/* opts.na_values != NULL: na_lengths aponta para na_count comprimentos.
+   Com na_count > 0, ambos os arrays e cada marcador precisam ser válidos.
+   Arrays são emprestados pela duração da chamada. na_values == NULL usa
+   padrões; na_values != NULL e na_count == 0 desativa todos os marcadores. */
 smaug_csv_opts_t smaug_csv_default_opts(void);
 /* sep=',', header=1, quote='"', na={"","NA","null","N/A","NULL"} */
 
@@ -657,6 +714,10 @@ char* smaug_write_csv_mem(const smaug_table_t *t,
 Coluna mista sobe para o tipo mais abrangente. Coluna toda NA → string.
 
 **RFC 4180:** aspas duplas suportadas (`"campo com, vírgula"`, `""aspas""` → `"`).
+O leitor aceita um BOM inicial, LF e CRLF; rejeita CR isolado, aspas
+malformadas e registros com largura diferente do header. Um campo vazio
+explícito é ausência/NA; um campo omitido é erro estrutural. O writer não emite
+BOM.
 
 <a id="section-json"></a>
 
@@ -675,6 +736,12 @@ char* smaug_write_json_mem(const smaug_table_t *t,
 /* NaN → null no JSON. Escapes: \n \t \\ \" \uXXXX para controles.
    err_out recebe uma causa duplicada em erro, quando fornecido. */
 ```
+
+Na leitura e na escrita, nomes e valores string JSON precisam formar UTF-8
+válido conforme RFC 3629. Sequência inválida, truncada, sobrelonga, surrogate
+codificada ou codepoint acima de U+10FFFF gera diagnóstico com a posição do
+byte e não publica resultado parcial. O core e o CSV continuam trabalhando com
+bytes crus, inclusive NUL; essa validação pertence à operação JSON.
 
 <a id="section-ciclo-de-vida"></a>
 
