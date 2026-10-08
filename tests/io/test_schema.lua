@@ -98,7 +98,9 @@ local literal_na = smaug.read_csv_mem("text\nNA\n", { schema = marker_schema, na
 check(literal_na["text"]:get(1) == "NA", "schema permits disabled NA markers")
 
 -- File APIs exercise the same contract, including a growing input buffer.
-local path = os.tmpname()
+-- Os.tmpname() pode apontar para a raiz do volume no Windows, onde o processo
+-- nao tem permissao de escrita. O build ja garante que a pasta build existe.
+local path = "build/test_schema_io.tmp"
 for unused_index, sample in ipairs({ { csv, smaug.read_csv }, { json, smaug.read_json } }) do
     local file = assert(io.open(path, "wb"))
     assert(file:write(sample[1]))

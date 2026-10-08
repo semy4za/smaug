@@ -2,7 +2,7 @@
 #define _GNU_SOURCE
 #endif
 #include "../include/smaug.h"
-#include <assert.h>
+#include <errno.h>
 #include <float.h>
 #include <fenv.h>
 #include <locale.h>
@@ -149,9 +149,19 @@ static void test_outbound_conversions(void) {
     OK(string_equal(to_string_series_2, 1, "-7"),     "f64->str -7.0 -> -7");
     OK(string_equal(to_string_series_2, 2, "100.25"), "f64->str 100.25");
     /* round-trip: a string de 3.14 volta ao mesmo double */
-    { size_t length; const char *string_get_result = smaug_str_get(to_string_series_2, 3, &length);
-      char temporary_path[40]; memcpy(temporary_path, string_get_result, length); temporary_path[length] = '\0';
-      OK(strtod(temporary_path, NULL) == 3.14, "f64->str 3.14 round-trip exato"); }
+    {
+        size_t length = 0;
+        const char *string_value = smaug_str_get(to_string_series_2, 3, &length);
+        char numeric_text[40];
+        OK(string_value != NULL && length < sizeof(numeric_text),
+           "f64->str fornece texto que cabe no buffer do teste");
+        memcpy(numeric_text, string_value, length);
+        numeric_text[length] = '\0';
+        char *parse_end = NULL;
+        double parsed_value = strtod(numeric_text, &parse_end);
+        OK(parsed_value == 3.14 && parse_end == numeric_text + length,
+           "f64->str 3.14 round-trip exato e consumo completo");
+    }
     OK(smaug_str_is_null(to_string_series_2, 4), "f64->str propaga null");
 
     /* dt -> str: ISO 8601 via dt_format (paridade por construcao). */
@@ -395,9 +405,38 @@ static void test_float_rounding_modes(void) {
            && output == DBL_MAX, "DBL_MAX exato é válido em todos os modos");
         OK(smaug_parse_f64_cstr_status("0x1p-1074", &output) == SMG_OK
            && output == DBL_TRUE_MIN, "menor subnormal exato preservado");
-        OK(smaug_parse_f64_cstr_status("0x1.fffffffffffffp-1023", &output) == SMG_OK
-           && output > 0.0 && output <= DBL_MIN,
-           "fronteira subnormal pode arredondar para DBL_MIN com ERANGE");
+        const char *boundary_token = "0x1.fffffffffffffp-1023";
+        /* Ponto medio exato: nearest/upward -> DBL_MIN; zero/downward -> anterior. */
+        double expected_boundary =
+            (modes[mode_index] == FE_TONEAREST || modes[mode_index] == FE_UPWARD)
+            ? DBL_MIN : 0x0.fffffffffffffp-1022;
+        output = 77.0;
+        smaug_status_t boundary_status =
+            smaug_parse_f64_cstr_status(boundary_token, &output);
+        if (boundary_status != SMG_OK || output != expected_boundary) {
+            fprintf(stderr,
+                    "diagnostico subnormal: modo=%d status=%d saida=%a esperado=%a\n",
+                    modes[mode_index], (int)boundary_status, output, expected_boundary);
+#ifdef _WIN32
+            /* Probe temporario apos a falha: nao altera o ambiente da chamada sob teste. */
+            _locale_t numeric_locale = _create_locale(LC_NUMERIC, "C");
+            if (numeric_locale != NULL) {
+                char *parse_end = NULL;
+                errno = 0;
+                double raw_value = _strtod_l(boundary_token, &parse_end, numeric_locale);
+                int saved_errno = errno;
+                fprintf(stderr,
+                        "probe CRT: modo=%d valor=%a errno=%d consumidos=%td\n",
+                        fegetround(), raw_value, saved_errno,
+                        parse_end != NULL ? parse_end - boundary_token : (ptrdiff_t)-1);
+                _free_locale(numeric_locale);
+            } else {
+                fprintf(stderr, "probe CRT: falha ao criar locale C\n");
+            }
+#endif
+        }
+        OK(boundary_status == SMG_OK && output == expected_boundary,
+           "fronteira subnormal respeita resultado exato por modo de arredondamento");
         output = 77.0;
         smaug_status_t status = smaug_parse_f64_cstr_status("1e-400", &output);
         if (modes[mode_index] == FE_UPWARD) {
@@ -412,6 +451,81 @@ static void test_float_rounding_modes(void) {
         OK(fegetround() == modes[mode_index], "parser preserva modo do caller");
     }
     OK(fesetround(original_rounding) == 0, "restaura modo de arredondamento");
+}
+
+/* Oraculos hex exatos; zero/inf na tabela indicam underflow/overflow esperado. */
+static void check_hex_rounding(const char *token, double expected_value) {
+    smaug_status_t expected_status = expected_value == 0.0 ? SMG_ERR_UNDERFLOW :
+        (isinf(expected_value) ? SMG_ERR_OVERFLOW : SMG_OK);
+    double output = 77.0;
+    OK(smaug_parse_f64_cstr_status(token, &output) == expected_status &&
+       output == (expected_status == SMG_OK ? expected_value : 77.0),
+       "hex cstr: arredondamento exato e saida preservada");
+    output = 77.0;
+    OK(smaug_parse_f64_status(token, strlen(token), &output) == expected_status &&
+       output == (expected_status == SMG_OK ? expected_value : 77.0),
+       "hex slice: arredondamento exato e saida preservada");
+}
+
+static void test_hex_rounding_regressions(void) {
+    const int modes[] = {FE_TONEAREST, FE_TOWARDZERO, FE_UPWARD, FE_DOWNWARD};
+    const struct { const char *token; double expected[4]; } cases[] = {
+        {"0x1.00000000000008p0", {1.0, 1.0, 0x1.0000000000001p0, 1.0}},
+        {"0x1.00000000000008001p0",
+         {0x1.0000000000001p0, 1.0, 0x1.0000000000001p0, 1.0}},
+        {"0x1.00000000000018p0",
+         {0x1.0000000000002p0, 0x1.0000000000001p0,
+          0x1.0000000000002p0, 0x1.0000000000001p0}},
+        {"0x0.8p-1074", {0.0, 0.0, DBL_TRUE_MIN, 0.0}},
+        {"0x0.80000000000000001p-1074", {DBL_TRUE_MIN, 0.0, DBL_TRUE_MIN, 0.0}},
+        {"0x0.7ffffffffffffffffp-1074", {0.0, 0.0, DBL_TRUE_MIN, 0.0}},
+        {"0x1.8p-1074", {0x1p-1073, DBL_TRUE_MIN, 0x1p-1073, DBL_TRUE_MIN}},
+        {"0x1.fffffffffffffp-1023",
+         {DBL_MIN, 0x0.fffffffffffffp-1022, DBL_MIN, 0x0.fffffffffffffp-1022}},
+        {"0x1p-999999999999999999999999", {0.0, 0.0, DBL_TRUE_MIN, 0.0}},
+        {"0x1p999999999999999999999999", {INFINITY, INFINITY, INFINITY, INFINITY}},
+        {"0x1.fffffffffffff8p1023", {INFINITY, DBL_MAX, INFINITY, DBL_MAX}},
+        {"0x000.004p+3", {0x1p-7, 0x1p-7, 0x1p-7, 0x1p-7}},
+    };
+    int original_rounding = fegetround();
+    OK(original_rounding != -1, "hex: salva arredondamento");
+    for (size_t mode_index = 0; mode_index < 4; mode_index++) {
+        OK(fesetround(modes[mode_index]) == 0, "hex: seleciona arredondamento");
+        for (size_t case_index = 0; case_index < sizeof(cases) / sizeof(cases[0]);
+             case_index++) {
+            check_hex_rounding(cases[case_index].token, cases[case_index].expected[mode_index]);
+            char negative_token[128];
+            int length = snprintf(negative_token, sizeof(negative_token), "-%s",
+                                  cases[case_index].token);
+            OK(length > 0 && (size_t)length < sizeof(negative_token), "hex: fixture negativa");
+            size_t opposite_mode = mode_index == 2 ? 3 : (mode_index == 3 ? 2 : mode_index);
+            check_hex_rounding(negative_token, -cases[case_index].expected[opposite_mode]);
+        }
+        char long_token[1100];
+        memcpy(long_token, "0x1", 3);
+        memset(long_token + 3, '0', 1000);
+        memcpy(long_token + 1003, "p-4000", 7);
+        check_hex_rounding(long_token, 1.0);
+        memcpy(long_token, "0x0.", 4);
+        memset(long_token + 4, '0', 1000);
+        memcpy(long_token + 1004, "1p4004", 7);
+        check_hex_rounding(long_token, 1.0);
+        const char *halfway_prefix = "0x1.00000000000008";
+        size_t prefix_length = strlen(halfway_prefix);
+        memcpy(long_token, halfway_prefix, prefix_length);
+        memset(long_token + prefix_length, '0', 1000);
+        memcpy(long_token + prefix_length + 1000, "1p0", 4);
+        check_hex_rounding(long_token, (mode_index == 0 || mode_index == 2)
+                           ? 0x1.0000000000001p0 : 1.0);
+        double output = 77.0;
+        OK(smaug_parse_f64_cstr_status("-0x0p999999999999999999999999", &output) == SMG_OK
+           && output == 0.0 && signbit(output), "hex: zero negativo com expoente enorme");
+        output = 77.0;
+        OK(smaug_parse_f64_cstr_status("0x1p999999999999999999999999x", &output)
+           == SMG_ERR_SYNTAX && output == 77.0, "hex: sintaxe prevalece sobre expoente enorme");
+        OK(fegetround() == modes[mode_index], "hex: preserva arredondamento");
+    }
+    OK(fesetround(original_rounding) == 0, "hex: restaura arredondamento");
 }
 
 /* O comprimento inclui conteudo, nunca um terminador implicito. */
@@ -758,6 +872,7 @@ int main(void) {
     test_convert_diagnosticos();
     test_integer_syntax_and_hex_boundaries();
     test_float_rounding_modes();
+    test_hex_rounding_regressions();
     test_float_grammar();
     test_fmt_direto();
     test_format_capacity_and_locale();

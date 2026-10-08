@@ -22,7 +22,9 @@
    precisam de terminador externo. Variantes _cstr exigem terminador. Sintaxe
    inválida prevalece sobre overflow de prefixo. Subnormais não zero têm sucesso;
    ERANGE com saturação em DBL_MAX é overflow. O parser não altera o modo de
-   arredondamento do caller. */
+   arredondamento do caller. Hexadecimal e convertido diretamente em binary64
+   com arredondamento unico (nearest-even, toward-zero, upward ou downward);
+   decimal continua usando a libc com locale C. */
 smaug_status_t smaug_parse_i64_status(const char *text, size_t length, int64_t *output);
 smaug_status_t smaug_parse_f64_status(const char *text, size_t length, double *output);
 smaug_status_t smaug_parse_i64_cstr_status(const char *text, int64_t *output);

@@ -8,6 +8,7 @@
 #include <string.h>   /* memcpy, memchr, strlen */
 #include <errno.h>
 #include <float.h>
+#include <fenv.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <math.h>     /* isinf, isnan */
@@ -189,6 +190,147 @@ static smaug_status_t parse_i64_text(const char *text, size_t length, int64_t *o
     return SMG_OK;
 }
 
+/* Expoente do primeiro bit significativo. A posicao hexadecimal e o expoente
+   textual sao combinados em unidades de quatro bits antes de limitar a faixa.
+   Assim, mantissas longas podem cancelar expoentes longos sem overflow nem
+   limite artificial de comprimento. O retorno +/-2048 ja esta fora de f64. */
+static int hex_leading_exponent(const char *exponent_text, size_t integer_digits,
+                                size_t first_digit, int first_bit) {
+    bool offset_negative = integer_digits <= first_digit;
+    size_t offset = offset_negative ? first_digit - integer_digits + 1
+        : integer_digits - first_digit - 1;
+    bool exponent_negative = false;
+    size_t exponent_quads = 0;
+    unsigned int remainder = 0;
+    if (*exponent_text) {
+        exponent_text++; /* p/P; a gramatica ja foi validada. */
+        exponent_negative = *exponent_text == '-';
+        if (*exponent_text == '-' || *exponent_text == '+') {
+            exponent_text++;
+        }
+        for (; *exponent_text; exponent_text++) {
+            unsigned int next = remainder * 10u + (unsigned int)(*exponent_text - '0');
+            unsigned int carry = next / 4u;
+            if (exponent_quads > (SIZE_MAX - carry) / 10u) {
+                /* Mais de SIZE_MAX digitos hex: nenhuma mantissa acessivel cancela. */
+                return exponent_negative ? -2048 : 2048;
+            }
+            exponent_quads = exponent_quads * 10u + carry;
+            remainder = next % 4u;
+        }
+    }
+    bool total_negative = offset_negative;
+    size_t magnitude;
+    if (offset_negative == exponent_negative) {
+        if (offset > SIZE_MAX - exponent_quads) {
+            return offset_negative ? -2048 : 2048;
+        }
+        magnitude = offset + exponent_quads;
+    } else if (offset >= exponent_quads) {
+        magnitude = offset - exponent_quads;
+    } else {
+        magnitude = exponent_quads - offset;
+        total_negative = exponent_negative;
+    }
+    if (magnitude > 512) {
+        return total_negative ? -2048 : 2048;
+    }
+    int exponent = (int)magnitude * (total_negative ? -4 : 4);
+    return exponent + first_bit + (exponent_negative ? -(int)remainder : (int)remainder);
+}
+
+/* Converte um token hexadecimal ja validado, com guard/sticky e um unico
+   arredondamento. Nao depende de strtod: algumas UCRT devolvem zero na
+   transicao de subnormal para DBL_MIN, inclusive sem ERANGE. */
+static smaug_status_t parse_hex_f64(const char *text, double *output) {
+    _Static_assert(FLT_RADIX == 2 && DBL_MANT_DIG == 53 &&
+                   DBL_MIN_EXP == -1021 && DBL_MAX_EXP == 1024,
+                   "smaug float64 requires binary64 precision and range");
+    bool negative = *text == '-';
+    if (*text == '+' || *text == '-') {
+        text++;
+    }
+    text += 2; /* 0x/0X */
+    size_t digit_count = 0;
+    size_t integer_digits = 0;
+    size_t first_digit = 0;
+    int first_bit = 0;
+    bool has_point = false;
+    uint64_t prefix = 0;
+    int prefix_bits = 0;
+    bool sticky = false;
+    for (; *text && *text != 'p' && *text != 'P'; text++) {
+        if (*text == '.') {
+            integer_digits = digit_count;
+            has_point = true;
+            continue;
+        }
+        unsigned int digit = (unsigned int)hex_digit((unsigned char)*text);
+        for (int bit_index = 3; bit_index >= 0; bit_index--) {
+            unsigned int bit = (digit >> bit_index) & 1u;
+            if (prefix_bits == 0) {
+                if (!bit) {
+                    continue;
+                }
+                first_digit = digit_count;
+                first_bit = bit_index;
+            }
+            if (prefix_bits < 54) {
+                prefix = (prefix << 1) | bit;
+                prefix_bits++;
+            } else {
+                sticky = sticky || bit != 0;
+            }
+        }
+        digit_count++;
+    }
+    if (!prefix_bits) {
+        *output = negative ? -0.0 : 0.0;
+        return SMG_OK;
+    }
+    if (!has_point) {
+        integer_digits = digit_count;
+    }
+    int exponent = hex_leading_exponent(text, integer_digits, first_digit, first_bit);
+    if (exponent > 1023) {
+        return SMG_ERR_OVERFLOW;
+    }
+    int rounding = fegetround();
+    if (rounding != FE_TONEAREST && rounding != FE_TOWARDZERO &&
+        rounding != FE_UPWARD && rounding != FE_DOWNWARD) {
+        return SMG_ERR_ARGUMENT;
+    }
+    bool round_away = (rounding == FE_UPWARD && !negative) ||
+                      (rounding == FE_DOWNWARD && negative);
+    if (exponent < -1075) {
+        if (!round_away) {
+            return SMG_ERR_UNDERFLOW;
+        }
+        *output = negative ? -0x1p-1074 : 0x1p-1074;
+        return SMG_OK;
+    }
+    prefix <<= 54 - prefix_bits;
+    int kept_bits = exponent < -1022 ? exponent + 1075 : 53;
+    int shift = 54 - kept_bits; /* 1..54; inclusive zero bits retidos no empate em zero. */
+    uint64_t significand = prefix >> shift;
+    bool guard = ((prefix >> (shift - 1)) & 1u) != 0;
+    sticky = sticky || (prefix & ((UINT64_C(1) << (shift - 1)) - 1)) != 0;
+    if ((round_away && (guard || sticky)) ||
+        (rounding == FE_TONEAREST && guard && (sticky || (significand & 1u)))) {
+        significand++;
+    }
+    if (exponent == 1023 && significand == (UINT64_C(1) << 53)) {
+        return SMG_ERR_OVERFLOW;
+    }
+    if (!significand) {
+        return SMG_ERR_UNDERFLOW;
+    }
+    /* Inteiro <= 2^53 e escala exata: nao ha segundo arredondamento. */
+    double value = scalbn((double)significand, exponent - kept_bits + 1);
+    *output = negative ? -value : value;
+    return SMG_OK;
+}
+
 /* strtod_l mantém o ponto decimal do core independente do locale global. */
 static smaug_status_t convert_f64_c_locale(const char *text, double *value,
                                            char **end, int *saved_errno) {
@@ -220,6 +362,11 @@ static smaug_status_t parse_f64_terminated(const char *text, size_t length, doub
     smaug_status_t status = validate_f64_lexeme(text, length, &lexical_nonzero, &special);
     if (status != SMG_OK) {
         return status;
+    }
+    size_t number_start = (text[0] == '+' || text[0] == '-') ? 1 : 0;
+    if (!special && length - number_start >= 2 && text[number_start] == '0' &&
+        ascii_lower(text[number_start + 1]) == 'x') {
+        return parse_hex_f64(text, output);
     }
     char *parse_end = NULL;
     double parsed_value = 0.0;

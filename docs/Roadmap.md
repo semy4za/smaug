@@ -246,6 +246,47 @@ reorganização documental.
 <a id="checkpoint"></a>
 ## Checkpoint de retomada — 2026-10-05
 
+**Seguimento Windows — 2026-10-08:** build relatado pelo mantenedor com
+MSYS2 UCRT64 e LuaJIT: DLL compilada, schema C com 129 checks, schema Lua com
+82, stress e demais suítes Lua aprovados; `test_astype` interrompeu na fronteira
+subnormal. Probe direto de `_strtod_l("0x1.fffffffffffffp-1023")`: modo 0,
+valor zero, errno 0, consumo de 23 bytes. Portanto, há evidência direta da
+conversão incorreta na CRT desse ambiente; não se declarou aprovação Windows.
+
+Correção local em `src/smaug_convert.c`: hexadecimal convertido por bits com
+guard/sticky, nearest-even e arredondamentos dirigidos; expoente combinado com
+a posição da mantissa antes de limitar a faixa. Sem alocação adicional, troca
+de locale ou modo de arredondamento; decimal mantém a libc. Contrato e ABI
+preservados. `test_astype.c` passou 808 checks com GCC 16.2.1, inclusive build
+`-O2 -Wall -Wextra -Wpedantic -Werror`; `make test` e `make test-lua` passaram
+no Linux (13 binários C e 21 suítes Lua). Comparação dirigida temporária com
+`strtod` da glibc passou 40.000 entradas hex aleatórias (seed 808) nos quatro
+modos, conferindo status, valor e preservação da saída. Coverage e auditoria
+de mutantes não foram regeneradas nesta etapa.
+
+O `build.ps1` também marcava falsamente `test_io_c` como falha por seu stdout
+começar com o SKIP de `/dev/full`; agora confere a última linha e o exit code,
+como já fazia no stress. O teste Lua de schema usa arquivo em `build/` para
+evitar o caminho sem permissão fornecido por `os.tmpname()` no Windows.
+Próximo passo: copiar as correções e executar novamente `scripts/build.ps1`
+no Windows; PowerShell/MinGW indisponíveis neste ambiente Linux. Mantidas as
+pendências de ASan/UBSan e do arredondamento decimal sob Valgrind.
+
+**Revisão de test_astype — 2026-10-08:** leitura integral de
+`tests/c/test_astype.c`; corrigida a cópia para buffer local no roundtrip de
+string (ponteiro, capacidade e consumo completo) e exigido resultado exato
+na fronteira subnormal para cada modo de arredondamento. O diagnóstico
+temporário de `_strtod_l` agora ocorre após a falha do parser, sem interferir
+na chamada observada. Base `8614ccf` com alterações locais; compilação Linux
+com `gcc -std=c11 -g -O0 -Wall -Wextra -Wpedantic -Werror -Iinclude
+tests/c/test_astype.c src/*.c -lm -o build/test_astype_review` e execução
+aprovadas: 526 checks. Guard de estilo e diff aprovados. Sem mudança no core
+ou na ABI. O relato Windows indica falha na fronteira (modo 0, status 7);
+o probe direto da CRT e a execução deste arquivo revisado no Windows seguem
+pendentes. A revisão não certifica injeção de OOM nas fixtures: helpers como
+`make_string` ainda não conferem todos os retornos de criação/setter (C03/C04),
+pendência de endurecimento dos testes em R6.
+
 Gramática R1 aprovada em 28/09. A revisão de 29/09 corrigiu o parser,
 `astype` e o consumidor CSV, mantendo a ABI e a arquitetura de anéis.
 **Estado de entrega:** implementação de schema registrada em `1eafa7a`;

@@ -6,6 +6,15 @@ Marcos resumidos. Decisões vigentes ficam no [contrato](CONTRACT.md);
 checkpoints e pendências ficam no roadmap. Resultados de uma execução não
 certificam versões posteriores.
 
+## 2026-10-08 — Conversão hexadecimal na fronteira subnormal
+
+Relato Windows confirmou `_strtod_l` retornando zero para um token que deveria
+arredondar para `DBL_MIN`. O core agora converte hexadecimal diretamente, com
+arredondamento único e preservação de saída em erro. Regressões cobrem sinais,
+quatro modos, empates, bits finais e expoentes longos. O executor Windows passa
+a conferir o resumo final `PASS` após avisos `SKIP`, mantendo a exigência de
+exit code zero. Suítes C/Lua aprovadas no Linux; nova execução Windows pendente.
+
 ## 2026-10-05 — Revisão dos consumidores de schema
 
 Conferida a ligação de consumidor C à biblioteca compartilhada, além dos

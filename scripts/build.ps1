@@ -140,7 +140,9 @@ foreach ($t in $cTests) {
     $testExitCode = $LASTEXITCODE
     $out = $out.Trim()
     Write-Host ("{0,-14} -> {1}" -f $t, $out)
-    if ($testExitCode -ne 0 -or $out -notlike "PASS*") { $allPass = $false }
+    # SKIP informativo pode preceder o resumo PASS (ex.: /dev/full no Windows).
+    $lastLine = ($out -split "`n")[-1].Trim()
+    if ($testExitCode -ne 0 -or $lastLine -notlike "PASS*") { $allPass = $false }
 }
 
 foreach ($t in $cTestsWrap) {
@@ -157,7 +159,8 @@ foreach ($t in $cTestsWrap) {
     $testExitCode = $LASTEXITCODE
     $out = $out.Trim()
     Write-Host ("{0,-14} -> {1}" -f $t, $out)
-    if ($testExitCode -ne 0 -or $out -notlike "PASS*") { $allPass = $false }
+    $lastLine = ($out -split "`n")[-1].Trim()
+    if ($testExitCode -ne 0 -or $lastLine -notlike "PASS*") { $allPass = $false }
 }
 
 Write-Host ""
