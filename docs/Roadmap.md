@@ -244,11 +244,12 @@ reorganização documental.
 
 
 <a id="checkpoint"></a>
-## Checkpoint de retomada — 2026-09-29
+## Checkpoint de retomada — 2026-10-05
 
 Gramática R1 aprovada em 28/09. A revisão de 29/09 corrigiu o parser,
 `astype` e o consumidor CSV, mantendo a ABI e a arquitetura de anéis.
-**Estado de entrega:** mudanças locais sem commit; R1 permanece aberta.
+**Estado de entrega:** implementação de schema registrada em `1eafa7a`;
+revisão documental de 05/10 local, sem commit. R1 permanece aberta.
 
 O checkpoint atual também inclui a frente R3: JSON e CSV seguem o contrato
 estrito baseado em RFC 8259/RFC 4180 e TensorFlow comparativo. JSON/CSV aceitam
@@ -478,9 +479,43 @@ vazamentos. A rodada Valgrind completa para no `test_astype` por divergência
 numérica conhecida no arredondamento de subnormal sob Valgrind; o erro não é de
 memória e o binário libera todos os blocos.
 
-**Próximo passo:** revisar a API implementada contra consumidores externos e
-preparar a migração Windows/sanitizers. Schema parcial, defaults e modo tolerante
-exigem decisão própria antes de qualquer extensão.
+**Retomada — consumidores públicos de schema (2026-10-05):** revisão dirigida
+de `smaug_schema.h`, validação C, leitores de memória/arquivo CSV/JSON,
+`smaug.core.schema` e adaptadores Lua. Conferidos descritores emprestados,
+âncoras de lifetime, capacidade de símbolos, ordem e transporte de resultados.
+Não foi identificada necessidade de alterar contrato ou ABI nesse recorte.
+O consumidor externo exercitado foi a suíte C existente, desta vez ligada à
+biblioteca compartilhada; isso não certifica aplicações de terceiros.
+
+Árvore base `1eafa7a`, Linux, GCC 16.2.1, glibc 2.43, LuaJIT 2.1.1767980792:
+
+- `make -B build/libsmaug.so` recompilou a biblioteca; `test_schema.c` ligado
+  com `-Lbuild -lsmaug` passou 131 checks. O consumidor compilou com
+  `-std=c11 -Wall -Wextra -Wpedantic -Werror`.
+- `luajit tests/io/test_schema.lua` passou 82 checks.
+- `python3 scripts/audit_io_abi.py` passou layouts C/FFI, rejeição de ABI
+  incompatível, ausência de capacidade schema, fallback e cleanup; detectou
+  as três mutações da ponte Lua.
+- `valgrind --leak-check=full --error-exitcode=1 ./build/test_schema_shared`
+  passou com Valgrind 3.27.1: 728 alocações/liberações, zero erros e zero
+  blocos pendentes.
+- `smaug_schema.h`, `smaug_io.h` e `smaug.h` compilaram isoladamente com
+  `-fsyntax-only` e os mesmos warnings estritos.
+- `python3 scripts/check_test_style.py` passou nos 35 arquivos;
+  `git diff --check` passou. A alteração preexistente de CODING_STYLE foi preservada.
+
+ASan/UBSan continuam sem validação: o link da suíte instrumentada falhou pela
+ausência de `/usr/lib64/libasan.so.8.0.0`; um probe independente de UBSan
+também falhou pela ausência de `/usr/lib64/libubsan.so.1.0.0`. MinGW e PowerShell
+não foram encontrados no PATH; Windows não foi executado. Não houve nova
+campanha completa, coverage ou regeneração de manifest/parity nesta revisão.
+Comandos reproduzíveis e escopo da validação foram adicionados ao
+[guia de build](Build_and_Testing.md), incluindo as suítes de schema no inventário.
+
+**Próximo passo:** executar a validação Windows e a suíte instrumentada em
+ambiente com runtimes ASan/UBSan disponíveis; ampliar depois a campanha para
+as famílias numéricas/I/O e falhas de alocação. Schema parcial, defaults e modo
+tolerante exigem decisão própria antes de qualquer extensão.
 
 | Frente | Já conferido | Falta para avançar |
 |---|---|---|

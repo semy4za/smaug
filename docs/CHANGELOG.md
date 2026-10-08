@@ -6,6 +6,13 @@ Marcos resumidos. Decisões vigentes ficam no [contrato](CONTRACT.md);
 checkpoints e pendências ficam no roadmap. Resultados de uma execução não
 certificam versões posteriores.
 
+## 2026-10-05 — Revisão dos consumidores de schema
+
+Conferida a ligação de consumidor C à biblioteca compartilhada, além dos
+consumidores Lua e da auditoria C/FFI. Guia de build ampliado com validação
+dirigida de schema e comandos de sanitizers; limitações de ambiente e evidências
+registradas no checkpoint. Sem mudança de contrato ou ABI.
+
 ## 2026-09-29 — Schema reutilizável em CSV/JSON
 
 Implementados `smaug.Schema` e leitores C com schema completo: associação por

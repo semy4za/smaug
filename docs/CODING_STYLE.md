@@ -32,7 +32,8 @@ não representa uma nova certificação de ausência de UB ou de vazamentos.
 <a id="bases"></a>
 ## Bases e alcance
 
-Consolidado em 2026-09-28. Este é o padrão do Smaug para código novo e trechos
+Consolidado em 2026-09-28 e revisado em 2026-09-30. Este é o padrão do Smaug
+para código novo e trechos
 revisados em C e Lua. A arquitetura de anéis permanece: regras de linguagem
 não transferem inferência ou políticas de arquivo para o núcleo. A adoção na
 base existente é incremental; conformidade integral ainda não foi demonstrada.
@@ -46,6 +47,7 @@ base existente é incremental; conformidade integral ainda não foi demonstrada.
 | [LuaRocks Lua Style Guide](https://github.com/luarocks/lua-style-guide) | Base de organização e escrita Lua | Prevalecem as convenções explícitas do Smaug, incluindo nomes e indentação |
 | [Lua 5.1](https://www.lua.org/manual/5.1/manual.html) e [LuaJIT](https://luajit.org/extensions.html) | Semântica e compatibilidade do frontend | Recursos de versões posteriores exigem suporte comprovado no runtime alvo |
 | [LuaJIT FFI](https://luajit.org/ext_ffi_semantics.html) | Conversões, ponteiros, lifetime e cdata | FFI não valida automaticamente os contratos C |
+| [TensorFlow `tf.io.decode_csv`](https://www.tensorflow.org/api_docs/python/tf/io/decode_csv) e [`tf.io.FixedLenFeature`](https://www.tensorflow.org/api_docs/python/tf/io/FixedLenFeature) | Referência comparativa para schema por campo, tipos, ausência e defaults em I/O | Não introduz dependência, não define o dialeto Smaug e não exige paridade integral |
 
 As regras identificadas abaixo são a seleção do projeto; os identificadores
 C01–C08 e L01–L07 não são IDs dos documentos externos. As fontes técnicas

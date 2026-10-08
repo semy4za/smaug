@@ -67,6 +67,40 @@ luajit tests/io/test_csv.lua
 ./build/test_io_c
 ```
 
+### Schema como consumidor da biblioteca compartilhada
+
+Os testes C habituais compilam os fontes junto com o teste. Para conferir também
+os símbolos públicos e a ligação de um consumidor separado à biblioteca Linux:
+
+```bash
+make -B build/libsmaug.so
+gcc -std=c11 -Wall -Wextra -Wpedantic -Werror -Iinclude \
+    tests/c/test_schema.c -Lbuild -Wl,-rpath,'$ORIGIN' -lsmaug -lm \
+    -o build/test_schema_shared
+./build/test_schema_shared
+luajit tests/io/test_schema.lua
+python3 scripts/audit_io_abi.py
+valgrind --leak-check=full --error-exitcode=1 ./build/test_schema_shared
+```
+
+A auditoria de ABI compara layouts C/FFI, rejeita bibliotecas incompatíveis e
+verifica o diagnóstico de capacidade quando uma biblioteca ABI 1 não oferece
+schema. Ela exige Linux, GCC e LuaJIT; não valida a DLL Windows.
+
+Para instrumentar a suíte C de schema sem substituir a biblioteca usada pelo Lua:
+
+```bash
+gcc -std=c11 -g -O1 -Wall -Wextra -Iinclude \
+    -fsanitize=address,undefined -fno-omit-frame-pointer \
+    -fno-sanitize-recover=all tests/c/test_schema.c src/*.c -lm \
+    -o build/test_schema_sanitized
+ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 ./build/test_schema_sanitized
+```
+
+Esse comando exige os runtimes ASan e UBSan do compilador. Falha de compilação,
+link ou inicialização não conta como validação. Este recorte não instrumenta
+LuaJIT nem substitui a campanha das outras famílias e de injeção de OOM.
+
 ---
 
 <a id="section-windows-msys2-ucrt64"></a>
@@ -79,6 +113,11 @@ scripts/build.ps1
 
 Detecta automaticamente todos os `.c` em `src/` (incluindo parsers I/O).
 Compila `smaug.dll` e todos os testes. Coverage/Valgrind rodam no Fedora.
+
+Na retomada de schema, conferir explicitamente `test_schema` e
+`io/test_schema.lua` na saída, com código de saída zero e sem skip de Lua.
+O build Windows e o carregamento da DLL pelo frontend precisam ser executados
+na plataforma; resultados Linux não encerram essa pendência.
 
 ---
 
@@ -100,6 +139,7 @@ Compila `smaug.dll` e todos os testes. Coverage/Valgrind rodam no Fedora.
 | `test_string` | lifecycle string, sort, filter |
 | `test_cow` | COW detach, isolamento após mutação |
 | `test_io_c` | parsers CSV/JSON: CRLF, aspas RFC 4180, NA, inferência, UTF-8 `\uXXXX`, roundtrips |
+| `test_schema` | descritores, leitores CSV/JSON com schema, ordem, tipos, nulidade, precisão e rejeição sem tabela parcial |
 | `test_datetime_c` | datetime C: lifecycle, parse ISO 8601, componentes calendário, aritmética, comparações, sort, COW, datas negativas, bissextos |
 | `test_ops_window` | ops de janela (Grupo C): multi_argsort 5 dtypes, rolling deque, cumulativas |
 | `test_astype` | conversões por dtype, falhas e precisão |
@@ -132,6 +172,7 @@ As suítes vivem em subpastas por domínio: `tests/series/`, `tests/dataset/`,
 | `dataset/test_io_support.lua` | at/iat, insert, to_dict, from_dict, to_markdown, to_string |
 | `io/test_csv.lua` | I/O CSV + dados reais (pedidos_digitados.csv, sep `;`) |
 | `io/test_json.lua` | I/O JSON + unicode |
+| `io/test_schema.lua` | schema reutilizável C/FFI, memória/arquivo, int64 exato, NUL e lifetime |
 | `props/test_props.lua` | property-based: invariantes × seeds × casos |
 | `props/test_integration.lua` | integração: reduções avançadas, rank, skew, kurtosis, mad, sem, funções matemáticas |
 
