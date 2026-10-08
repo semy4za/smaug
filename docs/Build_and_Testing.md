@@ -231,6 +231,25 @@ verificações ainda pendentes.
 Correções históricas estão no [changelog](CHANGELOG.md). Registrar comando,
 árvore, binários e limitações de cada nova campanha.
 
+## Auditoria de regressões numéricas e I/O
+
+```bash
+python3 scripts/audit_numeric_regressions.py
+```
+
+Requer Linux, GCC e Valgrind. Compila cópias temporárias dos fontes, valida as
+baselines de astype, falhas de alocação, I/O e schema, e introduz alterações
+propositalmente incorretas. Um mutante só conta como detectado se compilar e
+falhar pelo diagnóstico esperado; baseline inválida interrompe a auditoria.
+Os fontes da árvore de trabalho não são alterados.
+
+A baseline adicional `test_astype_early_underflow` intercepta `strtod_l` via
+`--wrap`, devolvendo zero positivo e errno zero para os decimais pequenos
+dirigidos da suíte. Isso reproduz o comportamento relevante da CRT no Linux
+e exige que a recuperação use o sinal textual. Cinco mutações verificam
+arredondamento dirigido, sinal, preservação da saída e zero literal. Essa
+simulação não substitui a execução Windows nem compõe a cobertura gcov padrão.
+
 <a id="section-makefile"></a>
 
 ## Makefile

@@ -15,7 +15,58 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 WRAP_FLAGS = [f"-Wl,--wrap={name}" for name in
               ("malloc", "calloc", "realloc", "strdup", "newlocale", "uselocale", "fclose")]
+# Reproduz no Linux o zero prematuro da CRT sem alterar a biblioteca real.
+# A libc ainda valida o consumo; errno=0 e zero positivo exercitam a recuperacao
+# pelo modo de arredondamento e pelo sinal textual, inclusive para entrada negativa.
+EARLY_UNDERFLOW_WRAPPER = r'''
+#define _GNU_SOURCE
+#include <locale.h>
+#include <errno.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+double __real_strtod_l(const char *, char **, locale_t);
+static unsigned int forced_calls;
+static void report_forced_calls(void) {
+    fprintf(stderr, "SIMULATED_EARLY_UNDERFLOW: %u calls\n", forced_calls);
+}
+double __wrap_strtod_l(const char *text, char **end, locale_t numeric_locale) {
+    double value = __real_strtod_l(text, end, numeric_locale);
+    const char *magnitude = text;
+    if (*magnitude == '+' || *magnitude == '-') {
+        magnitude++;
+    }
+    if (strcmp(magnitude, "1e-324") == 0 || strcmp(magnitude, "1e-400") == 0 ||
+        strcmp(magnitude, "1e-9999") == 0) {
+        if (!forced_calls && atexit(report_forced_calls) != 0) {
+            abort();
+        }
+        forced_calls++;
+        errno = 0;
+        return 0.0;
+    }
+    return value;
+}
+'''
 MUTATIONS = [
+    ("decimal ignores directed underflow", "smaug_convert.c", "test_astype_early_underflow",
+     "parsed_value = negative ? -DBL_TRUE_MIN : DBL_TRUE_MIN;",
+     "return SMG_ERR_UNDERFLOW;", "decimal cstr: underflow dirigido"),
+    ("decimal loses negative subnormal sign", "smaug_convert.c", "test_astype_early_underflow",
+     "parsed_value = negative ? -DBL_TRUE_MIN : DBL_TRUE_MIN;",
+     "parsed_value = DBL_TRUE_MIN;", "decimal cstr: underflow dirigido"),
+    ("decimal swaps directed modes", "smaug_convert.c", "test_astype_early_underflow",
+     "(rounding == FE_UPWARD && !negative) ||\n            (rounding == FE_DOWNWARD && negative)",
+     "(rounding == FE_DOWNWARD && !negative) ||\n            (rounding == FE_UPWARD && negative)",
+     "decimal cstr: underflow dirigido"),
+    ("decimal overwrites output on underflow", "smaug_convert.c", "test_astype_early_underflow",
+     "        } else {\n            return SMG_ERR_UNDERFLOW;\n        }\n    }\n    *output = parsed_value;",
+     "        } else {\n            *output = 0.0;\n            return SMG_ERR_UNDERFLOW;\n"
+     "        }\n    }\n    *output = parsed_value;", "status f64 underflow preserva"),
+    ("decimal treats literal zero as underflow", "smaug_convert.c", "test_astype_early_underflow",
+     "if (!special && parsed_value == 0.0 && lexical_nonzero) {",
+     "if (!special && parsed_value == 0.0) {", "status f64 zero textual"),
     ("schema CSV ignores nullable", "smaug_csv.c", "test_schema",
      "if (!descriptor->nullable) {", "if (0) {", "non-nullable"),
     ("schema JSON ignores nullable", "smaug_json.c", "test_schema",
@@ -151,7 +202,13 @@ def compile_test(directory, test_name):
                f"-I{directory / 'include'}"]
     if test_name == "test_allocfail":
         command += WRAP_FLAGS
-    command += [str(ROOT / "tests/c" / f"{test_name}.c")]
+    early_underflow = test_name == "test_astype_early_underflow"
+    source_name = "test_astype" if early_underflow else test_name
+    command += [str(ROOT / "tests/c" / f"{source_name}.c")]
+    if early_underflow:
+        wrapper = directory / "early_underflow.c"
+        wrapper.write_text(EARLY_UNDERFLOW_WRAPPER)
+        command += [str(wrapper), "-Wl,--wrap=strtod_l"]
     command += [str(source) for source in sorted((directory / "src").glob("*.c"))]
     result = run(command + ["-lm", "-o", str(executable)])
     if result.returncode:
@@ -179,11 +236,15 @@ def main():
         directory = Path(temporary)
         shutil.copytree(ROOT / "src", directory / "src")
         shutil.copytree(ROOT / "include", directory / "include")
-        for test_name in ("test_astype", "test_allocfail", "test_io_c", "test_schema"):
-            memory = test_name != "test_astype"
+        for test_name in ("test_astype", "test_astype_early_underflow", "test_allocfail",
+                          "test_io_c", "test_schema"):
+            memory = test_name not in ("test_astype", "test_astype_early_underflow")
             result = execute(compile_test(directory, test_name), memory=memory)
             if result.returncode:
                 raise RuntimeError(f"Baseline inválida: {result.stdout}\n{result.stderr}")
+            if test_name == "test_astype_early_underflow":
+                if "SIMULATED_EARLY_UNDERFLOW:" not in result.stderr:
+                    raise RuntimeError("Baseline inválida: simulação de underflow não exercitada.")
             profile = "Valgrind" if memory else "nativo (modos de arredondamento)"
             print(f"BASELINE: {test_name}, {profile} aprovado", flush=True)
         for name, filename, test_name, original, replacement, evidence in MUTATIONS:

@@ -244,7 +244,33 @@ reorganização documental.
 
 
 <a id="checkpoint"></a>
-## Checkpoint de retomada — 2026-10-05
+## Checkpoint de retomada — 2026-10-08
+
+**Estado atual — correção decimal:** base `f93d4a5`, posterior à correção
+hexadecimal `699acc6`. O mantenedor trouxe a correção do underflow decimal
+prematuro na UCRT. A revisão local confirmou tratamento do sinal textual,
+quatro modos, zero literal e saída preservada em erro. `test_astype` passou
+856 checks no Linux/GCC 16.2.1 com `-O2 -Wall -Wextra -Wpedantic -Werror`,
+e também sob Valgrind 3.27.1: 279 alocações/liberações, zero erros e zero
+blocos pendentes. Uma simulação temporária de `strtod_l` retornando zero sem
+errno passou 856 checks e interceptou 49 conversões. A divergência decimal
+anterior sob Valgrind está resolvida para esta suíte. Runtimes ASan/UBSan
+continuam ausentes; não há novo log Windows completo nesta revisão.
+Os relatos abaixo são históricos e não substituem este estado atual.
+
+**Avanço R6 — auditoria reproduzível:** `scripts/audit_numeric_regressions.py`
+agora mantém o wrapper de `strtod_l` em uma baseline separada. Ele força zero
+positivo sem errno nos tokens decimais pequenos e exige evidência de execução
+da simulação antes de aceitar a baseline. Cinco mutações cobrem remoção da
+correção, sinal negativo perdido, modos dirigidos trocados, saída sobrescrita
+em erro e zero literal confundido com underflow. A campanha completa na base
+`f93d4a5` com esta alteração local terminou com 44 mutantes compiláveis
+detectados, nenhum sobrevivente. Baselines astype nativa/simulada aprovadas;
+allocfail, I/O C e schema aprovados sob Valgrind. Guia de build atualizado com
+o comando reproduzível. Esta campanha não altera os relatórios gerados de
+coverage, paridade ou manifest; o ramo simulado não foi incluído no gcov.
+Próximo passo: estender os mesmos casos aos consumidores CSV/JSON/astype e
+consolidar a evidência Windows da correção decimal; sanitizers seguem pendentes.
 
 **Seguimento Windows — 2026-10-08:** build relatado pelo mantenedor com
 MSYS2 UCRT64 e LuaJIT: DLL compilada, schema C com 129 checks, schema Lua com

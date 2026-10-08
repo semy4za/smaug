@@ -3,9 +3,9 @@
 > **Arquivo gerado automaticamente** por `scripts/make_coverage.sh` (`make coverage`).
 > Nao editar a mao. Contagens **exatas** (parse do texto .gcov), nao reconstruidas por %.
 
-- Commit medido: `28f8ce3`  |  Data: 2026-09-29 13:14:28 -0300
+- Commit medido: `f93d4a5`  |  Data: 2026-10-08 01:03:56 -0300
 - **Branch-alvo** ("taken at least once"): metrica rigorosa (padrao SQLite/avionica), exclui guards defensivos/inalcancaveis marcados `COV-EXCL-BR` -- e a que perseguimos rumo a 100%.
-- **Branch-bruto** (todos os ramos): `5216/5764 = 90.49%` -- 104 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
+- **Branch-bruto** (todos os ramos): `5332/5896 = 90.43%` -- 104 ramo(s) excluido(s) com justificativa (ver fim do arquivo).
 - Agrega TODOS os testes: C diretos (incl. `test_cow test_io_c` e `test_stress`), Lua (FFI) e `test_allocfail` (OOM).
 
 <a id="coverage-total"></a>
@@ -13,7 +13,7 @@
 | Arquivo | Linhas | Branch-alvo (taken) |
 | :--- | :--- | :--- |
 | `smaug_astype.c` | `178/192 = 92.71%` `[█████████░]` | `152/166 = 91.57%` `[█████████░]` |
-| `smaug_convert.c` | `214/219 = 97.72%` `[█████████░]` | `190/200 = 95.00%` `[█████████░]` |
+| `smaug_convert.c` | `316/325 = 97.23%` `[█████████░]` | `306/332 = 92.17%` `[█████████░]` |
 | `smaug_core.c` | `428/428 = 100.00%` `[██████████]` | `343/350 = 98.00%` `[█████████░]` |
 | `smaug_csv.c` | `512/549 = 93.26%` `[█████████░]` | `433/535 = 80.93%` `[████████░░]` |
 | `smaug_datetime.c` | `585/594 = 98.48%` `[█████████░]` | `753/820 = 91.83%` `[█████████░]` |
@@ -26,7 +26,7 @@
 | `smaug_ops_window.c` | `335/342 = 97.95%` `[█████████░]` | `355/397 = 89.42%` `[████████░░]` |
 | `smaug_schema.c` | `26/26 = 100.00%` `[██████████]` | `33/34 = 97.06%` `[█████████░]` |
 | `smaug_str.c` | `297/297 = 100.00%` `[██████████]` | `254/254 = 100.00%` `[██████████]` |
-| **TOTAL** | `5218/5366 = 97.24%` `[█████████░]` | `5216/5660 = 92.16%` `[█████████░]` |
+| **TOTAL** | `5320/5472 = 97.22%` `[█████████░]` | `5332/5792 = 92.06%` `[█████████░]` |
 
 ## Ramos descobertos (mapa real, derivado do .gcov)
 
@@ -45,14 +45,27 @@ Alvos concretos de endurecimento rumo a **branch-alvo 100%** (MC/DC):
 - `smaug_astype.c:308` — parse_status != SMG_ERR_OVERFLOW &&
 - `smaug_astype.c:338` — parse_status != SMG_ERR_OVERFLOW &&
 
-**`smaug_convert.c`** — 7 linha(s) com ramo descoberto:
-- `smaug_convert.c:136` — if (!text || !output) {
-- `smaug_convert.c:231` — if (!parse_end || (size_t)(parse_end - text) != length) {
-- `smaug_convert.c:277` — if (length == SIZE_MAX) {
-- `smaug_convert.c:318` — if (!buffer || length <= 0 || (size_t)length >= capacity) {
-- `smaug_convert.c:328` — if (length < 0 || (size_t)length >= sizeof(temporary)) {
-- `smaug_convert.c:356` — if (!uselocale(previous_locale)) {
-- `smaug_convert.c:378` — if (length < 0 || (size_t)length >= sizeof(temporary)) {
+**`smaug_convert.c`** — 20 linha(s) com ramo descoberto:
+- `smaug_convert.c:137` — if (!text || !output) {
+- `smaug_convert.c:225` — if (offset > SIZE_MAX - exponent_quads) {
+- `smaug_convert.c:226` — return offset_negative ? -2048 : 2048;
+- `smaug_convert.c:235` — if (magnitude > 512) {
+- `smaug_convert.c:236` — return total_negative ? -2048 : 2048;
+- `smaug_convert.c:250` — if (*text == '+' || *text == '-') {
+- `smaug_convert.c:262` — for (; *text && *text != 'p' && *text != 'P'; text++) {
+- `smaug_convert.c:288` — *output = negative ? -0.0 : 0.0;
+- `smaug_convert.c:300` — rounding != FE_UPWARD && rounding != FE_DOWNWARD) {
+- `smaug_convert.c:317` — sticky = sticky || (prefix & ((UINT64_C(1) << (shift - 1)) - 1)) != 0;
+- `smaug_convert.c:318` — if ((round_away && (guard || sticky)) ||
+- `smaug_convert.c:378` — if (!parse_end || (size_t)(parse_end - text) != length) {
+- `smaug_convert.c:394` — if ((rounding == FE_UPWARD && !negative) ||
+- `smaug_convert.c:395` — (rounding == FE_DOWNWARD && negative)) {
+- `smaug_convert.c:396` — parsed_value = negative ? -DBL_TRUE_MIN : DBL_TRUE_MIN;
+- `smaug_convert.c:435` — if (length == SIZE_MAX) {
+- `smaug_convert.c:476` — if (!buffer || length <= 0 || (size_t)length >= capacity) {
+- `smaug_convert.c:486` — if (length < 0 || (size_t)length >= sizeof(temporary)) {
+- `smaug_convert.c:514` — if (!uselocale(previous_locale)) {
+- `smaug_convert.c:536` — if (length < 0 || (size_t)length >= sizeof(temporary)) {
 
 **`smaug_core.c`** — 7 linha(s) com ramo descoberto:
 - `smaug_core.c:41` — if (a == 0 || b == 0) {

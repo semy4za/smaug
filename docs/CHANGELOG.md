@@ -6,6 +6,21 @@ Marcos resumidos. Decisões vigentes ficam no [contrato](CONTRACT.md);
 checkpoints e pendências ficam no roadmap. Resultados de uma execução não
 certificam versões posteriores.
 
+## 2026-10-08 — Underflow decimal com arredondamento dirigido
+
+O commit `f93d4a5` corrige o zero prematuro devolvido pela libc para decimais
+muito pequenos: FE_UPWARD positivo e FE_DOWNWARD negativo produzem o menor
+subnormal com o sinal da entrada. Os demais modos preservam o diagnóstico e
+a saída anterior; zero textual mantém seu sinal. Regressões cobrem ambos os
+sinais, quatro modos e entradas C-string/slice. Revisão Linux: 856 checks
+aprovados com warnings estritos e no Valgrind, sem erros ou vazamentos,
+resolvendo também a divergência anteriormente registrada nessa ferramenta.
+
+A auditoria numérica/I-O ganhou uma baseline com underflow prematuro simulado
+e cinco mutações da correção decimal. Campanha completa aprovada no Linux:
+44 mutantes compiláveis detectados, nenhum sobrevivente; baselines de I/O,
+schema e falhas de alocação aprovadas no Valgrind.
+
 ## 2026-10-08 — Conversão hexadecimal na fronteira subnormal
 
 Relato Windows confirmou `_strtod_l` retornando zero para um token que deveria
