@@ -1,6 +1,6 @@
 # Smaug -- MANIFEST de integridade
 # Gerado por scripts/make_manifest.sh (o .ps1 delega a este)
-# Arvore: 28f8ce3 + alteracoes nao commitadas
+# Arvore: 699acc6 + alteracoes nao commitadas
 # Formato: <sha256>  <linhas>  <caminho>
 #
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
@@ -11,24 +11,24 @@ d66b9d6d1b2bb00272d0e347f966d34ccdf8e7d58e40c8d94e2aa63a2e09fce3      21  ./LICE
 b36fc58bb2526123e61156a02616aa9ff99731058a4c8b37c3e4e8c30bd3b6a8     641  ./docs/API_INDEX.md
 87f769ad5c84bcc13cd0a51d0563461e03d668fe6ead46e911230e1f280aa1e7    1129  ./docs/API_Reference.md
 b0ead12e73e10d4b9b67f24f0eb87e01245d28c7bc9ac74615c5aeee4d4653d4     161  ./docs/ARCHITECTURE.md
-005aa793e0dc5b8eb00e0a61a659329f931459f99786191a3d7fee6fd6dffac2     208  ./docs/Build_and_Testing.md
-d9034f04f01c38d92b0c8edf975c5a35351d2c9f1788d2d1b4b5f4c588bc29a9     162  ./docs/CHANGELOG.md
-df2f88c511f904f8dc22666668889803cde2d06f3dbcab2d2cd8cc30c7c4b699     312  ./docs/CODING_STYLE.md
+b835c2956f52444abe6508f489aab725826ca919a6473bdf8c954f1c1b57181c     249  ./docs/Build_and_Testing.md
+494b57244b47e6eae6cb57e70638e7978e8664bc1b85eb054922c14be579e836     178  ./docs/CHANGELOG.md
+a7233120206c4fdd6ef3fd91ed23eef0168af2da8aeaa679e71defa46ca8bfb3     314  ./docs/CODING_STYLE.md
 3d21001125f1fab0996be56f9044fe9b48e2624e8bc8f6fbaadd445cfd2a52fb    1045  ./docs/CONTRACT.md
 a190f6b76c26249bdec348b13637b214e0106e26585fc13521598b31de639bd3      97  ./docs/CORE_ARITHMETIC_REVIEW.md
 f38793f40834aac4f8f38f28ee56f4668e1319d49e17aa670e32c30e726e84e9     515  ./docs/COVERAGE.md
 4c23d42e4f8f399b9f08596fc08ed346be3749fd12618f75844b6937ce8d56bf     158  ./docs/COW.md
 74a0fe195fbaddded998dca2cd268e21c551f14933e1a5f7dbf3bf308a1fd52f     109  ./docs/GETTING_STARTED.md
 dc924f2774531da7dc5b7b7524b157171cb50e3c9ad7493a8d0aa0522cee08c3     863  ./docs/IO_REVIEW.md
-ab8d6b6640a2d8bc3978928cd0673f35dc98d23b663a3a1d92292a5880d73e1c     976  ./docs/PARITY_REPORT.md
+e1bf6f9dc66d1b03d041e07793d2627e74eab4bbb01f9e615be8b50cef2f6f95     976  ./docs/PARITY_REPORT.md
 9f5ac0a5ed4d0ccabccd3be3d423ff41495cc267951ba93b84052d881a00b7cb      43  ./docs/README.md
-3a0bcc4389c3fdcc979413fc30f907b2b3d05827934c456fa702677b28c7e86e     627  ./docs/Roadmap.md
+31dad2f214f8afb4bacb1113ef6e257db5c99b97b56e660f5a9126bf4baed377     707  ./docs/Roadmap.md
 8056d1548df05badec8d96e6f5f47fe474a2115ff0299832dd7432850df1462b     277  ./docs/TEST_SUITE_EXCLUSIONS_REVIEW.md
 1c0dffabd0cbb35bde12574fb176f15b389f7b7d7f47b7b4812d32bf8836dce6     210  ./docs/USER_GUIDE.md
 1722e1a5806e185b2f934f2a66ec5193cc6ab8dc5a03837be43be80628c8fb86      39  ./include/smaug.h
 ffd3e17523503071a9cf18ad53b381b1451cdde8bb9548fa8d234d0a823ffba8      76  ./include/smaug_astype.h
 b5af072fe1b2c11fff656da1b2aa010e54b14536946f30d6a292bd60a7c338d2      40  ./include/smaug_bool.h
-652c10cba0ace8b85367602d225980a406fd3dec2a4e34a61adc4f8197fea42e      50  ./include/smaug_convert.h
+adc16582b9960c02fad2ed5c8a668bc51c4dc1d48091ca389acd0d52fafb5036      53  ./include/smaug_convert.h
 c328593041a904e074caad67f63a43bcc811a85331044335f2f0c487da8d2550     119  ./include/smaug_core.h
 8c1babac047a15f549c465ecbe60633c3c23a21e40ba57db4af50f1aa79d4d76     221  ./include/smaug_datetime.h
 800a764145501e74dff3782a318efedece810846e97ced859a05b8747be2091a     135  ./include/smaug_io.h
@@ -79,7 +79,7 @@ d924fa121b8003734d5560301943bd3c2864dcdbab9ffe79dd6323c511388e51     125  ./scri
 cfcafa7712bf67a349a1c7716d6cae7a8a691190817e9ba322291ddf00d29e00     100  ./scripts/audit_json_numeric_policy.c
 861782ea3ecf803f89fe6371cb1cd7c6d24036661e08a9bb23f1284b9467a052     109  ./scripts/audit_numeric_parse.c
 53b8e4242aa43777db255a6d3db1978c4d442b43520fb7d3662966a3be663b26     209  ./scripts/audit_numeric_regressions.py
-b73148feead2e5eea61604a306091ccf6cfde309bdfcf9ab28f84ec1b2200024     252  ./scripts/build.ps1
+a2a7f0f75e42926fee8a0df5c76906c811cbfa9c5caa587f1aaf1b408283727e     255  ./scripts/build.ps1
 ca1a0ec158b557697d7e3a82efff6d2ef1f44db74e6180a5aa4f6a3e85c93bcd     314  ./scripts/build.sh
 e3e6a2e8a7fe472f48bde11f9f60eb1ee76f88eee1a1636f75a21b8fc620097c     110  ./scripts/check_test_style.py
 2d7de88f5729cd9ea0393ddaed756d0e6473b97854fab230bc543e14a00ffdc2     235  ./scripts/make_coverage.sh
@@ -104,7 +104,7 @@ cfb9c034523666455ebe43b89950b5c790effa963fbb138592d415bad92784f7     200  ./scri
 f31626168db025143b21426673364380f66eb91b9632e8658c7c047646f5ed69     132  ./scripts/parity/parity.ps1
 c415236c11f2074d9e1a1d311c2b5f72cfbcb6f547cb7649eb6e7a8f30ed7365     111  ./scripts/parity/parity.sh
 7544da0a33a0a786f30259fbe835afac513d00ef45e9473f7559ece5b78c4821     377  ./src/smaug_astype.c
-5f69c15cbf57c09639f3213af45706d1b927d996c1f1b9ee20474de4f737e838     382  ./src/smaug_convert.c
+944e21950f9eb81c3f512f4a13bda20da156010aa63feb7b2d49951751b722b2     540  ./src/smaug_convert.c
 1116b8ee71e1fbd0abaa0028776d87c7c44aaff43151e71bc8a2140afb1be4c7     683  ./src/smaug_core.c
 084ce5a4c61af2001325a036bd99a5106f1fab4840b1bfac69c47d04e2fc69ef     930  ./src/smaug_csv.c
 a5a9986ad59fbb50363828b9a22c5ca14ccc6b8a226e9753382e59168b0c7c97    1166  ./src/smaug_datetime.c
@@ -119,7 +119,7 @@ d36514e6dc0b82c1d0d244f32f3ff61e5f79b855ce417c966a7e332a5f06ef8d    1352  ./src/
 a654b4374b8abedcab6fe0de460051002d704361b575726392a23e47b98c818e     576  ./src/smaug_str.c
 d504c7cf7be99de9257f08a931b9b41afd3c856335d54d2b6cf0716d1293c8c0     296  ./tests/c/test_alloc.c
 3a9ed2ed570fb7201e9e5c4da54a28e43173cd079d50248fd982bef0f5ca8747    3213  ./tests/c/test_allocfail.c
-bc9e0df504e27b4f891b28adde8caf655d0d5f693781f3213cefd47c19032b33     772  ./tests/c/test_astype.c
+8de23f15a346b445ffa142ab3afb237e4a651233672a70d79edf0cb46a9ef4df     905  ./tests/c/test_astype.c
 c5c5efa908dca497209ee51228f0cf1ed7200d3d0b3b0e8afeb60b3784322dff     225  ./tests/c/test_bool.c
 7589e54254b84867a0e4db91166416722a1effc1c41951ca5c578e6a070db5d6     383  ./tests/c/test_bool_lifecycle.c
 07ce256ad22a2a1fbe9371772be077acf492e3ebba5785a691626c5693d542c0     673  ./tests/c/test_cow.c
@@ -139,7 +139,7 @@ d358cbdae0db502cb65f2604caeaeba5283176bc9a394fefdde574fc6d436cde     774  ./test
 2598f7fe4057a5682ef39ba8b59f382a3902ca61e2160cfe2af8b68933390652     340  ./tests/dataset/test_stat.lua
 af4920540f547af5e421511f0ab84bfd691831171080c5cff73e54384d19da9b     524  ./tests/io/test_csv.lua
 c26cbbcf2dfeccaef93d5575a5a3e6acaecc4b8564bb6c0ed8c9b40278e1271f     279  ./tests/io/test_json.lua
-4d3a4c36d849574e73d26d195bac05c77b7839eb35344d754326833a4e0912f4     126  ./tests/io/test_schema.lua
+d3d3eec9a405c10a2bce1b102fd9a0d3ca78f647db963b241b67b98e1e16ae88     128  ./tests/io/test_schema.lua
 453193076d61a9bae0a17a6ded0066cc7dbb8a2b35b7703234397bb88b696d78     198  ./tests/props/test_integration.lua
 ef7ea711bc42d9124526b5a47ce26f851c3f08791bb2a4f2459badef79a48503     554  ./tests/props/test_props.lua
 de0eadbd7fc76a392ac5e242ecbfa21b7058fa647d808799de0041707827694d     535  ./tests/series/test_access.lua

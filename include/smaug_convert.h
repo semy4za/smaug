@@ -24,7 +24,8 @@
    ERANGE com saturação em DBL_MAX é overflow. O parser não altera o modo de
    arredondamento do caller. Hexadecimal e convertido diretamente em binary64
    com arredondamento unico (nearest-even, toward-zero, upward ou downward);
-   decimal continua usando a libc com locale C. */
+   decimal continua usando a libc com locale C, corrigindo underflow para zero
+   quando o modo dirigido exige o menor subnormal com o sinal da entrada. */
 smaug_status_t smaug_parse_i64_status(const char *text, size_t length, int64_t *output);
 smaug_status_t smaug_parse_f64_status(const char *text, size_t length, double *output);
 smaug_status_t smaug_parse_i64_cstr_status(const char *text, int64_t *output);

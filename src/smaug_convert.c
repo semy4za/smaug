@@ -385,7 +385,18 @@ static smaug_status_t parse_f64_terminated(const char *text, size_t length, doub
         return SMG_ERR_OVERFLOW;
     }
     if (!special && parsed_value == 0.0 && lexical_nonzero) {
-        return SMG_ERR_UNDERFLOW;
+        /* A UCRT pode antecipar underflow decimal (ex.: 1e-400) e devolver
+           zero sem aplicar arredondamento dirigido. Uma magnitude nao zero
+           arredondada para longe de zero deve produzir o menor subnormal.
+           Use o sinal textual; zero literal nao entra neste ramo. */
+        int rounding = fegetround();
+        bool negative = text[0] == '-';
+        if ((rounding == FE_UPWARD && !negative) ||
+            (rounding == FE_DOWNWARD && negative)) {
+            parsed_value = negative ? -DBL_TRUE_MIN : DBL_TRUE_MIN;
+        } else {
+            return SMG_ERR_UNDERFLOW;
+        }
     }
     *output = parsed_value;
     return SMG_OK;

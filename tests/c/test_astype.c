@@ -437,15 +437,33 @@ static void test_float_rounding_modes(void) {
         }
         OK(boundary_status == SMG_OK && output == expected_boundary,
            "fronteira subnormal respeita resultado exato por modo de arredondamento");
-        output = 77.0;
-        smaug_status_t status = smaug_parse_f64_cstr_status("1e-400", &output);
-        if (modes[mode_index] == FE_UPWARD) {
-            OK(status == SMG_OK && output == DBL_TRUE_MIN,
-               "arredondamento para subnormal preserva magnitude");
-        } else {
-            OK(status == SMG_ERR_UNDERFLOW && output == 77.0,
-               "arredondamento para zero tem diagnóstico e preserva saída");
+        const char *tiny_tokens[] = {
+            "1e-324", "-1e-324", "+1e-400", "-1e-400", "1e-9999", "-1e-9999"
+        };
+        for (size_t token_index = 0;
+             token_index < sizeof(tiny_tokens) / sizeof(tiny_tokens[0]); token_index++) {
+            const char *token = tiny_tokens[token_index];
+            int negative = token[0] == '-';
+            int away_from_zero = (!negative && modes[mode_index] == FE_UPWARD)
+                || (negative && modes[mode_index] == FE_DOWNWARD);
+            smaug_status_t expected_status = away_from_zero ? SMG_OK : SMG_ERR_UNDERFLOW;
+            double expected_value = away_from_zero
+                ? (negative ? -DBL_TRUE_MIN : DBL_TRUE_MIN) : 77.0;
+            output = 77.0;
+            OK(smaug_parse_f64_cstr_status(token, &output) == expected_status
+               && output == expected_value,
+               "decimal cstr: underflow dirigido respeita sinal e preserva saida em erro");
+            /* Slice sem terminador: exercita tambem a copia da entrada. */
+            char slice[16];
+            memset(slice, '#', sizeof(slice));
+            memcpy(slice, token, strlen(token));
+            output = 77.0;
+            OK(smaug_parse_f64_status(slice, strlen(token), &output) == expected_status
+               && output == expected_value,
+               "decimal slice: underflow dirigido respeita sinal e preserva saida em erro");
         }
+        OK(smaug_parse_f64_cstr_status("0e-9999", &output) == SMG_OK
+           && output == 0.0 && !signbit(output), "zero textual positivo preservado");
         OK(smaug_parse_f64_cstr_status("-0e-9999", &output) == SMG_OK
            && output == 0.0 && signbit(output), "zero textual negativo preservado");
         OK(fegetround() == modes[mode_index], "parser preserva modo do caller");
