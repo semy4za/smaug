@@ -6,6 +6,16 @@ Marcos resumidos. Decisões vigentes ficam no [contrato](CONTRACT.md);
 checkpoints e pendências ficam no roadmap. Resultados de uma execução não
 certificam versões posteriores.
 
+## 2026-10-08 — Alinhamento dos resumos de retomada
+
+Resumos R1–R3 e fila do roadmap alinhados às entregas já registradas: migração
+numérica/formatadores, transporte C/Lua, schema completo e correções Windows
+hexadecimal/decimal. A campanha mais recente registra 44 mutantes detectados.
+Correção implementada e registro de validação por plataforma aparecem como
+estados distintos; execução Windows completa após as correções e sanitizers
+continuam sem evidência consolidada. Nenhum teste novo foi executado nesta
+revisão documental.
+
 ## 2026-10-08 — Underflow decimal com arredondamento dirigido
 
 O commit `f93d4a5` corrige o zero prematuro devolvido pela libc para decimais
@@ -28,7 +38,9 @@ arredondar para `DBL_MIN`. O core agora converte hexadecimal diretamente, com
 arredondamento único e preservação de saída em erro. Regressões cobrem sinais,
 quatro modos, empates, bits finais e expoentes longos. O executor Windows passa
 a conferir o resumo final `PASS` após avisos `SKIP`, mantendo a exigência de
-exit code zero. Suítes C/Lua aprovadas no Linux; nova execução Windows pendente.
+exit code zero. Suítes C/Lua aprovadas no Linux. Correção Windows implementada;
+registro da execução completa após as correções hexadecimal/decimal ainda não
+consolidado no checkpoint.
 
 ## 2026-10-05 — Revisão dos consumidores de schema
 

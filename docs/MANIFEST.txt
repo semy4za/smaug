@@ -1,6 +1,6 @@
 # Smaug -- MANIFEST de integridade
 # Gerado por scripts/make_manifest.sh (o .ps1 delega a este)
-# Arvore: f93d4a5 + alteracoes nao commitadas
+# Arvore: 373396d + alteracoes nao commitadas
 # Formato: <sha256>  <linhas>  <caminho>
 #
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
@@ -11,8 +11,8 @@ d66b9d6d1b2bb00272d0e347f966d34ccdf8e7d58e40c8d94e2aa63a2e09fce3      21  ./LICE
 b36fc58bb2526123e61156a02616aa9ff99731058a4c8b37c3e4e8c30bd3b6a8     641  ./docs/API_INDEX.md
 87f769ad5c84bcc13cd0a51d0563461e03d668fe6ead46e911230e1f280aa1e7    1129  ./docs/API_Reference.md
 b0ead12e73e10d4b9b67f24f0eb87e01245d28c7bc9ac74615c5aeee4d4653d4     161  ./docs/ARCHITECTURE.md
-b835c2956f52444abe6508f489aab725826ca919a6473bdf8c954f1c1b57181c     249  ./docs/Build_and_Testing.md
-494b57244b47e6eae6cb57e70638e7978e8664bc1b85eb054922c14be579e836     178  ./docs/CHANGELOG.md
+4144bfd755e8394054f138eea16cd36d08ec83ad6acba8fa64656488ed83700a     268  ./docs/Build_and_Testing.md
+9ffdee3321a340a5f61256dc3268c453debd62141419ba17dd820fe54856581b     205  ./docs/CHANGELOG.md
 a7233120206c4fdd6ef3fd91ed23eef0168af2da8aeaa679e71defa46ca8bfb3     314  ./docs/CODING_STYLE.md
 3d21001125f1fab0996be56f9044fe9b48e2624e8bc8f6fbaadd445cfd2a52fb    1045  ./docs/CONTRACT.md
 a190f6b76c26249bdec348b13637b214e0106e26585fc13521598b31de639bd3      97  ./docs/CORE_ARITHMETIC_REVIEW.md
@@ -20,9 +20,9 @@ a190f6b76c26249bdec348b13637b214e0106e26585fc13521598b31de639bd3      97  ./docs
 4c23d42e4f8f399b9f08596fc08ed346be3749fd12618f75844b6937ce8d56bf     158  ./docs/COW.md
 74a0fe195fbaddded998dca2cd268e21c551f14933e1a5f7dbf3bf308a1fd52f     109  ./docs/GETTING_STARTED.md
 dc924f2774531da7dc5b7b7524b157171cb50e3c9ad7493a8d0aa0522cee08c3     863  ./docs/IO_REVIEW.md
-c3424029dcc9b283f1b0411b8a4ab62c53b79a3f52301396153d98c9e8c3cde6     976  ./docs/PARITY_REPORT.md
+9dd37f903763cb46bf0a077a22aa14c8466e4b105b1de8a9c4369f5221b1e388     976  ./docs/PARITY_REPORT.md
 e8c03eb0a403ec0b324a9231e46761f869de0664dd735a5ea42ca41079eb218f      43  ./docs/README.md
-31dad2f214f8afb4bacb1113ef6e257db5c99b97b56e660f5a9126bf4baed377     707  ./docs/Roadmap.md
+cd79511c909582b4ed3cce59ac37c6378032057af84f8bd66bbe9392b68ba1ee     749  ./docs/Roadmap.md
 8056d1548df05badec8d96e6f5f47fe474a2115ff0299832dd7432850df1462b     277  ./docs/TEST_SUITE_EXCLUSIONS_REVIEW.md
 1c0dffabd0cbb35bde12574fb176f15b389f7b7d7f47b7b4812d32bf8836dce6     210  ./docs/USER_GUIDE.md
 1722e1a5806e185b2f934f2a66ec5193cc6ab8dc5a03837be43be80628c8fb86      39  ./include/smaug.h
@@ -78,7 +78,7 @@ d924fa121b8003734d5560301943bd3c2864dcdbab9ffe79dd6323c511388e51     125  ./scri
 8625304c3176fc6df1ad6ff2805236f4738d93060c41e263db498d6653c1eff0     101  ./scripts/audit_io_values.lua
 cfcafa7712bf67a349a1c7716d6cae7a8a691190817e9ba322291ddf00d29e00     100  ./scripts/audit_json_numeric_policy.c
 861782ea3ecf803f89fe6371cb1cd7c6d24036661e08a9bb23f1284b9467a052     109  ./scripts/audit_numeric_parse.c
-53b8e4242aa43777db255a6d3db1978c4d442b43520fb7d3662966a3be663b26     209  ./scripts/audit_numeric_regressions.py
+e159b80b146f4914412c033aa30fe8948ed7e4bc232631e6b176f4d5f269fa8c     270  ./scripts/audit_numeric_regressions.py
 a2a7f0f75e42926fee8a0df5c76906c811cbfa9c5caa587f1aaf1b408283727e     255  ./scripts/build.ps1
 ca1a0ec158b557697d7e3a82efff6d2ef1f44db74e6180a5aa4f6a3e85c93bcd     314  ./scripts/build.sh
 e3e6a2e8a7fe472f48bde11f9f60eb1ee76f88eee1a1636f75a21b8fc620097c     110  ./scripts/check_test_style.py

@@ -2,8 +2,11 @@
 
 [Documentação](README.md) · [Contrato](CONTRACT.md) · [Arquitetura](ARCHITECTURE.md)
 
-Revisão: 2026-09-28. Base inspecionada: `320b4bc`; parser R1 aplicado e
-consumidores CSV/JSON ainda em verificação. Objetivo imediato: preservar valores e tornar confiáveis
+Revisão documental: 2026-10-08. Base: `373396d`; parser, formatadores,
+consumidores CSV/JSON, transporte C/Lua e schema completo implementados.
+Correções Windows hexadecimal (`699acc6`) e decimal (`f93d4a5`) entregues;
+falta consolidar o registro da execução completa após essas correções.
+Objetivo imediato: preservar valores e tornar confiáveis
 os contratos e sua verificação nos anéis 0–3. Esta fila substitui a anterior;
 não aprova automaticamente mudanças de contrato ainda abertas.
 
@@ -16,30 +19,33 @@ valida apenas seu domínio/ambiente; contrato aprovado pode ter implementação
 pendente. Sem evidência suficiente, manter a lacuna aberta. Nenhum percentual,
 comentário ou suíte verde isolada significa certificação geral.
 
-## Estado de partida
+## Estado atual
 
 - Existem `Series`, `DataSet`, categorical e I/O CSV/JSON próprios.
 - `prod` já tem implementação C e consumidores Lua. Aritmética i64 checked,
   conversão estrita string/int64/float64→datetime e correções de join/groupby
   também existem. Não são tarefas de implementação inicial.
-- Foram reproduzidos problemas de sintaxe/associação JSON, preservação de NUL
-  e transporte exato de int64. [Evidências e decisões](IO_REVIEW.md).
+- Sintaxe/associação JSON, preservação de NUL e transporte exato de int64
+  foram corrigidos. Schema completo CSV/JSON está implementado em memória
+  e arquivo. [Evidências e decisões](IO_REVIEW.md).
 - A suíte relacional foi reescrita inicialmente e corrigida; a auditoria de
   migração e o poder de detecção ainda precisam ser concluídos.
 - Os quatro helpers aritméticos checked têm evidência dirigida favorável.
   Isso não certifica consumidores, memória ou restante do core.
 - O parser R1 tem contrato de saída obrigatória, consumo integral, gramática
-  explícita e diagnósticos testados. A integração dos leitores ainda não é
-  contabilizada como concluída.
+  explícita e diagnósticos testados. Leitores e formatadores foram migrados;
+  restam ampliar regressões de arredondamento nos consumidores e consolidar
+  a evidência Windows e de sanitizers.
 - A licença MIT já existe. Distribuição e política de compatibilidade seguem
   abertas; não recriar a tarefa de adicionar licença.
 
 ## Ordem de trabalho
 
-1. Fechar o mecanismo numérico e seu uso pelos consumidores (R1), com a
-   evidência pertinente de R6 em cada correção.
-2. Fechar transporte de valores e layouts de I/O (R2) antes de implementar
-   toda a adaptação CSV/JSON (R3).
+1. Ampliar a verificação dos consumidores numéricos (R1/R6), consolidar o
+   registro Windows após as correções já entregues e executar sanitizers.
+2. Consolidar verificação de transporte/layouts (R2) e revisar diagnóstico
+   de arquivo/readers (R3). Schema completo já implementado; schema parcial,
+   defaults e modo tolerante exigem decisão própria.
 3. Concluir a auditoria de inferência e entrada Lua (R4), então retomar
    `dayfirst`, detecção de datas e componentes datetime (R5).
 4. Concluir a reconstrução e verificação por famílias (R6); tratar R7 nas
@@ -52,8 +58,9 @@ ampliar datetime. Não exige reescrever todo o motor para corrigir um mecanismo.
 <a id="r1"></a>
 ## R1 — Conversão numérica e defesas do core
 
-**Estado:** parser e `astype` implementados conforme a gramática aprovada;
-integração CSV/JSON e verificação ampliada permanecem em andamento.
+**Estado:** parser, `astype`, formatadores e consumidores CSV/JSON migrados.
+Correções hexadecimal/decimal para Windows entregues; verificação ampliada dos
+consumidores, registro Windows completo e sanitizers permanecem abertos.
 
 Direção solicitada em 28/09: preservar os anéis e estabilizar as convenções
 de biblioteca C. O [padrão C/Lua consolidado](CODING_STYLE.md) usa o C11 já selecionado
@@ -71,13 +78,13 @@ Decisão aprovada em 28/09: formato/inferência no leitor, conversão no core;
 causas por código no core e contexto/mensagem na camada externa. `astype`
 tolerante distingue elemento inconversível de falha operacional, sem converter
 OOM em NA. [Contrato](CONTRACT.md#conversao-numerica-responsabilidades).
-Próximo passo: verificar consumidores CSV/JSON, formatadores e o mapeamento de
-diagnósticos antes de ampliar a ABI.
+Próximo passo: estender os casos de arredondamento hexadecimal/decimal aos
+consumidores CSV/JSON/astype e consolidar a evidência por plataforma.
 
 [Matriz de comparação](IO_REVIEW.md#r1-proposta): gramática atual versus
 destino, mudanças de compatibilidade e categorias de falha. A migração de astype e inferência CSV distingue falha operacional de texto
 inconversível desde a revisão de 29/09. A leitura numérica JSON foi migrada no
-seguimento abaixo; transporte e demais pontos de R3 seguem abertos.
+seguimento abaixo; transporte também implementado. Lacunas restantes estão em R3.
 Suporte explícito a hexadecimal aprovado em 28/09. A
 [gramática detalhada](IO_REVIEW.md#r1-gramatica) registra as regras aprovadas
 e casos de aceitação/rejeição; hexadecimal inteiro é aceito em i64 e f64. A
@@ -90,7 +97,7 @@ NUL dentro de um slice não pode permitir aceitação silenciosa de seu prefixo
 numérico. Falha deve preservar saída válida.
 
 Slices e `_cstr` usam a mesma gramática e não truncam tokens longos.
-Não migrar CSV cegamente sem verificar seus limites próprios. `astype` numérico conserva
+CSV já tem regressões de tokens longos e falhas operacionais. `astype` numérico conserva
 seu contrato de elemento inconversível→NA; escolha de dtype do arquivo é R3.
 
 **Conclusão:** decisões documentadas; regressões de NUL inicial/intermediário/
@@ -103,7 +110,10 @@ de ambiente explicitadas. [Review](IO_REVIEW.md#core).
 
 **Estado:** transporte de NUL, comprimentos dos marcadores CSV e identificação
 da ABI implementados em 29/09. Ponte int64 e cleanup da adaptação de leitura
-também implementados; verificação Windows e inferência geral ainda abertas.
+também implementados; consolidação de evidência Windows e inferência geral
+ainda abertas.
+
+Entregas implementadas (critérios de verificação no checkpoint):
 
 - Preservar int64 nas duas direções: tabela C→DataSet e DataSet→writer,
   sem passagem intermediária por `number` Lua.
@@ -112,7 +122,8 @@ também implementados; verificação Windows e inferência geral ainda abertas.
   cdef, buffers Lua e ownership. Metadata permanece fora desse recorte.
 - Consulta `smaug_abi_version()` implementada antes de acessar estruturas;
   biblioteca carregada incompatível deve falhar sem fallback silencioso.
-- Verificar cleanup quando a adaptação Lua lança erro e nos caminhos parciais C.
+- Cleanup da adaptação Lua e dos caminhos parciais C tem regressões de falha
+  e recuperação; ampliar a auditoria aos caminhos restantes.
 
 **Conclusão:** comparação de bytes/valores/máscaras nos dois sentidos, nomes
 com NUL e colisões, biblioteca ausente/incompatível/correta, sizeof/offsetof
@@ -122,23 +133,27 @@ entre C compilado e FFI, falhas de alocação e testes Linux/Windows identificad
 <a id="r3"></a>
 ## R3 — Leitura e escrita CSV/JSON
 
-**Estado:** políticas estritas de JSON/CSV fechadas; integração de arquivo e
-compatibilidade de modos tolerantes permanecem.
+**Estado:** políticas estritas, transporte e schema completo implementados,
+incluindo leitura em memória/arquivo e falha no fechamento dos writers.
+Restam revisar diagnóstico detalhado de arquivo e validação dos readers,
+consolidar evidência por plataforma e decidir eventuais extensões.
 
 Implementadas inclusive para nomes com NUL: associação JSON por nome, união de campos,
 ordem por primeira aparição, desambiguação sem perda e ausência/null→NA;
 strings `""`, `"null"` e `"NA"` continuam texto. Estrutura do documento exige
 consumo completo e erro por posição/motivo sem resultado parcial. O JSON também
 valida UTF-8 estrito em nomes e valores, com diagnóstico por byte e sem saída
-parcial. Restam as demais políticas de strings e dialeto.
+parcial. Políticas implementadas de strings e dialeto constam no contrato.
 
 Gramática numérica, faixa e promoção int64/float64 JSON foram aprovadas e
 implementadas em 29/09; corte de tokens e saturação foram corrigidos. O CSV
 agora exige largura exata, aceita BOM inicial/LF/CRLF e rejeita CR isolado e
-aspas malformadas. Resta fechar schema explícito e eventual modo tolerante.
+aspas malformadas. Schema explícito completo entregue em `1eafa7a`; schema
+parcial, defaults e modo tolerante exigem decisão própria.
 
-Completar diagnóstico da escrita em arquivo, propagação de erros de leitura/
-escrita/fechamento, limpeza parcial e fixtures com expectativas independentes.
+Revisar diagnóstico detalhado de arquivo e validação dos readers. Falha de
+fechamento dos writers e cleanup/OOM de schema já têm regressões; ampliar a
+verificação dos caminhos restantes com expectativas independentes.
 Não ampliar automaticamente o perfil JSON para objetos aninhados.
 
 **Conclusão:** corpus válido/inválido com resultados externos esperados,
@@ -586,8 +601,8 @@ tolerante exigem decisão própria antes de qualquer extensão.
 
 | Frente | Já conferido | Falta para avançar |
 |---|---|---|
-| Core numérico | Helpers checked: 30.712 chamadas e cinco mutações detectadas; parser/formatter/astype/CSV/JSON com regressões de status, OOM e 20 mutações detectadas | Windows e sanitizers |
-| I/O | 834 verificações C (`test_io_c` 703 + schema 131), 149 CSV + 103 JSON + 82 schema em Lua; NUL, int64, associação JSON, UTF-8, dialeto estrito e schema reproduzidos; 39 mutantes detectados | Windows/sanitizers e modo tolerante opcional |
+| Core numérico | Parser/formatter/astype/CSV/JSON migrados; correções Windows hexadecimal/decimal entregues; astype: 856 checks Linux e Valgrind; campanha numérica/I/O: 44 mutantes detectados | Ampliar arredondamento nos consumidores, consolidar registro Windows após as correções e executar sanitizers |
+| I/O | NUL, int64, associação JSON, UTF-8, dialeto estrito e schema completo memória/arquivo implementados; regressões de OOM/cleanup e baselines aprovadas no Valgrind | Revisar diagnóstico de arquivo/readers, consolidar evidência Windows/sanitizers; schema parcial/defaults/modo tolerante dependem de decisão |
 | Inferência Lua | Entradas mapeadas no review de I/O | Decidir divergências, sem uniformizar por conveniência |
 | Datetime | Parser e astype estritos C/Lua implementados em 25/09; build Windows histórica passou | Integração restante, 11 componentes escalares + 11 de série, formatter e semana ISO |
 | Relacional | Reescrita inicial; três defeitos corrigidos; 68 casos passaram no seguimento de 25/09 | Contratos count/pivot/join, migração dos casos antigos e mutações |
@@ -596,7 +611,8 @@ tolerante exigem decisão própria antes de qualquer extensão.
 
 A implementação R1 tem regressões C para gramática, limites, subnormal,
 underflow, overflow e preservação de saída. Isso não é teste da futura migração
-ABI. Não houve nova cobertura Windows ou sanitizers para esta frente.
+ABI. Correções Windows implementadas; o registro da execução completa após
+ambas e a validação com sanitizers ainda não constam deste checkpoint.
 As evidências específicas ficam nos reviews [I/O](IO_REVIEW.md) e
 [aritmético](CORE_ARITHMETIC_REVIEW.md), sem manter outra fila de execução.
 
