@@ -2,10 +2,10 @@
 
 [Documentação](README.md) · [Contrato](CONTRACT.md) · [Arquitetura](ARCHITECTURE.md)
 
-Revisão documental: 2026-10-08. Base: `373396d`; parser, formatadores,
+Revisão documental: 2026-10-08. Base: `ac695d1` com regressões locais; parser, formatadores,
 consumidores CSV/JSON, transporte C/Lua e schema completo implementados.
 Correções Windows hexadecimal (`699acc6`) e decimal (`f93d4a5`) entregues;
-falta consolidar o registro da execução completa após essas correções.
+execução completa Windows após ambas consolidada no checkpoint.
 Objetivo imediato: preservar valores e tornar confiáveis
 os contratos e sua verificação nos anéis 0–3. Esta fila substitui a anterior;
 não aprova automaticamente mudanças de contrato ainda abertas.
@@ -34,15 +34,16 @@ comentário ou suíte verde isolada significa certificação geral.
   Isso não certifica consumidores, memória ou restante do core.
 - O parser R1 tem contrato de saída obrigatória, consumo integral, gramática
   explícita e diagnósticos testados. Leitores e formatadores foram migrados;
-  restam ampliar regressões de arredondamento nos consumidores e consolidar
-  a evidência Windows e de sanitizers.
+  regressões de arredondamento nos consumidores e execução Windows ampliadas.
+  Sanitizers e auditoria das famílias restantes continuam abertos.
 - A licença MIT já existe. Distribuição e política de compatibilidade seguem
   abertas; não recriar a tarefa de adicionar licença.
 
 ## Ordem de trabalho
 
-1. Ampliar a verificação dos consumidores numéricos (R1/R6), consolidar o
-   registro Windows após as correções já entregues e executar sanitizers.
+1. Após a consolidação Windows registrada abaixo, reconstruir a paridade de
+   ponta a ponta (R6), conforme solicitado pelo mantenedor. Executar sanitizers
+   em ambiente compatível e ampliar as famílias numéricas restantes.
 2. Consolidar verificação de transporte/layouts (R2) e revisar diagnóstico
    de arquivo/readers (R3). Schema completo já implementado; schema parcial,
    defaults e modo tolerante exigem decisão própria.
@@ -59,8 +60,8 @@ ampliar datetime. Não exige reescrever todo o motor para corrigir um mecanismo.
 ## R1 — Conversão numérica e defesas do core
 
 **Estado:** parser, `astype`, formatadores e consumidores CSV/JSON migrados.
-Correções hexadecimal/decimal para Windows entregues; verificação ampliada dos
-consumidores, registro Windows completo e sanitizers permanecem abertos.
+Correções hexadecimal/decimal e regressões dos consumidores verificadas no
+Windows. Registro completo no checkpoint; sanitizers e demais famílias abertos.
 
 Direção solicitada em 28/09: preservar os anéis e estabilizar as convenções
 de biblioteca C. O [padrão C/Lua consolidado](CODING_STYLE.md) usa o C11 já selecionado
@@ -78,8 +79,8 @@ Decisão aprovada em 28/09: formato/inferência no leitor, conversão no core;
 causas por código no core e contexto/mensagem na camada externa. `astype`
 tolerante distingue elemento inconversível de falha operacional, sem converter
 OOM em NA. [Contrato](CONTRACT.md#conversao-numerica-responsabilidades).
-Próximo passo: estender os casos de arredondamento hexadecimal/decimal aos
-consumidores CSV/JSON/astype e consolidar a evidência por plataforma.
+Casos de arredondamento hexadecimal/decimal estendidos aos consumidores
+CSV/JSON/astype no Windows; repetir a matriz ampliada no Linux e sob sanitizers.
 
 [Matriz de comparação](IO_REVIEW.md#r1-proposta): gramática atual versus
 destino, mudanças de compatibilidade e categorias de falha. A migração de astype e inferência CSV distingue falha operacional de texto
@@ -88,8 +89,8 @@ seguimento abaixo; transporte também implementado. Lacunas restantes estão em 
 Suporte explícito a hexadecimal aprovado em 28/09. A
 [gramática detalhada](IO_REVIEW.md#r1-gramatica) registra as regras aprovadas
 e casos de aceitação/rejeição; hexadecimal inteiro é aceito em i64 e f64. A
-suíte C cobre limites, subnormais e underflow; a inferência CSV ainda precisa
-de verificação dirigida.
+suíte C cobre limites, subnormais e underflow; a inferência CSV agora tem
+regressões dirigidas de arredondamento, sem encerrar sua auditoria geral.
 
 Conferir as quatro funções `smaug_parse_i64/f64` e `_cstr`, seus headers,
 `astype` e wrappers CSV. Validar o mapeamento dos códigos nos consumidores.
@@ -110,8 +111,7 @@ de ambiente explicitadas. [Review](IO_REVIEW.md#core).
 
 **Estado:** transporte de NUL, comprimentos dos marcadores CSV e identificação
 da ABI implementados em 29/09. Ponte int64 e cleanup da adaptação de leitura
-também implementados; consolidação de evidência Windows e inferência geral
-ainda abertas.
+também implementados; layouts C/FFI Windows e inferência geral ainda abertos.
 
 Entregas implementadas (critérios de verificação no checkpoint):
 
@@ -199,6 +199,11 @@ posição de erro, saída preservada e todos os consumidores C/FFI/Lua atualizad
 
 **Estado:** reconstrução incremental iniciada; auditoria geral aberta.
 
+Próxima frente solicitada pelo mantenedor após consolidar Windows: refazer a
+paridade de ponta a ponta, revisando o significado dos 15 eixos, verificadores,
+fontes de evidência, falhas/skips e geração de `PARITY_REPORT.md`. A aprovação
+textual dos verificadores atuais não encerra essa reconstrução.
+
 Padrão C/Lua consolidado em 28/09: regras, contrato mínimo, critérios de revisão
 e registro de exceções ficam em CODING_STYLE. Falta configurar baseline e gates
 de análise estática C, lint LuaJIT e formatação; o verificador atual cobre apenas
@@ -259,9 +264,78 @@ reorganização documental.
 
 
 <a id="checkpoint"></a>
-## Checkpoint de retomada — 2026-10-08
+## Checkpoint de retomada — 2026-10-09
 
-**Estado atual — correção decimal:** base `f93d4a5`, posterior à correção
+**Reconstrução da paridade ponta a ponta:** a campanha Windows desta árvore
+executou `python scripts/parity/runner.py` depois de recompilar uma DLL limpa
+em diretório próprio. Os 15 eixos produziram 1.125 registros (839 PASS, 273
+OBSERVED, 12 REVIEW e 1 FAIL), sem erro de infraestrutura. Assinaturas C,
+símbolos FFI, layouts compilados, I/O, lifecycle e representação textual
+passaram; as revisões permanecem separadas para contratos abertos e análise
+lexical. O único FAIL é reproduzível em
+`Series<bool>:where(cond, other_series)`: ao selecionar `false` da série
+alternativa, o wrapper entrega uma tabela ao construtor bool. Esse caso já
+estava registrado na matriz R4/R7 e agora é um resultado executável em
+`docs/PARITY_REPORT.json`/`docs/PARITY_REPORT.md`, com exit 1 deliberado.
+
+O probe relacional foi alinhado à ordenação de chaves exigida pelos testes
+existentes (`1,2`, `false,true`, `a,b`), e o retorno tabular de
+`CategoricalSeries:value_counts` foi verificado como contrato intencional. O
+runner registra a biblioteca efetivamente carregada, comandos, ferramentas,
+hashes e limites em `build/parity/<timestamp>/`; sua saída é regenerável e não
+substitui a suíte completa. Próxima ação: repetir a mesma campanha no Linux,
+comparar divergências de plataforma e só então corrigir/fechar o FAIL de
+`where` em R4/R7.
+
+**Consolidação Windows — consumidores numéricos:** base `ac695d1` com alterações
+locais nos testes e na auditoria; produção, contratos e ABI preservados.
+Windows 11 x64 (build 26200), GCC MSYS2 UCRT64 15.2.0 Rev13,
+LuaJIT 2.1.ROLLING, UCRT do sistema 10.0.26100.9444. A execução de
+`scripts/build.ps1 -SkipManifest` passou nos 14 executáveis C (12 plain, um
+wrap e stress) e nas 21 suítes Lua, sem skip de Lua. Contagens dirigidas:
+astype 1.808, I/O C 2.778, schema C 129; Lua constructors 232, CSV 185,
+JSON 129 e schema 82. `/dev/full` permanece skip explícito no Windows.
+
+A matriz C usa expectativas binary64 exatas, quatro modos e ambos os sinais;
+cobre fronteira subnormal/normal, empate em zero, sticky bit, underflow decimal,
+overflow e zero textual negativo. CSV/JSON são exercitados em memória e arquivo,
+com inferência e schema completo. Verifica dtype, shape, máscara, valor/sinal,
+diagnóstico, ausência de tabela parcial e preservação do modo do caller.
+CSV sem schema preserva o token inconversível como texto; schema/JSON rejeitam
+com causa, e JSON continua rejeitando hexadecimal. Astype verifica valores,
+NA, fonte intacta e continuidade depois do elemento inconversível.
+
+`python scripts/audit_windows_regressions.py` recompila astype, I/O e schema
+com `-O2 -Wall -Wextra -Wpedantic -Werror`, sem `-fwrapv`, diretamente com os
+fontes e ligados à DLL; as seis baselines passaram com as contagens acima.
+A DLL mantém as flags de produção de `build.ps1`, incluindo `-O2 -fwrapv`;
+a compilação direta dos fontes usa as flags estritas acima.
+As quatro suítes Lua dirigidas passaram com o módulo efetivamente carregado
+identificado pela API Windows: `build/smaug.dll`, SHA-256
+`b16d72d1fa52675fc722f1c259c65af89463db0bd1d8f94a16974929c29ce3c5`.
+Sete mutações compiláveis foram detectadas, cada uma tanto por I/O quanto por
+astype: retorno ao hexadecimal da UCRT, perda de sticky bit/sinal e remoção,
+sinal, modos e zero literal da correção decimal. Nenhuma sobrevivente.
+Essas sete mutações Windows são uma campanha própria, não se somam à contagem
+histórica de 44 mutantes Linux. A campanha concluiu nativamente, fora da
+sandbox, com `status: PASS` (o TEMP da sandbox negou a criação das fixtures).
+Comando reproduzível e escopo no guia de build. Evidências locais ficam em
+`build/windows-regressions/`, incluindo comandos, saídas, versões e hashes de
+fontes, headers, testes e scripts. Guard de estilo passou nos 35 arquivos.
+
+Limites: esta matriz ampliada ainda não foi executada no Linux; ASan/UBSan
+continuam pendentes. Paridade permanece indicador, sem validação independente
+de todos os layouts C/FFI. Coverage e manifest não foram regenerados nesta etapa.
+Blocos POSIX de locale da thread e de injeção em `newlocale`/`uselocale` são
+excluídos por compilação no Windows; a contagem Windows não equivale à Linux.
+`PARITY_REPORT.md` foi regenerado automaticamente pelo build, sem revisão dos
+critérios ou dos verificadores; seus resultados não são o gate desta campanha.
+Próxima frente: reconstruir a paridade de ponta a ponta conforme R6.
+
+**Histórico anterior à consolidação Windows:** os relatos abaixo identificam
+as respectivas árvores e ambientes; limitações antigas não substituem o estado acima.
+
+**Histórico — correção decimal:** base `f93d4a5`, posterior à correção
 hexadecimal `699acc6`. O mantenedor trouxe a correção do underflow decimal
 prematuro na UCRT. A revisão local confirmou tratamento do sinal textual,
 quatro modos, zero literal e saída preservada em erro. `test_astype` passou
@@ -271,7 +345,7 @@ blocos pendentes. Uma simulação temporária de `strtod_l` retornando zero sem
 errno passou 856 checks e interceptou 49 conversões. A divergência decimal
 anterior sob Valgrind está resolvida para esta suíte. Runtimes ASan/UBSan
 continuam ausentes; não há novo log Windows completo nesta revisão.
-Os relatos abaixo são históricos e não substituem este estado atual.
+Os relatos seguintes também são históricos; a consolidação Windows acima é o estado atual.
 
 **Avanço R6 — auditoria reproduzível:** `scripts/audit_numeric_regressions.py`
 agora mantém o wrapper de `strtod_l` em uma baseline separada. Ele força zero
@@ -601,8 +675,8 @@ tolerante exigem decisão própria antes de qualquer extensão.
 
 | Frente | Já conferido | Falta para avançar |
 |---|---|---|
-| Core numérico | Parser/formatter/astype/CSV/JSON migrados; correções Windows hexadecimal/decimal entregues; astype: 856 checks Linux e Valgrind; campanha numérica/I/O: 44 mutantes detectados | Ampliar arredondamento nos consumidores, consolidar registro Windows após as correções e executar sanitizers |
-| I/O | NUL, int64, associação JSON, UTF-8, dialeto estrito e schema completo memória/arquivo implementados; regressões de OOM/cleanup e baselines aprovadas no Valgrind | Revisar diagnóstico de arquivo/readers, consolidar evidência Windows/sanitizers; schema parcial/defaults/modo tolerante dependem de decisão |
+| Core numérico | Parser/formatter/astype/CSV/JSON migrados; correções Windows e regressões ampliadas nos consumidores verificadas; evidências Linux anteriores preservadas | Executar matriz ampliada no Linux/sanitizers; auditar famílias restantes |
+| I/O | NUL, int64, associação JSON, UTF-8, dialeto estrito e schema completo memória/arquivo implementados; baselines Valgrind anteriores e regressões numéricas Windows diretas/DLL registradas | Revisar diagnóstico de arquivo/readers e executar sanitizers; schema parcial/defaults/modo tolerante dependem de decisão |
 | Inferência Lua | Entradas mapeadas no review de I/O | Decidir divergências, sem uniformizar por conveniência |
 | Datetime | Parser e astype estritos C/Lua implementados em 25/09; build Windows histórica passou | Integração restante, 11 componentes escalares + 11 de série, formatter e semana ISO |
 | Relacional | Reescrita inicial; três defeitos corrigidos; 68 casos passaram no seguimento de 25/09 | Contratos count/pivot/join, migração dos casos antigos e mutações |
@@ -611,8 +685,8 @@ tolerante exigem decisão própria antes de qualquer extensão.
 
 A implementação R1 tem regressões C para gramática, limites, subnormal,
 underflow, overflow e preservação de saída. Isso não é teste da futura migração
-ABI. Correções Windows implementadas; o registro da execução completa após
-ambas e a validação com sanitizers ainda não constam deste checkpoint.
+ABI. Correções Windows e execução completa após ambas registradas acima;
+a validação com sanitizers permanece pendente.
 As evidências específicas ficam nos reviews [I/O](IO_REVIEW.md) e
 [aritmético](CORE_ARITHMETIC_REVIEW.md), sem manter outra fila de execução.
 

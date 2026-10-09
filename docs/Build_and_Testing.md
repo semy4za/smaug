@@ -50,6 +50,24 @@ bash scripts/build.sh --skip-stress --skip-manifest
 
 Sem flags, build.sh inclui stress, Lua, parity e regeneração do manifesto.
 
+### Paridade ponta a ponta
+
+```bash
+python scripts/parity/runner.py       # Windows e Linux
+# ou
+python3 scripts/parity/runner.py      # Linux
+```
+
+O runner recompila a DLL/.so em `build/parity/<timestamp>/`, confirma qual
+biblioteca o LuaJIT carregou, executa os 15 eixos e grava
+[`PARITY_REPORT.json`](PARITY_REPORT.json) e [`PARITY_REPORT.md`](PARITY_REPORT.md).
+Também compila verificações C de assinaturas/layout e registra versões,
+comandos, hashes e limitações por execução. Exit 0 cobre PASS/REVIEW/OBSERVED;
+exit 1 indica divergência de comportamento e exit 2 indica erro de
+infraestrutura ou evidência incompleta. REVIEW aparece separado e não é
+convertido em PASS. O relatório é um gate de paridade, não substitui a suíte
+completa, sanitizers, Valgrind ou cobertura.
+
 <a id="section-so-cobertura"></a>
 
 ### Só cobertura
@@ -118,6 +136,34 @@ Na retomada de schema, conferir explicitamente `test_schema` e
 `io/test_schema.lua` na saída, com código de saída zero e sem skip de Lua.
 O build Windows e o carregamento da DLL pelo frontend precisam ser executados
 na plataforma; resultados Linux não encerram essa pendência.
+
+### Regressões numéricas e consumidores no Windows
+
+```powershell
+python scripts/audit_windows_regressions.py
+```
+
+Exige Windows nativo, GCC/UCRT64, LuaJIT e Windows PowerShell no PATH. Executa
+`build.ps1 -SkipManifest`, confere o inventário C/Lua e recompila astype, I/O e
+schema com `-O2 -Wall -Wextra -Wpedantic -Werror`, diretamente com os fontes e
+como consumidores da DLL. Os testes C verificam os quatro modos de
+arredondamento; os casos Lua usam nearest e verificam também a tradução para
+Series/DataSet. O caminho da DLL usada pelo namespace FFI é obtido do módulo
+Windows que contém `smaug_abi_version`, comparado com `build/smaug.dll` e
+associado ao SHA-256 dessa biblioteca.
+
+Sete mutações em cópia temporária removem ou corrompem os fixes hexadecimal e
+decimal. Cada uma precisa compilar e ser rejeitada tanto por I/O quanto por
+astype, com saída de asserção e exit code 1. Falha de compilação, timeout,
+crash ou ausência de checks não contam como detecção. Os fontes de produção
+permanecem intactos; hashes de entrada são conferidos ao terminar.
+
+Comandos, saídas e relatório JSON ficam em `build/windows-regressions/`.
+`report.json` só recebe `status: PASS` após todas as etapas. O relatório inclui
+HEAD, alterações locais, hashes, ferramentas, skips e limitações. A execução
+de paridade acionada pelo build continua informativa e regenera seu relatório;
+não certifica a ABI nem encerra a revisão dos 15 eixos. A campanha não executa
+ASan/UBSan ou Valgrind e não substitui a auditoria Linux de OOM/ownership.
 
 ---
 

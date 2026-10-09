@@ -6,3 +6,4 @@ cov/
 *.gcno
 *.gcov
 .vscode
+__pycache__/

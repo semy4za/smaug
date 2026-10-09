@@ -645,4 +645,23 @@ end
 -- =====================================================================
 -- FIM DOS TESTES
 -- =====================================================================
+do
+    local source = smaug.Series({
+        "0x1.fffffffffffffp-1023", "-0x1.fffffffffffffp-1023", "0x1p-1074",
+        "1e-400", "-1e-400", "-0e-9999", smaug.NA, "2.0",
+    }, "string")
+    local converted = source:astype("float64")
+    check(converted._dtype == "float64" and converted:len() == 8, "astype rounding shape/dtype")
+    for row_index, expected in ipairs({0x1p-1022, -0x1p-1022, 0x1p-1074}) do
+        check(converted:get(row_index) == expected and not converted:is_null(row_index),
+              "astype rounding exact boundary and mask")
+    end
+    check(converted:is_null(4) and converted:is_null(5) and converted:is_null(7),
+          "astype rounding underflow and source NA")
+    check(converted:get(6) == 0 and 1 / converted:get(6) == -math.huge,
+          "astype rounding negative zero")
+    check(converted:get(8) == 2 and source:get(4) == "1e-400",
+          "astype rounding following row and source preserved")
+end
+
 print(string.format("OK — %d checks passaram (Series: constructors, f64, i64, bool, aritmética, lifecycle, map)", passed_checks))

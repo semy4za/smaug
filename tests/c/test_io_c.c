@@ -19,6 +19,33 @@
 #include <assert.h>
 #include <math.h>
 #include <float.h>
+#include <fenv.h>
+
+/* Valores esperados sao constantes binary64, independentes do parser/libc.
+ * Zero em uma entrada nao zero significa UNDERFLOW; infinito significa OVERFLOW. */
+static const struct {
+    const char *token;
+    int hexadecimal;
+    int literal_zero;
+    double expected[4];
+} rounding_cases[] = {
+    {"0x1.fffffffffffffp-1023", 1, 0,
+     {DBL_MIN, 0x0.fffffffffffffp-1022, DBL_MIN, 0x0.fffffffffffffp-1022}},
+    {"-0x1.fffffffffffffp-1023", 1, 0,
+     {-DBL_MIN, -0x0.fffffffffffffp-1022, -0x0.fffffffffffffp-1022, -DBL_MIN}},
+    {"0x1.00000000000008001p0", 1, 0,
+     {0x1.0000000000001p0, 1.0, 0x1.0000000000001p0, 1.0}},
+    {"0x0.8p-1074", 1, 0, {0.0, 0.0, DBL_TRUE_MIN, 0.0}},
+    {"-0x0.8p-1074", 1, 0, {0.0, 0.0, 0.0, -DBL_TRUE_MIN}},
+    {"1e-400", 0, 0, {0.0, 0.0, DBL_TRUE_MIN, 0.0}},
+    {"-1e-400", 0, 0, {0.0, 0.0, 0.0, -DBL_TRUE_MIN}},
+    {"1e-324", 0, 0, {0.0, 0.0, DBL_TRUE_MIN, 0.0}},
+    {"-1e-324", 0, 0, {0.0, 0.0, 0.0, -DBL_TRUE_MIN}},
+    {"0e-9999", 0, 1, {0.0, 0.0, 0.0, 0.0}},
+    {"-0e-9999", 0, 1, {-0.0, -0.0, -0.0, -0.0}},
+    {"1e400", 0, 0, {INFINITY, INFINITY, INFINITY, INFINITY}},
+    {"-1e400", 0, 0, {-INFINITY, -INFINITY, -INFINITY, -INFINITY}}
+};
 
 static int passed_checks = 0;
 static int failed_checks = 0;
@@ -2068,7 +2095,137 @@ static void test_file_write_flush_failure(void) {
 #endif
 }
 
+static void check_rounding_table(smaug_table_t *table, const char *token,
+                                 double expected, const char *reason, int inferred_csv) {
+    if (reason && !inferred_csv) {
+        CHECK(table && table->error && strstr(table->error, reason),
+              "rounding consumer: strict reader preserves numeric reason");
+        CHECK(table && table->nrows == 0 && table->ncols == 0 && !table->columns,
+              "rounding consumer: failure publishes no partial table");
+    } else {
+        int valid_shape = table && !table->error && table->nrows == 2 &&
+                          table->ncols == 1 && table->columns;
+        CHECK(valid_shape, "rounding consumer: complete shape");
+        if (valid_shape) {
+            if (reason) {
+                CHECK(table->columns[0].str != NULL,
+                      "rounding consumer: CSV infers string on unrepresentable number");
+                if (table->columns[0].str) {
+                    size_t length = 0;
+                    const char *actual = smaug_str_get(table->columns[0].str, 0, &length);
+                    CHECK(actual && length == strlen(token) && memcmp(actual, token, length) == 0,
+                          "rounding consumer: CSV preserves original token");
+                }
+            } else {
+                CHECK(table->columns[0].f64 != NULL, "rounding consumer: float64 dtype");
+                if (table->columns[0].f64) {
+                    smaug_status_t status = SMG_ERR_ARGUMENT;
+                    double actual = smaug_f64_get(table->columns[0].f64, 0, &status);
+                    CHECK(status == SMG_OK && actual == expected &&
+                          !!signbit(actual) == !!signbit(expected),
+                          "rounding consumer: exact value, sign and valid mask");
+                }
+            }
+            CHECK(column_is_null(table, 0, 1), "rounding consumer: missing row stays NA");
+        }
+    }
+    smaug_table_free(table);
+}
+
+static int write_rounding_fixture(const char *path, const char *document, size_t length) {
+    FILE *stream = fopen(path, "wb");
+    CHECK(stream != NULL, "rounding consumer: open fixture");
+    if (!stream) {
+        return 0;
+    }
+    size_t written = fwrite(document, 1, length, stream);
+    int close_status = fclose(stream);
+    CHECK(written == length && close_status == 0, "rounding consumer: complete fixture");
+    return written == length && close_status == 0;
+}
+
+static void test_numeric_consumer_rounding(void) {
+    const int modes[] = {FE_TONEAREST, FE_TOWARDZERO, FE_UPWARD, FE_DOWNWARD};
+    const smaug_schema_field_t field = {"v", 1, SMAUG_DTYPE_FLOAT64, 1};
+    const smaug_schema_t schema = {&field, 1};
+    const char *paths[] = {"build/test_rounding.csv", "build/test_rounding.json"};
+    int original_rounding = fegetround();
+    CHECK(original_rounding != -1, "rounding consumer: save caller mode");
+    if (original_rounding == -1) {
+        return;
+    }
+    for (size_t mode_index = 0; mode_index < 4; mode_index++) {
+        int selected = fesetround(modes[mode_index]);
+        CHECK(selected == 0, "rounding consumer: select mode");
+        if (selected != 0) {
+            continue;
+        }
+        for (size_t case_index = 0;
+             case_index < sizeof(rounding_cases) / sizeof(rounding_cases[0]); case_index++) {
+            const char *token = rounding_cases[case_index].token;
+            double expected = rounding_cases[case_index].expected[mode_index];
+            const char *reason = NULL;
+            if (isinf(expected)) {
+                reason = "OVERFLOW";
+            } else if (expected == 0.0 && !rounding_cases[case_index].literal_zero) {
+                reason = "UNDERFLOW";
+            }
+            for (int json_format = 0; json_format < 2; json_format++) {
+                char document[160];
+                int length = snprintf(document, sizeof(document),
+                    json_format ? "[{\"v\":%s},{\"v\":null}]" : "v\n%s\nNA\n", token);
+                CHECK(length > 0 && (size_t)length < sizeof(document),
+                      "rounding consumer: fixture capacity");
+                if (length <= 0 || (size_t)length >= sizeof(document)) {
+                    continue;
+                }
+                const char *format_reason = json_format && rounding_cases[case_index].hexadecimal
+                    ? "SYNTAX" : reason;
+                if (!write_rounding_fixture(paths[json_format], document, (size_t)length)) {
+                    continue;
+                }
+                for (int from_file = 0; from_file < 2; from_file++) {
+                    for (int with_schema = 0; with_schema < 2; with_schema++) {
+                        int previous_failures = failed_checks;
+                        smaug_table_t *table;
+                        if (json_format) {
+                            if (from_file) {
+                                table = with_schema
+                                    ? smaug_read_json_schema(paths[1], &schema)
+                                    : smaug_read_json(paths[1]);
+                            } else {
+                                table = with_schema
+                                    ? smaug_read_json_mem_schema(document, (size_t)length, &schema)
+                                    : smaug_read_json_mem(document, (size_t)length);
+                            }
+                        } else if (from_file) {
+                            table = with_schema
+                                ? smaug_read_csv_schema(paths[0], NULL, &schema)
+                                : smaug_read_csv(paths[0], NULL);
+                        } else {
+                            table = with_schema
+                                ? smaug_read_csv_mem_schema(document, (size_t)length, NULL, &schema)
+                                : smaug_read_csv_mem(document, (size_t)length, NULL);
+                        }
+                        check_rounding_table(table, token, expected, format_reason,
+                                             !json_format && !with_schema);
+                        CHECK(fegetround() == modes[mode_index],
+                              "rounding consumer: preserves caller mode");
+                        if (failed_checks != previous_failures) {
+                            fprintf(stderr, "token=%s mode=%d json=%d file=%d schema=%d\n",
+                                    token, modes[mode_index], json_format, from_file, with_schema);
+                        }
+                    }
+                }
+                CHECK(remove(paths[json_format]) == 0, "rounding consumer: remove fixture");
+            }
+        }
+    }
+    CHECK(fesetround(original_rounding) == 0, "rounding consumer: restore caller mode");
+}
+
 int main(void) {
+    test_numeric_consumer_rounding();
     test_json_utf8_validation();
     test_csv_nul_markers_and_writer_names();
     test_io_nul_transport();

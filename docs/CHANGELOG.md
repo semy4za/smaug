@@ -6,6 +6,40 @@ Marcos resumidos. Decisões vigentes ficam no [contrato](CONTRACT.md);
 checkpoints e pendências ficam no roadmap. Resultados de uma execução não
 certificam versões posteriores.
 
+## 2026-10-09 — Reconstrução da paridade ponta a ponta
+
+Substituído o parity report textual por um runner único e reproduzível em
+Python/LuaJIT: ele recompila a biblioteca em diretório isolado, identifica a
+DLL/.so carregada, executa os eixos de dtype, Series/DataSet, FFI, relacional,
+I/O, nulidade, lifecycle, textualidade e reentrância, e compila probes C de
+assinaturas e layout. O resultado estruturado fica em
+`docs/PARITY_REPORT.json`, com a versão Markdown derivada no mesmo passo;
+comandos, hashes, ferramentas e limites ficam registrados por execução.
+
+A execução Windows desta árvore produziu 1.125 registros: 839 PASS, 273
+OBSERVED, 12 REVIEW e 1 FAIL, sem erro de infraestrutura. O status é FAIL por uma
+divergência reproduzida: `Series<bool>:where(cond, other_series)` converte uma
+tabela em vez de preservar `false`; o caso já estava documentado em R4/R7 e
+permanece explícito para a próxima correção. O agrupamento por dtype e o
+contrato de `CategoricalSeries:value_counts` foram conferidos contra os testes
+existentes e deixaram de gerar falsos positivos. O comando é
+`python scripts/parity/runner.py` (exit 1 para divergência, 2 para erro de
+infraestrutura). O checkpoint do roadmap registra o próximo passo Linux.
+
+## 2026-10-08 — Consolidação Windows das regressões numéricas
+
+Execução Windows/UCRT64 consolidada após os fixes hexadecimal/decimal: 14
+executáveis C e 21 suítes Lua aprovados. Regressões verificam arredondamento
+exato, sinal, máscaras e erros em astype e leitores CSV/JSON, em memória/arquivo,
+com inferência/schema. Baselines otimizadas com warnings estritos passaram com
+fontes diretos e DLL; quatro suítes Lua confirmaram a DLL efetivamente carregada.
+
+Nova auditoria reproduzível registra ferramentas, comandos, hashes e skips;
+sete mutações compiláveis foram detectadas por I/O e astype, sem sobreviventes.
+Produção, contrato e ABI preservados. ASan/UBSan e execução Linux da matriz
+ampliada continuam pendentes. Próxima frente solicitada: reconstruir a paridade
+de ponta a ponta, sem usar o relatório atual como certificação.
+
 ## 2026-10-08 — Alinhamento dos resumos de retomada
 
 Resumos R1–R3 e fila do roadmap alinhados às entregas já registradas: migração

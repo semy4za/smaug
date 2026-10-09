@@ -386,6 +386,35 @@ static void test_float_grammar(void) {
     }
 }
 
+static void check_astype_rounding(const char *token, smaug_status_t expected_status,
+                                  double expected_value) {
+    smaug_series_str_t *source = smaug_str_create(3);
+    OK(source != NULL, "rounding astype: allocate source");
+    OK(smaug_str_set(source, 0, token, strlen(token)) == SMG_OK &&
+       smaug_str_set_null(source, 1) == SMG_OK &&
+       smaug_str_set(source, 2, "2.0", 3) == SMG_OK, "rounding astype: prepare source");
+    smaug_series_f64_t *converted = smaug_str_to_f64(source);
+    OK(converted && converted->size == 3, "rounding astype: complete shape");
+    smaug_status_t status = SMG_ERR_ARGUMENT;
+    double actual = smaug_f64_get(converted, 0, &status);
+    if (expected_status == SMG_OK) {
+        OK(status == SMG_OK && actual == expected_value &&
+           !!signbit(actual) == !!signbit(expected_value),
+           "rounding astype: exact value, sign and valid mask");
+    } else {
+        OK(status == SMG_NULL_VALUE, "rounding astype: unrepresentable element becomes NA");
+    }
+    OK(smaug_f64_is_null(converted, 1), "rounding astype: source NA preserved");
+    actual = smaug_f64_get(converted, 2, &status);
+    OK(status == SMG_OK && actual == 2.0, "rounding astype: following element preserved");
+    size_t length = 0;
+    const char *original = smaug_str_get(source, 0, &length);
+    OK(original && length == strlen(token) && memcmp(original, token, length) == 0,
+       "rounding astype: source bytes preserved");
+    smaug_f64_free(converted);
+    smaug_str_free(source);
+}
+
 static void test_float_rounding_modes(void) {
     int original_rounding = fegetround();
     OK(original_rounding != -1, "modo de arredondamento disponível");
@@ -461,11 +490,14 @@ static void test_float_rounding_modes(void) {
             OK(smaug_parse_f64_status(slice, strlen(token), &output) == expected_status
                && output == expected_value,
                "decimal slice: underflow dirigido respeita sinal e preserva saida em erro");
+            check_astype_rounding(token, expected_status, expected_value);
         }
         OK(smaug_parse_f64_cstr_status("0e-9999", &output) == SMG_OK
            && output == 0.0 && !signbit(output), "zero textual positivo preservado");
         OK(smaug_parse_f64_cstr_status("-0e-9999", &output) == SMG_OK
            && output == 0.0 && signbit(output), "zero textual negativo preservado");
+        check_astype_rounding("0e-9999", SMG_OK, 0.0);
+        check_astype_rounding("-0e-9999", SMG_OK, -0.0);
         OK(fegetround() == modes[mode_index], "parser preserva modo do caller");
     }
     OK(fesetround(original_rounding) == 0, "restaura modo de arredondamento");
@@ -475,6 +507,7 @@ static void test_float_rounding_modes(void) {
 static void check_hex_rounding(const char *token, double expected_value) {
     smaug_status_t expected_status = expected_value == 0.0 ? SMG_ERR_UNDERFLOW :
         (isinf(expected_value) ? SMG_ERR_OVERFLOW : SMG_OK);
+    check_astype_rounding(token, expected_status, expected_value);
     double output = 77.0;
     OK(smaug_parse_f64_cstr_status(token, &output) == expected_status &&
        output == (expected_status == SMG_OK ? expected_value : 77.0),

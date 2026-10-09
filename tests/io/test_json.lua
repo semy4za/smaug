@@ -276,4 +276,35 @@ do
     check(roundtrip:col(valid):get(1) == valid, "JSON Lua preserva U+10FFFF")
 end
 
+do
+    local schema = smaug.Schema({{name = "v", dtype = "float64", nullable = true}})
+    for unused_index, case in ipairs({
+        {"5e-324", 0x1p-1074}, {"-5e-324", -0x1p-1074}, {"-0e-9999", -0.0},
+    }) do
+        local document = '[{"v":' .. case[1] .. '},{"v":null}]'
+        for unused_reader, dataset in ipairs({
+            smaug.read_json_mem(document), smaug.read_json_mem(document, {schema = schema}),
+        }) do
+            local column = dataset:col("v")
+            check(dataset:nrows() == 2 and column._dtype == "float64", "JSON rounding shape/dtype")
+            check(column:get(1) == case[2] and not column:is_null(1), "JSON rounding exact value")
+            check(column:is_null(2), "JSON rounding NA preserved")
+            if case[2] == 0 then
+                check(1 / column:get(1) == -math.huge, "JSON rounding negative zero")
+            end
+        end
+    end
+    for unused_index, case in ipairs({
+        {"1e-400", "UNDERFLOW"}, {"-1e-400", "UNDERFLOW"},
+        {"0x1p-1074", "SYNTAX"},
+    }) do
+        for unused_reader, options in ipairs({{}, {schema = schema}}) do
+            local document = '[{"v":' .. case[1] .. '}]'
+            local succeeded, message = pcall(smaug.read_json_mem, document, options)
+            check(not succeeded and tostring(message):find(case[2], 1, true),
+                  "JSON rounding preserves error and format grammar")
+        end
+    end
+end
+
 print(string.format("OK — %d checks passaram (I/O JSON + unicode)", passed_checks))

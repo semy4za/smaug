@@ -521,4 +521,39 @@ do
     check(tostring(error_message):match("OOM") == nil,       "12.30 não mente dizendo OOM")
 end
 
+-- Expectativas binary64 exatas: nao usar tolerancia absoluta para subnormais.
+do
+    local schema = smaug.Schema({{name = "v", dtype = "float64", nullable = true}})
+    local cases = {
+        {"0x1.fffffffffffffp-1023", 0x1p-1022},
+        {"-0x1.fffffffffffffp-1023", -0x1p-1022},
+        {"0x1p-1074", 0x1p-1074},
+        {"-0x1p-1074", -0x1p-1074},
+        {"-0e-9999", -0.0},
+    }
+    for unused_index, case in ipairs(cases) do
+        local document = "v\n" .. case[1] .. "\nNA\n"
+        for unused_reader, dataset in ipairs({
+            smaug.read_csv_mem(document), smaug.read_csv_mem(document, {schema = schema}),
+        }) do
+            local column = dataset:col("v")
+            check(dataset:nrows() == 2 and column._dtype == "float64", "CSV rounding shape/dtype")
+            check(column:get(1) == case[2] and not column:is_null(1), "CSV rounding exact value")
+            check(column:is_null(2), "CSV rounding NA preserved")
+            if case[2] == 0 then
+                check(1 / column:get(1) == -math.huge, "CSV rounding negative zero")
+            end
+        end
+    end
+    for unused_index, token in ipairs({"1e-400", "-1e-400"}) do
+        local document = "v\n" .. token .. "\nNA\n"
+        local column = smaug.read_csv_mem(document):col("v")
+        check(column._dtype == "string" and column:get(1) == token and column:is_null(2),
+              "CSV underflow preserves text under inference")
+        local succeeded, message = pcall(smaug.read_csv_mem, document, {schema = schema})
+        check(not succeeded and tostring(message):find("UNDERFLOW", 1, true),
+              "CSV schema underflow remains error")
+    end
+end
+
 print(string.format("OK — %d checks passaram (I/O CSV + dados reais)", passed_checks))
