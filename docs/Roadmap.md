@@ -705,7 +705,7 @@ retirar com justificativa); só retirar depois de validar o substituto.
 | R02 — datetime | Semana de 2023-01-01 retornou 53 em vez de 52; extração em série anulou ano -2 | R5: esperado único independente, ano separado de status |
 | R03 — OOM | Contagem de checks não enumera alocações e rollback de cada caminho | R6: registrar ponto atingido e estado após cada falha |
 | R04 — cobertura | Relatório histórico, coleta parcial e headers executáveis fora da visão podem ocultar lacunas | R6: dados brutos íntegros, árvore e ferramenta identificadas |
-| R05 — exclusões | Guards classificados como inalcançáveis foram atingidos por entradas públicas | R6: manter triagem individual do inventário de exclusões |
+| R05 — exclusões | Guards classificados como inalcançáveis foram atingidos por entradas públicas | R6: manter triagem individual de cada `COV-EXCL-BR` |
 | R06 — parity | Campo extra no cdef f64 e global mutável escaparam; fonte ausente virou texto vazio | R2/R6: layout compilado, inventário completo e falha explícita |
 | R07 — executores | PASS textual pode ocultar exit não zero; skips e eixos parity não barram aprovação | R6: testar executor, não só os testes |
 | R08 — fixtures/manifest | Uso das quatro fixtures de cotações não demonstrado; manifest omite csv/json/txt | R6: origem, licença, hashes e expectativas externas; Python já entrou no manifest |
@@ -774,10 +774,11 @@ enquanto as reduções centrais o convertem em `nil`; a semana ISO de
 wrapper. Esses pontos são evidência dirigida, não certificação do restante da
 API.
 
-Comentários de exclusões precisam de prova por ramo, conforme o
-[inventário](TEST_SUITE_EXCLUSIONS_REVIEW.md). Referências numéricas antigas
-no código continuam rastreáveis na versão Git indicada abaixo. Não renumerar
-comentários mecanicamente nem interpretar marcações históricas como garantias.
+Comentários de exclusões precisam de prova por ramo, conforme o Contrato 10 e o
+relatório de cobertura da árvore medida. Referências numéricas antigas no
+código continuam rastreáveis apenas na versão Git indicada abaixo. Não
+renumerar comentários mecanicamente nem interpretar marcações históricas como
+garantias; `COV-EXCL-BR` é uma decisão local do ramo, não um selo de correção.
 O cabeçalho do teste relacional foi atualizado para este roadmap e deixou de
 fixar a revisão antiga de coverage. Nenhuma asserção ou lógica foi alterada.
 

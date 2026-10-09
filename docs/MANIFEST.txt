@@ -1,6 +1,6 @@
 # Smaug -- MANIFEST de integridade
 # Gerado por scripts/make_manifest.sh (o .ps1 delega a este)
-# Arvore: ac695d1 + alteracoes nao commitadas
+# Arvore: 8bb7123 + alteracoes nao commitadas
 # Formato: <sha256>  <linhas>  <caminho>
 #
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855       0  ./.env.example
@@ -23,7 +23,6 @@ dc924f2774531da7dc5b7b7524b157171cb50e3c9ad7493a8d0aa0522cee08c3     863  ./docs
 e2a6db1eee83cff3fcbf1381fd4fca0385a976c06da79771fc9053e54384e29c     976  ./docs/PARITY_REPORT.md
 e8c03eb0a403ec0b324a9231e46761f869de0664dd735a5ea42ca41079eb218f      43  ./docs/README.md
 95983dcdd1dbc15a70cf1bd7790a90abddf10eb5ad4c886fde62797647cdfeca     823  ./docs/Roadmap.md
-8056d1548df05badec8d96e6f5f47fe474a2115ff0299832dd7432850df1462b     277  ./docs/TEST_SUITE_EXCLUSIONS_REVIEW.md
 1c0dffabd0cbb35bde12574fb176f15b389f7b7d7f47b7b4812d32bf8836dce6     210  ./docs/USER_GUIDE.md
 1722e1a5806e185b2f934f2a66ec5193cc6ab8dc5a03837be43be80628c8fb86      39  ./include/smaug.h
 ffd3e17523503071a9cf18ad53b381b1451cdde8bb9548fa8d234d0a823ffba8      76  ./include/smaug_astype.h
@@ -158,4 +157,4 @@ cee6ba5f9bd5ff212a9bee7ac6335c568e90d940fd6cf7e472d24eac14e2558a     545  ./test
 0e98ed9a9770f88f9ecd29a367d869aeadc19394cbfd84add9db366cda01f032     751  ./tests/series/test_str.lua
 62cdcabbcd4ddba62923df87eeac47570d5f2ca5762e7caa0f7ad228615e41a1     361  ./tests/series/test_window.lua
 #
-# total de arquivos: 154
+# total de arquivos: 153

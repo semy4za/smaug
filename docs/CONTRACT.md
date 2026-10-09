@@ -588,8 +588,10 @@ OOM e falhas de I/O são alcançáveis por falha ambiental. Ausência de injeç�
 gap de teste, não impossibilidade. Limites próximos de `SIZE_MAX` exigem prova
 de domínio e testes dos cálculos sem buffers fictícios ou alocações gigantes.
 Cada exclusão exige condição/ramo, evidência e decisão; não exclui a linha
-inteira. A cobertura bruta permanece visível. O inventário
-[inventário de exclusões](TEST_SUITE_EXCLUSIONS_REVIEW.md) é triagem, não aprovação.
+inteira. A cobertura bruta permanece visível. O relatório gerado em
+[COVERAGE.md](COVERAGE.md) mostra a medição e as exclusões aplicadas, mas não
+aprova suas justificativas; a decisão de cada débito pertence ao roadmap da
+frente correspondente.
 
 **Justificativa não se copia entre dtypes.** Cada uma vale para o código que está
 embaixo dela — e o código diverge.

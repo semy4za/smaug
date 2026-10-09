@@ -26,6 +26,12 @@ existentes e deixaram de gerar falsos positivos. O comando é
 `python scripts/parity/runner.py` (exit 1 para divergência, 2 para erro de
 infraestrutura). O checkpoint do roadmap registra o próximo passo Linux.
 
+O inventário histórico de exclusões de cobertura foi incorporado ao Contrato
+10, ao relatório gerado de coverage e ao R6 do roadmap. O arquivo independente
+estava preso a linhas e a um HEAD antigos; as regras duráveis permanecem, e a
+medição atual continua sendo a fonte por árvore. A entrada correspondente foi
+removida do manifesto; a próxima execução do build deve regenerar seus hashes.
+
 ## 2026-10-08 — Consolidação Windows das regressões numéricas
 
 Execução Windows/UCRT64 consolidada após os fixes hexadecimal/decimal: 14

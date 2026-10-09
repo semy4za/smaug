@@ -252,7 +252,8 @@ Resultado gerado em `docs/COVERAGE.md`.
 O relatório identifica a árvore medida; não certifica a árvore atual. Branches
 não são MC/DC. Exclusões exigem prova do ramo específico: OOM sem injeção não
 é impossibilidade, e overflow de tamanho precisa ser analisado por operação.
-Ver [inventário](TEST_SUITE_EXCLUSIONS_REVIEW.md) e [R6](Roadmap.md#r6).
+Ver o [Contrato 10](CONTRACT.md#section-contrato-10-guard-de-fronteira-publica-se-testa-cov-excl-br-e-para-o-inalcancavel),
+o [relatório gerado](COVERAGE.md) e [R6](Roadmap.md#r6).
 O script usa listas próprias, omite headers executáveis e pode perder resultados
 de gcov; essas limitações estão abertas. Também substitui temporariamente a
 biblioteca em build/ e a remove ao final: recompile antes de usar a API depois.
