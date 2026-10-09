@@ -15,7 +15,8 @@
 
 </details>
 
-Estas regras se aplicam ao código, aos testes e aos exemplos novos ou revisados.
+Estas regras se aplicam ao código, aos testes, aos exemplos e à documentação
+novos ou revisados.
 A migração dos arquivos existentes é incremental; este documento não declara
 que toda a base já foi convertida.
 
@@ -32,7 +33,7 @@ não representa uma nova certificação de ausência de UB ou de vazamentos.
 <a id="bases"></a>
 ## Bases e alcance
 
-Consolidado em 2026-09-28 e revisado em 2026-09-30. Este é o padrão do Smaug
+Consolidado em 2026-09-28 e revisado em 2026-10-09. Este é o padrão do Smaug
 para código novo e trechos
 revisados em C e Lua. A arquitetura de anéis permanece: regras de linguagem
 não transferem inferência ou políticas de arquivo para o núcleo. A adoção na
@@ -234,6 +235,58 @@ contrato. Referências históricas continuam rastreáveis no roadmap.
 
 ## Construção e chamadas Lua
 
+### Inferência e dtype explícito
+
+Na construção de Series e de colunas de DataSet, usar inferência por padrão.
+Informar `dtype` quando ele expressar uma intenção que os valores não mostram, como criar `float64`
+a partir de inteiros ou definir o tipo de uma série vazia ou só de NA.
+Essa convenção também se aplica aos exemplos, tutoriais, guias e demais
+trechos de código na documentação; omitir o tipo redundante torna a chamada
+mais legível e apresenta o uso habitual da API.
+
+Exemplos de uso habitual, com tipo inferido dos valores:
+
+```lua
+local smaug = require("smaug")
+
+local active_series = smaug.Series({true, false})
+local quantity_series = smaug.Series({1, 2, 3})
+local label_series = smaug.Series({"first", "second"})
+```
+
+Usar dtype explícito nos casos abaixo, pois sua omissão mudaria o tipo desejado:
+
+```lua
+local smaug = require("smaug")
+
+-- Queremos float64; estes valores seriam inferidos como int64.
+local measurement_series = smaug.Series({1, 2, 3}, "float64")
+-- Queremos bool, embora ainda não existam valores para inferir o tipo.
+local empty_series = smaug.Series({}, "bool")
+-- Queremos int64, embora todos os elementos sejam nulos.
+local all_null_series = smaug.Series({smaug.NA, smaug.NA}, "int64")
+```
+
+Na implementação atual, listas vazias ou só de NA assumem `string` quando o
+dtype é omitido; os valores continuam nulos. Declarar outro tipo nesses casos
+é necessário para expressar a intenção do chamador.
+
+Nos testes, manter dtype explícito quando o cenário precisa exercitar um tipo
+específico; omiti-lo nos testes de inferência. Exemplos que ensinam o próprio
+argumento `dtype` também podem explicitá-lo, identificando essa finalidade.
+A adoção nos arquivos existentes é incremental, durante sua revisão, sem
+remover tipos necessários nem alterar o comportamento ou a cobertura dos testes.
+Conferir a intenção de cada chamada em revisão; o guard léxico atual não
+verifica esta convenção.
+
+No código interno, preservar dtype explícito quando ele garante o tipo de
+saída de uma operação, inclusive para resultados vazios ou só de NA. Valores
+dinâmicos e cdata int64 também podem exigir o tipo explícito; não presumir que
+a inferência reconhece todo valor aceito pelo construtor tipado. Em Lua,
+`1.0` é inferido como `int64`; a escrita decimal não força `float64`.
+
+### Forma das chamadas
+
 Nos testes e exemplos de uso, importe o módulo como
 `local smaug = require("smaug")` e acesse os construtores
 pelo módulo. Não crie aliases de construtores, mesmo que o alias seja `Series`
@@ -263,13 +316,14 @@ quando necessário para evitar recursão no despacho.
 ```lua
 local smaug = require("smaug")
 
-local sales_series = smaug.Series({100, 200, 300}, "int64")
+local sales_series = smaug.Series({100, 200, 300})
 local sales_dataset = smaug.DataSet({
-    {"sales", {100, 200, 300}, "int64"},
+    {"sales", {100, 200, 300}},
 })
 local total_sales = sales_series:sum()
 local first_sale = sales_dataset["sales"]:get(1)
 
+-- A string deve ser interpretada como datetime; sem dtype seria string.
 local datetime_series = smaug.Series({"2026-01-01"}, "datetime")
 local year_series = datetime_series.dt:year()
 ```

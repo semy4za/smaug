@@ -21,7 +21,7 @@ package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 -- 1. Series:at / iat — acesso escalar (indexação e chamada)
 -- ================================================================
 
-local nullable_integer_series = smaug.Series({10, 20, smaug.NA, 40}, "int64")
+local nullable_integer_series = smaug.Series({10, 20, smaug.NA, 40})
 
 -- indexação s.at[i]
 check(nullable_integer_series.at[1] == 10,                "at[1] = 10")
@@ -48,7 +48,7 @@ do
     check(error_message:find("<Series", 1, true) ~= nil,
                                            "12.9 s:iat(3) descreve a Series sem conteúdo")
     -- a classe toda: nenhum método de acesso vaza dados na mensagem
-    local string_series = smaug.Series({"aaa", "bbb", "ccc"}, "string")
+    local string_series = smaug.Series({"aaa", "bbb", "ccc"})
     for unused_index, case in ipairs({
         { "get",      function() string_series:get(string_series) end },
         { "set",      function() string_series:set(string_series, "x") end },
@@ -63,7 +63,7 @@ do
 end
 
 -- string e datetime
-local string_series = smaug.Series({"x", "y"}, "string")
+local string_series = smaug.Series({"x", "y"})
 check(string_series.at[1] == "x",              "at[1] string = x")
 
 -- fora dos limites → erro
@@ -177,7 +177,7 @@ do
     -- (exercita `if (len>0)` e o ramo `total>0 ? total : INIT`).
     local allocated_string_series_3 = smaug.Series({smaug.NA, smaug.NA}, "string"); allocated_string_series_3:set(1, ""); allocated_string_series_3:set_null(2)
     local allocated_string_series_4 = smaug.Series({smaug.NA, smaug.NA}, "string"); allocated_string_series_4:set_null(1); allocated_string_series_4:set(2, "")
-    local boolean_series = smaug.Series({true, false}, "bool")
+    local boolean_series = smaug.Series({true, false})
     local conditional_series_9 = allocated_string_series_3:where(boolean_series, allocated_string_series_4)   -- [ea[1]="", eb[2]=""]
     check(conditional_series_9:get(1) == "" and conditional_series_9:get(2) == "" and not conditional_series_9:is_null(1) and not conditional_series_9:is_null(2),
           "10.6b: where str '' válida len==0 / total==0")
@@ -190,7 +190,7 @@ do
 
     -- não-regressão: int64 <= 2^53 intacto
     local integer_series = smaug.Series({10, 20}, "int64")
-    local boolean_series_2 = smaug.Series({true, false}, "bool")
+    local boolean_series_2 = smaug.Series({true, false})
     check(integer_series:where(boolean_series_2, integer_series):get(1) == 10,     "10.6b: where i64<=2^53 intacto")
     check(smaug.Series.ifelse(boolean_series_2, integer_series, integer_series):get(1) == 10, "10.6b: ifelse i64<=2^53 intacto")
 
@@ -199,7 +199,7 @@ do
     check(not pcall(function() return allocated_integer_series:where(condition, wrong) end),
           "10.6b: where dtype divergente → erro visível")
     -- falha visível: cond de tamanho diferente
-    check(not pcall(function() return allocated_integer_series:where(smaug.Series({true}, "bool"), fallback_series) end),
+    check(not pcall(function() return allocated_integer_series:where(smaug.Series({true}), fallback_series) end),
           "10.6b: where cond tamanho errado → erro visível")
 end
 
@@ -255,8 +255,8 @@ end
 -- colunas, drop_duplicates→contagem errada.
 -- ===================================================================
 do
-    local string_series_2  = smaug.Series({"a", "b", "c"}, "string")
-    local integer_series = smaug.Series({1, 2}, "int64")
+    local string_series_2  = smaug.Series({"a", "b", "c"})
+    local integer_series = smaug.Series({1, 2})
 
     -- 12.38.1 — os cinco casos que aceitavam em silêncio agora erram
     check(not pcall(function() return string_series_2:take(integer_series) end),

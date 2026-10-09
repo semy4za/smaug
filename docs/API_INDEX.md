@@ -421,7 +421,7 @@ dictionary encoding: `_codes` (int 1-based), `_levels` (lista ordenada),
 **Factories:**
 
 ```lua
-Series.from_table({"SP","RJ","SP",NA,"MG"}, "categorical")    -- ordem de 1ª aparição
+smaug.Series({"SP","RJ","SP",smaug.NA,"MG"}, "categorical")    -- ordem de 1ª aparição
 Series.Categorical.from_table(arr, [name])
 Series.Categorical.from_codes(codes_arr, levels_arr, [name], [n])
 ```

@@ -6,6 +6,34 @@ Marcos resumidos. Decisões vigentes ficam no [contrato](CONTRACT.md);
 checkpoints e pendências ficam no roadmap. Resultados de uma execução não
 certificam versões posteriores.
 
+## 2026-10-09 — Foco da avaliação de dtype
+
+A pesquisa passa a priorizar ingestão, transformação, composição e exportação,
+equilibrando análise e código reutilizável. Construção literal de dados fica
+como caso auxiliar. Próxima avaliação parte de schema na entrada, colunas
+derivadas e Series existentes; sintaxe dos construtores continua em aberto.
+Checkpoint e parecer do estudo alinhados, sem mudança executável.
+
+## 2026-10-09 — Pesquisa da API de dtype
+
+Review comparativo de opções nomeadas, descritores de coluna e schema, com
+referências oficiais e 43 casos observados no Windows, incluindo a fixture de
+916 pedidos. Probe reproduzível em `scripts/audit_dtype_api.lua`; resultados
+e alternativas em `DTYPE_API_REVIEW.md`. Nenhuma sintaxe nova ou alteração de
+inferência foi aprovada nesta etapa.
+
+## 2026-10-09 — Convenção de dtype na construção de Series
+
+Adotada inferência por padrão em código, exemplos e documentação novos ou
+revisados. Dtype explícito expressa intenção não dedutível dos valores ou fixa
+o tipo exercitado por um teste; testes de inferência omitem o argumento.
+O guia de estilo registra exemplos e o fallback atual de listas vazias/só NA
+para string. Exemplos de primeiros passos/contrato/API e fixtures gerais de
+DataSet/seleção foram revisados; tipos necessários em produção, auditorias e
+testes dedicados foram preservados. As 21 suítes Lua passaram no Windows antes
+e depois, com saídas idênticas; guard de estilo e diff aprovados. Sem mudança
+de comportamento da biblioteca.
+
 ## 2026-10-09 — Reconstrução da paridade ponta a ponta
 
 Substituído o parity report textual por um runner único e reproduzível em

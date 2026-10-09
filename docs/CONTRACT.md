@@ -49,12 +49,12 @@ certifica seu cumprimento: evidências e gaps estão em
 local smaug = require("smaug")
 
 -- dtype INFERIDO quando omitido (do conteúdo)
-smaug.Series.from_table({1, 2, 3})     -- int64
-smaug.Series.from_table({1, 2, 3.5})   -- float64  (o fracionário promove)
+smaug.Series({1, 2, 3})     -- int64
+smaug.Series({1, 2, 3.5})   -- float64  (o fracionário promove)
 
 local payload = {
-    {"produto", {"caneta", "caderno", "régua"}, "string"},
-    {"qtd",     {10, 5, 8},                    "int64"},
+    {"produto", {"caneta", "caderno", "régua"}},
+    {"qtd",     {10, 5, 8}},
 }
 local ds = smaug.DataSet(payload)
 
@@ -126,7 +126,7 @@ liberada antes de repassar o erro, sem publicar DataSet parcial.
 local smaug = require("smaug")
 
 local payload = {
-    {"valor_str", {"1.5", "abc", smaug.NA, "3.0"}, "string"},
+    {"valor_str", {"1.5", "abc", smaug.NA, "3.0"}},
 }
 local ds = smaug.DataSet(payload)
 local f  = ds["valor_str"]:astype("float64")
@@ -240,7 +240,7 @@ string ISO em `fillna` continua pendência do Roadmap 12.16.
 local smaug = require("smaug")
 
 local payload = {
-    {"cidade", {"SP", "RJ", "MG"}, "string"},
+    {"cidade", {"SP", "RJ", "MG"}},
     {"vendas", {120, 85},          "float64"},
 }
 local ds = smaug.DataSet(payload)   -- erro
@@ -263,8 +263,8 @@ imediato — não existe estado intermediário desalinhado.
 local smaug = require("smaug")
 
 local payload = {
-    {"nome",  {"Ana", "Bruno", "Carol"}, "string"},
-    {"ativo", {true, false, true},       "bool"},
+    {"nome",  {"Ana", "Bruno", "Carol"}},
+    {"ativo", {true, false, true}},
 }
 local ds = smaug.DataSet(payload)
 
@@ -293,7 +293,7 @@ ser explícitos por operação. Gaps conhecidos não se tornam suporte por esta 
 local smaug = require("smaug")
 
 local payload = {
-    {"cidade", {"SP", "RJ", "MG", "SP"}, "string"},
+    {"cidade", {"SP", "RJ", "MG", "SP"}},
     {"vendas", {10,   20,   30,   40}},
 }
 local ds   = smaug.DataSet(payload)
@@ -351,12 +351,12 @@ Toda API pública Lua usa índices 1-based (convenção Lua). A conversão
 local smaug = require("smaug")
 
 local a = smaug.DataSet({
-    {"cliente", {"A", smaug.Series.NA, "B"}, "string"},
-    {"valor",   {10, 20, 30},               "int64"},
+    {"cliente", {"A", smaug.Series.NA, "B"}},
+    {"valor",   {10, 20, 30}},
 })
 local b = smaug.DataSet({
-    {"cliente", {"A", "B"}, "string"},
-    {"cidade",  {"SP", "RJ"}, "string"},
+    {"cliente", {"A", "B"}},
+    {"cidade",  {"SP", "RJ"}},
 })
 
 a:join(b, "cliente")          -- erro

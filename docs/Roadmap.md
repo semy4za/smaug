@@ -165,6 +165,16 @@ opções e limitações refletidas na API. [Review](IO_REVIEW.md).
 
 **Estado:** consumidores mapeados; decisões de uniformização pendentes.
 
+**Pesquisa de ergonomia — 2026-10-09:** comparação de dtype nomeado, descritores
+de coluna e schema em [DTYPE_API_REVIEW](DTYPE_API_REVIEW.md). Estudo equilibra
+scripts de análise e código reutilizável, conforme preferência do mantenedor.
+`luajit scripts/audit_dtype_api.lua` registrou 43 observações Windows, incluindo
+fluxo com a fixture de 916 pedidos, cdata/NA e declarações hoje ignoradas.
+Semântica e produção preservadas; nenhuma sintaxe nova aprovada. Próxima etapa:
+avaliar ingestão, transformação e composição antes de escolher a sintaxe de
+construção; dados literais são casos auxiliares, conforme redirecionamento
+registrado no checkpoint. A comparação Linux de paridade segue pendente.
+
 Confrontar `Series`/`from_table`, `from_dict`, `full`, `map` normal/categórico,
 `explode`, `ifelse`, `where` e `mask`. Separar inferência de dtype, validação de
 dtype já fixado e conversão explícita. Não substituir um pelo outro apenas
@@ -265,6 +275,52 @@ reorganização documental.
 
 <a id="checkpoint"></a>
 ## Checkpoint de retomada — 2026-10-09
+
+**Ponto atual da discussão — prioridade de uso:** o mantenedor redirecionou a
+pesquisa de dtype para **ingestão → transformação → composição → exportação**.
+Construir dados literais dentro do script é caso auxiliar de exemplos/testes,
+não o principal critério de ergonomia. Construção programática continua
+relevante para colunas derivadas, resultados de funções e dados externos/FFI.
+Equilibrar scripts de análise e código reutilizável dentro desses fluxos.
+
+**Retomar por aqui:** revisar o estudo [DTYPE_API_REVIEW](DTYPE_API_REVIEW.md)
+partindo da fixture de pedidos: declaração de tipos/schema na entrada,
+preservação de identificadores/precisão/NA, tipos de colunas calculadas,
+composição de Series existentes e saída. Comparar a utilidade das opções
+nomeadas nesses pontos antes de escolher a escrita dos construtores. As
+alternativas A/B/C permanecem material de pesquisa, sem escolha ou autorização
+de implementação. As referências externas informam escolhas próprias do Smaug;
+não determinam compatibilidade com pandas ou outra biblioteca.
+
+**Já disponível:** convenção de inferência por padrão e tipos explícitos quando
+necessários, aplicada aos exemplos/fixtures revisados; 21 suítes Lua Windows
+aprovadas antes/depois, com saídas idênticas; estudo e probe de 43 observações,
+incluindo 916 pedidos. Nenhuma nova sintaxe, coerção ou regra de inferência foi
+implementada. O bug de `where` bool e a campanha Linux de paridade continuam
+pendentes, separados desta discussão. Esta atualização é documental e não
+representa nova execução de testes.
+
+**Convenção de escrita — dtype:** aprovada inferência por padrão na construção
+de Series, inclusive em exemplos e documentação. Dtype explícito fica para
+intenções não dedutíveis dos valores e testes de um tipo específico; testes de
+inferência omitem o argumento. Regra e exemplos de uso e exceções registrados no
+[guia de estilo](CODING_STYLE.md#section-construcao-e-chamadas-lua), com adoção
+incremental. Conferido o código de inferência em `series/_factories.lua`,
+incluindo fallback string para listas vazias/só NA. Aplicação ampliada aos
+exemplos de GETTING_STARTED/CONTRACT/API_INDEX e às fixtures gerais de
+`tests/dataset/test_core.lua`, `test_io_support.lua` e
+`tests/series/test_selection.lua`. Preservados os tipos que fixam a saída das
+operações internas e os cenários dedicados a dtype, cdata, vazio e NA.
+
+Validação Windows sobre `8016e73` com mudanças locais, LuaJIT 2.1.1779665312:
+as 21 suítes `tests/**/test_*.lua` executadas individualmente com `luajit`
+passaram antes/depois com stdout/stderr e contagens idênticos. Usada a DLL
+existente em `build/smaug.dll`, sem recompilar C nesta revisão (SHA256
+`aef709528d98f08d7f5688b22721fafe3288ae6fa6e03fe3619f925c41f542d1`).
+Registros locais em `build/dtype-style-baseline.json` e
+`build/dtype-style-results.json`. `python scripts/check_test_style.py` passou
+nos 35 arquivos; `git diff --check` aprovado. Não houve nova execução de
+paridade ou sanitizers. A frente de paridade abaixo continua pendente.
 
 **Reconstrução da paridade ponta a ponta:** a campanha Windows desta árvore
 executou `python scripts/parity/runner.py` depois de recompilar uma DLL limpa

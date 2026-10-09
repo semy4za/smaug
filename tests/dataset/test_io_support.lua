@@ -42,29 +42,29 @@ check(not pcall(function() return source_dataset:at(1, 5) end),     "at col não
 -- ================================================================
 
 local source_dataset_2 = smaug.DataSet({
-    {"a", {1, 2, 3}, "int64"},
-    {"c", {7, 8, 9}, "int64"},
+    {"a", {1, 2, 3}},
+    {"c", {7, 8, 9}},
 })
 
 -- inserir no meio
-source_dataset_2:insert(2, "b", smaug.Series({4, 5, 6}, "int64"))
+source_dataset_2:insert(2, "b", smaug.Series({4, 5, 6}))
 check(table.concat(source_dataset_2:columns(), ",") == "a,b,c", "insert no meio: ordem a,b,c")
 check(source_dataset_2:at(1, "b") == 4,           "insert: valor correto")
 
 -- inserir no início
-source_dataset_2:insert(1, "z", smaug.Series({0, 0, 0}, "int64"))
+source_dataset_2:insert(1, "z", smaug.Series({0, 0, 0}))
 check(source_dataset_2:columns()[1] == "z",       "insert no início")
 
 -- inserir no fim (loc = ncols+1)
-source_dataset_2:insert(source_dataset_2:ncols() + 1, "w", smaug.Series({9, 9, 9}, "int64"))
+source_dataset_2:insert(source_dataset_2:ncols() + 1, "w", smaug.Series({9, 9, 9}))
 check(source_dataset_2:columns()[source_dataset_2:ncols()] == "w", "insert no fim")
 
 -- erros
-check(not pcall(function() source_dataset_2:insert(99, "x", smaug.Series({1,2,3}, "int64")) end),
+check(not pcall(function() source_dataset_2:insert(99, "x", smaug.Series({1,2,3})) end),
       "insert loc fora dos limites = erro")
-check(not pcall(function() source_dataset_2:insert(1, "a", smaug.Series({1,2,3}, "int64")) end),
+check(not pcall(function() source_dataset_2:insert(1, "a", smaug.Series({1,2,3})) end),
       "insert nome duplicado = erro")
-check(not pcall(function() source_dataset_2:insert(1, "novo", smaug.Series({1,2}, "int64")) end),
+check(not pcall(function() source_dataset_2:insert(1, "novo", smaug.Series({1,2})) end),
       "insert nrows incompatível = erro")
 
 -- ================================================================
@@ -72,8 +72,8 @@ check(not pcall(function() source_dataset_2:insert(1, "novo", smaug.Series({1,2}
 -- ================================================================
 
 local source_dataset_3 = smaug.DataSet({
-    {"x", {1, 2}, "int64"},
-    {"y", {"a", "b"}, "string"},
+    {"x", {1, 2}},
+    {"y", {"a", "b"}},
 })
 
 -- columns (default)
@@ -129,8 +129,8 @@ check(not pcall(function() smaug.DataSet.from_dict({}, "bad") end), "from_dict o
 -- ================================================================
 
 local source_dataset_4 = smaug.DataSet({
-    {"nome", {"Ana", "Bruno"}, "string"},
-    {"idade", {30, smaug.NA}, "int64"},
+    {"nome", {"Ana", "Bruno"}},
+    {"idade", {30, smaug.NA}},
 })
 local markdown_text = source_dataset_4:to_markdown()
 check(type(markdown_text) == "string",         "to_markdown → string")
@@ -151,7 +151,7 @@ check(dempty:to_markdown() == "",   "to_markdown vazio → string vazia")
 -- ================================================================
 
 local source_dataset_5 = smaug.DataSet({
-    {"a", {1, 2, 3, 4, 5}, "int64"},
+    {"a", {1, 2, 3, 4, 5}},
 })
 local formatted_text = source_dataset_5:to_string()
 check(type(formatted_text) == "string",        "to_string → string")
@@ -179,7 +179,7 @@ local floating_point_series = smaug.Series({3.14159265358979}, "float64")
 local function cellnum(source_series) return source_series:match("3%.%d+") end
 check(cellnum(source_dataset_7:to_string()) == cellnum(floating_point_series:to_string()),
       "11.5 float: DataSet e Series rendem o MESMO texto (%.6g canônico)")
-local source_dataset_8 = smaug.DataSet({ {"g", {"x","y","x"}, "string"}, {"v", {1,2,3}, "int64"} })
+local source_dataset_8 = smaug.DataSet({ {"g", {"x","y","x"}}, {"v", {1,2,3}} })
 local groupby_text = tostring(source_dataset_8:groupby("g"))
 check(groupby_text:find("^table:") == nil and groupby_text:find("groupby", 1, true) ~= nil,
       "11.2 DataSet.groupby proxy __tostring legível")

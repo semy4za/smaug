@@ -54,10 +54,14 @@ Importe o módulo e crie uma Series pelo construtor do Smaug:
 ```lua
 local smaug = require("smaug")
 
-local sales_series = smaug.Series({100, 200, 300}, "int64")
+local sales_series = smaug.Series({100, 200, 300})
 local first_sale = sales_series:get(1)
 local total_sales = sales_series:sum()
 ```
+
+O dtype é inferido dos valores, inclusive nas colunas de DataSet. Informe-o
+explicitamente quando precisar de outro tipo; listas vazias ou só de NA
+assumem `string` se o argumento for omitido.
 
 Os índices Lua começam em 1. Para funções e construtores, use ponto;
 para métodos de instância, dois-pontos.
@@ -68,8 +72,8 @@ Um DataSet reúne as colunas em uma estrutura tabular:
 local smaug = require("smaug")
 
 local sales_dataset = smaug.DataSet({
-    {"city", {"SP", "RJ", "SP"}, "string"},
-    {"sales", {100, 200, 300}, "int64"},
+    {"city", {"SP", "RJ", "SP"}},
+    {"sales", {100, 200, 300}},
 })
 local sales_series = sales_dataset["sales"]
 local totals_by_city = sales_dataset:groupby("city"):sum("sales")
@@ -88,7 +92,7 @@ string vazia ou erro de execução. A máscara de validade é separada dos dados
 ```lua
 local smaug = require("smaug")
 
-local nullable_sales = smaug.Series({100, smaug.NA, 300}, "int64")
+local nullable_sales = smaug.Series({100, smaug.NA, 300})
 local has_missing_sale = nullable_sales:is_null(2)
 ```
 

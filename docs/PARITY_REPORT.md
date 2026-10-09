@@ -11,7 +11,7 @@ Convenção de status:
 - 🟨 ausência sem registro — suspeita, requer revisão humana
 - 🟥 inconsistência clara — gap real
 
-Gerado em: 2026-10-09 03:14:48 UTC
+Gerado em: 2026-10-09 18:53:43 UTC
 
 ## Eixo 1 — Paridade de métodos entre dtypes
 
@@ -854,14 +854,14 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | `series/test_stat` | 139 | 51 | 10 | 3 | 10 | 2 | — |
 | `series/test_window` | 137 | 10 | 12 | 3 | 7 | 2 | — |
 | `series/test_predicates` | 175 | 9 | 61 | 3 | 20 | 2 | — |
-| `series/test_selection` | 73 | 7 | 8 | 6 | 8 | 2 | 1 |
+| `series/test_selection` | 73 | 7 | 6 | 3 | 5 | 2 | 1 |
 | `series/test_str` | 273 | 4 | 9 | 1 | 51 | — | — |
 | `series/test_dt` | 276 | 7 | 10 | 2 | 23 | 77 | — |
 | `series/test_categorical` | 86 | 5 | 1 | 3 | 5 | 1 | 35 |
-| `dataset/test_core` | 238 | 30 | 33 | 8 | 14 | — | 1 |
+| `dataset/test_core` | 238 | 30 | 11 | 8 | 4 | — | 1 |
 | `dataset/test_relational` | 13 | 42 | 92 | 6 | 75 | — | — |
 | `dataset/test_stat` | 117 | 14 | 18 | 1 | 17 | 4 | — |
-| `dataset/test_io_support` | 53 | 4 | 15 | 1 | 7 | — | — |
+| `dataset/test_io_support` | 53 | 4 | 3 | 1 | 4 | — | — |
 | `io/test_csv` | 149 | 5 | 7 | 2 | 12 | 4 | 1 |
 | `io/test_json` | 84 | 6 | 7 | 1 | 5 | 2 | — |
 | `io/test_schema` | 19 | 1 | 3 | 5 | 9 | — | — |
@@ -875,9 +875,9 @@ Quantos checks cada arquivo de teste tem, e quantas vezes cada dtype é menciona
 | dtype | menções |
 | :--- | :-: |
 | float64 | 302 |
-| int64 | 388 |
-| bool | 67 |
-| string | 311 |
+| int64 | 352 |
+| bool | 64 |
+| string | 295 |
 | datetime | 103 |
 | categorical | 40 |
 

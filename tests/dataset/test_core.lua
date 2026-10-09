@@ -19,7 +19,7 @@ end
 local source_dataset = smaug.DataSet({
     {"id",    {1, 2, 3, 4, 5}, "int64"},
     {"preco", {10, 20, 30, 40, 50}, "float64"},
-    {"qtd",   {1, 0, 5, 2, 0}, "int64"},
+    {"qtd",   {1, 0, 5, 2, 0}},
 }, "pedidos")
 check(source_dataset:nrows() == 5, "nrows")
 check(source_dataset:ncols() == 3, "ncols")
@@ -36,11 +36,11 @@ check(column_types.id == "int64" and column_types.preco == "float64", "dtypes")
 
 -- ---- add_column: validação de comprimento e duplicidade ----
 local succeeded = pcall(function()
-    source_dataset:add_column("ruim", smaug.Series({1, 2}, "int64"))
+    source_dataset:add_column("ruim", smaug.Series({1, 2}))
 end)
 check(not succeeded, "add_column rejeita comprimento diferente")
 local succeeded_2 = pcall(function()
-    source_dataset:add_column("id", smaug.Series({1,2,3,4,5}, "int64"))
+    source_dataset:add_column("id", smaug.Series({1,2,3,4,5}))
 end)
 check(not succeeded_2, "add_column rejeita nome duplicado")
 
@@ -59,7 +59,7 @@ check(descending_dataset["preco"]:get(1) == 50 and descending_dataset["id"]:get(
 local ascending_dataset = source_dataset:sort_by("qtd", true)
 check(ascending_dataset["qtd"]:get(1) == 0, "sort_by asc")
 -- sort_by com nulos na chave -> erro
-local source_dataset_2 = smaug.DataSet({{"k", {1, smaug.NA, 3}, "int64"}, {"v", {7,8,9}, "int64"}})
+local source_dataset_2 = smaug.DataSet({{"k", {1, smaug.NA, 3}}, {"v", {7,8,9}}})
 local succeeded_3 = pcall(function() return source_dataset_2:sort_by("k") end)
 check(not succeeded_3, "sort_by rejeita nulos na chave")
 
@@ -147,7 +147,7 @@ check(empty:nrows() == 0,               "dropna todo-null: dataset vazio")
 -- dropna no sort_by (resolve a promessa do erro 'use dropna primeiro')
 local source_dataset_6 = smaug.DataSet({
     {"val",   smaug.Series({3, smaug.NA, 2}, "float64")},   -- null na linha 2
-    {"label", smaug.Series({1, 2, 3}, "int64")},
+    {"label", smaug.Series({1, 2, 3})},
 }, "sorttest")
 local non_null_result_2 = source_dataset_6:dropna()
 local sorted_dataset_2 = non_null_result_2:sort_by("val")
@@ -260,7 +260,7 @@ check(source_dataset_11:has_column("margem"),              "newindex: encadeamen
 
 -- tamanho diferente deve falhar
 check(not pcall(function()
-    source_dataset_11["ruim"] = smaug.Series({1, 2}, "int64")
+    source_dataset_11["ruim"] = smaug.Series({1, 2})
 end), "newindex: rejeita série com tamanho diferente")
 
 -- =====================================================================
@@ -322,7 +322,7 @@ check(full_result_4._dtype == "bool", "Series.full: bool dtype bool")
 -- =====================================================================
 local source_dataset_13 = smaug.DataSet({
     {"preco",  {10.0, 20.0, 30.0, 40.0}, "float64"},
-    {"cidade", {"SP", "RJ", "SP", "MG"}, "string"},
+    {"cidade", {"SP", "RJ", "SP", "MG"}},
 })
 
 -- broadcast de boolean cria coluna bool de fato (H.6.1), não mais int64 (1/0)
@@ -410,8 +410,8 @@ check(empty_result:ncols() == source_dataset:ncols(),   "df[mask] zero linhas pr
 -- =====================================================================
 
 local source_dataset_14 = smaug.DataSet({
-    {"uf",     {"SP","RJ","MG","SP","RJ"}, "string"},
-    {"vendas", {10,  20,  30,  40,  50},   "int64"},
+    {"uf",     {"SP","RJ","MG","SP","RJ"}},
+    {"vendas", {10,  20,  30,  40,  50}},
     {"custo",  {1.0, 2.0, 3.0, 4.0, 5.0}, "float64"},
 })
 
@@ -431,7 +431,7 @@ check(assign_result:nrows() == 5,                   "assign: nrows inalterado")
 check(not source_dataset_14:has_column("margem"),        "assign: original imutável")
 
 -- adicionar coluna via Series direta
-local replacement_series = smaug.Series({1,2,3,4,5}, "int64")
+local replacement_series = smaug.Series({1,2,3,4,5})
 local assign_result_2 = source_dataset_14:assign("idx", replacement_series)
 check(assign_result_2:has_column("idx"),              "assign Series: coluna adicionada")
 check(assign_result_2:col("idx"):get(3) == 3,        "assign Series: valor correto")
@@ -450,7 +450,7 @@ check(source_dataset_14:col("vendas"):get(1) == 10,     "assign substituir: orig
 
 -- erro: tamanho errado
 local succeeded_4, unused_error = pcall(function()
-    source_dataset_14:assign("x", smaug.Series({1,2}, "int64"))
+    source_dataset_14:assign("x", smaug.Series({1,2}))
 end)
 check(not succeeded_4,                            "assign: erro tamanho errado")
 
@@ -466,8 +466,8 @@ check(unique_count.uf == 3,                         "nunique uf: 3")
 check(unique_count.vendas == 5,                     "nunique vendas: 5")
 
 local source_dataset_15 = smaug.DataSet({
-    {"k", {1,1,smaug.NA,2}, "int64"},
-    {"v", {"a","b","a","a"}, "string"},
+    {"k", {1,1,smaug.NA,2}},
+    {"v", {"a","b","a","a"}},
 })
 local unique_count_2 = source_dataset_15:nunique()
 check(unique_count_2.k == 2,                         "nunique com NA: 2 distintos (NA excluído)")
@@ -505,7 +505,7 @@ check(sum_result_2:get(1) == 10,                    "rolling(1): sem NA")
 check(sum_result_2:get(5) == 50,                    "rolling(1): [5]=50")
 
 -- NA dentro da janela: ignorado
-local source_dataset_16 = smaug.DataSet({{"v",{10,smaug.NA,30},"int64"}})
+local source_dataset_16 = smaug.DataSet({{"v",{10,smaug.NA,30}}})
 local sum_result_3 = source_dataset_16:rolling(2):sum("v")
 check(sum_result_3:is_null(1),                     "rolling com NA: [1]=NA (janela incompleta)")
 check(sum_result_3:get(2) == 10,                   "rolling com NA: [2]=10 (NA ignorado)")
@@ -538,9 +538,9 @@ check(source_dataset_17:rolling(2):mean("v"):dtype() == "float64", "8c ds rollin
 -- pivot
 -- ================================================================
 local source_dataset_18 = smaug.DataSet({
-    {"uf",    {"SP","SP","RJ","RJ","MG"}, "string"},
-    {"prod",  {"A", "B", "A", "B", "A"}, "string"},
-    {"val",   {10,  20,  30,  40,  50},   "int64"},
+    {"uf",    {"SP","SP","RJ","RJ","MG"}},
+    {"prod",  {"A", "B", "A", "B", "A"}},
+    {"val",   {10,  20,  30,  40,  50}},
 })
 local pivot_result = source_dataset_18:pivot("uf","prod","val")
 check(pivot_result:nrows() == 3,                  "pivot: 3 linhas (3 UFs)")
@@ -566,9 +566,9 @@ check(not succeeded_9,                            "pivot: argumento não-string"
 -- melt
 -- ================================================================
 local wide2 = smaug.DataSet({
-    {"uf",   {"SP","RJ"},    "string"},
-    {"2022", {100, 200},     "int64"},
-    {"2023", {150, 250},     "int64"},
+    {"uf",   {"SP","RJ"}},
+    {"2022", {100, 200}},
+    {"2023", {150, 250}},
 })
 
 -- melt básico
@@ -616,7 +616,7 @@ check(not succeeded_11,                            "melt: value_var inexistente"
 -- =====================================================================
 
 local source_dataset_19 = smaug.DataSet({
-    {"uf",    {"SP","RJ","SP","MG","RJ","SP"}, "string"},
+    {"uf",    {"SP","RJ","SP","MG","RJ","SP"}},
     {"v",     {10.0,20.0,30.0,40.0,50.0,20.0},"float64"},
 })
 local grouped_dataset = source_dataset_19:groupby("uf")
@@ -639,8 +639,8 @@ check(columns_new[2] == "valor",      "rename: ordem [2]=valor")
 
 -- pivot_table
 local source_dataset_20 = smaug.DataSet({
-    {"ano",  {2023,2023,2024,2024},    "int64"},
-    {"mes",  {"jan","fev","jan","fev"},"string"},
+    {"ano",  {2023,2023,2024,2024}},
+    {"mes",  {"jan","fev","jan","fev"}},
     {"val",  {10.0,20.0,30.0,40.0},   "float64"},
 })
 local pivoted_dataset = source_dataset_20:pivot_table("ano","mes","val","sum")
@@ -662,7 +662,7 @@ check(pivoted_dataset_2:col("jan"):get(ano2023) == 10.0, "pivot mean jan 2023=10
 
 -- stack
 local source_dataset_21 = smaug.DataSet({
-    {"id", {1,2},       "int64"},
+    {"id", {1,2}},
     {"a",  {10.0,20.0}, "float64"},
     {"b",  {30.0,40.0}, "float64"},
 })
@@ -681,13 +681,13 @@ check(unstacked_dataset:nrows() == 2,             "unstack nrows=2")
 check(unstacked_dataset:has_column("jan"),        "unstack: coluna jan")
 
 -- explode com tabelas Lua (uso via assign)
-local source_dataset_22 = smaug.DataSet({{"id", {1,2}, "int64"}})
+local source_dataset_22 = smaug.DataSet({{"id", {1,2}}})
 -- simula coluna com listas usando melt/map não é direto,
 -- mas explode pode ser testado via coluna string que representa lista
 -- Para este teste, validamos que explode funciona com valores escalares
 -- (caso degenerado: cada valor já é escalar → linha 1-para-1)
 local source_dataset_23 = smaug.DataSet({
-    {"id",  {10,20,30}, "int64"},
+    {"id",  {10,20,30}},
     {"val", {1.0,2.0,3.0}, "float64"},
 })
 local exploded_dataset = source_dataset_23:explode("val")
@@ -698,12 +698,12 @@ check(exploded_dataset:col("val"):get(1) == 1.0, "explode escalar: val[1]=1.0")
 -- 6.5 — DataSet:clone() (par de Series:clone; cópia profunda)
 -- ================================================================
 do
-    local source_dataset_24 = smaug.DataSet({{"a", {1, 2}, "int64"}, {"b", {"x", "y"}, "string"}})
+    local source_dataset_24 = smaug.DataSet({{"a", {1, 2}}, {"b", {"x", "y"}}})
     local cloned_series = source_dataset_24:clone()
     check(#cloned_series:to_dict().a == 2 and cloned_series:column("a"):get(1) == 1, "6.5 clone: valores copiados")
     check(table.concat(cloned_series._col_names, ",") == "a,b", "6.5 clone: nomes e ordem preservados")
     -- cópia PROFUNDA: mutar o clone (via update_column) não afeta o original
-    cloned_series:update_column("a", smaug.Series({99, 2}, "int64"))
+    cloned_series:update_column("a", smaug.Series({99, 2}))
     check(source_dataset_24:column("a"):get(1) == 1, "6.5 clone: profundo (original intacto)")
     check(cloned_series:column("a"):get(1) == 99, "6.5 clone: mutação isolada no clone")
     -- DataSet vazio
@@ -748,8 +748,8 @@ end
 
 do
     -- 12.12: chave desconhecida erra com sugestão (método OU coluna)
-    local source_dataset_24 = smaug.DataSet({ {"vendas", {10, 20}, "int64"},
-                                {"regiao", {"SP", "RJ"}, "string"} })
+    local source_dataset_24 = smaug.DataSet({ {"vendas", {10, 20}},
+                                {"regiao", {"SP", "RJ"}} })
     local function message(callback) local succeeded_12, error_message = pcall(callback); return tostring(error_message) end
 
     local error_message = message(function() return source_dataset_24:group_by("regiao") end)
